@@ -1,11 +1,11 @@
 {
-	"name": "student-app",
+	"name": "frontapp",
 	"version": "0.0.1",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
 		"preview": "vite preview",
-		"prepare": "husky",
+		"prepare": "svelte-kit sync || echo ''",
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"lint": "eslint .",
 		"test:unit": "vitest",
@@ -32,8 +32,6 @@
 		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
-		"@commitlint/cli": "^20.0.0",
-		"@commitlint/config-conventional": "^20.0.0",
 		"@eslint/compat": "^1.2.5",
 		"@eslint/js": "^9.22.0",
 		"@sveltejs/adapter-auto": "^6.0.0",
@@ -48,7 +46,6 @@
 		"eslint": "^9.22.0",
 		"eslint-plugin-svelte": "^3.0.0",
 		"globals": "^16.0.0",
-		"husky": "^8.0.3",
 		"playwright": "^1.53.0",
 		"publint": "^0.3.2",
 		"svelte": "^5.0.0",
