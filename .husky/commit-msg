@@ -1,5 +1,2 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
 # 実際の処理を _/commit-msg に委譲
 sh "$(dirname "$0")/_/commit-msg" "$@"
