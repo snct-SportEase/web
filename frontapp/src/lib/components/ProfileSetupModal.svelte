@@ -1,11 +1,15 @@
 <script>
   import { enhance } from '$app/forms';
+  import { goto } from '$app/navigation';
 
   /** @type {Array<{id: number, name: string}>} */
   export let classes = [];
 
   /** @type {import('./$types').ActionData} */
   export let form;
+
+  let isLoading = false;
+  let errorMessage = '';
 </script>
 
 <!-- モーダルの背景 -->

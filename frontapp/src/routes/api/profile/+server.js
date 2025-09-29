@@ -1,13 +1,15 @@
 import { fail, json, redirect } from '@sveltejs/kit';
 
 /** @type {import('./$types').RequestHandler} */
-export async function POST({ request, locals: { supabase, getSession } }) {
-  const session = await getSession();
-  if (!session) {
+export async function POST({ request, locals: { supabase, getUser } }) {
+  const user = await getUser();
+  if (!user) {
     return json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  const { displayName, classId } = await request.json();
+  const formData = await request.formData();
+  const displayName = formData.get('displayName');
+  const classId = formData.get('classId');
 
   // バリデーション
   if (!displayName || !classId) {
@@ -22,9 +24,10 @@ export async function POST({ request, locals: { supabase, getSession } }) {
       class_id: classId,
       is_profile_complete: true // プロフィールが完成したことをマーク
     })
-    .eq('id', session.user.id);
+    .eq('id', user.id);
 
   if (error) {
+    console.error('Error updating profile:', error);
     return json({ message: 'プロフィールの更新に失敗しました。' }, { status: 500 });
   }
 
