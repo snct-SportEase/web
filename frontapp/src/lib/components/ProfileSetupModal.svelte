@@ -22,19 +22,21 @@
     <!-- プロフィール更新フォーム -->
     <form 
       method="POST" 
-      action="/api/profile"
-      use:enhance={({ form, data, action, cancel }) => {
+      action="/dashboard?/updateProfile"
+      use:enhance={() => {
         isLoading = true;
         errorMessage = '';
 
         return async ({ result }) => {
-          if (result.type === 'success') {
-            await goto('/dashboard', { invalidateAll: true });
-          } else if (result.type === 'failure') {
-            errorMessage = result.data?.message || 'エラーが発生しました。';
-          } else {
-            errorMessage = '予期せぬエラーが発生しました。';
+          // 成功時はサーバーがリダイレクトを処理するため、クライアントでの遷移処理は不要。
+          // use:enhanceがリダイレクトを自動的に追従します。
+
+          // `result.type`が`failure`の場合のみ、クライアントでエラーメッセージを設定
+          if (result.type === 'failure') {
+            errorMessage = result.data?.message || 'プロフィールの更新に失敗しました。';
           }
+          
+          // フォーム送信が完了したら（成功・失敗問わず）ローディング状態を解除
           isLoading = false;
         };
       }}

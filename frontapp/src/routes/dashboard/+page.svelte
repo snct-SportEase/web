@@ -16,9 +16,13 @@
         method="POST" 
         use:enhance={() => {
           return async ({ result }) => {
+            console.log('Form submission result:', result);
+            // The result object appears to be the JSON body directly.
             if (result.type === 'success') {
-              // invalidateAll: true をつけて、全レイアウトのload関数を再実行させる
               await goto('/', { invalidateAll: true });
+            } else {
+              console.error('Logout failed:', result);
+              await applyAction(result);
             }
           };
         }}

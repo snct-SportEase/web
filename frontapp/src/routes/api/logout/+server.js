@@ -8,5 +8,5 @@ export async function POST({ locals: { supabase } }) {
     return json({ error: 'Logout failed' }, { status: 500 });
   }
 
-  return json({ success: true }, { status: 200 });
+  return json({ type: 'success', message: 'Logout successful' }, { status: 200 });
 }
