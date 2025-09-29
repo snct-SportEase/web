@@ -3,6 +3,8 @@
   import { applyAction, enhance } from '$app/forms';
 
   let { data } = $props();
+
+  console.log('data.profile', data.userProfile);
 </script>
 
 <div class="min-h-screen bg-gray-100 p-4 sm:p-8">
@@ -15,7 +17,8 @@
         use:enhance={() => {
           return async ({ result }) => {
             if (result.type === 'success') {
-              await goto('/');
+              // invalidateAll: true をつけて、全レイアウトのload関数を再実行させる
+              await goto('/', { invalidateAll: true });
             }
           };
         }}
@@ -32,9 +35,8 @@
     <div class="bg-white shadow-md rounded-lg p-6">
       <h2 class="text-xl font-semibold text-gray-700 mb-4">ようこそ</h2>
       {#if data.userProfile}
-        <p class="text-gray-600">こんにちは、{data.userProfile.name || data.user?.email}さん。</p>
-      {:else if data.user}
-        <p class="text-gray-600">こんにちは、{data.user.email}さん。</p>
+        <p class="text-gray-600">こんにちは、{data.userProfile.display_name}さん。</p>
+        <p class="text-gray-600">クラス: {data.userProfile.class.name}</p>
       {/if}
     </div>
   </div>

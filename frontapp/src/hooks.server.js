@@ -31,6 +31,11 @@ export const handle = async ({ event, resolve }) => {
   const user = await event.locals.getUser();
   const { url } = event;
 
+  // ログイン済みのユーザーがルートにアクセスした場合、ダッシュボードにリダイレクト
+  if (user && url.pathname === '/') {
+    throw redirect(303, '/dashboard');
+  }
+
   // 保護されたルートへのアクセス制御
   if (!user && url.pathname.startsWith('/dashboard')) {
     throw redirect(303, '/');
