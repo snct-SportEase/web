@@ -10,6 +10,7 @@ export const load = async ({ locals: { getUser } }) => {
   const user = await getUser();
   let userProfile = null;
   let classes = [];
+  console.log('user', user);
 
   if (user) {
     // ログインしているユーザーのプロフィールを単純に取得する
