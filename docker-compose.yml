@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  sportease-traefik:
+    image: traefik:v2.10
+    container_name: sportease-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - --entrypoints.local3300.address=:3300
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=${LETSENCRYPT_EMAIL}" # IMPORTANT: Change this in .env file!
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik Dashboard
+      - "3300:3300" # Frontapp"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - spotease-net
+
+  sportease-db:
+    image: mysql:8.0
+    container_name: sportease-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./backapp/db/migrations:/docker-entrypoint-initdb.d
+      - ./backapp/db/conf.d:/etc/mysql/conf.d
+    networks:
+      - spotease-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sportease-backapp:
+    build:
+      context: ./backapp
+    container_name: sportease-backapp
+    env_file:
+      - .env
+    depends_on:
+      sportease-db:
+        condition: service_healthy
+    networks:
+      - spotease-net
+    labels:
+       - "traefik.enable=true"
+       - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
+       - "traefik.http.routers.backend-https.entrypoints=websecure"
+       - "traefik.http.routers.backend-https.tls.certresolver=myresolver"
+       - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
+       - "traefik.http.routers.backend.entrypoints=local3300"
+       - "traefik.http.services.backend.loadbalancer.server.port=8080"
+
+  sportease-frontapp:
+    build:
+      context: ./frontapp
+    container_name: frontapp
+    depends_on:
+      - sportease-backapp
+    networks:
+      - spotease-net
+    labels:
+      - "traefik.enable=true"
+
+      # nitsche-gyouji.com用（80/443）
+      - "traefik.http.routers.frontend-http.rule=Host(`nitsche-gyouji.com`)"
+      - "traefik.http.routers.frontend-http.entrypoints=web"
+
+      # localhost:3300用
+      - "traefik.http.routers.frontend-localhost.rule=Host(`localhost`)"
+      - "traefik.http.routers.frontend-localhost.entrypoints=local3300"
+
+      # 2. HTTPからHTTPSへリダイレクトするミドルウェアを定義・適用
+      - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+      # 3. 既存のHTTPS用ルーター（nitsche-gyouji.comのみ）
+      - "traefik.http.routers.frontend-https.rule=Host(`nitsche-gyouji.com`)"
+      - "traefik.http.routers.frontend-https.entrypoints=websecure"
+      - "traefik.http.routers.frontend-https.tls.certresolver=myresolver"
+
+      # サービス設定（変更なし）
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+networks:
+  spotease-net:
+    driver: bridge
+
+volumes:
+  db-data:
