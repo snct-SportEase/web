@@ -10,6 +10,10 @@ declare global {
 				display_name: string | null;
 				class_id: number | null;
 				is_profile_complete: boolean;
+				roles?: Array<{
+					id: number;
+					name: string;
+				}>;
 				created_at: string;
 				updated_at: string;
 			} | null;
