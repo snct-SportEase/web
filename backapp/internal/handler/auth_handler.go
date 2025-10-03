@@ -83,6 +83,21 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
+	// ドメイン制限
+	allowedDomains := []string{"sendai-nct.jp", "sendai-nct.ac.jp"}
+	emailDomain := strings.Split(userInfo.Email, "@")[1]
+	isAllowed := false
+	for _, domain := range allowedDomains {
+		if emailDomain == domain {
+			isAllowed = true
+			break
+		}
+	}
+	if !isAllowed {
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=access_denied")
+		return
+	}
+
 	user, err := h.userRepo.GetUserByEmail(userInfo.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
