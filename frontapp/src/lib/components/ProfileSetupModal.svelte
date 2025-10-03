@@ -1,15 +1,69 @@
 <script>
-  import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
 
   /** @type {Array<{id: number, name: string}>} */
   export let classes = [];
 
-  /** @type {import('./$types').ActionData} */
-  export let form;
-
   let isLoading = false;
   let errorMessage = '';
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    isLoading = true;
+    errorMessage = '';
+
+    const formData = new FormData(event.target);
+    const displayName = formData.get('displayName');
+    const classId = formData.get('classId');
+    
+    if (!displayName || !classId) {
+      throw new Error('表示名とクラスを入力してください。');
+    }
+
+    try {
+      // セッションクッキーを取得
+      let sessionToken = null;
+      if (browser) {
+        console.log('All cookies:', document.cookie);
+        const cookies = document.cookie.split('; ');
+        const sessionCookie = cookies.find(row => row.startsWith('session_token='));
+        sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
+        console.log('Session token:', sessionToken);
+      }
+
+      if (!sessionToken) {
+        throw new Error('セッションが見つかりません。再度ログインしてください。');
+      }
+
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': `session_token=${sessionToken}`,
+        },
+        body: JSON.stringify({ 
+          display_name: displayName, 
+          class_id: parseInt(classId) 
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'プロフィールの更新に失敗しました。');
+      }
+
+      // 成功時はページをリロードしてユーザー情報を更新
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Profile update error:', error);
+      errorMessage = error.message;
+    } finally {
+      isLoading = false;
+    }
+  }
 </script>
 
 <!-- モーダルの背景 -->
@@ -20,27 +74,7 @@
     <p class="text-center text-gray-600">初回ログインありがとうございます。サービスを利用する前に、表示名とクラスを設定してください。</p>
 
     <!-- プロフィール更新フォーム -->
-    <form 
-      method="POST" 
-      action="/dashboard?/updateProfile"
-      use:enhance={() => {
-        isLoading = true;
-        errorMessage = '';
-
-        return async ({ result }) => {
-          // 成功時はサーバーがリダイレクトを処理するため、クライアントでの遷移処理は不要。
-          // use:enhanceがリダイレクトを自動的に追従します。
-
-          // `result.type`が`failure`の場合のみ、クライアントでエラーメッセージを設定
-          if (result.type === 'failure') {
-            errorMessage = result.data?.message || 'プロフィールの更新に失敗しました。';
-          }
-          
-          // フォーム送信が完了したら（成功・失敗問わず）ローディング状態を解除
-          isLoading = false;
-        };
-      }}
-    >
+    <form on:submit={handleSubmit}>
       <div class="space-y-4">
         <!-- 表示名 -->
         <div>
@@ -73,17 +107,18 @@
       </div>
 
       <!-- エラーメッセージ -->
-      {#if form?.message}
-        <p class="mt-4 text-sm text-center text-red-600">{form.message}</p>
+      {#if errorMessage}
+        <p class="mt-4 text-sm text-center text-red-600">{errorMessage}</p>
       {/if}
 
       <!-- 送信ボタン -->
       <div class="mt-6">
         <button
           type="submit"
-          class="w-full px-4 py-2 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          disabled={isLoading}
+          class="w-full px-4 py-2 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          保存して開始する
+          {isLoading ? '保存中...' : '保存して開始する'}
         </button>
       </div>
     </form>

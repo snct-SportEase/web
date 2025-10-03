@@ -1,47 +1,78 @@
 <script>
+  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { applyAction, enhance } from '$app/forms';
+  import { browser } from '$app/environment';
+  import ProfileSetupModal from '$lib/components/ProfileSetupModal.svelte';
 
-  let { data } = $props();
+  let { data } = $page;
+  $: user = data.user;
+  $: classes = data.classes;
+  $: form = data.form;
 
-  console.log('data.profile', data.userProfile);
+  async function handleLogout() {
+    try {
+      // セッションクッキーを取得
+      let sessionToken = null;
+      if (browser) {
+        const cookies = document.cookie.split('; ');
+        const sessionCookie = cookies.find(row => row.startsWith('session_token='));
+        sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
+      }
+
+      if (sessionToken) {
+        const response = await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cookie': `session_token=${sessionToken}`,
+          },
+        });
+
+        if (response.ok) {
+          // ログアウト成功時はページをリロードしてログインページに遷移
+          window.location.href = '/';
+        }
+      } else {
+        // セッションがない場合は直接ログインページに遷移
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもログインページに遷移
+      window.location.href = '/';
+    }
+  }
 </script>
 
-<div class="min-h-screen bg-gray-100 p-4 sm:p-8">
-  <div class="max-w-4xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">ダッシュボード</h1>
-      <form 
-        action="/api/logout" 
-        method="POST" 
-        use:enhance={() => {
-          return async ({ result }) => {
-            console.log('Form submission result:', result);
-            // The result object appears to be the JSON body directly.
-            if (result.type === 'success') {
-              await goto('/', { invalidateAll: true });
-            } else {
-              console.error('Logout failed:', result);
-              await applyAction(result);
-            }
-          };
-        }}
-      >
-        <button 
-          type="submit"
-          class="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition duration-200"
-        >
-          ログアウト
-        </button>
-      </form>
+<div class="min-h-screen bg-gray-50">
+  <nav class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <img class="h-8 w-auto" src="/icon.png" alt="SportEase Logo">
+          <span class="font-semibold text-xl ml-2">SportEase</span>
+        </div>
+        <div class="flex items-center">
+          <span class="mr-4">{user?.email}</span>
+          <button 
+            type="button" 
+            on:click={handleLogout}
+            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
     </div>
+  </nav>
 
-    <div class="bg-white shadow-md rounded-lg p-6">
-      <h2 class="text-xl font-semibold text-gray-700 mb-4">ようこそ</h2>
-      {#if data.userProfile}
-        <p class="text-gray-600">こんにちは、{data.userProfile.display_name}さん。</p>
-        <p class="text-gray-600">クラス: {data.userProfile.class.name}</p>
-      {/if}
-    </div>
-  </div>
+  <main class="p-8">
+    <h1 class="text-3xl font-bold">Welcome, {user?.displayName || 'User'}!</h1>
+    <p class="text-gray-600">This is your dashboard.</p>
+  </main>
+
+  {#if user && !user.is_profile_complete}
+    <ProfileSetupModal classes={classes} form={form} />
+  {/if}
 </div>
