@@ -83,6 +83,32 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
+	// ドメイン制限
+	allowedDomains := []string{"sendai-nct.jp", "sendai-nct.ac.jp"}
+	emailDomain := strings.Split(userInfo.Email, "@")[1]
+	isAllowed := false
+	for _, domain := range allowedDomains {
+		if emailDomain == domain {
+			isAllowed = true
+			break
+		}
+	}
+	if !isAllowed {
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=access_denied")
+		return
+	}
+
+	// ホワイトリストチェック
+	isWhitelisted, err := h.userRepo.IsEmailWhitelisted(userInfo.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !isWhitelisted {
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=access_denied")
+		return
+	}
+
 	user, err := h.userRepo.GetUserByEmail(userInfo.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -99,7 +125,12 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		user = newUser
+		// ロール情報を含めてユーザー情報を再取得
+		user, err = h.userRepo.GetUserWithRoles(newUser.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user after creation"})
+			return
+		}
 	}
 
 	// Create session
@@ -120,12 +151,27 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 }
 
 func (h *AuthHandler) GetUser(c *gin.Context) {
-	user, exists := c.Get("user")
+	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
 		return
 	}
-	c.JSON(http.StatusOK, user)
+
+	user := userCtx.(*models.User)
+
+	// ロール情報を含むユーザー情報を取得
+	userWithRoles, err := h.userRepo.GetUserWithRoles(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
+	}
+
+	if userWithRoles == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, userWithRoles)
 }
 
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {

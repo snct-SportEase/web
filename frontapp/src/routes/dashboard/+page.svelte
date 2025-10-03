@@ -139,6 +139,7 @@
   <EditDisplayNameModal
     isOpen={showEditDisplayNameModal}
     currentDisplayName={user?.display_name || ''}
+    userRoles={user?.roles || []}
     onClose={handleCloseEditDisplayNameModal}
     onSave={handleSaveDisplayName}
   />
