@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"backapp/internal/repository"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
