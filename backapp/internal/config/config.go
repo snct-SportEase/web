@@ -10,6 +10,7 @@ type Config struct {
 	DBHost, DBPort, DBUser, DBPassword, DBName            string
 	GoogleClientID, GoogleClientSecret, GoogleRedirectURL string
 	FrontendURL                                           string
+	InitRootUser                                          string
 }
 
 func Load() (*Config, error) {
@@ -24,6 +25,7 @@ func Load() (*Config, error) {
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
 		FrontendURL:        os.Getenv("FRONTEND_URL"),
+		InitRootUser:       os.Getenv("INIT_ROOT_USER"),
 	}
 	return cfg, nil
 }

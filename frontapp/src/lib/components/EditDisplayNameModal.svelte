@@ -3,6 +3,7 @@
 
   export let isOpen = false;
   export let currentDisplayName = '';
+  export let userRoles = [];
   export let onClose = () => {};
   export let onSave = async (newDisplayName) => {};
 
@@ -58,7 +59,32 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" on:click={handleCancel}>
     <!-- モーダルの本体 -->
     <div class="w-full max-w-md p-6 space-y-4 bg-white rounded-lg shadow-xl" on:click|stopPropagation on:keydown={handleKeydown}>
-      <h2 class="text-xl font-bold text-gray-800">表示名を変更</h2>
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold text-gray-800">プロフィール管理</h2>
+        <button
+          type="button"
+          on:click={handleCancel}
+          class="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- ロール情報表示 -->
+      {#if userRoles && userRoles.length > 0}
+        <div class="bg-gray-50 p-3 rounded-md">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">現在のロール</h3>
+          <div class="flex flex-wrap gap-2">
+            {#each userRoles as role}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                {role.name}
+              </span>
+            {/each}
+          </div>
+        </div>
+      {/if}
       
       <div>
         <label for="displayName" class="block text-sm font-medium text-gray-700 mb-2">
