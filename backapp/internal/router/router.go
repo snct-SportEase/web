@@ -42,7 +42,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				google.GET("/callback", authHandler.GoogleCallback)
 			}
 			auth.GET("/user", middleware.AuthMiddleware(userRepo), authHandler.GetUser)
-			auth.GET("/logout", authHandler.Logout)
+			auth.POST("/logout", authHandler.Logout)
 		}
 
 		user := api.Group("/user")

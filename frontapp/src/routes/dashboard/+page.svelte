@@ -1,5 +1,7 @@
 <script>
   import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
   import ProfileSetupModal from '$lib/components/ProfileSetupModal.svelte';
 
   let { data } = $page;
@@ -7,6 +9,40 @@
   $: classes = data.classes;
   $: form = data.form;
 
+  async function handleLogout() {
+    try {
+      // セッションクッキーを取得
+      let sessionToken = null;
+      if (browser) {
+        const cookies = document.cookie.split('; ');
+        const sessionCookie = cookies.find(row => row.startsWith('session_token='));
+        sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
+      }
+
+      if (sessionToken) {
+        const response = await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cookie': `session_token=${sessionToken}`,
+          },
+        });
+
+        if (response.ok) {
+          // ログアウト成功時はページをリロードしてログインページに遷移
+          window.location.href = '/';
+        }
+      } else {
+        // セッションがない場合は直接ログインページに遷移
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもログインページに遷移
+      window.location.href = '/';
+    }
+  }
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -19,9 +55,13 @@
         </div>
         <div class="flex items-center">
           <span class="mr-4">{user?.email}</span>
-          <form action="?/logout" method="POST">
-            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">Logout</button>
-          </form>
+          <button 
+            type="button" 
+            on:click={handleLogout}
+            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+          >
+            Logout
+          </button>
         </div>
       </div>
     </div>

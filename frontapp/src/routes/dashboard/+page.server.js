@@ -25,7 +25,7 @@ export const actions = {
   logout: async ({ fetch, locals }) => {
     const sessionCookie = locals.request.headers.get('cookie');
     await fetch(`${BACKEND_URL}/api/auth/logout`, {
-        method: 'GET',
+        method: 'POST',
         headers: {
             'cookie': sessionCookie,
         },
