@@ -54,7 +54,7 @@
           <span class="font-semibold text-xl ml-2">SportEase</span>
         </div>
         <div class="flex items-center">
-          <span class="mr-4">{user?.email}</span>
+          <span class="mr-4">{user?.display_name || user?.email || 'User'}</span>
           <button 
             type="button" 
             on:click={handleLogout}
@@ -68,7 +68,7 @@
   </nav>
 
   <main class="p-8">
-    <h1 class="text-3xl font-bold">Welcome, {user?.displayName || 'User'}!</h1>
+    <h1 class="text-3xl font-bold">Welcome, {user?.display_name || user?.email || 'User'}!</h1>
     <p class="text-gray-600">This is your dashboard.</p>
   </main>
 
