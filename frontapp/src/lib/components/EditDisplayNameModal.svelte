@@ -34,7 +34,6 @@
       await onSave(newDisplayName.trim());
       onClose();
     } catch (error) {
-      console.error('Display name update error:', error);
       errorMessage = error.message || '表示名の更新に失敗しました。';
     } finally {
       isLoading = false;

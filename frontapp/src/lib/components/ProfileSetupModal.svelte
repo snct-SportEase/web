@@ -25,11 +25,9 @@
       // セッションクッキーを取得
       let sessionToken = null;
       if (browser) {
-        console.log('All cookies:', document.cookie);
         const cookies = document.cookie.split('; ');
         const sessionCookie = cookies.find(row => row.startsWith('session_token='));
         sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
-        console.log('Session token:', sessionToken);
       }
 
       if (!sessionToken) {
@@ -58,7 +56,6 @@
       window.location.reload();
       
     } catch (error) {
-      console.error('Profile update error:', error);
       errorMessage = error.message;
     } finally {
       isLoading = false;

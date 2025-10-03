@@ -46,7 +46,6 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		fmt.Printf("user: %v\n", user)
 
 		c.Set("user", user)
 		c.Next()
