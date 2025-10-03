@@ -29,6 +29,9 @@ services:
   sportease-db:
     image: mysql:8.0
     container_name: sportease-db
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_DATABASE}
@@ -73,6 +76,8 @@ services:
     build:
       context: ./frontapp
     container_name: frontapp
+    env_file:
+      - ./frontapp/.env
     depends_on:
       - sportease-backapp
     networks:
@@ -98,7 +103,7 @@ services:
       - "traefik.http.routers.frontend-https.tls.certresolver=myresolver"
 
       # サービス設定（変更なし）
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
 
 networks:
   spotease-net:

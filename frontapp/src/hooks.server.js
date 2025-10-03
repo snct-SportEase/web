@@ -1,49 +1,57 @@
-import { redirect, error } from '@sveltejs/kit';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
-import * as pkg from '@supabase/ssr'  // ← これが一番安定する
-const { createServerClient } = pkg    // SSR用は createServerClient を使う
+import { BACKEND_URL } from '$env/static/private';
+import { redirect } from '@sveltejs/kit';
+
 /** @type {import('@sveltejs/kit').Handle} */
-export const handle = async ({ event, resolve }) => {
-  event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
-    cookies: {
-      get: (key) => event.cookies.get(key),
-      set: (key, value, options) => {
-        event.cookies.set(key, value, { path: '/', ...options });
-      },
-      remove: (key, options) => {
-        event.cookies.delete(key, { path: '/', ...options });
+export async function handle({ event, resolve }) {
+  const sessionToken = event.cookies.get('session_token');
+
+  if (sessionToken) {
+    try {
+      const url = `${BACKEND_URL}/api/auth/user`;
+      console.log(`[HOOKS] Fetching user from: ${url}`);
+      const response = await fetch(url, {
+        headers: {
+          'cookie': `session_token=${sessionToken}`, 
+        },
+      });
+
+      console.log(`[HOOKS] Response status: ${response.status}`);
+      console.log('[HOOKS] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const responseText = await response.text();
+      console.log(`[HOOKS] Response text: ${responseText}`);
+
+      if (response.ok) {
+        try {
+          event.locals.user = JSON.parse(responseText);
+        } catch (e) {
+          console.error('[HOOKS] Failed to parse JSON:', e);
+          event.locals.user = null;
+        }
+      } else {
+        event.locals.user = null;
       }
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+      event.locals.user = null;
     }
-  });
-
-  /**
-   * a little helper that is written for convenience so that instead
-   * of calling `const { data: { session } } = await event.locals.supabase.auth.getSession()`
-   * you just call this `await event.locals.getSession()`
-   */
-  event.locals.getUser = async () => {
-    const {
-      data: { user },
-    } = await event.locals.supabase.auth.getUser();
-    return user;
-  };
-
-  const user = await event.locals.getUser();
-  const { url } = event;
-
-  // ログイン済みのユーザーがルートにアクセスした場合、ダッシュボードにリダイレクト
-  if (user && url.pathname === '/') {
-    throw redirect(303, '/dashboard');
+  } else {
+    event.locals.user = null;
   }
 
-  // 保護されたルートへのアクセス制御
-  if (!user && url.pathname.startsWith('/dashboard')) {
-    throw redirect(303, '/');
+  // Protect dashboard route
+  if (event.url.pathname.startsWith('/dashboard')) {
+    if (!event.locals.user) {
+      throw redirect(302, '/');
+    }
   }
 
-  return resolve(event, {
-    filterSerializedResponseHeaders(name) {
-      return name === 'content-range' || name === 'x-supabase-api-version';
+  // Redirect from login page if already logged in
+  if (event.url.pathname === '/') {
+    if (event.locals.user) {
+      throw redirect(302, '/dashboard');
     }
-  });
-};
+  }
+
+  return resolve(event);
+}

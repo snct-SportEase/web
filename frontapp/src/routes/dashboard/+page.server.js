@@ -1,38 +1,38 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { BACKEND_URL } from '$env/static/private';
+
+/** @type {import('./$types').PageServerLoad} */
+export async function load({ locals, fetch }) {
+  // Fetch classes for the profile setup modal
+  // This assumes a /api/classes endpoint exists on the backend
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/classes`);
+    if (response.ok) {
+      const classes = await response.json();
+      return { user: locals.user, classes };
+    }
+  } catch (e) {
+    console.error('Could not fetch classes', e);
+    // Return empty array if classes can't be fetched
+    return { user: locals.user, classes: [] };
+  }
+
+  return { user: locals.user, classes: [] };
+}
 
 /** @type {import('./$types').Actions} */
 export const actions = {
-  updateProfile: async ({ request, locals: { supabase, getUser } }) => {
-    const user = await getUser();
-    if (!user) {
-      return fail(401, { message: 'Unauthorized' });
-    }
+  logout: async ({ fetch, locals }) => {
+    const sessionCookie = locals.request.headers.get('cookie');
+    await fetch(`${BACKEND_URL}/api/auth/logout`, {
+        method: 'GET',
+        headers: {
+            'cookie': sessionCookie,
+        },
+    });
 
-    const formData = await request.formData();
-    const displayName = formData.get('displayName');
-    const classId = formData.get('classId');
-
-    if (!displayName || !classId) {
-      return fail(400, { message: '表示名とクラスの両方を選択してください。' });
-    }
-
-    const { error } = await supabase
-      .from('users')
-      .update({
-        display_name: displayName,
-        class_id: classId,
-        is_profile_complete: true
-      })
-      .eq('id', user.id);
-
-    if (error) {
-      console.error('Error updating profile:', error);
-      return fail(500, { message: 'プロフィールの更新に失敗しました。' });
-    }
-
-    console.log('Profile updated successfully');
-
-    // 成功した場合、ダッシュボードにリダイレクトする
-    throw redirect(303, '/dashboard');
-  }
+    // Clear the user from locals and redirect
+    locals.user = null;
+    throw redirect(302, '/');
+  },
 };
