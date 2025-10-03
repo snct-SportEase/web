@@ -8,31 +8,25 @@ export async function handle({ event, resolve }) {
   if (sessionToken) {
     try {
       const url = `${BACKEND_URL}/api/auth/user`;
-      console.log(`[HOOKS] Fetching user from: ${url}`);
       const response = await fetch(url, {
         headers: {
           'cookie': `session_token=${sessionToken}`, 
         },
       });
 
-      console.log(`[HOOKS] Response status: ${response.status}`);
-      console.log('[HOOKS] Response headers:', Object.fromEntries(response.headers.entries()));
 
       const responseText = await response.text();
-      console.log(`[HOOKS] Response text: ${responseText}`);
 
       if (response.ok) {
         try {
           event.locals.user = JSON.parse(responseText);
         } catch (e) {
-          console.error('[HOOKS] Failed to parse JSON:', e);
           event.locals.user = null;
         }
       } else {
         event.locals.user = null;
       }
     } catch (error) {
-      console.error('Failed to fetch user:', error);
       event.locals.user = null;
     }
   } else {
