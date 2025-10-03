@@ -55,7 +55,6 @@
       // 成功時はページをリロードしてユーザー情報を更新
       window.location.reload();
     } catch (error) {
-      console.error('Display name update error:', error);
       throw error;
     }
   }
@@ -89,7 +88,6 @@
         window.location.href = '/';
       }
     } catch (error) {
-      console.error('Logout error:', error);
       // エラーが発生してもログインページに遷移
       window.location.href = '/';
     }

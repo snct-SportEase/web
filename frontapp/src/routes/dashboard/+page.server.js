@@ -12,7 +12,6 @@ export async function load({ locals, fetch }) {
       return { user: locals.user, classes };
     }
   } catch (e) {
-    console.error('Could not fetch classes', e);
     // Return empty array if classes can't be fetched
     return { user: locals.user, classes: [] };
   }
