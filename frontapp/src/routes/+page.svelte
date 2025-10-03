@@ -1,5 +1,38 @@
 <script>
-  
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { browser } from '$app/environment';
+
+  // URLパラメータからエラーメッセージをチェック
+  onMount(() => {
+    if (browser) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get('error');
+      
+      if (error) {
+        // エラーメッセージに基づいて適切なメッセージを表示
+        let errorMessage = '';
+        switch (error) {
+          case 'access_denied':
+            errorMessage = 'アクセスが拒否されました。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
+            break;
+          case 'invalid_domain':
+            errorMessage = '許可されていないドメインです。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
+            break;
+          default:
+            errorMessage = 'ログインに失敗しました。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
+        }
+        
+        // アラートポップアップを表示
+        alert(errorMessage);
+        
+        // URLからエラーパラメータを削除
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.delete('error');
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  });
 </script>
 
 <div class="min-h-screen bg-gray-100 flex flex-col justify-center items-center px-4 sm:px-0">
