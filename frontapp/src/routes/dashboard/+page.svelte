@@ -95,36 +95,31 @@
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  <nav class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center">
-          <img class="h-8 w-auto" src="/icon.png" alt="SportEase Logo">
-          <span class="font-semibold text-xl ml-2">SportEase</span>
-        </div>
-        <div class="flex items-center">
-          <button 
-            type="button"
-            on:click={handleDisplayNameClick}
-            class="mr-4 flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            title="表示名をクリックして変更"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-            </svg>
-            <span>{user?.display_name || user?.email || 'User'}</span>
-          </button>
-          <button 
-            type="button" 
-            on:click={handleLogout}
-            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors duration-200"
-          >
-            Logout
-          </button>
-        </div>
+  <header class="bg-white shadow-sm p-4">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
+      <div class="flex items-center">
+        <button 
+          type="button"
+          on:click={handleDisplayNameClick}
+          class="mr-4 flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          title="表示名をクリックして変更"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          </svg>
+          <span>{user?.display_name || user?.email || 'User'}</span>
+        </button>
+        <button 
+          type="button" 
+          on:click={handleLogout}
+          class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors duration-200"
+        >
+          Logout
+        </button>
       </div>
     </div>
-  </nav>
+  </header>
 
   <main class="p-8">
     <h1 class="text-3xl font-bold">Welcome, {user?.display_name || user?.email || 'User'}!</h1>
