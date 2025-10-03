@@ -2,13 +2,13 @@ package handler
 
 import (
 	"backapp/internal/config"
+	"backapp/internal/middleware"
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -18,9 +18,6 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
-
-// Note: In a production environment, use a persistent session store like Redis.
-var sessionStore = make(map[string]string)
 
 type AuthHandler struct {
 	cfg          *config.Config
@@ -107,7 +104,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	// Create session
 	sessionToken := uuid.New().String()
-	sessionStore[sessionToken] = user.ID
+	middleware.CreateSession(sessionToken, user.ID)
 
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session_token",
@@ -120,35 +117,6 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	})
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
-}
-
-func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		cookie, err := c.Cookie("session_token")
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			c.Abort()
-			return
-		}
-
-		userID, exists := sessionStore[cookie]
-		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			c.Abort()
-			return
-		}
-
-		user, err := h.userRepo.GetUserByID(userID)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			c.Abort()
-			return
-		}
-		fmt.Printf("user: %v\n", user)
-
-		c.Set("user", user)
-		c.Next()
-	}
 }
 
 func (h *AuthHandler) GetUser(c *gin.Context) {
@@ -194,7 +162,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
-	delete(sessionStore, cookie)
+	middleware.DeleteSession(cookie)
 
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session_token",
