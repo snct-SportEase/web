@@ -4,10 +4,10 @@ SET time_zone = '+09:00'; -- 必要に応じて日本のタイムゾーンに設
 
 -- ログインを許可するメールアドレスのホワイトリスト
 CREATE TABLE whitelisted_emails (
-    email VARCHAR(255),
+    email VARCHAR(255) NOT NULL,
     role ENUM('root', 'admin', 'student') NOT NULL,
     event_id INT NULL,
-    PRIMARY KEY (email, event_id)
+    UNIQUE KEY uk_email_event (email, event_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ロール（役割）マスタテーブル
@@ -38,8 +38,8 @@ CREATE TABLE users (
 CREATE TABLE user_roles (
     user_id CHAR(36) NOT NULL, -- FK to users.id
     role_id INT NOT NULL,      -- FK to roles.id
-    event_id INT NOT NULL,     -- FK to events.id
-    PRIMARY KEY (user_id, role_id, event_id)
+    event_id INT NULL,     -- FK to events.id, NULLable for global roles
+    PRIMARY KEY (user_id, role_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 大会イベントテーブル
@@ -53,6 +53,12 @@ CREATE TABLE events (
     UNIQUE(`year`, season)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 競技（スポーツ）テーブル
+CREATE TABLE sports (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- events_sportsテーブル（大会と競技の中間テーブル）
 CREATE TABLE event_sports (
     event_id INT NOT NULL,  -- FK to events.id
@@ -62,23 +68,7 @@ CREATE TABLE event_sports (
     location ENUM('gym1', 'gym2', 'ground', 'noon_game', 'other') NOT NULL,
     
     -- 複合プライマリキー: 同じイベントIDと競技IDの組み合わせは一意
-    PRIMARY KEY (event_id, sport_id),
-    
-    -- 外部キー制約
-    -- 大会（イベント）が削除されるのを防ぐ（RESTRICTまたはNO ACTIONがデフォルト動作）
-    CONSTRAINT fk_eventsports_event_id 
-        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT,
-        
-    -- 競技が削除されるのを防ぐ
-    CONSTRAINT fk_eventsports_sport_id 
-        FOREIGN KEY (sport_id) REFERENCES sports(id) ON DELETE RESTRICT
-        
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- 競技（スポーツ）テーブル
-CREATE TABLE sports (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
+    PRIMARY KEY (event_id, sport_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- チームテーブル
@@ -207,6 +197,9 @@ CREATE TABLE notification_recipients (
 
 -- whitelisted_emails テーブル
 ALTER TABLE whitelisted_emails ADD CONSTRAINT fk_whitelisted_emails_event_id FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE;
+
+ALTER TABLE event_sports ADD CONSTRAINT fk_eventsports_event_id FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT;
+ALTER TABLE event_sports ADD CONSTRAINT fk_eventsports_sport_id FOREIGN KEY (sport_id) REFERENCES sports(id) ON DELETE RESTRICT;
 
 -- ユーザーとロールの中間テーブル
 ALTER TABLE user_roles ADD CONSTRAINT fk_user_roles_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
