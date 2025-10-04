@@ -1,0 +1,1 @@
+<h1 class="text-2xl font-bold">競技一覧・詳細閲覧</h1>
