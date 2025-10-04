@@ -1,0 +1,1 @@
+<h1 class="text-2xl font-bold">クラス・チーム管理</h1>

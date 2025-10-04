@@ -1,0 +1,1 @@
+<h1 class="text-2xl font-bold">試合結果入力</h1>

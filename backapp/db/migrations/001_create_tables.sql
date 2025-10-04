@@ -156,6 +156,7 @@ CREATE TABLE mvp_votes (
     event_id INT NOT NULL, -- FK
     voter_user_id CHAR(36) NOT NULL, -- FK
     voted_for_class_id INT NOT NULL, -- FK
+    reason TEXT NOT NULL,
     points INT NOT NULL DEFAULT 3,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(event_id, voter_user_id)
