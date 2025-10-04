@@ -4,8 +4,10 @@ SET time_zone = '+09:00'; -- 必要に応じて日本のタイムゾーンに設
 
 -- ログインを許可するメールアドレスのホワイトリスト
 CREATE TABLE whitelisted_emails (
-    email VARCHAR(255) PRIMARY KEY,
-    role ENUM('root', 'admin', 'student') NOT NULL
+    email VARCHAR(255),
+    role ENUM('root', 'admin', 'student') NOT NULL,
+    event_id INT NULL,
+    PRIMARY KEY (email, event_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ロール（役割）マスタテーブル
@@ -36,7 +38,8 @@ CREATE TABLE users (
 CREATE TABLE user_roles (
     user_id CHAR(36) NOT NULL, -- FK to users.id
     role_id INT NOT NULL,      -- FK to roles.id
-    PRIMARY KEY (user_id, role_id)
+    event_id INT NOT NULL,     -- FK to events.id
+    PRIMARY KEY (user_id, role_id, event_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 大会イベントテーブル
@@ -50,13 +53,32 @@ CREATE TABLE events (
     UNIQUE(`year`, season)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- events_sportsテーブル（大会と競技の中間テーブル）
+CREATE TABLE event_sports (
+    event_id INT NOT NULL,  -- FK to events.id
+    sport_id INT NOT NULL,  -- FK to sports.id
+    description TEXT,
+    rules TEXT,
+    location ENUM('gym1', 'gym2', 'ground', 'noon_game', 'other') NOT NULL,
+    
+    -- 複合プライマリキー: 同じイベントIDと競技IDの組み合わせは一意
+    PRIMARY KEY (event_id, sport_id),
+    
+    -- 外部キー制約
+    -- 大会（イベント）が削除されるのを防ぐ（RESTRICTまたはNO ACTIONがデフォルト動作）
+    CONSTRAINT fk_eventsports_event_id 
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT,
+        
+    -- 競技が削除されるのを防ぐ
+    CONSTRAINT fk_eventsports_sport_id 
+        FOREIGN KEY (sport_id) REFERENCES sports(id) ON DELETE RESTRICT
+        
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 競技（スポーツ）テーブル
 CREATE TABLE sports (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
-    description TEXT,
-    rules TEXT,
-    location ENUM('gym1', 'gym2', 'ground', 'noon_game', 'other') NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- チームテーブル
@@ -168,6 +190,7 @@ CREATE TABLE notifications (
     title TEXT NOT NULL,
     body TEXT NOT NULL,
     created_by CHAR(36), -- FK
+    event_id INT NULL, -- FK
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -182,25 +205,28 @@ CREATE TABLE notification_recipients (
 
 -- --- 外部キー制約 (Foreign Key Constraints) ---
 
+-- whitelisted_emails テーブル
+ALTER TABLE whitelisted_emails ADD CONSTRAINT fk_whitelisted_emails_event_id FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE;
+
 -- ユーザーとロールの中間テーブル
 ALTER TABLE user_roles ADD CONSTRAINT fk_user_roles_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE user_roles ADD CONSTRAINT fk_user_roles_role_id FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE;
+ALTER TABLE user_roles ADD CONSTRAINT fk_user_roles_event_id FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE;
 
 -- users テーブル
 ALTER TABLE users ADD CONSTRAINT fk_users_class_id FOREIGN KEY (class_id) REFERENCES classes(id);
 
 -- teams テーブル
 ALTER TABLE teams ADD CONSTRAINT fk_teams_class_id FOREIGN KEY (class_id) REFERENCES classes(id);
-ALTER TABLE teams ADD CONSTRAINT fk_teams_sport_id FOREIGN KEY (sport_id) REFERENCES sports(id);
-ALTER TABLE teams ADD CONSTRAINT fk_teams_event_id FOREIGN KEY (event_id) REFERENCES events(id);
+ALTER TABLE teams ADD CONSTRAINT fk_teams_event_sport FOREIGN KEY (event_id, sport_id) REFERENCES event_sports(event_id, sport_id) ON DELETE RESTRICT;
+
 
 -- team_members テーブル
 ALTER TABLE team_members ADD CONSTRAINT fk_team_members_team_id FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE;
 ALTER TABLE team_members ADD CONSTRAINT fk_team_members_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 
 -- tournaments テーブル
-ALTER TABLE tournaments ADD CONSTRAINT fk_tournaments_event_id FOREIGN KEY (event_id) REFERENCES events(id);
-ALTER TABLE tournaments ADD CONSTRAINT fk_tournaments_sport_id FOREIGN KEY (sport_id) REFERENCES sports(id);
+ALTER TABLE tournaments ADD CONSTRAINT fk_tournaments_event_sport FOREIGN KEY (event_id, sport_id) REFERENCES event_sports(event_id, sport_id) ON DELETE RESTRICT;
 
 -- matches テーブル
 ALTER TABLE matches ADD CONSTRAINT fk_matches_tournament_id FOREIGN KEY (tournament_id) REFERENCES tournaments(id);
@@ -234,3 +260,4 @@ ALTER TABLE notifications ADD CONSTRAINT fk_notifications_created_by FOREIGN KEY
 ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_notification_id FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE;
 ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_class_id FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE;
+ALTER TABLE notifications ADD CONSTRAINT fk_notifications_event_id FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL;
