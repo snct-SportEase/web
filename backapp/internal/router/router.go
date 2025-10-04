@@ -23,6 +23,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	classRepo := repository.NewClassRepository(db)
 	classHandler := handler.NewClassHandler(classRepo)
 
+	whitelistRepo := repository.NewWhitelistRepository(db)
+	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo)
+
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -49,6 +52,14 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 		{
 			user.Use(middleware.AuthMiddleware(userRepo))
 			user.PUT("/profile", authHandler.UpdateProfile)
+		}
+
+		root := api.Group("/root")
+		{
+			root.Use(middleware.AuthMiddleware(userRepo), middleware.RootRequired())
+			root.GET("/whitelist", whitelistHandler.GetWhitelistHandler)
+			root.POST("/whitelist", whitelistHandler.AddWhitelistedEmailHandler)
+			root.POST("/whitelist/csv", whitelistHandler.BulkAddWhitelistedEmailsHandler)
 		}
 	}
 
