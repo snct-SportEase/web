@@ -19,7 +19,7 @@
 
 <aside class="w-64 bg-gray-800 text-white flex flex-col transition-all duration-300" class:closed={!$isSidebarOpen}>
   <div class="h-16 flex items-center justify-between px-4">
-    <span class="text-2xl font-bold">SportEase</span>
+    <a href="/dashboard" class="flex items-center"><span class="text-2xl font-bold">SportEase</span></a>
     <button on:click={closeSidebar} class="p-2 rounded-md hover:bg-gray-700">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
     </button>
@@ -29,6 +29,9 @@
     {#if isRoot}
       <div class="pt-4">
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Root</h3>
+        <a href="/dashboard/root/event-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          大会情報登録・管理
+        </a>
         <a href="/dashboard/root/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           通知管理
         </a>
@@ -37,6 +40,9 @@
         </a>
         <a href="/dashboard/root/whitelist-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           ホワイトリスト
+        </a>
+        <a href="/dashboard/root/change-username" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          ユーザー名変更
         </a>
         <a href="/dashboard/root/identify-mvp" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           MVP確認
@@ -48,11 +54,11 @@
     {#if isAdmin || isRoot}
       <div class="pt-4">
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</h3>
-        <a href="/dashboard/admin/user-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
-          ユーザー登録・管理
-        </a>
         <a href="/dashboard/admin/class-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
-          クラス・チーム管理
+          クラス・チーム割り当て
+        </a>
+        <a href="/dashboard/admin/role-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          ロール割り当て・管理
         </a>
         <a href="/dashboard/admin/qr-code-reader" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           QRコード読み取り
