@@ -35,6 +35,9 @@
         <a href="/dashboard/root/tournament-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           トーナメント生成・管理
         </a>
+        <a href="/dashboard/root/whitelist-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          ホワイトリスト
+        </a>
       </div>
     {/if}
     
