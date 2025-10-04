@@ -12,6 +12,8 @@ type UserRepository interface {
 	UpdateUser(user *models.User) error
 	GetUserWithRoles(userID string) (*models.User, error)
 	IsEmailWhitelisted(email string) (bool, error)
+	GetRoleByEmail(email string) (string, error)
+	AddUserRoleIfNotExists(userID string, roleName string) error
 }
 
 type userRepository struct {
@@ -20,6 +22,54 @@ type userRepository struct {
 
 func NewUserRepository(db *sql.DB) UserRepository {
 	return &userRepository{db: db}
+}
+
+func (r *userRepository) GetRoleByEmail(email string) (string, error) {
+	var roleName string
+	err := r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ?", email).Scan(&roleName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "student", nil // Not in whitelist, default to student
+		}
+		return "", err // Other DB error
+	}
+	return roleName, nil
+}
+
+func (r *userRepository) AddUserRoleIfNotExists(userID string, roleName string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// role名からrolesテーブルのIDを取得
+	var roleID int
+	err = tx.QueryRow("SELECT id FROM roles WHERE name = ?", roleName).Scan(&roleID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// ロールが存在しない場合は何もせず終了
+			return nil
+		}
+		return err
+	}
+
+	// ユーザーにそのロールが既に割り当てられているか確認
+	var exists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?", userID, roleID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+
+	// ロールがまだ割り当てられていない場合のみ挿入
+	if exists == 0 {
+		_, err = tx.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", userID, roleID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (r *userRepository) IsEmailWhitelisted(email string) (bool, error) {
@@ -114,12 +164,28 @@ func (r *userRepository) GetUserWithRoles(userID string) (*models.User, error) {
 	row := r.db.QueryRow("SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users WHERE id = ?", userID)
 
 	user := &models.User{}
-	err := row.Scan(&user.ID, &user.Email, &user.DisplayName, &user.ClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+	var tempClassID sql.NullInt32
+	var tempDisplayName sql.NullString
+
+	err := row.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // User not found
 		}
 		return nil, err
+	}
+
+	// sql.NullXXXXからUserモデルに値をコピー
+	if tempDisplayName.Valid {
+		user.DisplayName = &tempDisplayName.String
+	} else {
+		user.DisplayName = nil
+	}
+	if tempClassID.Valid {
+		val := int(tempClassID.Int32)
+		user.ClassID = &val
+	} else {
+		user.ClassID = nil
 	}
 
 	// ユーザーのロール情報を取得
