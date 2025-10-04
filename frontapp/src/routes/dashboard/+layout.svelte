@@ -87,7 +87,7 @@
 <div class="min-h-screen bg-gray-50">
   <header class="bg-white shadow-sm p-4">
     <div class="flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-gray-800 pl-12">Dashboard</h1>
+      <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800 pl-12">Dashboard</h1></a>
       <div class="flex items-center">
         <button 
           type="button"
