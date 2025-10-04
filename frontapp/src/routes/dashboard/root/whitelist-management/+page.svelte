@@ -4,6 +4,86 @@
   let { data } = $page;
   $: whitelist = data.whitelist;
 
+  // ロールのソート順序を定義 (数値が高いほど上位)
+	const roleRank = {
+		'root': 3,
+		'admin': 2,
+		'student': 1
+	};
+
+  // フィルタリング用の状態変数を追加
+	let filterText = ''; // Email search term (メールアドレス検索用語)
+	let filterRole = 'all'; // Role filter ('all', 'root', 'admin', 'student')
+
+  // ソート用の状態変数を追加
+	let sortColumn = 'email'; // デフォルトはメールアドレスでソート
+	let sortDirection = 'asc'; // デフォルトは昇順
+
+	// ソートロジック
+	function handleSort(column) {
+		if (sortColumn === column) {
+			// 同じカラムがクリックされたら、ソート方向を切り替える
+			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+		} else {
+			// 異なるカラムがクリックされたら、そのカラムで昇順ソートを開始
+			sortColumn = column;
+			sortDirection = 'asc';
+		}
+	}
+
+  // フィルタリングされたリストをリアクティブに生成
+	$: filteredWhitelist = (() => {
+		if (!whitelist) return [];
+
+		return whitelist.filter(entry => {
+			// 1. Emailフィルタリング (大文字小文字を区別しない部分一致)
+			// 日本語環境ではトリミングは必須ではありませんが、念のため残しています
+			const matchesEmail = entry.email.toLowerCase().includes(filterText.toLowerCase().trim());
+
+			// 2. Roleフィルタリング ('all'の場合はすべて一致)
+			const matchesRole = filterRole === 'all' || entry.role === filterRole;
+
+			return matchesEmail && matchesRole;
+		});
+	})();
+
+	// ソートされたリストをリアクティブに生成
+	// ソートされたリストをリアクティブに生成 (フィルタリングされたリストを基にソート)
+	$: sortedWhitelist = (() => {
+		const list = [...filteredWhitelist]; // フィルタリングされたリストを使用
+
+		list.sort((a, b) => {
+			let comparison = 0;
+
+			if (sortColumn === 'role') {
+				// ロール名ではなく、定義したランク（数値）で比較する
+				const aRank = roleRank[a.role] || 0; // 未知のロールは最下位 (0)
+				const bRank = roleRank[b.role] || 0;
+
+				if (aRank > bRank) {
+					comparison = 1;
+				} else if (aRank < bRank) {
+					comparison = -1;
+				}
+			} else {
+				// メールアドレスなど、その他のカラムは標準の文字列比較
+				const aValue = a[sortColumn];
+				const bValue = b[sortColumn];
+				
+				if (aValue > bValue) {
+					comparison = 1;
+				} else if (aValue < bValue) {
+					comparison = -1;
+				}
+			}
+
+			// ソート方向に応じて比較結果を反転
+			return sortDirection === 'desc' ? comparison * -1 : comparison;
+		});
+
+		return list;
+	})();
+
   let newEmailLocal = '';
 	let newEmailDomain = '@sendai-nct.jp'; // デフォルト値
   const allowedDomains = ['@sendai-nct.jp', '@sendai-nct.ac.jp'];
@@ -141,29 +221,102 @@
   <!-- Whitelist Table -->
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">現在のホワイトリスト</h2>
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          {#if whitelist && whitelist.length > 0}
-            {#each whitelist as entry}
-              <tr>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{entry.email}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.role}</td>
-              </tr>
-            {/each}
-          {:else}
-            <tr>
-              <td colspan="2" class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">No whitelisted emails found.</td>
-            </tr>
-          {/if}
-        </tbody>
-      </table>
-    </div>
+    <!-- 💡 フィルタリング コントロール -->
+		<div class="mb-6 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+			<div class="flex-grow">
+				<label for="email_search" class="block text-sm font-medium text-gray-700">Email検索</label>
+				<input
+					type="text"
+					id="email_search"
+					bind:value={filterText}
+					placeholder="メールアドレスの一部を入力..."
+					class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+				/>
+			</div>
+			<div class="w-full md:w-1/4">
+				<label for="role_filter" class="block text-sm font-medium text-gray-700">Roleでフィルタ</label>
+				<select
+					id="role_filter"
+					bind:value={filterRole}
+					class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+				>
+					<option value="all">すべて</option>
+					<option value="root">Root</option>
+					<option value="admin">Admin</option>
+					<option value="student">Student</option>
+				</select>
+			</div>
+		</div>
+
+		<div class="overflow-x-auto rounded-lg border border-gray-200">
+			<table class="min-w-full divide-y divide-gray-200">
+				<thead class="bg-gray-50">
+					<tr>
+						<!-- Email Sort Header -->
+						<th
+							scope="col"
+							class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition duration-100"
+							on:click={() => handleSort('email')}
+						>
+							<div class="flex items-center">
+								Email
+								{#if sortColumn === 'email'}
+									<span class="ml-1 text-gray-900">
+										{#if sortDirection === 'asc'}
+											&#9650; <!-- Up Arrow -->
+										{:else}
+											&#9660; <!-- Down Arrow -->
+										{/if}
+									</span>
+								{/if}
+							</div>
+						</th>
+						<!-- Role Sort Header -->
+						<th
+							scope="col"
+							class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition duration-100"
+							on:click={() => handleSort('role')}
+						>
+							<div class="flex items-center">
+								Role
+								{#if sortColumn === 'role'}
+									<span class="ml-1 text-gray-900">
+										{#if sortDirection === 'asc'}
+											&#9650; <!-- Up Arrow -->
+										{:else}
+											&#9660; <!-- Down Arrow -->
+										{/if}
+									</span>
+								{/if}
+							</div>
+						</th>
+					</tr>
+				</thead>
+				<tbody class="bg-white divide-y divide-gray-200">
+					<!-- 💡 sortedWhitelist を使用 -->
+					{#if sortedWhitelist && sortedWhitelist.length > 0}
+						{#each sortedWhitelist as entry}
+							<tr class="hover:bg-gray-50 transition duration-100">
+								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{entry.email}</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.role}</td>
+							</tr>
+						{/each}
+					{:else}
+						<tr>
+							<td colspan="2" class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
+                  {#if data.error}
+                    データの読み込み中にエラーが発生しました: {data.error}
+                  {:else if whitelist && whitelist.length > 0}
+                    <!-- フィルタリングの結果、一致するメールアドレスが見つかりませんでした。 -->
+                    <p class="text-gray-600">フィルタリング条件に一致するエントリーは見つかりませんでした。</p>
+                  {:else}
+                    No whitelisted emails found.
+                  {/if}
+                </td>
+						</tr>
+					{/if}
+				</tbody>
+			</table>
+		</div>
   </div>
 </div>
