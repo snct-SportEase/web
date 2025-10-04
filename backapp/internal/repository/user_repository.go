@@ -8,7 +8,6 @@ import (
 type UserRepository interface {
 	GetUserByEmail(email string) (*models.User, error)
 	CreateUser(user *models.User) error
-	GetUserByID(id string) (*models.User, error)
 	UpdateUser(user *models.User) error
 	GetUserWithRoles(userID string) (*models.User, error)
 	IsEmailWhitelisted(email string) (bool, error)
@@ -140,17 +139,6 @@ func (r *userRepository) CreateUser(user *models.User) error {
 
 	// トランザクションをコミット
 	return tx.Commit()
-}
-
-func (r *userRepository) GetUserByID(id string) (*models.User, error) {
-	row := r.db.QueryRow("SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users WHERE id = ?", id)
-
-	user := &models.User{}
-	err := row.Scan(&user.ID, &user.Email, &user.DisplayName, &user.ClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
 }
 
 func (r *userRepository) UpdateUser(user *models.User) error {
