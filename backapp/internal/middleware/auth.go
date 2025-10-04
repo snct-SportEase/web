@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"backapp/internal/models"
 	"backapp/internal/repository"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +41,7 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 			return
 		}
 
-		user, err := userRepo.GetUserByID(userID)
+		user, err := userRepo.GetUserWithRoles(userID)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			c.Abort()
@@ -47,6 +49,41 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 		}
 
 		c.Set("user", user)
+		c.Next()
+	}
+}
+
+func RootRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, exists := c.Get("user")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+			c.Abort()
+			return
+		}
+
+		userModel, ok := user.(*models.User)
+		fmt.Printf("%+v\n", userModel)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
+			c.Abort()
+			return
+		}
+
+		isRoot := false
+		for _, role := range userModel.Roles {
+			if role.Name == "root" {
+				isRoot = true
+				break
+			}
+		}
+
+		if !isRoot {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden: root access required"})
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	}
 }

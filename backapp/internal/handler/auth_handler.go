@@ -111,24 +111,33 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	user, err := h.userRepo.GetUserByEmail(userInfo.Email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user by email"})
 		return
 	}
 
 	if user == nil {
+		// User does not exist, create a new one
 		newUser := &models.User{
 			ID:                uuid.New().String(),
 			Email:             userInfo.Email,
 			IsProfileComplete: false,
 		}
 		if err := h.userRepo.CreateUser(newUser); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}
-		// ロール情報を含めてユーザー情報を再取得
-		user, err = h.userRepo.GetUserWithRoles(newUser.ID)
+		user = newUser // Continue with the newly created user
+	} else {
+		// User exists, sync role from whitelist
+		whitelistRole, err := h.userRepo.GetRoleByEmail(user.Email)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user after creation"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get role from whitelist"})
+			return
+		}
+
+		// Add role from whitelist if it doesn't exist
+		if err := h.userRepo.AddUserRoleIfNotExists(user.ID, whitelistRole); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add user role"})
 			return
 		}
 	}
