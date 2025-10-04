@@ -55,10 +55,10 @@
       <div class="pt-4">
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</h3>
         <a href="/dashboard/admin/class-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
-          クラス・チーム管理
+          クラス・チーム割り当て
         </a>
         <a href="/dashboard/admin/role-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
-          ロール管理
+          ロール割り当て・管理
         </a>
         <a href="/dashboard/admin/qr-code-reader" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           QRコード読み取り
