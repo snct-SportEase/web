@@ -38,6 +38,9 @@
         <a href="/dashboard/root/whitelist-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           ホワイトリスト
         </a>
+        <a href="/dashboard/root/identify-mvp" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          MVP確認
+        </a>
       </div>
     {/if}
     
