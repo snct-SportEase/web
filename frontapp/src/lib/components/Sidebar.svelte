@@ -74,16 +74,16 @@
         <a href="/dashboard/student/class-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           クラス情報
         </a>
-        <a href="/dashboard/studnet/sport-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+        <a href="/dashboard/student/sport-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           競技一覧・詳細閲覧
         </a>
         <a href="/dashboard/student/issueqr-code" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           QRコード発行
         </a>
-        <a href="/dashboard/studnet/score-list" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+        <a href="/dashboard/student/score-list" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           点数一覧
         </a>
-        <a href="/dashboard/studnet/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+        <a href="/dashboard/student/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           通知
         </a>
       </div>
