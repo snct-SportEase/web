@@ -25,18 +25,41 @@
     </button>
   </div>
   <nav class="flex-1 px-2 py-4 space-y-1">
+    <!-- Root Menu -->
+    {#if isRoot}
+      <div class="pt-4">
+        <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Root</h3>
+        <a href="/dashboard/root/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          通知管理
+        </a>
+        <a href="/dashboard/root/tournament-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          トーナメント生成・管理
+        </a>
+      </div>
+    {/if}
+    
     <!-- Admin/Root Menu -->
     {#if isAdmin || isRoot}
       <div class="pt-4">
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</h3>
-        <a href="/dashboard/user-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
-          ユーザー管理
+        <a href="/dashboard/admin/user-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          ユーザー登録・管理
         </a>
-        <a href="/dashboard/class-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
-          クラス管理
+        <a href="/dashboard/admin/class-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          クラス・チーム管理
         </a>
-        <a href="/dashboard/event-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
-          大会管理
+        <a href="/dashboard/admin/qr-code-reader" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          QRコード読み取り
+        </a>
+        <a href="/dashboard/admin/insert-matche-result" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          試合結果入力
+        </a>
+        <a href="/dashboard/admin/attendance-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          出席登録
+        </a>
+        <!-- MVP投票の被対象者は1~2年生のみ。投票はadminとrootしか行えない -->
+        <a href="/dashboard/admin/vorting-mvp" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          MVP投票
         </a>
       </div>
     {/if}
@@ -45,11 +68,23 @@
     {#if isStudent || isAdmin || isRoot}
       <div>
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Student</h3>
-        <a href="/dashboard/my-page" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+        <a href="/dashboard/student/my-page" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           マイページ
         </a>
-        <a href="/dashboard/class-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+        <a href="/dashboard/student/class-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           クラス情報
+        </a>
+        <a href="/dashboard/studnet/sport-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          競技一覧・詳細閲覧
+        </a>
+        <a href="/dashboard/student/issueqr-code" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          QRコード発行
+        </a>
+        <a href="/dashboard/studnet/score-list" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          点数一覧
+        </a>
+        <a href="/dashboard/studnet/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          通知
         </a>
       </div>
     {/if}
