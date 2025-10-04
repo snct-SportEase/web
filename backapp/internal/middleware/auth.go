@@ -41,7 +41,7 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 			return
 		}
 
-		user, err := userRepo.GetUserByID(userID)
+		user, err := userRepo.GetUserWithRoles(userID)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			c.Abort()

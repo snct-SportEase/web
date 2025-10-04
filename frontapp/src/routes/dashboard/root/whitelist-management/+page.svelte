@@ -4,7 +4,10 @@
   let { data } = $page;
   $: whitelist = data.whitelist;
 
-  let newEmail = '';
+  let newEmailLocal = '';
+	let newEmailDomain = '@sendai-nct.jp'; // デフォルト値
+  const allowedDomains = ['@sendai-nct.jp', '@sendai-nct.ac.jp'];
+
   let newRole = 'student';
   let csvFile = null;
   let message = '';
@@ -13,20 +16,24 @@
   async function addEmail() {
     errorMessage = '';
     message = '';
+
+    // ローカル部とドメイン部を結合して完全なメールアドレスを作成
+    const fullEmail = newEmailLocal.trim() + newEmailDomain;
+
     try {
       const response = await fetch('/api/root/whitelist', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: newEmail, role: newRole }),
+        body: JSON.stringify({ email: fullEmail, role: newRole })
       });
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || 'Failed to add email');
       }
       message = 'Email added successfully!';
-      newEmail = '';
+      newEmailLocal = '';
       // Refresh whitelist
       const res = await fetch('/api/root/whitelist');
       whitelist = await res.json();
@@ -82,11 +89,30 @@
 
   <!-- Add Single Email -->
   <div class="bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-semibold mb-4">Add Single Email</h2>
+    <h2 class="text-xl font-semibold mb-4">ホワイトリストに追加</h2>
     <form on:submit|preventDefault={addEmail} class="flex items-end space-x-4">
       <div class="flex-grow">
-        <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
-        <input type="email" id="email" bind:value={newEmail} required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        <label for="email_local" class="block text-sm font-medium text-gray-700">メールアドレス</label>
+				<div class="flex mt-1">
+					<!-- ローカル部入力 -->
+					<input
+						type="text"
+						id="email_local"
+						bind:value={newEmailLocal}
+						required
+						class="block w-2/3 rounded-l-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm placeholder-gray-400"
+						placeholder="taro.yamada"
+					/>
+					<!-- ドメイン部選択 -->
+					<select
+						id="email_domain"
+						bind:value={newEmailDomain}
+						class="block w-1/3 rounded-r-lg border-l-0 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-gray-50 text-gray-700 font-medium"
+					>
+						{#each allowedDomains as domain}
+							<option value={domain}>{domain}</option>
+						{/each}
+					</select>
       </div>
       <div>
         <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
@@ -102,7 +128,7 @@
 
   <!-- Bulk Upload CSV -->
   <div class="bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-semibold mb-4">Bulk Upload CSV</h2>
+    <h2 class="text-xl font-semibold mb-4">CSVで一括追加</h2>
     <form on:submit|preventDefault={uploadCsv} class="flex items-end space-x-4">
       <div class="flex-grow">
         <label for="csvfile" class="block text-sm font-medium text-gray-700">CSV File (email,role)</label>
@@ -114,7 +140,7 @@
 
   <!-- Whitelist Table -->
   <div class="bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-semibold mb-4">Current Whitelist</h2>
+    <h2 class="text-xl font-semibold mb-4">現在のホワイトリスト</h2>
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
