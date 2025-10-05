@@ -25,7 +25,7 @@ func NewUserRepository(db *sql.DB) UserRepository {
 
 func (r *userRepository) GetRoleByEmail(email string) (string, error) {
 	var roleName string
-	err := r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ?", email).Scan(&roleName)
+	err := r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? AND event_id IS NULL", email).Scan(&roleName)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "student", nil // Not in whitelist, default to student
@@ -113,7 +113,7 @@ func (r *userRepository) CreateUser(user *models.User) error {
 
 	// emailに基づいてwhitelisted_emailsからroleを取得
 	var roleName string
-	err = r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ?", user.Email).Scan(&roleName)
+	err = r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? AND event_id IS NULL", user.Email).Scan(&roleName)
 	if err != nil {
 		// ホワイトリストにない場合は'student'ロールを付与
 		if err == sql.ErrNoRows {

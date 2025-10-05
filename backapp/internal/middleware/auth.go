@@ -53,6 +53,45 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 	}
 }
 
+func RoleRequired(roles ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, exists := c.Get("user")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+			c.Abort()
+			return
+		}
+
+		userModel, ok := user.(*models.User)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
+			c.Abort()
+			return
+		}
+
+		hasRole := false
+		for _, userRole := range userModel.Roles {
+			for _, requiredRole := range roles {
+				if userRole.Name == requiredRole {
+					hasRole = true
+					break
+				}
+			}
+			if hasRole {
+				break
+			}
+		}
+
+		if !hasRole {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden: insufficient permissions"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func RootRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, exists := c.Get("user")

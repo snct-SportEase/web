@@ -180,6 +180,13 @@ func (h *AuthHandler) GetUser(c *gin.Context) {
 		return
 	}
 
+	// Determine if this user is the initial root user and hasn't completed profile
+	if h.cfg != nil && h.cfg.InitRootUser != "" {
+		userWithRoles.IsInitRootFirstLogin = (h.cfg.InitRootUser == userWithRoles.Email) && !userWithRoles.IsProfileComplete
+	} else {
+		userWithRoles.IsInitRootFirstLogin = false
+	}
+
 	c.JSON(http.StatusOK, userWithRoles)
 }
 

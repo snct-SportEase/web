@@ -3,20 +3,36 @@ import { BACKEND_URL } from '$env/static/private';
 
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ locals, fetch }) {
-  // Fetch classes for the profile setup modal
-  // This assumes a /api/classes endpoint exists on the backend
+  const returnData = { user: locals.user, classes: [], events: [] };
+
   try {
-    const response = await fetch(`${BACKEND_URL}/api/classes`);
-    if (response.ok) {
-      const classes = await response.json();
-      return { user: locals.user, classes };
+    // Fetch classes
+    const classesResponse = await fetch(`${BACKEND_URL}/api/classes`);
+    if (classesResponse.ok) {
+      returnData.classes = await classesResponse.json();
     }
   } catch (e) {
-    // Return empty array if classes can't be fetched
-    return { user: locals.user, classes: [] };
+    console.error('Failed to fetch classes:', e);
   }
 
-  return { user: locals.user, classes: [] };
+  // Fetch events if user is root
+  const isRoot = locals.user?.roles?.some(role => role.name === 'root');
+  if (isRoot && locals.user?.is_profile_complete) {
+      try {
+        const eventResponse = await fetch(`${BACKEND_URL}/api/root/events`, {
+            headers: {
+                'cookie': locals.request.headers.get('cookie'),
+            }
+        });
+        if (eventResponse.ok) {
+            returnData.events = await eventResponse.json();
+        }
+      } catch (e) {
+        console.error('Failed to fetch events:', e);
+      }
+  }
+
+  return returnData;
 }
 
 /** @type {import('./$types').Actions} */
