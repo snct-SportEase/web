@@ -10,7 +10,9 @@
   $: form = data.form;
 
   $: isRoot = user?.roles?.some(role => role.name === 'root');
-  $: showEventSetup = user?.is_profile_complete && isRoot && events?.length === 0;
+  // Show EventSetupModal only when the logged-in user is root AND
+  // this is the initial root user's first login (backend provides is_init_root_first_login)
+  $: showEventSetup = isRoot && user?.is_init_root_first_login && events?.length === 0;
 </script>
 
 <h1 class="text-3xl font-bold">Welcome, {user?.display_name || user?.email || 'User'}!</h1>

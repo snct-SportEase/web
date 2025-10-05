@@ -3,7 +3,6 @@ package handler
 import (
 	"backapp/internal/repository"
 	"encoding/csv"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,10 +10,14 @@ import (
 
 type WhitelistHandler struct {
 	WhitelistRepo repository.WhitelistRepository
+	EventRepo     repository.EventRepository
 }
 
-func NewWhitelistHandler(whitelistRepo repository.WhitelistRepository) *WhitelistHandler {
-	return &WhitelistHandler{WhitelistRepo: whitelistRepo}
+func NewWhitelistHandler(whitelistRepo repository.WhitelistRepository, eventRepo repository.EventRepository) *WhitelistHandler {
+	return &WhitelistHandler{
+		WhitelistRepo: whitelistRepo,
+		EventRepo:     eventRepo,
+	}
 }
 
 func (h *WhitelistHandler) GetWhitelistHandler(c *gin.Context) {
@@ -23,7 +26,6 @@ func (h *WhitelistHandler) GetWhitelistHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve whitelist"})
 		return
 	}
-	fmt.Printf("%s\n", entries[0].Email)
 	c.JSON(http.StatusOK, entries)
 }
 
@@ -39,7 +41,22 @@ func (h *WhitelistHandler) AddWhitelistedEmailHandler(c *gin.Context) {
 		return
 	}
 
-	if err := h.WhitelistRepo.AddWhitelistedEmail(entry.Email, entry.Role); err != nil {
+	// Get active event_id
+	activeEventID, err := h.EventRepo.GetActiveEvent()
+	if err != nil {
+		// If there is an error other than "no rows", it's a server error.
+		// "no rows" is handled by GetActiveEvent returning 0, so we don't need to check sql.ErrNoRows here.
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event", "details": err.Error()})
+		return
+	}
+
+	var eventIDPtr *int
+	if activeEventID != 0 {
+		eventIDPtr = &activeEventID
+	}
+
+	// Add email with event_id
+	if err := h.WhitelistRepo.AddWhitelistedEmail(entry.Email, entry.Role, eventIDPtr); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add email to whitelist"})
 		return
 	}
@@ -62,6 +79,18 @@ func (h *WhitelistHandler) BulkAddWhitelistedEmailsHandler(c *gin.Context) {
 		return
 	}
 
+	// Get active event_id
+	activeEventID, err := h.EventRepo.GetActiveEvent()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event", "details": err.Error()})
+		return
+	}
+
+	var eventIDPtr *int
+	if activeEventID != 0 {
+		eventIDPtr = &activeEventID
+	}
+
 	var entries []repository.WhitelistEntry
 	for i, record := range records {
 		if i == 0 { // Skip header row
@@ -70,7 +99,11 @@ func (h *WhitelistHandler) BulkAddWhitelistedEmailsHandler(c *gin.Context) {
 		if len(record) < 2 {
 			continue // Skip empty or invalid rows
 		}
-		entries = append(entries, repository.WhitelistEntry{Email: record[0], Role: record[1]})
+		entries = append(entries, repository.WhitelistEntry{
+			Email:   record[0],
+			Role:    record[1],
+			EventID: eventIDPtr, // Set the active event ID
+		})
 	}
 
 	if err := h.WhitelistRepo.AddWhitelistedEmails(entries); err != nil {

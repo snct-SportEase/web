@@ -24,9 +24,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	classHandler := handler.NewClassHandler(classRepo)
 
 	whitelistRepo := repository.NewWhitelistRepository(db)
-	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo)
-
 	eventRepo := repository.NewEventRepository(db)
+	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo, eventRepo)
+
 	eventHandler := handler.NewEventHandler(eventRepo)
 
 	// ヘルスチェック用のエンドポイント
@@ -39,6 +39,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	api := router.Group("/api")
 	{
 		api.GET("/classes", classHandler.GetAllClasses)
+
+		api.GET("/events/active", eventHandler.GetActiveEvent)
 
 		auth := api.Group("/auth")
 		{
@@ -71,6 +73,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				events.GET("", eventHandler.GetAllEvents)
 				events.POST("", eventHandler.CreateEvent)
 				events.PUT("/:id", eventHandler.UpdateEvent)
+				events.PUT("/active", eventHandler.SetActiveEvent)
 			}
 		}
 	}
