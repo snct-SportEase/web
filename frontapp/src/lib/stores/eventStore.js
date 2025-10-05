@@ -19,7 +19,7 @@ export const activeEvent = {
             const data = await res.json();
             // Expecting { event_id: <id> } from backend; fetch full event if id present
             if (data && data.event_id) {
-                const evRes = await fetch(`/api/events`);
+                const evRes = await fetch(`/api/root/events`);
                 if (evRes.ok) {
                     const events = await evRes.json();
                     const active = events.find(e => e.id === data.event_id) || null;
@@ -70,7 +70,7 @@ export const activeEvent = {
         }
         try {
             // fetch event details
-            const res = await fetch('/api/events');
+            const res = await fetch('/api/root/events');
             if (!res.ok) throw new Error('Failed to fetch events');
             const events = await res.json();
             const eventObj = events.find(e => e.id === parseInt(id));
