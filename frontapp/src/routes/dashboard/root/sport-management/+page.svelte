@@ -1,0 +1,1 @@
+<h1 class="text-2xl font-bold">競技情報登録・管理</h1>
