@@ -192,6 +192,12 @@ CREATE TABLE notification_recipients (
     PRIMARY KEY (notification_id, user_id, class_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- どの大会が有効化
+CREATE TABLE active_event (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    event_id INT UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- --- 外部キー制約 (Foreign Key Constraints) ---
 

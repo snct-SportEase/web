@@ -1,5 +1,7 @@
 <script>
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
+  import { activeEvent } from '$lib/stores/eventStore.js';
 
   let events = [];
   let showModal = false;
@@ -14,8 +16,18 @@
     end_date: '',
   };
 
+  let selectedEventIdForActivation = null;
+
   onMount(async () => {
     await fetchEvents();
+    // initialize activeEvent store from backend
+    const active = await activeEvent.init();
+    if (active) {
+      selectedEventIdForActivation = active.id;
+    } else if (events.length > 0) {
+      // If no active event is set, default to the latest one
+      selectedEventIdForActivation = events[0].id;
+    }
   });
 
   async function fetchEvents() {
@@ -28,6 +40,20 @@
     } catch (error) {
       console.error(error);
       alert(error.message);
+    }
+  }
+
+  function setActiveEvent() {
+    if (selectedEventIdForActivation) {
+      activeEvent.setActiveEventById(selectedEventIdForActivation)
+        .then(() => {
+          const eventToActivate = events.find(e => e.id === parseInt(selectedEventIdForActivation));
+          alert(`「${eventToActivate.name}」がアクティブな大会として設定されました。`);
+        })
+        .catch(err => {
+          console.error(err);
+          alert('アクティブ大会の設定に失敗しました。');
+        });
     }
   }
 
@@ -96,6 +122,25 @@
     <button on:click={openCreateModal} class="btn btn-primary bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
       新規作成
     </button>
+  </div>
+
+  <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+    <h2 class="text-xl font-bold mb-4">アクティブな大会の設定</h2>
+    <p class="text-sm text-gray-600 mb-4">ここで設定した大会が、他の管理ページでの操作対象となります。</p>
+    <div class="flex items-center space-x-4">
+        <select bind:value={selectedEventIdForActivation} class="block w-full max-w-xs border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            <option value={null} disabled>大会を選択...</option>
+            {#each events as event}
+                <option value={event.id}>{event.name}</option>
+            {/each}
+        </select>
+        <button on:click={setActiveEvent} class="btn btn-secondary bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700" disabled={!selectedEventIdForActivation}>
+            この大会をアクティブにする
+        </button>
+    </div>
+    {#if $activeEvent}
+        <p class="mt-4 text-sm text-gray-600">現在のアクティブな大会: <span class="font-semibold text-indigo-600">{$activeEvent.name}</span></p>
+    {/if}
   </div>
 
   <div class="bg-white shadow-md rounded-lg overflow-hidden">

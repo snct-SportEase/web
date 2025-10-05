@@ -9,6 +9,8 @@ type EventRepository interface {
 	CreateEvent(event *models.Event) (int64, error)
 	GetAllEvents() ([]*models.Event, error)
 	UpdateEvent(event *models.Event) error
+	GetActiveEvent() (event_id int, err error)
+	SetActiveEvent(event_id *int) error
 }
 
 type eventRepository struct {
@@ -54,5 +56,34 @@ func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
 func (r *eventRepository) UpdateEvent(event *models.Event) error {
 	query := "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ? WHERE id = ?"
 	_, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.ID)
+	return err
+}
+
+func (r *eventRepository) GetActiveEvent() (event_id int, err error) {
+	query := "SELECT event_id FROM active_event WHERE id = 1"
+	var nullableEventId sql.NullInt64
+	err = r.db.QueryRow(query).Scan(&nullableEventId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// レコードが存在しない場合は、0とnilを返す
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	if nullableEventId.Valid {
+		return int(nullableEventId.Int64), nil
+	}
+	// event_id が NULL の場合
+	return 0, nil
+}
+
+func (r *eventRepository) SetActiveEvent(event_id *int) error {
+	query := "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
+	if event_id == nil {
+		_, err := r.db.Exec(query, nil)
+		return err
+	}
+	_, err := r.db.Exec(query, *event_id)
 	return err
 }
