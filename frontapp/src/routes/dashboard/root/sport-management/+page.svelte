@@ -252,8 +252,8 @@
                         
                         <!-- 競技選択 -->
                         <div>
-                            <label for="sport-select" class="label-text">割り当てる競技</label>
-                            <select id="sport-select" bind:value={newAssignment.sport_id} class="select-field">
+                            <label for="sport-select" class="block text-sm font-medium text-gray-700 mb-1">割り当てる競技</label>
+                            <select id="sport-select" bind:value={newAssignment.sport_id} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 <option value={null} disabled>競技を選択...</option>
                                 {#each allSports as sport}
                                     <option value={sport.id}>{sport.name}</option>
@@ -263,8 +263,8 @@
                         
                         <!-- 場所選択 -->
                         <div>
-                            <label for="location-select" class="label-text">場所</label>
-                            <select id="location-select" bind:value={newAssignment.location} class="select-field">
+                            <label for="location-select" class="block text-sm font-medium text-gray-700 mb-1">場所</label>
+                            <select id="location-select" bind:value={newAssignment.location} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 {#each allLocations as loc}
                                     <option value={loc} disabled={usedLocations.includes(loc)}>
                                         {loc} {usedLocations.includes(loc) ? '(使用中)' : ''}
@@ -275,14 +275,14 @@
                         
                         <!-- 概要 -->
                         <div>
-                            <label for="description" class="label-text">概要 (任意)</label>
-                            <textarea id="description" bind:value={newAssignment.description} class="textarea-field h-20" placeholder="競技の簡単な説明や備考"></textarea>
+                            <label for="description" class="block text-sm font-medium text-gray-700 mb-1">概要 (任意)</label>
+                            <textarea id="description" bind:value={newAssignment.description} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-20" placeholder="競技の簡単な説明や備考"></textarea>
                         </div>
                         
                         <!-- ルール -->
                         <div>
-                            <label for="rules" class="label-text">ルール詳細 (任意)</label>
-                            <textarea id="rules" bind:value={newAssignment.rules} class="textarea-field h-32" placeholder="競技のルール詳細"></textarea>
+                            <label for="rules" class="block text-sm font-medium text-gray-700 mb-1">ルール詳細 (任意)</label>
+                            <textarea id="rules" bind:value={newAssignment.rules} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-32" placeholder="競技のルール詳細"></textarea>
                         </div>
                         
                         <button on:click={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150" disabled={!newAssignment.sport_id}>
