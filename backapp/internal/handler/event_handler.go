@@ -11,11 +11,12 @@ import (
 )
 
 type EventHandler struct {
-	eventRepo repository.EventRepository
+	eventRepo     repository.EventRepository
+	whitelistRepo repository.WhitelistRepository
 }
 
-func NewEventHandler(eventRepo repository.EventRepository) *EventHandler {
-	return &EventHandler{eventRepo: eventRepo}
+func NewEventHandler(eventRepo repository.EventRepository, whitelistRepo repository.WhitelistRepository) *EventHandler {
+	return &EventHandler{eventRepo: eventRepo, whitelistRepo: whitelistRepo}
 }
 
 func (h *EventHandler) CreateEvent(c *gin.Context) {
@@ -160,14 +161,22 @@ func (h *EventHandler) SetActiveEvent(c *gin.Context) {
 		return
 	}
 
-	// 3. リポジトリのSetActiveEventメソッドを呼び出して、DBの値を更新
-	// h.eventRepo.SetActiveEvent(req.EventID) は、以前の回答で想定したメソッドです。
 	// Pass pointer to allow nil -> clearing active event
 	err := h.eventRepo.SetActiveEvent(req.EventID)
 	if err != nil {
 		// DB更新に失敗した場合、500 Internal Server Errorを返す
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set active event", "details": err.Error()})
 		return
+	}
+
+	// If a new event is being activated (not cleared), update the whitelist
+	if req.EventID != nil {
+		if err := h.whitelistRepo.UpdateNullEventIDs(*req.EventID); err != nil {
+			// このエラーはクリティカルではないので、ログには残すがクライアントには成功を返す
+			// c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update whitelist event IDs", "details": err.Error()})
+			// return
+			// TODO: Add proper logging here
+		}
 	}
 
 	// 4. 成功レスポンスを返す
