@@ -6,9 +6,11 @@ import (
 )
 
 type UserRepository interface {
+	FindUsers(query string, searchType string) ([]*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
 	CreateUser(user *models.User) error
 	UpdateUser(user *models.User) error
+	UpdateUserDisplayName(userID string, displayName string) error
 	GetUserWithRoles(userID string) (*models.User, error)
 	IsEmailWhitelisted(email string) (bool, error)
 	GetRoleByEmail(email string) (string, error)
@@ -83,6 +85,55 @@ func (r *userRepository) IsEmailWhitelisted(email string) (bool, error) {
 	return true, nil // Whitelisted
 }
 
+func (r *userRepository) FindUsers(query string, searchType string) ([]*models.User, error) {
+	baseQuery := "SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users"
+	var args []interface{}
+
+	if query != "" {
+		switch searchType {
+		case "email":
+			baseQuery += " WHERE email LIKE ?"
+			args = append(args, "%"+query+"%")
+		case "display_name":
+			baseQuery += " WHERE display_name LIKE ?"
+			args = append(args, "%"+query+"%")
+		}
+	}
+
+	rows, err := r.db.Query(baseQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		user := &models.User{}
+		var tempClassID sql.NullInt32
+		var tempDisplayName sql.NullString
+
+		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if tempDisplayName.Valid {
+			user.DisplayName = &tempDisplayName.String
+		} else {
+			user.DisplayName = nil
+		}
+		if tempClassID.Valid {
+			val := int(tempClassID.Int32)
+			user.ClassID = &val
+		} else {
+			user.ClassID = nil
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
 func (r *userRepository) GetUserByEmail(email string) (*models.User, error) {
 	row := r.db.QueryRow("SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users WHERE email = ?", email)
 
@@ -144,6 +195,11 @@ func (r *userRepository) CreateUser(user *models.User) error {
 func (r *userRepository) UpdateUser(user *models.User) error {
 	_, err := r.db.Exec("UPDATE users SET display_name = ?, class_id = ?, is_profile_complete = ? WHERE id = ?",
 		user.DisplayName, user.ClassID, user.IsProfileComplete, user.ID)
+	return err
+}
+
+func (r *userRepository) UpdateUserDisplayName(userID string, displayName string) error {
+	_, err := r.db.Exec("UPDATE users SET display_name = ? WHERE id = ?", displayName, userID)
 	return err
 }
 
