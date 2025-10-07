@@ -30,7 +30,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	sportRepo := repository.NewSportRepository(db)
 	sportHandler := handler.NewSportHandler(sportRepo)
 
-	eventHandler := handler.NewEventHandler(eventRepo)
+	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
 
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {

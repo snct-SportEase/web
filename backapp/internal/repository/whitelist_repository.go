@@ -15,6 +15,7 @@ type WhitelistRepository interface {
 	AddWhitelistedEmail(email, role string, eventID *int) error
 	GetAllWhitelistedEmails() ([]WhitelistEntry, error)
 	AddWhitelistedEmails(entries []WhitelistEntry) error
+	UpdateNullEventIDs(eventID int) error
 }
 
 type whitelistRepository struct {
@@ -91,4 +92,10 @@ func (r *whitelistRepository) AddWhitelistedEmails(entries []WhitelistEntry) err
 	}
 
 	return tx.Commit()
+}
+
+func (r *whitelistRepository) UpdateNullEventIDs(eventID int) error {
+	query := `UPDATE whitelisted_emails SET event_id = ? WHERE event_id IS NULL`
+	_, err := r.db.Exec(query, eventID)
+	return err
 }
