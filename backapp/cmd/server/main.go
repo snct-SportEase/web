@@ -56,9 +56,8 @@ func initializeRootUser(db *sql.DB, cfg *config.Config) error {
 		return nil
 	}
 
-	// ルートユーザーを登録
-	initeventID := 1
-	if err := whitelistRepo.AddWhitelistedEmail(cfg.InitRootUser, "root", &initeventID); err != nil {
+	// ルートユーザーを登録 (event_id は NULL)
+	if err := whitelistRepo.AddWhitelistedEmail(cfg.InitRootUser, "root", nil); err != nil {
 		return err
 	}
 

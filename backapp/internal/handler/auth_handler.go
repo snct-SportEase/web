@@ -94,7 +94,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		}
 	}
 	if !isAllowed {
-		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=access_denied")
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=domain_not_allowed")
 		return
 	}
 
@@ -105,7 +105,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 	if !isWhitelisted {
-		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=access_denied")
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
 		return
 	}
 
