@@ -13,14 +13,17 @@
         // エラーメッセージに基づいて適切なメッセージを表示
         let errorMessage = '';
         switch (error) {
-          case 'access_denied':
-            errorMessage = 'アクセスが拒否されました。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
-            break;
-          case 'invalid_domain':
+          case 'domain_not_allowed':
             errorMessage = '許可されていないドメインです。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
             break;
+          case 'email_not_whitelisted':
+            errorMessage = 'このメールアドレスはアクセスが許可されていません。管理者に連絡して、ホワイトリストへの追加を依頼してください。';
+            break;
+          case 'access_denied':
+            errorMessage = 'アクセスが拒否されました。詳しくは管理者にお問い合わせください。';
+            break;
           default:
-            errorMessage = 'ログインに失敗しました。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
+            errorMessage = 'ログインに失敗しました。もう一度お試しください。';
         }
         
         // アラートポップアップを表示
