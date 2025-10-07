@@ -239,6 +239,66 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "logout successful"})
 }
 
+func (h *AuthHandler) FindUsersHandler(c *gin.Context) {
+	query := c.Query("query")
+	searchType := c.Query("searchType")
+
+	users, err := h.userRepo.FindUsers(query, searchType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find users"})
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
+}
+
+type UpdateUserDisplayNameRequest struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+}
+
+func (h *AuthHandler) UpdateUserDisplayNameByRoot(c *gin.Context) {
+	var req UpdateUserDisplayNameRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if the user has root role
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
+		return
+	}
+	user := userCtx.(*models.User)
+
+	userWithRoles, err := h.userRepo.GetUserWithRoles(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
+	}
+
+	isRoot := false
+	for _, role := range userWithRoles.Roles {
+		if role.Name == "root" {
+			isRoot = true
+			break
+		}
+	}
+
+	if !isRoot {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to update user display name"})
+		return
+	}
+
+	if err := h.userRepo.UpdateUserDisplayName(req.UserID, req.DisplayName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User display name updated successfully"})
+}
+
 func generateStateOauthCookie(w http.ResponseWriter) string {
 	var expiration = time.Now().Add(20 * time.Minute)
 	b := make([]byte, 16)
