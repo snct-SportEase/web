@@ -102,6 +102,8 @@ CREATE TABLE matches (
     tournament_id INT, -- FK
     round INT,
     match_number_in_round INT,
+    match_start_time TIMESTAMP NULL,
+    match_end_time TIMESTAMP NULL,
     team1_id INT, -- FK
     team2_id INT, -- FK
     team1_score INT,

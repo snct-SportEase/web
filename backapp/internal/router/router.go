@@ -101,6 +101,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 			{
 				rootSports.GET("", sportHandler.GetAllSportsHandler)
 				rootSports.POST("", sportHandler.CreateSportHandler)
+				rootSports.GET("/:id/teams", sportHandler.GetTeamsBySportHandler)
 			}
 			// User management routes that require 'root' role
 			rootUsers := root.Group("/users")
