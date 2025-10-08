@@ -13,6 +13,7 @@ type SportRepository interface {
 	GetSportsByEventID(eventID int) ([]*models.EventSport, error)
 	AssignSportToEvent(eventSport *models.EventSport) error
 	DeleteSportFromEvent(eventID int, sportID int) error
+	GetTeamsBySportID(sportID int) ([]*models.Team, error)
 }
 
 type sportRepository struct {
@@ -103,4 +104,24 @@ func (r *sportRepository) DeleteSportFromEvent(eventID int, sportID int) error {
 	query := "DELETE FROM event_sports WHERE event_id = ? AND sport_id = ?"
 	_, err := r.db.Exec(query, eventID, sportID)
 	return err
+}
+
+// GetTeamsBySportID retrieves all teams for a given sport ID from the database.
+func (r *sportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, error) {
+	query := "SELECT id, name, class_id, sport_id, event_id FROM teams WHERE sport_id = ?"
+	rows, err := r.db.Query(query, sportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []*models.Team
+	for rows.Next() {
+		team := &models.Team{}
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID); err != nil {
+			return nil, err
+		}
+		teams = append(teams, team)
+	}
+	return teams, nil
 }

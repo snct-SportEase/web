@@ -119,3 +119,21 @@ func (h *SportHandler) DeleteSportFromEventHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Sport deleted from event successfully"})
 }
+
+// GetTeamsBySportHandler handles the request to get all teams for a specific sport.
+func (h *SportHandler) GetTeamsBySportHandler(c *gin.Context) {
+	sportIDStr := c.Param("id")
+	sportID, err := strconv.Atoi(sportIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sport ID"})
+		return
+	}
+
+	teams, err := h.sportRepo.GetTeamsBySportID(sportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve teams for the sport"})
+		return
+	}
+
+	c.JSON(http.StatusOK, teams)
+}
