@@ -6,11 +6,10 @@
     let selectedSportId = null;
     let participants = [];
     let matchDuration = 30; // Default match duration in minutes
-    const API_BASE_URL = 'http://localhost:8080'; // TODO: Make this configurable
 
     onMount(async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/root/sports`);
+            const response = await fetch(`/api/root/sports`);
             if (response.ok) {
                 sports = await response.json();
             } else {
@@ -27,7 +26,7 @@
             return;
         }
         try {
-            const response = await fetch(`${API_BASE_URL}/api/root/sports/${sportId}/teams`);
+            const response = await fetch(`/api/root/sports/${sportId}/teams`);
             if (response.ok) {
                 teams = await response.json();
             } else {
@@ -51,11 +50,13 @@
     }
 
     async function generateTournament() {
-        const { BracketsViewer } = window.bracketsViewer;
-        const { BracketsManager } = window.bracketsManager;
+        if (participants.length < 2) {
+            alert('トーナメントを生成するには、少なくとも2チームの参加者が必要です。');
+            return;
+        }
 
-        const viewer = new BracketsViewer();
-        const manager = new BracketsManager(viewer);
+        const viewer = new window.BracketsViewer();
+        const manager = new window.BracketsManager(viewer);
 
         const participantNames = participants.map(p => p.name);
 
@@ -67,27 +68,8 @@
             settings: { seedOrdering: ['natural'] },
         });
 
-        viewer.render({
-            stages: manager.storage.stage,
-            matches: manager.storage.match,
-            matchGames: manager.storage.match_game,
-            participants: manager.storage.participant,
-        }, {
-            customRoundCallback: (round, roundNumber) => {
-                const roundName = document.createElement('h3');
-                roundName.innerText = `Round ${roundNumber}`;
-
-                const roundDate = document.createElement('p');
-                const date = new Date();
-                date.setMinutes(date.getMinutes() + (roundNumber - 1) * matchDuration);
-                roundDate.innerText = `Est. time: ${date.toLocaleTimeString()}`;
-
-                const fragment = document.createDocumentFragment();
-                fragment.append(roundName, roundDate);
-
-                return fragment;
-            },
-        });
+        const viewerElement = document.querySelector('#viewer');
+        viewer.render(viewerElement, manager.get.storage());
     }
 
     $: {

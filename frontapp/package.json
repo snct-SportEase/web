@@ -41,6 +41,8 @@
 	],
 	"dependencies": {
 		"@supabase/ssr": "^0.7.0",
-		"@supabase/supabase-js": "^2.58.0"
+		"@supabase/supabase-js": "^2.58.0",
+		"brackets-manager": "^1.7.0",
+		"brackets-viewer": "^1.8.1"
 	}
 }
