@@ -32,5 +32,17 @@ export default defineConfig({
 				}
 			}
 		]
-	}
+	},
+	optimizeDeps: {
+    	// 開発サーバー用
+    	include: ['brackets-viewer'], 
+  	},
+  	build: {
+    	rollupOptions: {
+      	external: [
+        	// ビルド用 (SSRビルドで問題が起きているため)
+        	'brackets-viewer',
+      	],
+    	},
+  	},
 });

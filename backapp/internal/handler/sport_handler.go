@@ -26,6 +26,12 @@ func (h *SportHandler) GetAllSportsHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve sports"})
 		return
 	}
+
+	if sports == nil {
+		c.JSON(http.StatusOK, []*models.Sport{})
+		return
+	}
+
 	c.JSON(http.StatusOK, sports)
 }
 
