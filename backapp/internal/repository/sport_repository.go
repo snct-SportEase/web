@@ -9,6 +9,7 @@ import (
 // SportRepository defines the interface for sport and event_sport related database operations.
 type SportRepository interface {
 	GetAllSports() ([]*models.Sport, error)
+	GetSportByID(sportID int) (*models.Sport, error)
 	CreateSport(sport *models.Sport) (int64, error)
 	GetSportsByEventID(eventID int) ([]*models.EventSport, error)
 	AssignSportToEvent(eventSport *models.EventSport) error
@@ -57,6 +58,20 @@ func (r *sportRepository) CreateSport(sport *models.Sport) (int64, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+// GetSportByID retrieves a sport by its ID.
+func (r *sportRepository) GetSportByID(sportID int) (*models.Sport, error) {
+	query := "SELECT id, name FROM sports WHERE id = ?"
+	sport := &models.Sport{}
+	err := r.db.QueryRow(query, sportID).Scan(&sport.ID, &sport.Name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("sport not found")
+		}
+		return nil, err
+	}
+	return sport, nil
 }
 
 // GetSportsByEventID retrieves all sports assigned to a specific event.

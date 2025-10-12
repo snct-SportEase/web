@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -12,11 +13,19 @@ import (
 // SportHandler handles sport-related API requests.
 type SportHandler struct {
 	sportRepo repository.SportRepository
+	classRepo repository.ClassRepository
+	teamRepo  repository.TeamRepository
+	eventRepo repository.EventRepository
 }
 
 // NewSportHandler creates a new instance of SportHandler.
-func NewSportHandler(sportRepo repository.SportRepository) *SportHandler {
-	return &SportHandler{sportRepo: sportRepo}
+func NewSportHandler(sportRepo repository.SportRepository, classRepo repository.ClassRepository, teamRepo repository.TeamRepository, eventRepo repository.EventRepository) *SportHandler {
+	return &SportHandler{
+		sportRepo: sportRepo,
+		classRepo: classRepo,
+		teamRepo:  teamRepo,
+		eventRepo: eventRepo,
+	}
 }
 
 // GetAllSportsHandler handles the request to get all sports.
@@ -48,13 +57,14 @@ func (h *SportHandler) CreateSportHandler(c *gin.Context) {
 		return
 	}
 
+	// Create the sport
 	id, err := h.sportRepo.CreateSport(&sport)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create sport"})
 		return
 	}
-
 	sport.ID = int(id)
+
 	c.JSON(http.StatusCreated, sport)
 }
 
@@ -97,6 +107,34 @@ func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
 	if err := h.sportRepo.AssignSportToEvent(&eventSport); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign sport to the event"})
 		return
+	}
+
+	// Get sport details
+	sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve sport details"})
+		return
+	}
+
+	// Get all classes
+	classes, err := h.classRepo.GetAllClasses()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve classes"})
+		return
+	}
+
+	// Create teams for each class
+	for _, class := range classes {
+		team := &models.Team{
+			Name:    fmt.Sprintf("%s_%s", sport.Name, class.Name),
+			ClassID: class.ID,
+			SportID: sport.ID,
+			EventID: eventID,
+		}
+		if _, err := h.teamRepo.CreateTeam(team); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create team"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Sport assigned to event successfully"})
