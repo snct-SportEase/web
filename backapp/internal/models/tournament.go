@@ -91,3 +91,11 @@ type TournamentData struct {
 type TeamName struct {
 	Name string `json:"name"`
 }
+
+type GeneratedTournament struct {
+	EventID        int            `json:"event_id"`
+	SportID        int            `json:"sport_id"`
+	SportName      string         `json:"sport_name"`
+	TournamentData TournamentData `json:"tournament_data"`
+	ShuffledTeams  []Team         `json:"shuffled_teams"`
+}

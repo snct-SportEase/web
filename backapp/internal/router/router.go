@@ -100,6 +100,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 				rootEvents.PUT("/active", eventHandler.SetActiveEvent)
 				rootEvents.POST("/:event_id/tournaments/generate-all", tournHandler.GenerateAllTournamentsHandler)
+				rootEvents.POST("/:event_id/tournaments/generate-preview", tournHandler.GenerateAllTournamentsPreviewHandler)
+				rootEvents.POST("/:event_id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)
 				rootEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 			}
 			// Sport management routes that require 'root' role

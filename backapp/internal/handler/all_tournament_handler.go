@@ -44,6 +44,99 @@ func (h *TournamentHandler) GetTournamentsByEventHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, tournaments)
 }
 
+func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+
+	sports, err := h.sportRepo.GetSportsByEventID(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event", "details": err.Error()})
+		return
+	}
+
+	generatedTournaments := make([]models.GeneratedTournament, 0)
+
+	for _, eventSport := range sports {
+		sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
+		if err != nil {
+			continue // Log this error
+		}
+
+		teams, err := h.sportRepo.GetTeamsBySportID(sport.ID)
+		if err != nil {
+			continue // Log this error
+		}
+
+		if len(teams) <= 1 {
+			continue
+		}
+
+		// check if the number of teams is a power of 2
+		if (len(teams) & (len(teams) - 1)) != 0 {
+			continue
+		}
+
+		tournamentData, shuffledTeams := generateTournamentStructure(teams)
+
+		// Convert []*models.Team to []models.Team
+		teamsSlice := make([]models.Team, len(shuffledTeams))
+		for i, t := range shuffledTeams {
+			if t != nil {
+				teamsSlice[i] = *t
+			}
+		}
+		generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
+			EventID:        eventID,
+			SportID:        sport.ID,
+			SportName:      sport.Name,
+			TournamentData: *tournamentData,
+			ShuffledTeams:  teamsSlice,
+		})
+	}
+
+	c.JSON(http.StatusOK, generatedTournaments)
+}
+
+func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+
+	var tournamentsToCreate []models.GeneratedTournament
+	if err := c.ShouldBindJSON(&tournamentsToCreate); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// First, delete existing tournaments for this event
+	if err := h.tournRepo.DeleteTournamentsByEventID(eventID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete existing tournaments", "details": err.Error()})
+		return
+	}
+
+	// Then, save the new tournaments
+	for _, t := range tournamentsToCreate {
+		// Convert []models.Team to []*models.Team
+		shuffledTeamsPtr := make([]*models.Team, len(t.ShuffledTeams))
+		for i := range t.ShuffledTeams {
+			shuffledTeamsPtr[i] = &t.ShuffledTeams[i]
+		}
+		err := h.tournRepo.SaveTournament(t.EventID, t.SportID, t.SportName, &t.TournamentData, shuffledTeamsPtr)
+		if err != nil {
+			// Attempt to rollback or handle partial save might be needed here
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + t.SportName, "details": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tournaments created successfully."})
+}
+
 func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Param("event_id"))
 	if err != nil {
