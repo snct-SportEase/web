@@ -28,7 +28,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo, eventRepo)
 
 	sportRepo := repository.NewSportRepository(db)
-	sportHandler := handler.NewSportHandler(sportRepo)
+	teamRepo := repository.NewTeamRepository(db)
+	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo)
 
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
 

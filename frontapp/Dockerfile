@@ -22,7 +22,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
 # Expose the port the app will run on
-EXPOSE 3000
+EXPOSE 3300
 
 # Set the command to start the server
 # The server will listen on 0.0.0.0 by default through HOST=0.0.0.0

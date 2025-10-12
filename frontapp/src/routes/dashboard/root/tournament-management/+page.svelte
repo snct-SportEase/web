@@ -29,6 +29,7 @@
             const response = await fetch(`/api/root/sports/${sportId}/teams`);
             if (response.ok) {
                 teams = await response.json();
+                console.log('teams', teams);
             } else {
                 console.error('Failed to fetch teams');
                 teams = [];
