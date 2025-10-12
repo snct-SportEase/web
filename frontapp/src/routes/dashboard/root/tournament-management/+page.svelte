@@ -7,8 +7,10 @@
     let sports = [];
     let teams = [];
     let selectedSportId = null;
-    let isGeneratingAll = false;
+    let isGenerating = false;
+    let isSaving = false;
     let allTournaments = [];
+    let generatedTournamentsPreview = null;
 
     onMount(async () => {
         try {
@@ -47,61 +49,88 @@
         }
     }
 
-    async function generateTournament() {
-        try {
-            const response = await fetch('/api/root/tournaments/generate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(teams),
-            });
-
-            if (response.ok) {
-                const tournamentData = await response.json();
-                const wrapperElement = document.getElementById('viewer-individual');
-                wrapperElement.innerHTML = ''; // Clear previous bracket
-                createBracket(tournamentData, wrapperElement);
-            } else {
-                const error = await response.json();
-                alert(`トーナメントの生成に失敗しました: ${error.error}`);
-            }
-        } catch (error) {
-            console.error('Error generating tournament:', error);
-            alert('トーナメントの生成中にエラーが発生しました。');
-        }
-    }
-
-    async function generateAllTournaments() {
+    async function previewAllTournaments() {
         const currentEvent = get(activeEvent);
         if (!currentEvent) {
             alert('アクティブな大会が設定されていません。');
             return;
         }
 
-        if (!confirm(`「${currentEvent.name}」の全競技のトーナメントを生成します。よろしいですか？既存のトーナメントは削除されます。`)) {
+        if (!confirm(`「${currentEvent.name}」の全競技のトーナメントプレビューを生成します。よろしいですか？`)) {
             return;
         }
 
-        isGeneratingAll = true;
-        allTournaments = [];
+        isGenerating = true;
+        generatedTournamentsPreview = null;
         try {
-            const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/generate-all`, {
+            const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/generate-preview`, {
                 method: 'POST',
+            });
+
+            if (response.ok) {
+                const previewData = await response.json();
+                generatedTournamentsPreview = previewData;
+                // Adapt preview data to the format expected by the UI
+                allTournaments = previewData.map((t, index) => ({
+                    id: `preview-${index}`,
+                    name: t.sport_name,
+                    data: t.tournament_data,
+                }));
+                alert('トーナメントのプレビューが生成されました。内容を確認して保存してください。');
+                // Render brackets for preview
+                setTimeout(() => {
+                    allTournaments.forEach(tournament => {
+                        const wrapper = document.getElementById(`bracket-${tournament.id}`);
+                        if (wrapper && tournament.data) {
+                            wrapper.innerHTML = ''; // Clear previous bracket
+                            createBracket(tournament.data, wrapper);
+                        }
+                    });
+                }, 0);
+            } else {
+                const result = await response.json();
+                alert(`エラー: ${result.error || '不明なエラー'}`);
+            }
+        } catch (error) {
+            console.error('Error generating tournament preview:', error);
+            alert('トーナメントプレビューの生成中にエラーが発生しました。');
+        } finally {
+            isGenerating = false;
+        }
+    }
+
+    async function saveAllTournaments() {
+        const currentEvent = get(activeEvent);
+        if (!currentEvent || !generatedTournamentsPreview) {
+            alert('保存するトーナメントデータがありません。');
+            return;
+        }
+
+        if (!confirm('現在のプレビューをデータベースに保存します。よろしいですか？既存のトーナメントは上書きされます。')) {
+            return;
+        }
+
+        isSaving = true;
+        try {
+            const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/bulk-create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(generatedTournamentsPreview),
             });
 
             const result = await response.json();
             if (response.ok) {
-                alert(result.message || '全トーナメントの生成が正常に完了しました。');
-                await fetchTournamentsForActiveEvent();
+                alert(result.message || 'トーナメントが正常に保存されました。');
+                generatedTournamentsPreview = null; // Clear preview data
+                await fetchTournamentsForActiveEvent(); // Refresh with data from DB
             } else {
                 alert(`エラー: ${result.error || '不明なエラー'}`);
             }
         } catch (error) {
-            console.error('Error generating all tournaments:', error);
-            alert('全トーナメントの生成中にエラーが発生しました。');
+            console.error('Error saving all tournaments:', error);
+            alert('トーナメントの保存中にエラーが発生しました。');
         } finally {
-            isGeneratingAll = false;
+            isSaving = false;
         }
     }
 
@@ -113,11 +142,13 @@
             const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments`);
             if (response.ok) {
                 allTournaments = await response.json();
+                generatedTournamentsPreview = null; // Ensure preview is cleared
                 // Use timeout to ensure DOM is updated before creating brackets
                 setTimeout(() => {
                     allTournaments.forEach(tournament => {
                         const wrapper = document.getElementById(`bracket-${tournament.id}`);
                         if (wrapper && tournament.data) {
+                            wrapper.innerHTML = ''; // Clear previous bracket
                             createBracket(tournament.data, wrapper);
                         }
                     });
@@ -141,47 +172,32 @@
 
 <h1 class="text-2xl font-bold mb-4">トーナメント生成・管理</h1>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-    <div class="md:col-span-1 space-y-6">
+<div>
+    <div>
         <div>
             <h2 class="text-xl font-semibold mb-3">一括トーナメント生成</h2>
             <div class="space-y-4 p-4 border rounded-lg">
-                <p class="text-sm text-gray-600">現在アクティブな大会に登録されている全ての競技のトーナメントを一括で生成します。</p>
+                <p class="text-sm text-gray-600">現在アクティブな大会に登録されている全ての競技のトーナメントをプレビューし、保存します。</p>
                 {#if $activeEvent}
                     <p class="text-sm">アクティブな大会: <span class="font-bold">{$activeEvent.name}</span></p>
                 {/if}
-                <button on:click={generateAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" disabled={!$activeEvent || isGeneratingAll}>
-                    {isGeneratingAll ? '生成中...' : '全トーナメントを一括生成'}
+                <button on:click={previewAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled={!$activeEvent || isGenerating}>
+                    {isGenerating ? 'プレビュー生成中...' : 'トーナメントプレビューを生成'}
                 </button>
-            </div>
-        </div>
-        <div>
-            <h2 class="text-xl font-semibold mb-3">個別トーナメント表示</h2>
-            <div class="space-y-4 p-4 border rounded-lg">
-                <div>
-                    <label for="sport-select" class="block text-sm font-medium text-gray-700">競技選択</label>
-                    <select id="sport-select" bind:value={selectedSportId} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value={null}>-- 競技を選択 --</option>
-                        {#each sports as sport}
-                            <option value={sport.id}>{sport.name}</option>
-                        {/each}
-                    </select>
-                </div>
-                <button on:click={generateTournament} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" disabled={!selectedSportId || teams.length < 2}>
-                    個別トーナメント表示
-                </button>
-                 <div class="pt-4">
-                    <div id="viewer-individual"></div>
-                </div>
+                {#if generatedTournamentsPreview}
+                    <button on:click={saveAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" disabled={isSaving}>
+                        {isSaving ? '保存中...' : 'プレビューをDBに保存'}
+                    </button>
+                {/if}
             </div>
         </div>
     </div>
 
-    <div class="md:col-span-2 space-y-6">
-        {#if allTournaments.length > 0}
-            <h2 class="text-xl font-semibold">生成済みトーナメント一覧</h2>
+    <div class="mt-16">
+        {#if allTournaments && allTournaments.length > 0}
+            <h2 class="text-xl font-semibold">{generatedTournamentsPreview ? 'プレビュー中のトーナメント' : '生成済みトーナメント一覧'}</h2>
             {#each allTournaments as tournament (tournament.id)}
-                <div class="p-4 border rounded-lg">
+                <div class="p-4 border rounded-lg mb-8">
                     <h3 class="text-lg font-bold mb-2">{tournament.name}</h3>
                     <div id="bracket-{tournament.id}"></div>
                 </div>
@@ -189,7 +205,7 @@
         {:else}
             <div class="p-4 border rounded-lg text-center text-gray-500">
                 <p>表示するトーナメントがありません。</p>
-                <p>「全トーナメントを一括生成」ボタンを押して、トーナメントを作成してください。</p>
+                <p>「トーナメントプレビューを生成」ボタンを押して、トーナメントを作成してください。</p>
             </div>
         {/if}
     </div>
