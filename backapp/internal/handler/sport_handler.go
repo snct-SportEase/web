@@ -126,7 +126,7 @@ func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
 	// Create teams for each class
 	for _, class := range classes {
 		team := &models.Team{
-			Name:    fmt.Sprintf("%s_%s", sport.Name, class.Name),
+			Name:    fmt.Sprintf("%s_%s_%d", class.Name, sport.Name, eventID),
 			ClassID: class.ID,
 			SportID: sport.ID,
 			EventID: eventID,
