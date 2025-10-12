@@ -33,6 +33,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
 
+	tournRepo := repository.NewTournamentRepository(db)
+	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo)
+
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -96,6 +99,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				rootEvents.POST("", eventHandler.CreateEvent)
 				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 				rootEvents.PUT("/active", eventHandler.SetActiveEvent)
+				rootEvents.POST("/:event_id/tournaments/generate-all", tournHandler.GenerateAllTournamentsHandler)
+				rootEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 			}
 			// Sport management routes that require 'root' role
 			rootSports := root.Group("/sports")
@@ -109,11 +114,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 			{
 				rootUsers.GET("", authHandler.FindUsersHandler)
 				rootUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByRoot)
-			}
-
-			rootTournaments := root.Group("/tournaments")
-			{
-				rootTournaments.POST("/generate", handler.GenerateTournamentHandler)
 			}
 		}
 	}
