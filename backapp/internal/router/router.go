@@ -110,6 +110,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				rootUsers.GET("", authHandler.FindUsersHandler)
 				rootUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByRoot)
 			}
+
+			rootTournaments := root.Group("/tournaments")
+			{
+				rootTournaments.POST("/generate", handler.GenerateTournamentHandler)
+			}
 		}
 	}
 
