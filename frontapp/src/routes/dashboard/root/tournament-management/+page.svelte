@@ -75,8 +75,8 @@
 
 <h1 class="text-2xl font-bold mb-4">トーナメント生成・管理</h1>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div class="col-span-1">
+<div>
+    <div>
         <div class="mb-4">
             <label for="sport-select" class="block text-sm font-medium text-gray-700">競技選択</label>
             <select id="sport-select" bind:value={selectedSportId} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
@@ -97,7 +97,7 @@
         </button>
     </div>
 
-    <div class="col-span-2">
+    <div class="pt-8">
         <div id="viewer"></div>
     </div>
 </div>
