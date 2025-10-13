@@ -9,10 +9,12 @@ import (
 // SportRepository defines the interface for sport and event_sport related database operations.
 type SportRepository interface {
 	GetAllSports() ([]*models.Sport, error)
+	GetSportByID(sportID int) (*models.Sport, error)
 	CreateSport(sport *models.Sport) (int64, error)
 	GetSportsByEventID(eventID int) ([]*models.EventSport, error)
 	AssignSportToEvent(eventSport *models.EventSport) error
 	DeleteSportFromEvent(eventID int, sportID int) error
+	GetTeamsBySportID(sportID int) ([]*models.Team, error)
 }
 
 type sportRepository struct {
@@ -56,6 +58,20 @@ func (r *sportRepository) CreateSport(sport *models.Sport) (int64, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+// GetSportByID retrieves a sport by its ID.
+func (r *sportRepository) GetSportByID(sportID int) (*models.Sport, error) {
+	query := "SELECT id, name FROM sports WHERE id = ?"
+	sport := &models.Sport{}
+	err := r.db.QueryRow(query, sportID).Scan(&sport.ID, &sport.Name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("sport not found")
+		}
+		return nil, err
+	}
+	return sport, nil
 }
 
 // GetSportsByEventID retrieves all sports assigned to a specific event.
@@ -103,4 +119,24 @@ func (r *sportRepository) DeleteSportFromEvent(eventID int, sportID int) error {
 	query := "DELETE FROM event_sports WHERE event_id = ? AND sport_id = ?"
 	_, err := r.db.Exec(query, eventID, sportID)
 	return err
+}
+
+// GetTeamsBySportID retrieves all teams for a given sport ID from the database.
+func (r *sportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, error) {
+	query := "SELECT id, name, class_id, sport_id, event_id FROM teams WHERE sport_id = ?"
+	rows, err := r.db.Query(query, sportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []*models.Team
+	for rows.Next() {
+		team := &models.Team{}
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID); err != nil {
+			return nil, err
+		}
+		teams = append(teams, team)
+	}
+	return teams, nil
 }
