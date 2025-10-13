@@ -1,6 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { activeEvent } from '$lib/stores/eventStore.js';
+    import { marked } from 'marked';
 
     let allSports = [];
     let eventSports = [];
@@ -282,7 +283,15 @@
                         <!-- ルール -->
                         <div>
                             <label for="rules" class="block text-sm font-medium text-gray-700 mb-1">ルール詳細 (任意)</label>
-                            <textarea id="rules" bind:value={newAssignment.rules} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-32" placeholder="競技のルール詳細"></textarea>
+                            <textarea id="rules" bind:value={newAssignment.rules} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-32" placeholder="競技のルール詳細をMarkdownで記述"></textarea>
+                        </div>
+
+                        <!-- プレビュー -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">プレビュー</label>
+                            <div class="prose mt-1 p-2 border rounded-md bg-gray-100 min-h-[8rem]">
+                                {@html marked(newAssignment.rules)}
+                            </div>
                         </div>
                         
                         <button on:click={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150" disabled={!newAssignment.sport_id}>

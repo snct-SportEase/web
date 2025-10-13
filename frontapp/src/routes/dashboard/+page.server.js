@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { BACKEND_URL } from '$env/static/private';
 
 /** @type {import('./$types').PageServerLoad} */
-export async function load({ locals, fetch }) {
+export async function load({ locals, fetch, request }) {
   const returnData = { user: locals.user, classes: [], events: [] };
 
   try {
@@ -21,7 +21,7 @@ export async function load({ locals, fetch }) {
       try {
         const eventResponse = await fetch(`${BACKEND_URL}/api/root/events`, {
             headers: {
-                'cookie': locals.request.headers.get('cookie'),
+                'cookie': request.headers.get('cookie'),
             }
         });
         if (eventResponse.ok) {
@@ -37,8 +37,8 @@ export async function load({ locals, fetch }) {
 
 /** @type {import('./$types').Actions} */
 export const actions = {
-  logout: async ({ fetch, locals }) => {
-    const sessionCookie = locals.request.headers.get('cookie');
+  logout: async ({ fetch, locals, request }) => {
+    const sessionCookie = request.headers.get('cookie');
     await fetch(`${BACKEND_URL}/api/auth/logout`, {
         method: 'POST',
         headers: {
