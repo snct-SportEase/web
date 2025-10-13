@@ -31,7 +31,7 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 	}
 	defer rows.Close()
 
-	var tournaments []*models.Tournament
+	tournaments := make([]*models.Tournament, 0)
 	for rows.Next() {
 		var t models.Tournament
 		if err := rows.Scan(&t.ID, &t.Name, &t.SportID); err != nil {
