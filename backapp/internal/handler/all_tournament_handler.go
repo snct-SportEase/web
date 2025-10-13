@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"fmt"
 	"math"
 	"math/rand"
 	"net/http"
@@ -60,6 +61,7 @@ func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context)
 	generatedTournaments := make([]models.GeneratedTournament, 0)
 
 	for _, eventSport := range sports {
+		roundBusyClasses := make(map[int]map[int]bool)
 		sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
 		if err != nil {
 			continue // Log this error
@@ -70,16 +72,10 @@ func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context)
 			continue // Log this error
 		}
 
-		if len(teams) <= 1 {
+		tournamentData, shuffledTeams, err := generateTournamentStructure(teams, roundBusyClasses)
+		if err != nil {
 			continue
 		}
-
-		// check if the number of teams is a power of 2
-		if (len(teams) & (len(teams) - 1)) != 0 {
-			continue
-		}
-
-		tournamentData, shuffledTeams := generateTournamentStructure(teams)
 
 		// Convert []*models.Team to []models.Team
 		teamsSlice := make([]models.Team, len(shuffledTeams))
@@ -156,6 +152,7 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 	}
 
 	for _, eventSport := range sports {
+		roundBusyClasses := make(map[int]map[int]bool)
 		sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
 		if err != nil {
 			continue
@@ -166,15 +163,10 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 			continue
 		}
 
-		if len(teams) <= 1 {
+		tournamentData, shuffledTeams, err := generateTournamentStructure(teams, roundBusyClasses)
+		if err != nil {
 			continue
 		}
-
-		if (len(teams) & (len(teams) - 1)) != 0 {
-			continue
-		}
-
-		tournamentData, shuffledTeams := generateTournamentStructure(teams)
 
 		err = h.tournRepo.SaveTournament(eventID, sport.ID, sport.Name, tournamentData, shuffledTeams)
 		if err != nil {
@@ -186,9 +178,35 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Tournaments generated successfully for all eligible sports."})
 }
 
-func generateTournamentStructure(teams []*models.Team) (*models.TournamentData, []*models.Team) {
-	shuffledTeams := make([]*models.Team, len(teams))
-	copy(shuffledTeams, teams)
+func generateTournamentStructure(teams []*models.Team, roundBusyClasses map[int]map[int]bool) (*models.TournamentData, []*models.Team, error) {
+	availableTeams := make([]*models.Team, 0)
+	if roundBusyClasses[0] == nil {
+		roundBusyClasses[0] = make(map[int]bool)
+	}
+
+	for _, team := range teams {
+		if !roundBusyClasses[0][team.ClassID] {
+			availableTeams = append(availableTeams, team)
+		}
+	}
+
+	if len(availableTeams) <= 1 || (len(availableTeams)&(len(availableTeams)-1)) != 0 {
+		return nil, nil, fmt.Errorf("invalid number of available teams to form a tournament: %d", len(availableTeams))
+	}
+
+	numRounds := int(math.Log2(float64(len(availableTeams))))
+
+	for _, team := range availableTeams {
+		for i := 0; i < numRounds; i++ {
+			if roundBusyClasses[i] == nil {
+				roundBusyClasses[i] = make(map[int]bool)
+			}
+			roundBusyClasses[i][team.ClassID] = true
+		}
+	}
+
+	shuffledTeams := make([]*models.Team, len(availableTeams))
+	copy(shuffledTeams, availableTeams)
 
 	source := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(source)
@@ -204,7 +222,6 @@ func generateTournamentStructure(teams []*models.Team) (*models.TournamentData, 
 		}
 	}
 
-	numRounds := int(math.Log2(float64(len(shuffledTeams))))
 	rounds := make([]models.Round, numRounds)
 
 	var roundNames []string
@@ -280,5 +297,5 @@ func generateTournamentStructure(teams []*models.Team) (*models.TournamentData, 
 		Contestants: contestants,
 	}
 
-	return &tournamentData, shuffledTeams
+	return &tournamentData, shuffledTeams, nil
 }
