@@ -29,11 +29,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 	sportRepo := repository.NewSportRepository(db)
 	teamRepo := repository.NewTeamRepository(db)
-	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo)
+	tournRepo := repository.NewTournamentRepository(db)
+	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo, tournRepo)
 
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
 
-	tournRepo := repository.NewTournamentRepository(db)
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo)
 
 	// ヘルスチェック用のエンドポイント

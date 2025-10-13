@@ -7,6 +7,7 @@ import (
 
 type TeamRepository interface {
 	CreateTeam(team *models.Team) (int64, error)
+	DeleteTeamsByEventAndSportID(eventID int, sportID int) error
 }
 
 type teamRepository struct {
@@ -28,4 +29,10 @@ func (r *teamRepository) CreateTeam(team *models.Team) (int64, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+func (r *teamRepository) DeleteTeamsByEventAndSportID(eventID int, sportID int) error {
+	query := "DELETE FROM teams WHERE event_id = ? AND sport_id = ?"
+	_, err := r.db.Exec(query, eventID, sportID)
+	return err
 }

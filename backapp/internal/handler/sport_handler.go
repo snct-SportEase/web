@@ -16,15 +16,17 @@ type SportHandler struct {
 	classRepo repository.ClassRepository
 	teamRepo  repository.TeamRepository
 	eventRepo repository.EventRepository
+	tournRepo repository.TournamentRepository
 }
 
 // NewSportHandler creates a new instance of SportHandler.
-func NewSportHandler(sportRepo repository.SportRepository, classRepo repository.ClassRepository, teamRepo repository.TeamRepository, eventRepo repository.EventRepository) *SportHandler {
+func NewSportHandler(sportRepo repository.SportRepository, classRepo repository.ClassRepository, teamRepo repository.TeamRepository, eventRepo repository.EventRepository, tournRepo repository.TournamentRepository) *SportHandler {
 	return &SportHandler{
 		sportRepo: sportRepo,
 		classRepo: classRepo,
 		teamRepo:  teamRepo,
 		eventRepo: eventRepo,
+		tournRepo: tournRepo,
 	}
 }
 
@@ -156,6 +158,19 @@ func (h *SportHandler) DeleteSportFromEventHandler(c *gin.Context) {
 		return
 	}
 
+	// Delete tournaments associated with the sport and event
+	if err := h.tournRepo.DeleteTournamentsByEventAndSportID(eventID, sportID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tournaments for the sport"})
+		return
+	}
+
+	// Delete teams associated with the sport and event
+	if err := h.teamRepo.DeleteTeamsByEventAndSportID(eventID, sportID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete teams for the sport"})
+		return
+	}
+
+	// Finally, delete the sport from the event
 	if err := h.sportRepo.DeleteSportFromEvent(eventID, sportID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete sport from the event"})
 		return

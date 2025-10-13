@@ -13,6 +13,7 @@ import (
 type TournamentRepository interface {
 	SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error
 	DeleteTournamentsByEventID(eventID int) error
+	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 }
 
@@ -289,6 +290,55 @@ func (r *tournamentRepository) DeleteTournamentsByEventID(eventID int) error {
 		
 		qMarks := strings.Repeat("?,", len(args)-1) + "?"
 		
+		query := fmt.Sprintf("DELETE FROM matches WHERE tournament_id IN (%s)", qMarks)
+		_, err = tx.Exec(query, args...)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		query = fmt.Sprintf("DELETE FROM tournaments WHERE id IN (%s)", qMarks)
+		_, err = tx.Exec(query, args...)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *tournamentRepository) DeleteTournamentsByEventAndSportID(eventID int, sportID int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	rows, err := tx.Query("SELECT id FROM tournaments WHERE event_id = ? AND sport_id = ?", eventID, sportID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer rows.Close()
+
+	var tournamentIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			tx.Rollback()
+			return err
+		}
+		tournamentIDs = append(tournamentIDs, id)
+	}
+
+	if len(tournamentIDs) > 0 {
+		args := make([]interface{}, len(tournamentIDs))
+		for i, v := range tournamentIDs {
+			args[i] = v
+		}
+
+		qMarks := strings.Repeat("?,", len(args)-1) + "?"
+
 		query := fmt.Sprintf("DELETE FROM matches WHERE tournament_id IN (%s)", qMarks)
 		_, err = tx.Exec(query, args...)
 		if err != nil {
