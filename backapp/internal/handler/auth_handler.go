@@ -22,13 +22,15 @@ import (
 type AuthHandler struct {
 	cfg          *config.Config
 	userRepo     repository.UserRepository
+	eventRepo    repository.EventRepository
 	oauth2Config *oauth2.Config
 }
 
-func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, eventRepo repository.EventRepository) *AuthHandler {
 	return &AuthHandler{
-		cfg:      cfg,
-		userRepo: userRepo,
+		cfg:       cfg,
+		userRepo:  userRepo,
+		eventRepo: eventRepo,
 		oauth2Config: &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
@@ -257,14 +259,13 @@ type UpdateUserDisplayNameRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
-func (h *AuthHandler) UpdateUserDisplayNameByRoot(c *gin.Context) {
+func (h *AuthHandler) UpdateUserDisplayNameByAdmin(c *gin.Context) {
 	var req UpdateUserDisplayNameRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Check if the user has root role
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
@@ -278,15 +279,15 @@ func (h *AuthHandler) UpdateUserDisplayNameByRoot(c *gin.Context) {
 		return
 	}
 
-	isRoot := false
+	isAuthorized := false
 	for _, role := range userWithRoles.Roles {
-		if role.Name == "root" {
-			isRoot = true
+		if role.Name == "root" || role.Name == "admin" {
+			isAuthorized = true
 			break
 		}
 	}
 
-	if !isRoot {
+	if !isAuthorized {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to update user display name"})
 		return
 	}
@@ -297,6 +298,53 @@ func (h *AuthHandler) UpdateUserDisplayNameByRoot(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User display name updated successfully"})
+}
+
+type UpdateUserRoleRequest struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+	Event  *int   `json:"event"`
+}
+
+func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
+	var req UpdateUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
+		return
+	}
+	user := userCtx.(*models.User)
+
+	userWithRoles, err := h.userRepo.GetUserWithRoles(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
+	}
+
+	isAuthorized := false
+	for _, role := range userWithRoles.Roles {
+		if role.Name == "root" || role.Name == "admin" {
+			isAuthorized = true
+			break
+		}
+	}
+
+	if !isAuthorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to update user role"})
+		return
+	}
+
+	if err := h.userRepo.UpdateUserRole(req.UserID, req.Role, req.Event); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
 }
 
 func generateStateOauthCookie(w http.ResponseWriter) string {
