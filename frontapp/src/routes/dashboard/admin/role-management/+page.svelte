@@ -30,8 +30,8 @@
 			let aValue, bValue;
 
 			if (column === 'roles') {
-				aValue = a.roles?.find(r => r.name !== 'student')?.name || '';
-				bValue = b.roles?.find(r => r.name !== 'student')?.name || '';
+				aValue = a.roles?.find(r => !defaultRoles.includes(r.name))?.name || '';
+				bValue = b.roles?.find(r => !defaultRoles.includes(r.name))?.name || '';
 			} else {
 				aValue = a[column] || '';
 				bValue = b[column] || '';
@@ -59,7 +59,7 @@
 			const data = await res.json();
 			console.log("fetchUsersWithRoles:", data);
 			if (Array.isArray(data)) {
-				usersWithRoles = data.filter(u => u.roles && u.roles.some(r => r.name !== 'student'));
+				usersWithRoles = data.filter(u => u.roles && u.roles.some(r => !defaultRoles.includes(r.name)));
 			}
 		}
 	}
@@ -239,7 +239,7 @@
 							{#if user.roles}
 								<div class="flex space-x-2">
 									{#each user.roles as role}
-										{#if role.name !== 'student'}
+										{#if !defaultRoles.includes(role.name)}
 											<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800"										>
 												{role.name}
 											</span>
