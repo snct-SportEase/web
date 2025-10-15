@@ -125,6 +125,10 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 			IsProfileComplete: false,
 		}
 		if err := h.userRepo.CreateUser(newUser); err != nil {
+			if err.Error() == "email not in whitelist" {
+				c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}
@@ -132,15 +136,12 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	} else {
 		// User exists, sync role from whitelist
 		whitelistRole, err := h.userRepo.GetRoleByEmail(user.Email)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get role from whitelist"})
-			return
-		}
-
-		// Add role from whitelist if it doesn't exist
-		if err := h.userRepo.AddUserRoleIfNotExists(user.ID, whitelistRole); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add user role"})
-			return
+		if err == nil {
+			// Add role from whitelist if it doesn't exist
+			if err := h.userRepo.AddUserRoleIfNotExists(user.ID, whitelistRole); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add user role"})
+				return
+			}
 		}
 	}
 
