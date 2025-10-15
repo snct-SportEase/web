@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
+	import EditRoleModal from '../../../../lib/components/EditRoleModal.svelte';
 
 	let usersWithRoles = [];
 	let allUsers = [];
@@ -8,6 +9,16 @@
 	let emailSearch = '';
 	let role = '';
 	let showUserList = false;
+
+	let showEditModal = false;
+	let selectedUserForEdit = null;
+
+	const defaultRoles = ['root', 'admin', 'student'];
+
+	function openEditModal(user) {
+		selectedUserForEdit = user;
+		showEditModal = true;
+	}
 
 	async function fetchUsersWithRoles() {
 		const res = await fetch('/api/admin/users');
@@ -59,6 +70,11 @@
 			return;
 		}
 
+		if (defaultRoles.includes(role.trim().toLowerCase())) {
+			alert('デフォルトのロール（root, admin, student）は割り当てられません。');
+			return;
+		}
+
 		for (const user of selectedUsers) {
 			const updateRes = await fetch('/api/admin/users/role', {
 				method: 'PUT',
@@ -85,6 +101,8 @@
 		fetchUsersWithRoles();
 	});
 </script>
+
+<EditRoleModal bind:showModal={showEditModal} user={selectedUserForEdit} on:roleDeleted={fetchUsersWithRoles} />
 
 <h1 class="text-2xl font-bold mb-4">ロール管理</h1>
 
@@ -135,7 +153,7 @@
                 id="role-name"
                 type="text"
                 bind:value={role}
-                placeholder="例: admin"
+                placeholder="例: role"
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             />
         </div>
@@ -168,7 +186,7 @@
 			</thead>
 			<tbody class="bg-white divide-y divide-gray-200">
 				{#each usersWithRoles as user}
-					<tr class="hover:bg-gray-50">
+					<tr class="hover:bg-gray-50 cursor-pointer" on:click={() => openEditModal(user)}>
 						<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
 							{user.email}
 						</td>

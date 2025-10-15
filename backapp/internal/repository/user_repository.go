@@ -18,6 +18,34 @@ type UserRepository interface {
 	GetRoleByEmail(email string) (string, error)
 	AddUserRoleIfNotExists(userID string, roleName string) error
 	UpdateUserRole(userID string, roleName string, eventID *int) error
+	DeleteUserRole(userID string, roleName string) error
+}
+
+func (r *userRepository) DeleteUserRole(userID string, roleName string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// ロール名からロールIDを取得
+	var roleID int
+	err = tx.QueryRow("SELECT id FROM roles WHERE name = ?", roleName).Scan(&roleID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// ロールが存在しない場合は、何もせずに成功として扱う
+			return nil
+		}
+		return err
+	}
+
+	// user_rolesテーブルからエントリを削除
+	_, err = tx.Exec("DELETE FROM user_roles WHERE user_id = ? AND role_id = ?", userID, roleID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 type userRepository struct {

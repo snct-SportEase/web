@@ -87,6 +87,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				adminUsers.GET("", authHandler.FindUsersHandler)
 				adminUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByAdmin)
 				adminUsers.PUT("/role", authHandler.UpdateUserRoleByAdmin)
+				adminUsers.DELETE("/role", authHandler.DeleteUserRoleByAdmin)
 			}
 		}
 
