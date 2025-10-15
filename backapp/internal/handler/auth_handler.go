@@ -22,13 +22,15 @@ import (
 type AuthHandler struct {
 	cfg          *config.Config
 	userRepo     repository.UserRepository
+	eventRepo    repository.EventRepository
 	oauth2Config *oauth2.Config
 }
 
-func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, eventRepo repository.EventRepository) *AuthHandler {
 	return &AuthHandler{
-		cfg:      cfg,
-		userRepo: userRepo,
+		cfg:       cfg,
+		userRepo:  userRepo,
+		eventRepo: eventRepo,
 		oauth2Config: &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
@@ -123,6 +125,10 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 			IsProfileComplete: false,
 		}
 		if err := h.userRepo.CreateUser(newUser); err != nil {
+			if err.Error() == "email not in whitelist" {
+				c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}
@@ -130,15 +136,12 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	} else {
 		// User exists, sync role from whitelist
 		whitelistRole, err := h.userRepo.GetRoleByEmail(user.Email)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get role from whitelist"})
-			return
-		}
-
-		// Add role from whitelist if it doesn't exist
-		if err := h.userRepo.AddUserRoleIfNotExists(user.ID, whitelistRole); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add user role"})
-			return
+		if err == nil {
+			// Add role from whitelist if it doesn't exist
+			if err := h.userRepo.AddUserRoleIfNotExists(user.ID, whitelistRole); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add user role"})
+				return
+			}
 		}
 	}
 
@@ -257,14 +260,13 @@ type UpdateUserDisplayNameRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
-func (h *AuthHandler) UpdateUserDisplayNameByRoot(c *gin.Context) {
+func (h *AuthHandler) UpdateUserDisplayNameByAdmin(c *gin.Context) {
 	var req UpdateUserDisplayNameRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Check if the user has root role
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
@@ -278,15 +280,15 @@ func (h *AuthHandler) UpdateUserDisplayNameByRoot(c *gin.Context) {
 		return
 	}
 
-	isRoot := false
+	isAuthorized := false
 	for _, role := range userWithRoles.Roles {
-		if role.Name == "root" {
-			isRoot = true
+		if role.Name == "root" || role.Name == "admin" {
+			isAuthorized = true
 			break
 		}
 	}
 
-	if !isRoot {
+	if !isAuthorized {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to update user display name"})
 		return
 	}
@@ -297,6 +299,112 @@ func (h *AuthHandler) UpdateUserDisplayNameByRoot(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User display name updated successfully"})
+}
+
+type UpdateUserRoleRequest struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+	Event  *int   `json:"event"`
+}
+
+func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
+	var req UpdateUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Prevent modification of default roles
+	defaultRoles := []string{"root", "admin", "student"}
+	for _, r := range defaultRoles {
+		if req.Role == r {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot assign default roles"})
+			return
+		}
+	}
+
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
+		return
+	}
+	user := userCtx.(*models.User)
+
+	userWithRoles, err := h.userRepo.GetUserWithRoles(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
+	}
+
+	isAuthorized := false
+	for _, role := range userWithRoles.Roles {
+		if role.Name == "root" || role.Name == "admin" {
+			isAuthorized = true
+			break
+		}
+	}
+
+	if !isAuthorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to update user role"})
+		return
+	}
+
+	if err := h.userRepo.UpdateUserRole(req.UserID, req.Role, req.Event); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
+}
+
+func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
+	var req UpdateUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Prevent modification of default roles
+	defaultRoles := []string{"root", "admin", "student"}
+	for _, r := range defaultRoles {
+		if req.Role == r {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete default roles"})
+			return
+		}
+	}
+
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
+		return
+	}
+	user := userCtx.(*models.User)
+
+	userWithRoles, err := h.userRepo.GetUserWithRoles(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
+	}
+
+	isAuthorized := false
+	for _, role := range userWithRoles.Roles {
+		if role.Name == "root" || role.Name == "admin" {
+			isAuthorized = true
+			break
+		}
+	}
+
+	if !isAuthorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to delete user role"})
+		return
+	}
+
+	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User role deleted successfully"})
 }
 
 func generateStateOauthCookie(w http.ResponseWriter) string {

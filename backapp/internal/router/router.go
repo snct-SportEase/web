@@ -18,13 +18,13 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	router.Use(middleware.CORSMiddleware())
 
 	userRepo := repository.NewUserRepository(db)
-	authHandler := handler.NewAuthHandler(cfg, userRepo)
+	eventRepo := repository.NewEventRepository(db)
+	authHandler := handler.NewAuthHandler(cfg, userRepo, eventRepo)
 
 	classRepo := repository.NewClassRepository(db)
 	classHandler := handler.NewClassHandler(classRepo)
 
 	whitelistRepo := repository.NewWhitelistRepository(db)
-	eventRepo := repository.NewEventRepository(db)
 	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo, eventRepo)
 
 	sportRepo := repository.NewSportRepository(db)
@@ -81,6 +81,14 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 			admin.POST("/events/:id/sports", sportHandler.AssignSportToEventHandler)
 			// Delete a sport from a specific event
 			admin.DELETE("/events/:event_id/sports/:sport_id", sportHandler.DeleteSportFromEventHandler)
+
+			adminUsers := admin.Group("/users")
+			{
+				adminUsers.GET("", authHandler.FindUsersHandler)
+				adminUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByAdmin)
+				adminUsers.PUT("/role", authHandler.UpdateUserRoleByAdmin)
+				adminUsers.DELETE("/role", authHandler.DeleteUserRoleByAdmin)
+			}
 		}
 
 		root := api.Group("/root")
@@ -110,12 +118,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				rootSports.GET("", sportHandler.GetAllSportsHandler)
 				rootSports.POST("", sportHandler.CreateSportHandler)
 				rootSports.GET("/:id/teams", sportHandler.GetTeamsBySportHandler)
-			}
-			// User management routes that require 'root' role
-			rootUsers := root.Group("/users")
-			{
-				rootUsers.GET("", authHandler.FindUsersHandler)
-				rootUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByRoot)
 			}
 		}
 	}

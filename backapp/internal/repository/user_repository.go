@@ -3,6 +3,8 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"errors"
+	"strings"
 )
 
 type UserRepository interface {
@@ -15,6 +17,35 @@ type UserRepository interface {
 	IsEmailWhitelisted(email string) (bool, error)
 	GetRoleByEmail(email string) (string, error)
 	AddUserRoleIfNotExists(userID string, roleName string) error
+	UpdateUserRole(userID string, roleName string, eventID *int) error
+	DeleteUserRole(userID string, roleName string) error
+}
+
+func (r *userRepository) DeleteUserRole(userID string, roleName string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// ロール名からロールIDを取得
+	var roleID int
+	err = tx.QueryRow("SELECT id FROM roles WHERE name = ?", roleName).Scan(&roleID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// ロールが存在しない場合は、何もせずに成功として扱う
+			return nil
+		}
+		return err
+	}
+
+	// user_rolesテーブルからエントリを削除
+	_, err = tx.Exec("DELETE FROM user_roles WHERE user_id = ? AND role_id = ?", userID, roleID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 type userRepository struct {
@@ -30,7 +61,7 @@ func (r *userRepository) GetRoleByEmail(email string) (string, error) {
 	err := r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? AND event_id IS NULL", email).Scan(&roleName)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "student", nil // Not in whitelist, default to student
+			return "", errors.New("email not in whitelist") // Not in whitelist, return error
 		}
 		return "", err // Other DB error
 	}
@@ -107,6 +138,7 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 	defer rows.Close()
 
 	var users []*models.User
+	var userIDs []interface{}
 	for rows.Next() {
 		user := &models.User{}
 		var tempClassID sql.NullInt32
@@ -129,6 +161,41 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 			user.ClassID = nil
 		}
 		users = append(users, user)
+		userIDs = append(userIDs, user.ID)
+	}
+
+	if len(users) == 0 {
+		return users, nil
+	}
+
+	// Fetch roles for all users in a single query
+	rolesQuery := `
+		SELECT ur.user_id, r.id, r.name
+		FROM roles r
+		INNER JOIN user_roles ur ON r.id = ur.role_id
+		WHERE ur.user_id IN (?` + strings.Repeat(",?", len(userIDs)-1) + `)`
+
+	roleRows, err := r.db.Query(rolesQuery, userIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer roleRows.Close()
+
+	rolesMap := make(map[string][]models.Role)
+	for roleRows.Next() {
+		var userID string
+		var role models.Role
+		if err := roleRows.Scan(&userID, &role.ID, &role.Name); err != nil {
+			return nil, err
+		}
+		rolesMap[userID] = append(rolesMap[userID], role)
+	}
+
+	// Assign roles to users
+	for _, user := range users {
+		if roles, ok := rolesMap[user.ID]; ok {
+			user.Roles = roles
+		}
 	}
 
 	return users, nil
@@ -166,9 +233,9 @@ func (r *userRepository) CreateUser(user *models.User) error {
 	var roleName string
 	err = r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? AND event_id IS NULL", user.Email).Scan(&roleName)
 	if err != nil {
-		// ホワイトリストにない場合は'student'ロールを付与
+		// ホワイトリストにない場合はエラーを返す
 		if err == sql.ErrNoRows {
-			roleName = "student"
+			return errors.New("email not in whitelist")
 		} else {
 			return err // その他のDBエラー
 		}
@@ -256,4 +323,46 @@ func (r *userRepository) GetUserWithRoles(userID string) (*models.User, error) {
 
 	user.Roles = roles
 	return user, nil
+}
+
+func (r *userRepository) UpdateUserRole(userID string, roleName string, eventID *int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 新しいロールのIDを取得
+	var roleID int64
+	err = tx.QueryRow("SELECT id FROM roles WHERE name = ?", roleName).Scan(&roleID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Role does not exist, so create it
+			result, err := tx.Exec("INSERT INTO roles (name) VALUES (?)", roleName)
+			if err != nil {
+				return err
+			}
+			roleID, err = result.LastInsertId()
+			if err != nil {
+				return err
+			}
+		} else {
+			// Another database error occurred
+			return err
+		}
+	}
+
+	// REPLACE INTOを使用して、ロールの割り当てをアトミックに行う
+	// これにより、(user_id, role_id)の組み合わせが既存の場合、event_idが更新される
+	if eventID != nil {
+		_, err = tx.Exec("REPLACE INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, ?)", userID, roleID, *eventID)
+	} else {
+		_, err = tx.Exec("REPLACE INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, NULL)", userID, roleID)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
