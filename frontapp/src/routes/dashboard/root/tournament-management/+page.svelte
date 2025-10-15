@@ -137,7 +137,6 @@
             const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments`);
             if (response.ok) {
                 const fetchedTournaments = await response.json();
-                console.log('Fetched tournaments:', fetchedTournaments);
 
                 allTournaments = fetchedTournaments.map(t => {
                     if (typeof t.data === 'string') {
@@ -150,7 +149,6 @@
                     }
                     return t;
                 });
-                console.log('Parsed tournaments:', allTournaments);
 
                 generatedTournamentsPreview = null; // Ensure preview is cleared
                 renderAllBrackets();
