@@ -93,6 +93,10 @@
 		selectedUsers = selectedUsers.filter(u => u.ID !== user.ID);
 	}
 
+	function handleRoleUpdate() {
+		location.reload();
+	}
+
 	async function assignRole() {
 		if (selectedUsers.length === 0) {
 			alert('ユーザーを選択してください。');
@@ -127,7 +131,7 @@
 		alert('選択したユーザーにロールが割り当てられました。');
 		selectedUsers = [];
 		role = '';
-		fetchUsersWithRoles();
+		handleRoleUpdate();
 	}
 
 	onMount(() => {
@@ -135,7 +139,7 @@
 	});
 </script>
 
-<EditRoleModal bind:showModal={showEditModal} user={selectedUserForEdit} on:roleDeleted={fetchUsersWithRoles} />
+<EditRoleModal bind:showModal={showEditModal} user={selectedUserForEdit} on:roleDeleted={handleRoleUpdate} />
 
 <h1 class="text-2xl font-bold mb-4">ロール管理</h1>
 
