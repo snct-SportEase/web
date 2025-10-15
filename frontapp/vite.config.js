@@ -4,6 +4,9 @@ import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	ssr: {
+		noExternal: ['bracketry', 'marked', 'svelte-dnd-action']
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
@@ -32,17 +35,5 @@ export default defineConfig({
 				}
 			}
 		]
-	},
-	optimizeDeps: {
-    	// 開発サーバー用
-    	include: ['brackets-viewer'], 
-  	},
-  	build: {
-    	rollupOptions: {
-      	external: [
-        	// ビルド用 (SSRビルドで問題が起きているため)
-        	'brackets-viewer',
-      	],
-    	},
-  	},
+	}
 });
