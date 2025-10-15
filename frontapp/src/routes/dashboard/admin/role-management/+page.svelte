@@ -57,7 +57,6 @@
 		const res = await fetch('/api/admin/users');
 		if (res.ok) {
 			const data = await res.json();
-			console.log("fetchUsersWithRoles:", data);
 			if (Array.isArray(data)) {
 				usersWithRoles = data.filter(u => u.roles && u.roles.some(r => !defaultRoles.includes(r.name)));
 			}
