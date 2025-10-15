@@ -314,6 +314,15 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 		return
 	}
 
+	// Prevent modification of default roles
+	defaultRoles := []string{"root", "admin", "student"}
+	for _, r := range defaultRoles {
+		if req.Role == r {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot assign default roles"})
+			return
+		}
+	}
+
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
@@ -346,6 +355,56 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
+}
+
+func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
+	var req UpdateUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Prevent modification of default roles
+	defaultRoles := []string{"root", "admin", "student"}
+	for _, r := range defaultRoles {
+		if req.Role == r {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete default roles"})
+			return
+		}
+	}
+
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
+		return
+	}
+	user := userCtx.(*models.User)
+
+	userWithRoles, err := h.userRepo.GetUserWithRoles(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
+	}
+
+	isAuthorized := false
+	for _, role := range userWithRoles.Roles {
+		if role.Name == "root" || role.Name == "admin" {
+			isAuthorized = true
+			break
+		}
+	}
+
+	if !isAuthorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to delete user role"})
+		return
+	}
+
+	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User role deleted successfully"})
 }
 
 func generateStateOauthCookie(w http.ResponseWriter) string {
