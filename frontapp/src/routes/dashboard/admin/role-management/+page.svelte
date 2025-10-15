@@ -13,7 +13,40 @@
 	let showEditModal = false;
 	let selectedUserForEdit = null;
 
+	let sortColumn = '';
+	let sortAsc = true;
+
 	const defaultRoles = ['root', 'admin', 'student'];
+
+	function sortUsers(column) {
+		if (sortColumn === column) {
+			sortAsc = !sortAsc;
+		} else {
+			sortColumn = column;
+			sortAsc = true;
+		}
+
+		usersWithRoles.sort((a, b) => {
+			let aValue, bValue;
+
+			if (column === 'roles') {
+				aValue = a.roles?.find(r => r.name !== 'student')?.name || '';
+				bValue = b.roles?.find(r => r.name !== 'student')?.name || '';
+			} else {
+				aValue = a[column] || '';
+				bValue = b[column] || '';
+			}
+
+			if (aValue < bValue) {
+				return sortAsc ? -1 : 1;
+			}
+			if (aValue > bValue) {
+				return sortAsc ? 1 : -1;
+			}
+			return 0;
+		});
+		usersWithRoles = [...usersWithRoles];
+	}
 
 	function openEditModal(user) {
 		selectedUserForEdit = user;
@@ -173,14 +206,23 @@
 		<table class="min-w-full divide-y divide-gray-200">
 			<thead class="bg-gray-50">
 				<tr>
-					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" on:click={() => sortUsers('email')}>
 						メールアドレス
+						{#if sortColumn === 'email'}
+							<span>{sortAsc ? '▲' : '▼'}</span>
+						{/if}
 					</th>
-					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" on:click={() => sortUsers('display_name')}>
 						表示名
+						{#if sortColumn === 'display_name'}
+							<span>{sortAsc ? '▲' : '▼'}</span>
+						{/if}
 					</th>
-					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" on:click={() => sortUsers('roles')}>
 						ロール
+						{#if sortColumn === 'roles'}
+							<span>{sortAsc ? '▲' : '▼'}</span>
+						{/if}
 					</th>
 				</tr>
 			</thead>
