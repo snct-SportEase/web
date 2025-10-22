@@ -21,7 +21,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	eventRepo := repository.NewEventRepository(db)
 
 	classRepo := repository.NewClassRepository(db)
-	classHandler := handler.NewClassHandler(classRepo)
+	classHandler := handler.NewClassHandler(classRepo, eventRepo)
 
 	authHandler := handler.NewAuthHandler(cfg, userRepo, eventRepo, classRepo)
 

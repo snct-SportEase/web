@@ -80,6 +80,11 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 		return
 	}
 
+	if class.EventID != activeEventID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Class does not belong to the active event"})
+		return
+	}
+
 	if req.AttendanceCount > class.StudentCount {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Attendance count (%d) cannot exceed student count (%d)", req.AttendanceCount, class.StudentCount)})
 		return

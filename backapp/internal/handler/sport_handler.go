@@ -118,8 +118,8 @@ func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
 		return
 	}
 
-	// Get all classes
-	classes, err := h.classRepo.GetAllClasses()
+	// Get all classes for the event
+	classes, err := h.classRepo.GetAllClasses(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve classes"})
 		return
