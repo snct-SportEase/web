@@ -46,6 +46,8 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 	}
 }
 
+// ... (GoogleLogin, GoogleCallback, GetUser are unchanged)
+
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 	state := generateStateOauthCookie(c.Writer)
 	url := h.oauth2Config.AuthCodeURL(state)
@@ -224,14 +226,26 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	// Assign class representative role on first completion
 	if isFirstCompletion {
+		activeEventID, err := h.eventRepo.GetActiveEvent()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+			return
+		}
+
 		class, err := h.classRepo.GetClassByID(req.ClassID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
 			return
 		}
 		if class != nil {
+			// Verify the class belongs to the active event
+			if class.EventID != activeEventID {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
+				return
+			}
+
 			roleName := class.Name + "_rep"
-			if err := h.userRepo.UpdateUserRole(user.ID, roleName, nil); err != nil {
+			if err := h.userRepo.UpdateUserRole(user.ID, roleName, &activeEventID); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign class representative role"})
 				return
 			}
@@ -241,6 +255,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// ... (Logout and other handlers are unchanged)
 func (h *AuthHandler) Logout(c *gin.Context) {
 	cookie, err := c.Cookie("session_token")
 	if err != nil {

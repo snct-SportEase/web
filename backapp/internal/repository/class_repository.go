@@ -7,7 +7,7 @@ import (
 )
 
 type ClassRepository interface {
-	GetAllClasses() ([]*models.Class, error)
+	GetAllClasses(eventID int) ([]*models.Class, error)
 	GetClassByID(id int) (*models.Class, error)
 	GetClassDetails(classID int, eventID int) (*models.ClassDetails, error)
 	UpdateAttendance(classID int, eventID int, attendanceCount int) (int, error)
@@ -21,8 +21,8 @@ func NewClassRepository(db *sql.DB) ClassRepository {
 	return &classRepository{db: db}
 }
 
-func (r *classRepository) GetAllClasses() ([]*models.Class, error) {
-	rows, err := r.db.Query("SELECT id, name, student_count, attend_count FROM classes ORDER BY name")
+func (r *classRepository) GetAllClasses(eventID int) ([]*models.Class, error) {
+	rows, err := r.db.Query("SELECT id, event_id, name, student_count, attend_count FROM classes WHERE event_id = ? ORDER BY name", eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (r *classRepository) GetAllClasses() ([]*models.Class, error) {
 	var classes []*models.Class
 	for rows.Next() {
 		class := &models.Class{}
-		if err := rows.Scan(&class.ID, &class.Name, &class.StudentCount, &class.AttendCount); err != nil {
+		if err := rows.Scan(&class.ID, &class.EventID, &class.Name, &class.StudentCount, &class.AttendCount); err != nil {
 			return nil, err
 		}
 		classes = append(classes, class)
@@ -41,10 +41,10 @@ func (r *classRepository) GetAllClasses() ([]*models.Class, error) {
 }
 
 func (r *classRepository) GetClassByID(id int) (*models.Class, error) {
-	row := r.db.QueryRow("SELECT id, name, student_count, attend_count FROM classes WHERE id = ?", id)
+	row := r.db.QueryRow("SELECT id, event_id, name, student_count, attend_count FROM classes WHERE id = ?", id)
 
 	class := &models.Class{}
-	err := row.Scan(&class.ID, &class.Name, &class.StudentCount, &class.AttendCount)
+	err := row.Scan(&class.ID, &class.EventID, &class.Name, &class.StudentCount, &class.AttendCount)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Class not found
@@ -59,10 +59,10 @@ func (r *classRepository) GetClassDetails(classID int, eventID int) (*models.Cla
         SELECT c.id, c.name, c.student_count, COALESCE(cs.attendance_points, 0)
         FROM classes c
         LEFT JOIN class_scores cs ON c.id = cs.class_id AND cs.event_id = ?
-        WHERE c.id = ?
+        WHERE c.id = ? AND c.event_id = ?
     `
 
-	row := r.db.QueryRow(query, eventID, classID)
+	row := r.db.QueryRow(query, eventID, classID, eventID)
 
 	details := &models.ClassDetails{}
 	err := row.Scan(&details.ID, &details.Name, &details.StudentCount, &details.AttendancePoints)
@@ -82,9 +82,9 @@ func (r *classRepository) UpdateAttendance(classID int, eventID int, attendanceC
 		return 0, err
 	}
 
-	// 1. Get student_count from classes table
+	// 1. Get student_count from classes table for the specific event
 	var studentCount int
-	row := tx.QueryRow("SELECT student_count FROM classes WHERE id = ?", classID)
+	row := tx.QueryRow("SELECT student_count FROM classes WHERE id = ? AND event_id = ?", classID, eventID)
 	if err := row.Scan(&studentCount); err != nil {
 		tx.Rollback()
 		return 0, err
@@ -92,11 +92,11 @@ func (r *classRepository) UpdateAttendance(classID int, eventID int, attendanceC
 
 	if studentCount == 0 {
 		tx.Rollback()
-		return 0, fmt.Errorf("class with ID %d has zero students", classID)
+		return 0, fmt.Errorf("class with ID %d in event %d has zero students", classID, eventID)
 	}
 
-	// 2. Update attend_count in classes table
-	_, err = tx.Exec("UPDATE classes SET attend_count = ? WHERE id = ?", attendanceCount, classID)
+	// 2. Update attend_count in classes table for the specific event
+	_, err = tx.Exec("UPDATE classes SET attend_count = ? WHERE id = ? AND event_id = ?", attendanceCount, classID, eventID)
 	if err != nil {
 		tx.Rollback()
 		return 0, err
