@@ -23,14 +23,16 @@ type AuthHandler struct {
 	cfg          *config.Config
 	userRepo     repository.UserRepository
 	eventRepo    repository.EventRepository
+	classRepo    repository.ClassRepository
 	oauth2Config *oauth2.Config
 }
 
-func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, eventRepo repository.EventRepository) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *AuthHandler {
 	return &AuthHandler{
 		cfg:       cfg,
 		userRepo:  userRepo,
 		eventRepo: eventRepo,
+		classRepo: classRepo,
 		oauth2Config: &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
@@ -208,6 +210,9 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	// Check if it's the first time the profile is being completed
+	isFirstCompletion := !user.IsProfileComplete
+
 	user.DisplayName = &req.DisplayName
 	user.ClassID = &req.ClassID
 	user.IsProfileComplete = true
@@ -215,6 +220,22 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	if err := h.userRepo.UpdateUser(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Assign class representative role on first completion
+	if isFirstCompletion {
+		class, err := h.classRepo.GetClassByID(req.ClassID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
+			return
+		}
+		if class != nil {
+			roleName := class.Name + "_rep"
+			if err := h.userRepo.UpdateUserRole(user.ID, roleName, nil); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign class representative role"})
+				return
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, user)

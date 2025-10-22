@@ -20,7 +20,8 @@ CREATE TABLE roles (
 CREATE TABLE classes (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) UNIQUE NOT NULL,
-    student_count INT NOT NULL DEFAULT 0
+    student_count INT NOT NULL DEFAULT 0,
+    attend_count INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ユーザーテーブル
