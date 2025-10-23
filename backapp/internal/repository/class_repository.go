@@ -11,6 +11,8 @@ type ClassRepository interface {
 	GetClassByID(id int) (*models.Class, error)
 	GetClassDetails(classID int, eventID int) (*models.ClassDetails, error)
 	UpdateAttendance(classID int, eventID int, attendanceCount int) (int, error)
+	UpdateStudentCounts(eventID int, counts map[int]int) error
+	CreateClasses(eventID int, classNames []string) error
 }
 
 type classRepository struct {
@@ -21,8 +23,36 @@ func NewClassRepository(db *sql.DB) ClassRepository {
 	return &classRepository{db: db}
 }
 
+func (r *classRepository) CreateClasses(eventID int, classNames []string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO classes (event_id, name) VALUES (?, ?)")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+
+	for _, name := range classNames {
+		_, err := stmt.Exec(eventID, name)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (r *classRepository) GetAllClasses(eventID int) ([]*models.Class, error) {
-	rows, err := r.db.Query("SELECT id, event_id, name, student_count, attend_count FROM classes WHERE event_id = ? ORDER BY name", eventID)
+	var rows *sql.Rows
+	var err error
+
+	rows, err = r.db.Query("SELECT id, event_id, name, student_count, attend_count FROM classes WHERE event_id = ? ORDER BY name", eventID)
+
 	if err != nil {
 		return nil, err
 	}
@@ -161,4 +191,27 @@ func (r *classRepository) UpdateAttendance(classID int, eventID int, attendanceC
 	}
 
 	return points, tx.Commit()
+}
+
+func (r *classRepository) UpdateStudentCounts(eventID int, counts map[int]int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() // Rollback on error
+
+	stmt, err := tx.Prepare("UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ?")
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for classID, count := range counts {
+		_, err := stmt.Exec(count, classID, eventID)
+		if err != nil {
+			return fmt.Errorf("failed to update student_count for class %d: %w", classID, err)
+		}
+	}
+
+	return tx.Commit()
 }

@@ -80,7 +80,7 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 		return
 	}
 
-	if class.EventID != activeEventID {
+	if class.EventID != nil && *class.EventID != activeEventID {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Class does not belong to the active event"})
 		return
 	}

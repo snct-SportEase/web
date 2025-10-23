@@ -46,7 +46,7 @@
   }
 
   async function handleClassSelection(event) {
-    const newClassId = event.target.value;
+    const newClassId = parseInt(event.target.value, 10);
     selectedClassId = newClassId;
     // Reset states
     classDetails = null;
@@ -54,7 +54,9 @@
     successMessage = '';
     attendanceCount = 0;
 
-    fetchClassDetails(newClassId);
+    if (newClassId) {
+      fetchClassDetails(newClassId);
+    }
   }
 
   async function handleSubmit() {

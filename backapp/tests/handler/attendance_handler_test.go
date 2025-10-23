@@ -130,8 +130,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ClassID:         1,
 			AttendanceCount: 20,
 		}
-		class := &models.Class{ID: 1, EventID: activeEventID, Name: "Test Class", StudentCount: 25}
-
+		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 		mockClassRepo.On("UpdateAttendance", reqBody.ClassID, activeEventID, reqBody.AttendanceCount).Return(10, nil).Once()
@@ -163,7 +162,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ClassID:         1,
 			AttendanceCount: 20,
 		}
-		class := &models.Class{ID: 1, EventID: differentEventID, Name: "Test Class", StudentCount: 25}
+		class := &models.Class{ID: 1, EventID: &differentEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
@@ -193,7 +192,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ClassID:         1,
 			AttendanceCount: 30,
 		}
-		class := &models.Class{ID: 1, EventID: activeEventID, Name: "Test Class", StudentCount: 25}
+		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()

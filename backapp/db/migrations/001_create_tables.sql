@@ -19,7 +19,7 @@ CREATE TABLE roles (
 -- クラス情報テーブル
 CREATE TABLE classes (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    event_id INT NOT NULL, -- FK
+    event_id INT NULL, -- FK
     name VARCHAR(255) NOT NULL,
     student_count INT NOT NULL DEFAULT 0,
     attend_count INT NOT NULL DEFAULT 0
