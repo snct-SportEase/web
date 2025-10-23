@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -133,6 +134,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 				c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
 				return
 			}
+			fmt.Printf("userhandler_err: %s\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}
@@ -239,7 +241,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		}
 		if class != nil {
 			// Verify the class belongs to the active event
-			if class.EventID != activeEventID {
+			if class.EventID != nil && *class.EventID != activeEventID {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
 				return
 			}

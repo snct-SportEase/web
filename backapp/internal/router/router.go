@@ -124,6 +124,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				rootEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 			}
 			// Sport management routes that require 'root' role
+			rootClasses := root.Group("/classes")
+			{
+				rootClasses.PUT("/student-counts", classHandler.UpdateStudentCountsHandler)
+				rootClasses.POST("/student-counts/csv", classHandler.UpdateStudentCountsFromCSVHandler)
+			}
 			rootSports := root.Group("/sports")
 			{
 				rootSports.GET("", sportHandler.GetAllSportsHandler)
