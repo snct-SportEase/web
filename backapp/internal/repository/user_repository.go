@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -222,9 +223,16 @@ func (r *userRepository) CreateUser(user *models.User) error {
 	}
 	defer tx.Rollback()
 
+	fmt.Printf("user.ClassID: %d\n", user.ClassID)
+
 	// ユーザーをusersテーブルに挿入
-	_, err = tx.Exec("INSERT INTO users (id, email, display_name, class_id, is_profile_complete) VALUES (?, ?, ?, ?, ?)",
-		user.ID, user.Email, user.DisplayName, user.ClassID, user.IsProfileComplete)
+	if user.ClassID != nil && *user.ClassID != 0 {
+		_, err = tx.Exec("INSERT INTO users (id, email, display_name, class_id, is_profile_complete) VALUES (?, ?, ?, ?, ?)",
+			user.ID, user.Email, user.DisplayName, *user.ClassID, user.IsProfileComplete)
+	} else {
+		_, err = tx.Exec("INSERT INTO users (id, email, display_name, is_profile_complete) VALUES (?, ?, ?, ?)",
+			user.ID, user.Email, user.DisplayName, user.IsProfileComplete)
+	}
 	if err != nil {
 		return err
 	}
@@ -242,11 +250,23 @@ func (r *userRepository) CreateUser(user *models.User) error {
 	}
 
 	// role名からrolesテーブルのIDを取得
-	var roleID int
+	var roleID int64
 	err = r.db.QueryRow("SELECT id FROM roles WHERE name = ?", roleName).Scan(&roleID)
 	if err != nil {
-		// rolesテーブルに該当roleがない場合はエラー
-		return err
+		if errors.Is(err, sql.ErrNoRows) {
+			// Role does not exist, so create it
+			result, err := tx.Exec("INSERT INTO roles (name) VALUES (?)", roleName)
+			if err != nil {
+				return err
+			}
+			roleID, err = result.LastInsertId()
+			if err != nil {
+				return err
+			}
+		} else {
+			// Another database error occurred
+			return err
+		}
 	}
 
 	// user_rolesテーブルにマッピングを挿入

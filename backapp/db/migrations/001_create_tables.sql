@@ -19,8 +19,10 @@ CREATE TABLE roles (
 -- クラス情報テーブル
 CREATE TABLE classes (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) UNIQUE NOT NULL,
-    student_count INT NOT NULL DEFAULT 0
+    event_id INT NOT NULL DEFAULT 0, -- FK
+    name VARCHAR(255) NOT NULL,
+    student_count INT NOT NULL DEFAULT 0,
+    attend_count INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ユーザーテーブル
@@ -262,3 +264,7 @@ ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_notification_id
 ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_class_id FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE;
 ALTER TABLE notifications ADD CONSTRAINT fk_notifications_event_id FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL;
+
+-- classes テーブル
+ALTER TABLE classes ADD UNIQUE KEY uk_name_event (name, event_id);
+ALTER TABLE classes ADD CONSTRAINT fk_classes_event_id FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE;

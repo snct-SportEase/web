@@ -11,6 +11,8 @@ type Config struct {
 	GoogleClientID, GoogleClientSecret, GoogleRedirectURL string
 	FrontendURL                                           string
 	InitRootUser                                          string
+	InitEventName, InitEventSeason, InitEventStartDate, InitEventEndDate string
+	InitEventYear                                         string
 }
 
 func Load() (*Config, error) {
@@ -26,6 +28,11 @@ func Load() (*Config, error) {
 		GoogleRedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
 		FrontendURL:        os.Getenv("FRONTEND_URL"),
 		InitRootUser:       os.Getenv("INIT_ROOT_USER"),
+		InitEventName:      os.Getenv("INIT_EVENT_NAME"),
+		InitEventYear:      os.Getenv("INIT_EVENT_YEAR"),
+		InitEventSeason:    os.Getenv("INIT_EVENT_SEASON"),
+		InitEventStartDate: os.Getenv("INIT_EVENT_START_DATE"),
+		InitEventEndDate:   os.Getenv("INIT_EVENT_END_DATE"),
 	}
 	return cfg, nil
 }
