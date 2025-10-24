@@ -49,6 +49,16 @@ func (m *MockClassRepository) UpdateAttendance(classID, eventID, attendanceCount
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockClassRepository) CreateClasses(eventID int, classNames []string) error {
+	args := m.Called(eventID, classNames)
+	return args.Error(0)
+}
+
+func (m *MockClassRepository) UpdateStudentCounts(eventID int, counts map[int]int) error {
+    args := m.Called(eventID, counts)
+    return args.Error(0)
+}
+
 type MockEventRepository struct {
 	mock.Mock
 }
