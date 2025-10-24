@@ -5,15 +5,18 @@
   export let data;
 
   let classes = [];
+  let originalClasses = []; // 保存前の状態を保持
   let errorMessage = '';
   let successMessage = '';
-  let isLoading = false;
+  let isSaving = false;
+  let isUploading = false;
   let csvFile = null;
 
   onMount(() => {
     if (data.classes) {
-      // Create a deep copy for editing
+      // データをディープコピーして編集用と保存前用に保持
       classes = JSON.parse(JSON.stringify(data.classes));
+      originalClasses = JSON.parse(JSON.stringify(data.classes));
     }
     if (data.error) {
       errorMessage = data.error;
@@ -21,7 +24,7 @@
   });
 
   async function handleSave() {
-    isLoading = true;
+    isSaving = true;
     errorMessage = '';
     successMessage = '';
 
@@ -45,14 +48,15 @@
       }
 
       successMessage = '生徒数を更新しました。';
-      // Optionally, re-fetch data to confirm changes
+      // データを再取得して画面を更新
       const freshData = await fetch(`/api/classes`).then(res => res.json());
       classes = JSON.parse(JSON.stringify(freshData));
+      originalClasses = JSON.parse(JSON.stringify(freshData));
 
     } catch (error) {
       errorMessage = error.message;
     } finally {
-      isLoading = false;
+      isSaving = false;
     }
   }
 
@@ -66,7 +70,7 @@
       return;
     }
 
-    isLoading = true;
+    isUploading = true;
     errorMessage = '';
     successMessage = '';
 
@@ -84,93 +88,103 @@
         throw new Error(res.error || 'CSVでの更新に失敗しました。');
       }
       
-      successMessage = 'CSVで生徒数を更新しました。ページをリロードして確認してください。';
-      // After successful upload, refresh the class list
+      successMessage = 'CSVで生徒数を更新しました。';
+      // データを再取得して画面を更新
       const freshData = await fetch(`/api/classes`).then(res => res.json());
       classes = JSON.parse(JSON.stringify(freshData));
-      csvFile = null; // Reset file input
+      originalClasses = JSON.parse(JSON.stringify(freshData));
+      csvFile = null; // ファイル選択をリセット
 
     } catch (error) {
       errorMessage = error.message;
     } finally {
-      isLoading = false;
+      isUploading = false;
     }
   }
 </script>
 
-<div class="container mx-auto p-8">
-  <h1 class="text-2xl font-bold mb-6">各クラス人数設定</h1>
+<div class="space-y-8 p-4 md:p-8">
+  <h1 class="text-2xl md:text-3xl font-bold">各クラス人数設定</h1>
 
-  {#if errorMessage}
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-      <span class="block sm:inline">{errorMessage}</span>
-    </div>
-  {/if}
-
+  <!-- Messages -->
   {#if successMessage}
-    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-      <span class="block sm:inline">{successMessage}</span>
+    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4" role="alert">
+      <p class="font-bold">成功</p>
+      <p>{successMessage}</p>
+    </div>
+  {/if}
+  {#if errorMessage}
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+      <p class="font-bold">エラー</p>
+      <p>{errorMessage}</p>
     </div>
   {/if}
 
-  <div class="bg-white shadow-md rounded-lg p-6">
-    <div class="mb-8">
-      <h2 class="text-xl font-semibold mb-4">CSVで一括更新</h2>
-      <div class="flex items-center space-x-4">
-        <input
-          type="file"
-          accept=".csv"
-          on:change={handleFileSelect}
-          class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
-        <button
-          on:click={handleCSVUpload}
-          disabled={isLoading || !csvFile}
-          class="btn btn-primary"
-        >
-          {#if isLoading}
-            <span class="loading loading-spinner"></span>
-          {/if}
-          CSVで更新
-        </button>
+  <!-- CSV Upload -->
+  <div class="bg-white p-6 rounded-lg shadow">
+    <h2 class="text-xl font-semibold mb-4">CSVで一括更新</h2>
+    <form on:submit|preventDefault={handleCSVUpload} class="flex flex-col sm:flex-row items-start sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
+      <div class="flex-grow w-full">
+        <label for="csvfile" class="block text-sm font-medium text-gray-700">CSVファイル</label>
+        <input 
+          type="file" 
+          id="csvfile" 
+          accept=".csv" 
+          on:change={handleFileSelect} 
+          class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+        <p class="text-xs text-gray-500 mt-1">フォーマット: 1列目にクラス名, 2列目に生徒数 (ヘッダー行あり)</p>
       </div>
-       <p class="text-sm text-gray-500 mt-2">CSVフォーマット: 1列目にクラス名, 2列目に生徒数を入力してください。(ヘッダー行あり)</p>
-    </div>
+      <button type="submit" disabled={isUploading || !csvFile} class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+        {#if isUploading}
+          <span class="loading loading-spinner"></span>
+        {/if}
+        CSVで更新
+      </button>
+    </form>
+  </div>
 
-    <div class="divider">OR</div>
-
+  <!-- Manual Update -->
+  <div class="bg-white p-6 rounded-lg shadow">
+    <h2 class="text-xl font-semibold mb-4">手動で更新</h2>
     <form on:submit|preventDefault={handleSave}>
-      <h2 class="text-xl font-semibold mb-4">手動で更新</h2>
-      <div class="overflow-x-auto">
-        <table class="table w-full">
-          <thead>
+      <div class="overflow-x-auto rounded-lg border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
             <tr>
-              <th>クラス名</th>
-              <th>現在の生徒数</th>
-              <th>新しい生徒数</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">クラス名</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">現在の生徒数</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">新しい生徒数</th>
             </tr>
           </thead>
-          <tbody>
-            {#each classes as classItem, i}
+          <tbody class="bg-white divide-y divide-gray-200">
+            {#if classes.length > 0}
+              {#each classes as classItem, i}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{classItem.name}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{originalClasses[i].student_count}</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="number"
+                      bind:value={classItem.student_count}
+                      class="input input-bordered w-full max-w-xs"
+                      min="0"
+                    />
+                  </td>
+                </tr>
+              {/each}
+            {:else}
               <tr>
-                <td>{classItem.name}</td>
-                <td>{data.classes[i].student_count}</td>
-                <td>
-                  <input
-                    type="number"
-                    bind:value={classItem.student_count}
-                    class="input input-bordered w-full max-w-xs"
-                    min="0"
-                  />
+                <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">
+                  クラスデータが見つかりません。
                 </td>
               </tr>
-            {/each}
+            {/if}
           </tbody>
         </table>
       </div>
       <div class="mt-6 text-right">
-        <button type="submit" disabled={isLoading} class="btn btn-primary">
-          {#if isLoading}
+        <button type="submit" disabled={isSaving} class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" >
+          {#if isSaving}
             <span class="loading loading-spinner"></span>
           {/if}
           保存
