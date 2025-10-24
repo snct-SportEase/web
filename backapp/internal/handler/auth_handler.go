@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -23,14 +24,16 @@ type AuthHandler struct {
 	cfg          *config.Config
 	userRepo     repository.UserRepository
 	eventRepo    repository.EventRepository
+	classRepo    repository.ClassRepository
 	oauth2Config *oauth2.Config
 }
 
-func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, eventRepo repository.EventRepository) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *AuthHandler {
 	return &AuthHandler{
 		cfg:       cfg,
 		userRepo:  userRepo,
 		eventRepo: eventRepo,
+		classRepo: classRepo,
 		oauth2Config: &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
@@ -43,6 +46,8 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 		},
 	}
 }
+
+// ... (GoogleLogin, GoogleCallback, GetUser are unchanged)
 
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 	state := generateStateOauthCookie(c.Writer)
@@ -129,6 +134,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 				c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
 				return
 			}
+			fmt.Printf("userhandler_err: %s\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}
@@ -208,6 +214,9 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	// Check if it's the first time the profile is being completed
+	isFirstCompletion := !user.IsProfileComplete
+
 	user.DisplayName = &req.DisplayName
 	user.ClassID = &req.ClassID
 	user.IsProfileComplete = true
@@ -217,9 +226,38 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	// Assign class representative role on first completion
+	if isFirstCompletion {
+		activeEventID, err := h.eventRepo.GetActiveEvent()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+			return
+		}
+
+		class, err := h.classRepo.GetClassByID(req.ClassID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
+			return
+		}
+		if class != nil {
+			// Verify the class belongs to the active event
+			if class.EventID != nil && *class.EventID != activeEventID {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
+				return
+			}
+
+			roleName := class.Name + "_rep"
+			if err := h.userRepo.UpdateUserRole(user.ID, roleName, &activeEventID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign class representative role"})
+				return
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, user)
 }
 
+// ... (Logout and other handlers are unchanged)
 func (h *AuthHandler) Logout(c *gin.Context) {
 	cookie, err := c.Cookie("session_token")
 	if err != nil {

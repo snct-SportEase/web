@@ -19,10 +19,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
-	authHandler := handler.NewAuthHandler(cfg, userRepo, eventRepo)
 
 	classRepo := repository.NewClassRepository(db)
-	classHandler := handler.NewClassHandler(classRepo)
+	classHandler := handler.NewClassHandler(classRepo, eventRepo)
+
+	authHandler := handler.NewAuthHandler(cfg, userRepo, eventRepo, classRepo)
 
 	whitelistRepo := repository.NewWhitelistRepository(db)
 	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo, eventRepo)
@@ -35,6 +36,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
 
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo)
+
+	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
@@ -77,6 +80,14 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 		admin := api.Group("/admin")
 		{
 			admin.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("admin", "root"))
+
+			// Attendance routes
+			attendance := admin.Group("/attendance")
+			{
+				attendance.GET("/class-details/:classID", attendanceHandler.GetClassDetailsHandler)
+				attendance.POST("/register", attendanceHandler.RegisterAttendanceHandler)
+			}
+
 			// Assign a sport to a specific event
 			admin.POST("/events/:id/sports", sportHandler.AssignSportToEventHandler)
 			// Delete a sport from a specific event
@@ -113,6 +124,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				rootEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 			}
 			// Sport management routes that require 'root' role
+			rootClasses := root.Group("/classes")
+			{
+				rootClasses.PUT("/student-counts", classHandler.UpdateStudentCountsHandler)
+				rootClasses.POST("/student-counts/csv", classHandler.UpdateStudentCountsFromCSVHandler)
+			}
 			rootSports := root.Group("/sports")
 			{
 				rootSports.GET("", sportHandler.GetAllSportsHandler)

@@ -11,7 +11,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server/main.go
 
 # final stage
-FROM alpine:latest
+FROM alpine:3.20
 
 WORKDIR /app
 
