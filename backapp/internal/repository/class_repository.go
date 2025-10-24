@@ -112,42 +112,48 @@ func (r *classRepository) UpdateAttendance(classID int, eventID int, attendanceC
 		return 0, err
 	}
 
-	// 1. Get student_count from classes table for the specific event
+	// 1. Get student_count and name from classes table
 	var studentCount int
-	row := tx.QueryRow("SELECT student_count FROM classes WHERE id = ? AND event_id = ?", classID, eventID)
-	if err := row.Scan(&studentCount); err != nil {
+	var className string
+	row := tx.QueryRow("SELECT student_count, name FROM classes WHERE id = ? AND event_id = ?", classID, eventID)
+	if err := row.Scan(&studentCount, &className); err != nil {
 		tx.Rollback()
 		return 0, err
 	}
 
-	if studentCount == 0 {
-		tx.Rollback()
-		return 0, fmt.Errorf("class with ID %d in event %d has zero students", classID, eventID)
-	}
-
-	// 2. Update attend_count in classes table for the specific event
+	// 2. Update attend_count in classes table
 	_, err = tx.Exec("UPDATE classes SET attend_count = ? WHERE id = ? AND event_id = ?", attendanceCount, classID, eventID)
 	if err != nil {
 		tx.Rollback()
 		return 0, err
 	}
 
-	// 3. Calculate points based on attendance rate
-	attendanceRate := float64(attendanceCount) / float64(studentCount)
-	points := 0
-	switch {
-	case attendanceRate >= 0.9:
-		points = 10
-	case attendanceRate >= 0.8:
-		points = 9
-	case attendanceRate >= 0.7:
-		points = 8
-	case attendanceRate >= 0.6:
-		points = 7
-	case attendanceRate >= 0.5:
-		points = 6
-	default:
-		points = 5
+	// 3. Calculate points
+	var points int
+	var attendanceRate float64
+
+	if className == "専教" {
+		points = 0
+	} else {
+		if studentCount == 0 {
+			tx.Rollback()
+			return 0, fmt.Errorf("class '%s' (ID %d) has zero students, cannot calculate attendance points", className, classID)
+		}
+		attendanceRate = float64(attendanceCount) / float64(studentCount)
+		switch {
+		case attendanceRate >= 0.9:
+			points = 10
+		case attendanceRate >= 0.8:
+			points = 9
+		case attendanceRate >= 0.7:
+			points = 8
+		case attendanceRate >= 0.6:
+			points = 7
+		case attendanceRate >= 0.5:
+			points = 6
+		default:
+			points = 5
+		}
 	}
 
 	// 4. Update attendance_points in class_scores table
@@ -183,7 +189,12 @@ func (r *classRepository) UpdateAttendance(classID int, eventID int, attendanceC
         INSERT INTO score_logs (event_id, class_id, points, reason)
         VALUES (?, ?, ?, ?)
     `
-	reason := fmt.Sprintf("Attendance points updated based on attendance rate (%.2f%%)", attendanceRate*100)
+	var reason string
+	if className == "専教" {
+		reason = "Attendance points for faculty team are fixed to 0."
+	} else {
+		reason = fmt.Sprintf("Attendance points updated based on attendance rate (%.2f%%)", attendanceRate*100)
+	}
 	_, err = tx.Exec(logQuery, eventID, classID, points, reason)
 	if err != nil {
 		tx.Rollback()
