@@ -15,6 +15,8 @@ type SportRepository interface {
 	AssignSportToEvent(eventSport *models.EventSport) error
 	DeleteSportFromEvent(eventID int, sportID int) error
 	GetTeamsBySportID(sportID int) ([]*models.Team, error)
+	GetSportDetails(eventID int, sportID int) (*models.EventSport, error)
+	UpdateSportDetails(eventID int, sportID int, description string, rules string) error
 }
 
 type sportRepository struct {
@@ -139,4 +141,23 @@ func (r *sportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, error)
 		teams = append(teams, team)
 	}
 	return teams, nil
+}
+
+func (r *sportRepository) GetSportDetails(eventID int, sportID int) (*models.EventSport, error) {
+	query := "SELECT event_id, sport_id, description, rules, location FROM event_sports WHERE event_id = ? AND sport_id = ?"
+	eventSport := &models.EventSport{}
+	err := r.db.QueryRow(query, eventID, sportID).Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.Rules, &eventSport.Location)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("sport details not found")
+		}
+		return nil, err
+	}
+	return eventSport, nil
+}
+
+func (r *sportRepository) UpdateSportDetails(eventID int, sportID int, description string, rules string) error {
+	query := "UPDATE event_sports SET description = ?, rules = ? WHERE event_id = ? AND sport_id = ?"
+	_, err := r.db.Exec(query, description, rules, eventID, sportID)
+	return err
 }

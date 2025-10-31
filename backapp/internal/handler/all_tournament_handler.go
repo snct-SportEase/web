@@ -299,3 +299,53 @@ func generateTournamentStructure(teams []*models.Team, roundBusyClasses map[int]
 
 	return &tournamentData, shuffledTeams, nil
 }
+
+type UpdateMatchStartTimeRequest struct {
+	StartTime string `json:"start_time"`
+}
+
+func (h *TournamentHandler) UpdateMatchStartTimeHandler(c *gin.Context) {
+	matchID, err := strconv.Atoi(c.Param("match_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
+		return
+	}
+
+	var req UpdateMatchStartTimeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if err := h.tournRepo.UpdateMatchStartTime(matchID, req.StartTime); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match start time"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Match start time updated successfully"})
+}
+
+type UpdateMatchStatusRequest struct {
+	Status string `json:"status"`
+}
+
+func (h *TournamentHandler) UpdateMatchStatusHandler(c *gin.Context) {
+	matchID, err := strconv.Atoi(c.Param("match_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
+		return
+	}
+
+	var req UpdateMatchStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if err := h.tournRepo.UpdateMatchStatus(matchID, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Match status updated successfully"})
+}
