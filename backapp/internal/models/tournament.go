@@ -27,6 +27,7 @@ type MatchDB struct {
 	Status             string
 	NextMatchID        sql.NullInt64
 	StartTime          sql.NullString
+	IsBronzeMatch      bool
 }
 
 // Player represents a player in a contestant

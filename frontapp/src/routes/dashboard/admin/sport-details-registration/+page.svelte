@@ -49,6 +49,7 @@
     const res = await fetch(`/api/admin/events/${eventId}/tournaments`);
     if (res.ok) {
       const fetched = await res.json();
+      console.log("fetched:", fetched);
       tournaments = fetched.map(t => {
         let data = t.data;
         if (typeof data === 'string') {
