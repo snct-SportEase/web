@@ -79,6 +79,9 @@
         <a href="/dashboard/admin/vorting-mvp" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           MVP投票
         </a>
+        <a href="/dashboard/admin/sport-details-registration" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          競技詳細情報登録
+        </a>
       </div>
     {/if}
     

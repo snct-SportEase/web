@@ -15,6 +15,8 @@ type TournamentRepository interface {
 	DeleteTournamentsByEventID(eventID int) error
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
+	UpdateMatchStartTime(matchID int, startTime string) error
+	UpdateMatchStatus(matchID int, status string) error
 }
 
 type tournamentRepository struct {
@@ -51,14 +53,14 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 
 		for _, m := range matches {
 			var sides []models.Side
-			
+
 			if m.Team1ID.Valid {
 				side, team, err := r.getSide(m.Team1ID.Int64, &contestantCounter, teamMap, contestants)
 				if err != nil {
 					return nil, err
 				}
 				sides = append(sides, side)
-				if (team != nil) {
+				if team != nil {
 					teamMap[int(m.Team1ID.Int64)] = team
 				}
 			}
@@ -69,15 +71,23 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 					return nil, err
 				}
 				sides = append(sides, side)
-				if (team != nil) {
+				if team != nil {
 					teamMap[int(m.Team2ID.Int64)] = team
 				}
 			}
 
 			bracketryMatches = append(bracketryMatches, models.Match{
-				RoundIndex: m.Round,
-				Order:      m.MatchNumberInRound,
-				Sides:      sides,
+				ID:          m.ID,
+				RoundIndex:  m.Round,
+				Order:       m.MatchNumberInRound,
+				Sides:       sides,
+				MatchStatus: m.StartTime.String,
+				StartTime: func() string {
+					if m.StartTime.Valid {
+						return m.StartTime.String
+					}
+					return ""
+				}(),
 			})
 		}
 
@@ -107,46 +117,45 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 }
 
 func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, teamMap map[int]*models.Team, contestants map[string]models.Contestant) (models.Side, *models.Team, error) {
-    var team *models.Team
-    var ok bool
+	var team *models.Team
+	var ok bool
 
-    if team, ok = teamMap[int(teamID)]; !ok {
-        var err error
-        team, err = r.getTeamByID(teamID)
-        if err != nil {
+	if team, ok = teamMap[int(teamID)]; !ok {
+		var err error
+		team, err = r.getTeamByID(teamID)
+		if err != nil {
 			if err == sql.ErrNoRows {
 				return models.Side{}, nil, nil // Team not found is not a fatal error here
 			}
-            return models.Side{}, nil, err
-        }
-    }
+			return models.Side{}, nil, err
+		}
+	}
 
-	 if team == nil {
-        return models.Side{}, nil, nil
-    }
+	if team == nil {
+		return models.Side{}, nil, nil
+	}
 
-    contestantID := ""
-    for id, c := range contestants {
-        if len(c.Players) > 0 && c.Players[0].Title == team.Name {
-            contestantID = id
-            break
-        }
-    }
+	contestantID := ""
+	for id, c := range contestants {
+		if len(c.Players) > 0 && c.Players[0].Title == team.Name {
+			contestantID = id
+			break
+		}
+	}
 
-    if contestantID == "" {
-        contestantID = "c" + strconv.Itoa(*contestantCounter)
-        contestants[contestantID] = models.Contestant{
-            Players: []models.Player{{Title: team.Name}},
-        }
-        (*contestantCounter)++
-    }
+	if contestantID == "" {
+		contestantID = "c" + strconv.Itoa(*contestantCounter)
+		contestants[contestantID] = models.Contestant{
+			Players: []models.Player{{Title: team.Name}},
+		}
+		(*contestantCounter)++
+	}
 
-    return models.Side{ContestantID: contestantID}, team, nil
+	return models.Side{ContestantID: contestantID}, team, nil
 }
 
-
 func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*models.MatchDB, error) {
-	rows, err := r.db.Query("SELECT id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
+	rows, err := r.db.Query("SELECT id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +164,7 @@ func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*
 	var matches []*models.MatchDB
 	for rows.Next() {
 		var m models.MatchDB
-		if err := rows.Scan(&m.ID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID); err != nil {
+		if err := rows.Scan(&m.ID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime); err != nil {
 			return nil, err
 		}
 		matches = append(matches, &m)
@@ -179,7 +188,6 @@ func (r *tournamentRepository) marshal(data interface{}) (json.RawMessage, error
 	}
 	return bytes, nil
 }
-
 
 func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {
 	tx, err := r.db.Begin()
@@ -287,9 +295,9 @@ func (r *tournamentRepository) DeleteTournamentsByEventID(eventID int) error {
 		for i, v := range tournamentIDs {
 			args[i] = v
 		}
-		
+
 		qMarks := strings.Repeat("?,", len(args)-1) + "?"
-		
+
 		query := fmt.Sprintf("DELETE FROM matches WHERE tournament_id IN (%s)", qMarks)
 		_, err = tx.Exec(query, args...)
 		if err != nil {
@@ -355,4 +363,20 @@ func (r *tournamentRepository) DeleteTournamentsByEventAndSportID(eventID int, s
 	}
 
 	return tx.Commit()
+}
+
+func (r *tournamentRepository) UpdateMatchStartTime(matchID int, startTime string) error {
+	if startTime != "" {
+		// Only change status to 'scheduled' if it is currently 'pending'.
+		_, err := r.db.Exec("UPDATE matches SET start_time = ?, status = CASE WHEN status = 'pending' THEN 'scheduled' ELSE status END WHERE id = ?", startTime, matchID)
+		return err
+	}
+	// If startTime is empty, just update the time.
+	_, err := r.db.Exec("UPDATE matches SET start_time = ? WHERE id = ?", startTime, matchID)
+	return err
+}
+
+func (r *tournamentRepository) UpdateMatchStatus(matchID int, status string) error {
+	_, err := r.db.Exec("UPDATE matches SET status = ? WHERE id = ?", status, matchID)
+	return err
 }

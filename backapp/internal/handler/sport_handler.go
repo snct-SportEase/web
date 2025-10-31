@@ -196,3 +196,55 @@ func (h *SportHandler) GetTeamsBySportHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, teams)
 }
+
+type UpdateSportDetailsRequest struct {
+	Description string `json:"description"`
+	Rules       string `json:"rules"`
+}
+
+func (h *SportHandler) GetSportDetailsHandler(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+	sportID, err := strconv.Atoi(c.Param("sport_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sport ID"})
+		return
+	}
+
+	details, err := h.sportRepo.GetSportDetails(eventID, sportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve sport details"})
+		return
+	}
+
+	c.JSON(http.StatusOK, details)
+}
+
+func (h *SportHandler) UpdateSportDetailsHandler(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+	sportID, err := strconv.Atoi(c.Param("sport_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sport ID"})
+		return
+	}
+
+	var req UpdateSportDetailsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if err := h.sportRepo.UpdateSportDetails(eventID, sportID, req.Description, req.Rules); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update sport details"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Sport details updated successfully"})
+}
