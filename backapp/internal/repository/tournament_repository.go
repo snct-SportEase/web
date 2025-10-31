@@ -77,11 +77,12 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 			}
 
 			bracketryMatches = append(bracketryMatches, models.Match{
-				ID:          m.ID,
-				RoundIndex:  m.Round,
-				Order:       m.MatchNumberInRound,
-				Sides:       sides,
-				MatchStatus: m.StartTime.String,
+				ID:            m.ID,
+				RoundIndex:    m.Round,
+				Order:         m.MatchNumberInRound,
+				Sides:         sides,
+				MatchStatus:   m.StartTime.String,
+				IsBronzeMatch: m.IsBronzeMatch,
 				StartTime: func() string {
 					if m.StartTime.Valid {
 						return m.StartTime.String
@@ -155,7 +156,7 @@ func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, tea
 }
 
 func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*models.MatchDB, error) {
-	rows, err := r.db.Query("SELECT id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
+	rows, err := r.db.Query("SELECT id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time, is_bronze_match FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +165,7 @@ func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*
 	var matches []*models.MatchDB
 	for rows.Next() {
 		var m models.MatchDB
-		if err := rows.Scan(&m.ID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime); err != nil {
+		if err := rows.Scan(&m.ID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch); err != nil {
 			return nil, err
 		}
 		matches = append(matches, &m)
@@ -227,13 +228,14 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 		}
 
 		res, err := tx.Exec(
-			"INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status) VALUES (?, ?, ?, ?, ?, ?)",
+			"INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match) VALUES (?, ?, ?, ?, ?, ?, ?)",
 			tournamentID,
 			match.RoundIndex,
 			match.Order,
 			team1ID,
 			team2ID,
 			"pending",
+			match.IsBronzeMatch,
 		)
 		if err != nil {
 			tx.Rollback()
