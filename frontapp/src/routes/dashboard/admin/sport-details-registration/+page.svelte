@@ -259,6 +259,48 @@
         return '';
     }
   }
+
+  async function handlePaste(event) {
+    const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        event.preventDefault();
+        const blob = item.getAsFile();
+        const formData = new FormData();
+        formData.append('image', blob);
+
+        try {
+          const res = await fetch('/api/admin/images', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const imageUrl = data.url;
+            const textarea = event.target;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const before = text.substring(0, start);
+            const after = text.substring(end, text.length);
+            const markdownImage = `\n![pasted-image](${imageUrl})\n`;
+            sportDetails.rules = before + markdownImage + after;
+            // Move cursor after the inserted image
+            setTimeout(() => {
+              textarea.selectionStart = textarea.selectionEnd = start + markdownImage.length;
+            }, 0);
+          } else {
+            const error = await res.json();
+            alert(`Image upload failed: ${error.error}`);
+          }
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          alert('Image upload failed.');
+        }
+      }
+    }
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -294,7 +336,7 @@
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">ルール詳細 (Markdown)</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <textarea bind:value={sportDetails.rules} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
+        <textarea bind:value={sportDetails.rules} on:paste={handlePaste} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
         <div class="prose border p-4 rounded-md">
           {@html marked(sportDetails.rules || '')}
         </div>

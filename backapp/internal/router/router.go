@@ -17,6 +17,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	// CORS middleware
 	router.Use(middleware.CORSMiddleware())
 
+	// Serve static files for uploaded images
+	router.Static("/uploads", "./uploads")
+
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
 
@@ -38,6 +41,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo)
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
+
+	imageHandler := handler.NewImageHandler()
 
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
@@ -115,6 +120,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 			}
 
 			admin.GET("/allsports", sportHandler.GetAllSportsHandler)
+
+			admin.POST("/images", imageHandler.UploadImageHandler)
 		}
 
 		root := api.Group("/root")
