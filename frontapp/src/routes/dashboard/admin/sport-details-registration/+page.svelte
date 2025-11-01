@@ -18,6 +18,7 @@
   let selectedTournament = null;
   let bulkStartTime = '';
   let matchStartTimes = {};
+  let rulesTextarea;
 
   onMount(async () => {
     // Fetch events
@@ -301,6 +302,54 @@
       }
     }
   }
+
+  async function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file || !file.type.startsWith('image/')) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const res = await fetch('/api/admin/images', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const imageUrl = data.url;
+        const altText = file.name.split('.')[0]; // use filename without extension as alt text
+        const markdownImage = `\n![${altText}](${imageUrl})\n`;
+
+        const start = rulesTextarea.selectionStart;
+        const end = rulesTextarea.selectionEnd;
+        const text = rulesTextarea.value;
+        const before = text.substring(0, start);
+        const after = text.substring(end, text.length);
+        
+        sportDetails.rules = before + markdownImage + after;
+
+        // Move cursor after the inserted image
+        setTimeout(() => {
+          rulesTextarea.selectionStart = rulesTextarea.selectionEnd = start + markdownImage.length;
+          rulesTextarea.focus();
+        }, 0);
+
+      } else {
+        const error = await res.json();
+        alert(`Image upload failed: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Image upload failed.');
+    }
+
+    // Reset file input
+    event.target.value = '';
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -336,11 +385,15 @@
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">ルール詳細 (Markdown)</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <textarea bind:value={sportDetails.rules} on:paste={handlePaste} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
+        <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:paste={handlePaste} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
         <div class="prose border p-4 rounded-md">
           {@html marked(sportDetails.rules || '')}
         </div>
       </div>
+      <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
+      <button on:click={() => document.getElementById('image-upload').click()} class="mb-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
+        画像アップロード
+      </button>
     </div>
 
     <div class="flex justify-end mb-4">
