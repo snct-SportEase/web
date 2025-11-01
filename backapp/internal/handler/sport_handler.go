@@ -197,11 +197,6 @@ func (h *SportHandler) GetTeamsBySportHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, teams)
 }
 
-type UpdateSportDetailsRequest struct {
-	Description string `json:"description"`
-	Rules       string `json:"rules"`
-}
-
 func (h *SportHandler) GetSportDetailsHandler(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Param("event_id"))
 	if err != nil {
@@ -235,13 +230,13 @@ func (h *SportHandler) UpdateSportDetailsHandler(c *gin.Context) {
 		return
 	}
 
-	var req UpdateSportDetailsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var details models.EventSport
+	if err := c.ShouldBindJSON(&details); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	if err := h.sportRepo.UpdateSportDetails(eventID, sportID, req.Description, req.Rules); err != nil {
+	if err := h.sportRepo.UpdateSportDetails(eventID, sportID, details); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update sport details"})
 		return
 	}

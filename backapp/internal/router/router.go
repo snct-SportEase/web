@@ -43,6 +43,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
 	imageHandler := handler.NewImageHandler()
+	pdfHandler := handler.NewPdfHandler()
 
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
@@ -122,6 +123,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 			admin.GET("/allsports", sportHandler.GetAllSportsHandler)
 
 			admin.POST("/images", imageHandler.UploadImageHandler)
+			admin.POST("/pdfs", pdfHandler.UploadPdfHandler)
 		}
 
 		root := api.Group("/root")

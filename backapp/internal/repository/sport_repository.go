@@ -16,7 +16,7 @@ type SportRepository interface {
 	DeleteSportFromEvent(eventID int, sportID int) error
 	GetTeamsBySportID(sportID int) ([]*models.Team, error)
 	GetSportDetails(eventID int, sportID int) (*models.EventSport, error)
-	UpdateSportDetails(eventID int, sportID int, description string, rules string) error
+	UpdateSportDetails(eventID int, sportID int, details models.EventSport) error
 }
 
 type sportRepository struct {
@@ -78,7 +78,7 @@ func (r *sportRepository) GetSportByID(sportID int) (*models.Sport, error) {
 
 // GetSportsByEventID retrieves all sports assigned to a specific event.
 func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport, error) {
-	query := "SELECT event_id, sport_id, description, rules, location FROM event_sports WHERE event_id = ?"
+	query := "SELECT event_id, sport_id, description, rules, rules_type, rules_pdf_url, location FROM event_sports WHERE event_id = ?"
 	rows, err := r.db.Query(query, eventID)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport,
 	var eventSports []*models.EventSport
 	for rows.Next() {
 		eventSport := &models.EventSport{}
-		if err := rows.Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.Rules, &eventSport.Location); err != nil {
+		if err := rows.Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.Rules, &eventSport.RulesType, &eventSport.RulesPdfURL, &eventSport.Location); err != nil {
 			return nil, err
 		}
 		eventSports = append(eventSports, eventSport)
@@ -144,20 +144,24 @@ func (r *sportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, error)
 }
 
 func (r *sportRepository) GetSportDetails(eventID int, sportID int) (*models.EventSport, error) {
-	query := "SELECT event_id, sport_id, description, rules, location FROM event_sports WHERE event_id = ? AND sport_id = ?"
+	query := "SELECT event_id, sport_id, description, rules, rules_type, rules_pdf_url, location FROM event_sports WHERE event_id = ? AND sport_id = ?"
 	eventSport := &models.EventSport{}
-	err := r.db.QueryRow(query, eventID, sportID).Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.Rules, &eventSport.Location)
+	err := r.db.QueryRow(query, eventID, sportID).Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.Rules, &eventSport.RulesType, &eventSport.RulesPdfURL, &eventSport.Location)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errors.New("sport details not found")
+			return &models.EventSport{
+				EventID:   eventID,
+				SportID:   sportID,
+				RulesType: "markdown",
+			}, nil
 		}
 		return nil, err
 	}
 	return eventSport, nil
 }
 
-func (r *sportRepository) UpdateSportDetails(eventID int, sportID int, description string, rules string) error {
-	query := "UPDATE event_sports SET description = ?, rules = ? WHERE event_id = ? AND sport_id = ?"
-	_, err := r.db.Exec(query, description, rules, eventID, sportID)
+func (r *sportRepository) UpdateSportDetails(eventID int, sportID int, details models.EventSport) error {
+	query := "UPDATE event_sports SET description = ?, rules = ?, rules_type = ?, rules_pdf_url = ? WHERE event_id = ? AND sport_id = ?"
+	_, err := r.db.Exec(query, details.Description, details.Rules, details.RulesType, details.RulesPdfURL, eventID, sportID)
 	return err
 }
