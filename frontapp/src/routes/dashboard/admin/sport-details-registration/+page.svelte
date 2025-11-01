@@ -11,15 +11,16 @@
   let sports = [];
   let selectedEventId = null;
   let selectedSportId = null;
-  let sportDetails = { description: '', rules: '' };
+  let sportDetails = { description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null };
   let tournaments = [];
-  let currentTournamentData = null;
   let selectedTournamentId = null;
   let selectedTournament = null;
   let bulkStartTime = '';
   let matchStartTimes = {};
   let rulesTextarea;
   let previewDiv;
+  let selectedPdfFile = null;
+  let pdfPreviewUrl = null;
 
   onMount(async () => {
     // Fetch events
@@ -41,17 +42,23 @@
     const res = await fetch(`/api/admin/events/${eventId}/sports/${sportId}/details`);
     if (res.ok) {
       const details = await res.json();
-      sportDetails = { description: details.description, rules: details.rules };
+      sportDetails = {
+        description: details.description || '',
+        rules: details.rules || '',
+        rules_type: details.rules_type || 'markdown',
+        rules_pdf_url: details.rules_pdf_url || null
+      };
     } else {
-      sportDetails = { description: '', rules: '' };
+      sportDetails = { description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null };
     }
+    selectedPdfFile = null;
+    pdfPreviewUrl = null;
   }
 
   async function fetchTournaments(eventId) {
     const res = await fetch(`/api/admin/events/${eventId}/tournaments`);
     if (res.ok) {
       const fetched = await res.json();
-      console.log("fetched:", fetched);
       tournaments = fetched.map(t => {
         let data = t.data;
         if (typeof data === 'string') {
@@ -92,7 +99,6 @@
     selectedSportId = null;
     sports = [];
     tournaments = [];
-    currentTournamentData = null;
     selectedTournamentId = null;
     selectedTournament = null;
     const wrapper = document.getElementById('bracket-container');
@@ -108,15 +114,12 @@
     selectedSportId = e.target.value;
     if (selectedSportId) {
       await fetchSportDetails(selectedEventId, selectedSportId);
-      // 選択された競技の名前を取得
       const selectedSport = sports.find(s => s.id == selectedSportId);
       const sportName = selectedSport ? selectedSport.name : '';
 
-      // Ensure tournaments are loaded before updating
       if (tournaments.length === 0 && selectedEventId) {
         await fetchTournaments(selectedEventId);
       }
-      // 競技選択時に該当トーナメントを選択
       const t = tournaments.find(t => t.sport_id == selectedSportId);
       selectedTournamentId = t ? t.id : null;
       if (t) {
@@ -131,23 +134,70 @@
     }
   }
 
+  function handlePdfFileSelect(e) {
+    selectedPdfFile = e.target.files[0];
+    if (selectedPdfFile) {
+      pdfPreviewUrl = URL.createObjectURL(selectedPdfFile);
+    } else {
+      pdfPreviewUrl = null;
+    }
+  }
+
+  async function uploadPdf() {
+    if (!selectedPdfFile) return null;
+
+    const formData = new FormData();
+    formData.append('pdf', selectedPdfFile);
+
+    const res = await fetch('/api/admin/pdfs', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data.url;
+    } else {
+      alert('PDF upload failed');
+      return null;
+    }
+  }
+
   async function handleSave() {
     if (!selectedEventId || !selectedSportId) {
       alert('Please select an event and a sport.');
       return;
     }
+
+    let detailsToSave = {
+      description: sportDetails.description,
+      rules_type: sportDetails.rules_type,
+      rules: sportDetails.rules_type === 'markdown' ? sportDetails.rules : null,
+      rules_pdf_url: sportDetails.rules_type === 'pdf' ? sportDetails.rules_pdf_url : null,
+    };
+
+    if (detailsToSave.rules_type === 'pdf' && selectedPdfFile) {
+      const newPdfUrl = await uploadPdf();
+      if (newPdfUrl) {
+        detailsToSave.rules_pdf_url = newPdfUrl;
+      } else {
+        return; // PDF upload failed, so we stop saving.
+      }
+    }
+
     const res = await fetch(`/api/admin/events/${selectedEventId}/sports/${selectedSportId}/details`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(sportDetails)
+      body: JSON.stringify(detailsToSave)
     });
 
     if (res.ok) {
       alert('Sport details saved successfully');
-    }
-    else {
+      selectedPdfFile = null;
+      await fetchSportDetails(selectedEventId, selectedSportId);
+    } else {
       alert('Failed to save sport details');
     }
   }
@@ -556,27 +606,51 @@
     </div>
 
     <div class="mb-4">
-      <h2 class="text-xl font-semibold mb-2">ルール詳細 (Markdown)</h2>
-      <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
-        <button on:click={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
-        <button on:click={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
-        <button on:click={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
-        <button on:click={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
-        <button on:click={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
-        <button on:click={addLink} class="px-3 py-1">Link</button>
-        <button on:click={addList} class="px-3 py-1">List</button>
-        <button on:click={addTable} class="px-3 py-1">Table</button>
+      <h2 class="text-xl font-semibold mb-2">ルール詳細</h2>
+      <div class="flex gap-4 mb-2">
+        <label class="flex items-center">
+          <input type="radio" bind:group={sportDetails.rules_type} value={'markdown'} class="mr-1">
+          Markdown
+        </label>
+        <label class="flex items-center">
+          <input type="radio" bind:group={sportDetails.rules_type} value={'pdf'} class="mr-1">
+          PDF
+        </label>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
-        <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
-          {@html marked(sportDetails.rules || '')}
+
+      {#if sportDetails.rules_type === 'markdown'}
+        <div>
+          <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
+            <button on:click={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
+            <button on:click={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
+            <button on:click={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
+            <button on:click={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
+            <button on:click={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
+            <button on:click={addLink} class="px-3 py-1">Link</button>
+            <button on:click={addList} class="px-3 py-1">List</button>
+            <button on:click={addTable} class="px-3 py-1">Table</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
+            <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
+              {@html marked(sportDetails.rules || '')}
+            </div>
+          </div>
+          <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
+          <button on:click={() => document.getElementById('image-upload').click()} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
+            画像アップロード
+          </button>
         </div>
-      </div>
-      <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
-      <button on:click={() => document.getElementById('image-upload').click()} class="mb-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
-        画像アップロード
-      </button>
+      {:else}
+        <div class="flex flex-col gap-4">
+          <input type="file" accept=".pdf" on:change={handlePdfFileSelect} class="file-input file-input-bordered w-full max-w-xs">
+          {#if pdfPreviewUrl || sportDetails.rules_pdf_url}
+            <div class="border rounded-md h-96">
+              <embed src={pdfPreviewUrl || sportDetails.rules_pdf_url} type="application/pdf" width="100%" height="100%">
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <div class="flex justify-end mb-4">
