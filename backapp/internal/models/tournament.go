@@ -26,6 +26,8 @@ type MatchDB struct {
 	WinnerID           sql.NullInt64
 	Status             string
 	NextMatchID        sql.NullInt64
+	StartTime          sql.NullString
+	IsBronzeMatch      bool
 }
 
 // Player represents a player in a contestant
@@ -64,10 +66,12 @@ type Side struct {
 // Match represents a match in the tournament
 
 type Match struct {
+	ID            int    `json:"id,omitempty"`
 	RoundIndex    int    `json:"roundIndex"`
 	Order         int    `json:"order"`
 	Sides         []Side `json:"sides,omitempty"`
 	MatchStatus   string `json:"matchStatus,omitempty"`
+	StartTime     string `json:"startTime,omitempty"`
 	IsLive        bool   `json:"isLive,omitempty"`
 	IsBronzeMatch bool   `json:"isBronzeMatch,omitempty"`
 }

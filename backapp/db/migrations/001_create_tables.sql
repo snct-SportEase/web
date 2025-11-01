@@ -113,7 +113,7 @@ CREATE TABLE matches (
     winner_team_id INT, -- FK
     next_match_id INT, -- FK
     status VARCHAR(50),
-    start_time TIMESTAMP NULL,
+    start_time VARCHAR(255) NULL,
     court_number VARCHAR(255)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

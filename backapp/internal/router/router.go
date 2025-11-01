@@ -17,6 +17,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	// CORS middleware
 	router.Use(middleware.CORSMiddleware())
 
+	// Serve static files for uploaded images
+	router.Static("/uploads", "./uploads")
+
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
 
@@ -38,6 +41,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo)
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
+
+	imageHandler := handler.NewImageHandler()
+	pdfHandler := handler.NewPdfHandler()
 
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
@@ -81,6 +87,13 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 		{
 			admin.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("admin", "root"))
 
+			adminEvent := admin.Group("/events")
+			{
+				adminEvent.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
+			}
+
+			admin.GET("/events", eventHandler.GetAllEvents)
+
 			// Attendance routes
 			attendance := admin.Group("/attendance")
 			{
@@ -93,6 +106,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 			// Delete a sport from a specific event
 			admin.DELETE("/events/:event_id/sports/:sport_id", sportHandler.DeleteSportFromEventHandler)
 
+			admin.GET("/events/:event_id/sports/:sport_id/details", sportHandler.GetSportDetailsHandler)
+			admin.PUT("/events/:event_id/sports/:sport_id/details", sportHandler.UpdateSportDetailsHandler)
+
+			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
+			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
+
 			adminUsers := admin.Group("/users")
 			{
 				adminUsers.GET("", authHandler.FindUsersHandler)
@@ -100,6 +119,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 				adminUsers.PUT("/role", authHandler.UpdateUserRoleByAdmin)
 				adminUsers.DELETE("/role", authHandler.DeleteUserRoleByAdmin)
 			}
+
+			admin.GET("/allsports", sportHandler.GetAllSportsHandler)
+
+			admin.POST("/images", imageHandler.UploadImageHandler)
+			admin.POST("/pdfs", pdfHandler.UploadPdfHandler)
 		}
 
 		root := api.Group("/root")
