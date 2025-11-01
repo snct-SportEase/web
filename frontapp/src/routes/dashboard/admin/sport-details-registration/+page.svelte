@@ -357,6 +357,172 @@
     const percentage = rulesTextarea.scrollTop / (rulesTextarea.scrollHeight - rulesTextarea.clientHeight);
     previewDiv.scrollTop = percentage * (previewDiv.scrollHeight - previewDiv.clientHeight);
   }
+
+  function applyMarkdown(prefix, suffix = '') {
+    if (!rulesTextarea) return;
+
+    const start = rulesTextarea.selectionStart;
+    const end = rulesTextarea.selectionEnd;
+    const selectedText = sportDetails.rules.substring(start, end);
+    const newText = `${prefix}${selectedText}${suffix}`;
+    
+    sportDetails.rules = 
+      sportDetails.rules.substring(0, start) + 
+      newText + 
+      sportDetails.rules.substring(end);
+
+    // Wait for Svelte to update the textarea value
+    setTimeout(() => {
+      rulesTextarea.focus();
+      rulesTextarea.selectionStart = start + prefix.length;
+      rulesTextarea.selectionEnd = end + prefix.length;
+    }, 0);
+  }
+
+  function addLink() {
+    if (!rulesTextarea) return;
+    const url = prompt('Enter the URL:');
+    if (url) {
+      const start = rulesTextarea.selectionStart;
+      const end = rulesTextarea.selectionEnd;
+      const selectedText = sportDetails.rules.substring(start, end) || 'link text';
+      const newText = `[${selectedText}](${url})`;
+      
+      sportDetails.rules = 
+        sportDetails.rules.substring(0, start) + 
+        newText + 
+        sportDetails.rules.substring(end);
+
+      setTimeout(() => {
+        rulesTextarea.focus();
+        if (selectedText === 'link text') {
+          rulesTextarea.selectionStart = start + 1;
+          rulesTextarea.selectionEnd = start + 1 + 'link text'.length;
+        } else {
+          rulesTextarea.selectionStart = start + newText.length;
+          rulesTextarea.selectionEnd = start + newText.length;
+        }
+      }, 0);
+    }
+  }
+
+  function addList() {
+    if (!rulesTextarea) return;
+
+    const start = rulesTextarea.selectionStart;
+    const end = rulesTextarea.selectionEnd;
+    const selectedText = sportDetails.rules.substring(start, end);
+
+    const lines = selectedText.split('\n');
+    const newText = lines.map(line => `- ${line}`).join('\n');
+
+    sportDetails.rules = 
+      sportDetails.rules.substring(0, start) + 
+      newText + 
+      sportDetails.rules.substring(end);
+    
+    setTimeout(() => {
+      rulesTextarea.focus();
+      rulesTextarea.selectionStart = start;
+      rulesTextarea.selectionEnd = start + newText.length;
+    }, 0);
+  }
+
+  function applyHeading(level) {
+    if (!rulesTextarea) return;
+
+    const prefix = '#'.repeat(level) + ' ';
+    const cursorPos = rulesTextarea.selectionStart;
+    const text = sportDetails.rules;
+    
+    let lineStart = text.lastIndexOf('\n', cursorPos - 1) + 1;
+    let lineEnd = text.indexOf('\n', cursorPos);
+    if (lineEnd === -1) lineEnd = text.length;
+
+    const originalLine = text.substring(lineStart, lineEnd);
+    let newLine;
+    let change;
+
+    // Remove any existing heading
+    const lineWithoutHeading = originalLine.replace(/^#+\s*/, '');
+    const currentPrefixLength = originalLine.length - lineWithoutHeading.length;
+
+    if (originalLine.startsWith(prefix)) {
+      // Toggle off
+      newLine = lineWithoutHeading;
+      change = -prefix.length;
+    } else {
+      // Apply new heading
+      newLine = prefix + lineWithoutHeading;
+      change = prefix.length - currentPrefixLength;
+    }
+
+    sportDetails.rules = text.substring(0, lineStart) + newLine + text.substring(lineEnd);
+
+    setTimeout(() => {
+      rulesTextarea.focus();
+      rulesTextarea.selectionStart = rulesTextarea.selectionEnd = cursorPos + change;
+    }, 0);
+  }
+
+  function addTable() {
+    if (!rulesTextarea) return;
+    const tableTemplate = '\n| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |\n| Cell 3   | Cell 4   |\n';
+    
+    const start = rulesTextarea.selectionStart;
+    const end = rulesTextarea.selectionEnd;
+    
+    sportDetails.rules = 
+      sportDetails.rules.substring(0, start) + 
+      tableTemplate + 
+      sportDetails.rules.substring(end);
+
+    setTimeout(() => {
+      rulesTextarea.focus();
+      rulesTextarea.selectionStart = rulesTextarea.selectionEnd = start + tableTemplate.length;
+    }, 0);
+  }
+
+  function handleKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      const textarea = event.target;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+
+      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+      const currentLineToCursor = text.substring(lineStart, start);
+      
+      const listPrefixRegex = /^(\s*-\s)/;
+      const listMatch = currentLineToCursor.match(listPrefixRegex);
+
+      if (listMatch) {
+        const lineEnd = text.indexOf('\n', start);
+        const currentLine = text.substring(lineStart, lineEnd === -1 ? text.length : lineEnd);
+
+        if (currentLine.trim() === '-') {
+          event.preventDefault();
+          // Remove the list item line
+          const before = text.substring(0, lineStart);
+          const after = text.substring(lineEnd === -1 ? text.length : lineEnd + 1);
+          sportDetails.rules = before + after;
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = before.length;
+          }, 0);
+        } else {
+          // If list item has content, create a new list item on new line
+          event.preventDefault();
+          const prefix = listMatch[0]; // e.g., "  - "
+          const newText = '\n' + prefix;
+          
+          sportDetails.rules = text.substring(0, start) + newText + text.substring(end);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = start + newText.length;
+          }, 0);
+        }
+      }
+    }
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -391,8 +557,18 @@
 
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">ルール詳細 (Markdown)</h2>
+      <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
+        <button on:click={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
+        <button on:click={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
+        <button on:click={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
+        <button on:click={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
+        <button on:click={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
+        <button on:click={addLink} class="px-3 py-1">Link</button>
+        <button on:click={addList} class="px-3 py-1">List</button>
+        <button on:click={addTable} class="px-3 py-1">Table</button>
+      </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
+        <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
         <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
           {@html marked(sportDetails.rules || '')}
         </div>
