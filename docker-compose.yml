@@ -58,6 +58,8 @@ services:
     container_name: sportease-backapp
     env_file:
       - .env
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       sportease-db:
         condition: service_healthy
@@ -65,10 +67,10 @@ services:
       - spotease-net
     labels:
        - "traefik.enable=true"
-       - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
+       - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
        - "traefik.http.routers.backend-https.entrypoints=websecure"
        - "traefik.http.routers.backend-https.tls.certresolver=myresolver"
-       - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
+       - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
        - "traefik.http.routers.backend.entrypoints=local3300"
        - "traefik.http.services.backend.loadbalancer.server.port=8080"
 
@@ -111,3 +113,4 @@ networks:
 
 volumes:
   db-data:
+  uploads-data:
