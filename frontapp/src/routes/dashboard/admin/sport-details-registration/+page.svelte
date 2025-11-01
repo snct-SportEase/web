@@ -19,6 +19,7 @@
   let bulkStartTime = '';
   let matchStartTimes = {};
   let rulesTextarea;
+  let previewDiv;
 
   onMount(async () => {
     // Fetch events
@@ -350,6 +351,12 @@
     // Reset file input
     event.target.value = '';
   }
+
+  function syncScroll() {
+    if (!rulesTextarea || !previewDiv) return;
+    const percentage = rulesTextarea.scrollTop / (rulesTextarea.scrollHeight - rulesTextarea.clientHeight);
+    previewDiv.scrollTop = percentage * (previewDiv.scrollHeight - previewDiv.clientHeight);
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -385,8 +392,8 @@
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">ルール詳細 (Markdown)</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:paste={handlePaste} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
-        <div class="prose border p-4 rounded-md">
+        <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
+        <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
           {@html marked(sportDetails.rules || '')}
         </div>
       </div>
