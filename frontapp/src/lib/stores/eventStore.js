@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store';
+import { writable, get, derived } from 'svelte/store';
 
 // activeEvent store holds the active event object or null
 const { subscribe, set, update } = writable(null);
@@ -84,3 +84,8 @@ export const activeEvent = {
     // read-only access to current value
     get: () => get({ subscribe }),
 };
+
+export const activeEventId = derived(
+    activeEvent,
+    $activeEvent => $activeEvent ? $activeEvent.id : null
+);

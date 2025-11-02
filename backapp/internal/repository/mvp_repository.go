@@ -13,6 +13,7 @@ type MVPRepository interface {
 	VoteMVP(userID string, votedForClassID int, eventID int, reason string) error
 	GetMVPVotes(eventID int) ([]models.MVPVote, error)
 	GetVoteByUserID(userID string, eventID int) (*models.MVPVote, error)
+	GetMVPClass(eventID int) (*models.MVPResult, error)
 }
 
 type mvpRepository struct {
@@ -130,4 +131,50 @@ func (r *mvpRepository) GetVoteByUserID(userID string, eventID int) (*models.MVP
 		return nil, err
 	}
 	return &vote, nil
+}
+
+func (r *mvpRepository) GetMVPClass(eventID int) (*models.MVPResult, error) {
+	var season string
+	err := r.db.QueryRow("SELECT season FROM events WHERE id = ?", eventID).Scan(&season)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("event not found")
+		}
+		return nil, err
+	}
+
+	var query string
+	if season == "spring" {
+		query = `
+			SELECT c.name, cs.total_points_current_event + cs.mvp_points AS total_points
+			FROM class_scores cs
+			JOIN classes c ON cs.class_id = c.id
+			WHERE cs.event_id = ?
+			ORDER BY total_points DESC
+			LIMIT 1
+		`
+	} else {
+		query = `
+			SELECT c.name, cs.total_points_overall + cs.mvp_points AS total_points
+			FROM class_scores cs
+			JOIN classes c ON cs.class_id = c.id
+			WHERE cs.event_id = ?
+			ORDER BY total_points DESC
+			LIMIT 1
+		`
+	}
+
+	var result models.MVPResult
+	err = r.db.QueryRow(query, eventID).Scan(&result.ClassName, &result.TotalPoints)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No MVP class found yet
+		}
+		return nil, err
+	}
+
+	result.Season = season
+	result.EventID = eventID
+
+	return &result, nil
 }
