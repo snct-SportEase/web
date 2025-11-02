@@ -139,10 +139,10 @@ CREATE TABLE class_scores (
     ground_champion_points INT DEFAULT 0,
     noon_game_points INT DEFAULT 0,
     mvp_points INT DEFAULT 0,
-    total_points_current_event INT,
-    rank_current_event INT,
-    total_points_overall INT,
-    rank_overall INT,
+    total_points_current_event INT DEFAULT 0,
+    rank_current_event INT DEFAULT 0,
+    total_points_overall INT DEFAULT 0,
+    rank_overall INT DEFAULT 0,
     UNIQUE(event_id, class_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

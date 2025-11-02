@@ -45,6 +45,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	imageHandler := handler.NewImageHandler()
 	pdfHandler := handler.NewPdfHandler()
 
+	mvpRepo := repository.NewMVPRepository(db)
+	mvpHandler := handler.NewMVPHandler(mvpRepo)
+
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -124,6 +127,14 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 			admin.POST("/images", imageHandler.UploadImageHandler)
 			admin.POST("/pdfs", pdfHandler.UploadPdfHandler)
+
+			mvp := admin.Group("/mvp")
+			{
+				mvp.GET("/eligible-classes", mvpHandler.GetEligibleClasses)
+				mvp.POST("/vote", mvpHandler.VoteMVP)
+				mvp.GET("/votes", mvpHandler.GetMVPVotes)
+				mvp.GET("/user-vote", mvpHandler.GetUserVote)
+			}
 		}
 
 		root := api.Group("/root")
