@@ -86,6 +86,18 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 		return err
 	}
 
+	// Update ranks by calling the stored procedure
+	_, err = tx.Exec("CALL update_class_ranks(?)", eventID)
+	if err != nil {
+		return fmt.Errorf("failed to update ranks: %w", err)
+	}
+
+	// Update ranks overall by calling the stored procedure
+	_, err = tx.Exec("CALL update_class_overall_ranks(?)", eventID)
+	if err != nil {
+		return fmt.Errorf("failed to update overall ranks: %w", err)
+	}
+
 	return tx.Commit()
 }
 
