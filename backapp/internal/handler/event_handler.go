@@ -65,8 +65,24 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	event.ID = int(id)
+
+	if event.Season == "autumn" {
+		springEvent, err := h.eventRepo.GetEventByYearAndSeason(event.Year, "spring")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if springEvent != nil {
+			err := h.eventRepo.CopyClassScores(springEvent.ID, event.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+	}
+
 	c.JSON(http.StatusCreated, event)
 }
 

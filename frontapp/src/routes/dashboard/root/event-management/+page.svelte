@@ -6,6 +6,7 @@
   let events = [];
   let showModal = false;
   let selectedEvent = null;
+  let isNameManuallyChanged = false;
 
   let currentEvent = {
     id: null,
@@ -15,6 +16,17 @@
     start_date: '',
     end_date: '',
   };
+
+  $: {
+    if (!isNameManuallyChanged && currentEvent.year && currentEvent.season) {
+      const seasonText = currentEvent.season === 'spring' ? '春' : '秋';
+      currentEvent.name = `${currentEvent.year}${seasonText}季スポーツ大会`;
+    }
+  }
+
+  function onNameInput() {
+    isNameManuallyChanged = true;
+  }
 
   let selectedEventIdForActivation = null;
 
@@ -59,6 +71,7 @@
 
   function openCreateModal() {
     selectedEvent = null;
+    isNameManuallyChanged = false;
     currentEvent = {
       id: null,
       name: '',
@@ -72,6 +85,7 @@
 
   function openEditModal(event) {
     selectedEvent = event;
+    isNameManuallyChanged = true; // 編集時は手動変更とみなし、自動更新しない
     currentEvent = {
       ...event,
       start_date: event.start_date ? new Date(event.start_date).toISOString().split('T')[0] : '',
@@ -189,7 +203,7 @@
           <div class="space-y-4">
             <div>
               <label for="name" class="block text-sm font-medium text-gray-700">大会名</label>
-              <input type="text" id="name" bind:value={currentEvent.name} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+              <input type="text" id="name" bind:value={currentEvent.name} on:input={onNameInput} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
             </div>
             <div>
               <label for="year" class="block text-sm font-medium text-gray-700">年度</label>

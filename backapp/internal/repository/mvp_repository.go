@@ -87,16 +87,27 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 		return err
 	}
 
-	// Update ranks by calling the stored procedure
-	_, err = tx.Exec("CALL update_class_ranks(?)", eventID)
+	// Get season to determine which rank to update
+	var season string
+	err = tx.QueryRow("SELECT season FROM events WHERE id = ?", eventID).Scan(&season)
 	if err != nil {
-		return fmt.Errorf("failed to update ranks: %w", err)
+		return err
 	}
 
-	// Update ranks overall by calling the stored procedure
-	_, err = tx.Exec("CALL update_class_overall_ranks(?)", eventID)
-	if err != nil {
-		return fmt.Errorf("failed to update overall ranks: %w", err)
+	if season == "spring" {
+		_, err = tx.Exec("CALL update_class_ranks(?)", eventID)
+		if err != nil {
+			return fmt.Errorf("failed to update ranks: %w", err)
+		}
+	} else if season == "autumn" {
+		_, err = tx.Exec("CALL update_class_ranks(?)", eventID)
+		if err != nil {
+			return fmt.Errorf("failed to update ranks: %w", err)
+		}
+		_, err = tx.Exec("CALL update_class_overall_ranks(?)", eventID)
+		if err != nil {
+			return fmt.Errorf("failed to update overall ranks: %w", err)
+		}
 	}
 
 	return tx.Commit()

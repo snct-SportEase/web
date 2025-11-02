@@ -27,7 +27,8 @@ BEGIN
         IFNULL(NEW.ground_win2_points, 0) +
         IFNULL(NEW.ground_win3_points, 0) +
         IFNULL(NEW.ground_champion_points, 0) +
-        IFNULL(NEW.noon_game_points, 0);
+        IFNULL(NEW.noon_game_points, 0) +
+        IFNULL(NEW.mvp_points, 0);
 
     -- initial_points を含む総合計得点を計算
     SET NEW.total_points_overall = NEW.total_points_current_event + IFNULL(NEW.initial_points, 0);
@@ -56,7 +57,8 @@ BEGIN
         IFNULL(NEW.ground_win2_points, 0) +
         IFNULL(NEW.ground_win3_points, 0) +
         IFNULL(NEW.ground_champion_points, 0) +
-        IFNULL(NEW.noon_game_points, 0) ;
+        IFNULL(NEW.noon_game_points, 0) +
+        IFNULL(NEW.mvp_points, 0);
 
     -- initial_points を含む総合計得点を計算
     SET NEW.total_points_overall = NEW.total_points_current_event + IFNULL(NEW.initial_points, 0);
