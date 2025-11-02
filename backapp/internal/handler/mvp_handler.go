@@ -118,3 +118,24 @@ func (h *MVPHandler) GetUserVote(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"voted": true, "vote": vote})
 }
+
+func (h *MVPHandler) GetMVPClass(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Query("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event_id"})
+		return
+	}
+
+	mvpResult, err := h.mvpRepo.GetMVPClass(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if mvpResult == nil {
+		c.JSON(http.StatusOK, gin.H{"message": "No MVP class found yet"})
+		return
+	}
+
+	c.JSON(http.StatusOK, mvpResult)
+}

@@ -128,12 +128,18 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 			admin.POST("/images", imageHandler.UploadImageHandler)
 			admin.POST("/pdfs", pdfHandler.UploadPdfHandler)
 
-			mvp := admin.Group("/mvp")
+			mvp := api.Group("/mvp")
 			{
-				mvp.GET("/eligible-classes", mvpHandler.GetEligibleClasses)
-				mvp.POST("/vote", mvpHandler.VoteMVP)
-				mvp.GET("/votes", mvpHandler.GetMVPVotes)
-				mvp.GET("/user-vote", mvpHandler.GetUserVote)
+				mvp.Use(middleware.AuthMiddleware(userRepo))
+				mvp.GET("/class", mvpHandler.GetMVPClass)
+			}
+
+			adminMvp := admin.Group("/mvp")
+			{
+				adminMvp.GET("/eligible-classes", mvpHandler.GetEligibleClasses)
+				adminMvp.POST("/vote", mvpHandler.VoteMVP)
+				adminMvp.GET("/votes", mvpHandler.GetMVPVotes)
+				adminMvp.GET("/user-vote", mvpHandler.GetUserVote)
 			}
 		}
 

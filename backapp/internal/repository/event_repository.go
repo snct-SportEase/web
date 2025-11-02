@@ -11,6 +11,8 @@ type EventRepository interface {
 	UpdateEvent(event *models.Event) error
 	GetActiveEvent() (event_id int, err error)
 	SetActiveEvent(event_id *int) error
+	GetEventByYearAndSeason(year int, season string) (*models.Event, error)
+	CopyClassScores(fromEventID int, toEventID int) error
 }
 
 type eventRepository struct {
@@ -85,5 +87,30 @@ func (r *eventRepository) SetActiveEvent(event_id *int) error {
 		return err
 	}
 	_, err := r.db.Exec(query, *event_id)
+	return err
+}
+
+func (r *eventRepository) GetEventByYearAndSeason(year int, season string) (*models.Event, error) {
+	query := "SELECT id, name, `year`, season, start_date, end_date FROM events WHERE `year` = ? AND season = ?"
+	event := &models.Event{}
+	err := r.db.QueryRow(query, year, season).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Not found
+		}
+		return nil, err
+	}
+	return event, nil
+}
+
+func (r *eventRepository) CopyClassScores(fromEventID int, toEventID int) error {
+	query := `
+		INSERT INTO class_scores (event_id, class_id, initial_points)
+		SELECT ?, class_id, total_points_current_event
+		FROM class_scores
+		WHERE event_id = ?
+		ON DUPLICATE KEY UPDATE initial_points = VALUES(initial_points)
+	`
+	_, err := r.db.Exec(query, toEventID, fromEventID)
 	return err
 }
