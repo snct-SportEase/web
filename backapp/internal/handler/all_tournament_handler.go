@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"backapp/internal/websocket"
 	"fmt"
 	"math"
 	"math/rand"
@@ -14,18 +15,20 @@ import (
 )
 
 type TournamentHandler struct {
-	tournRepo repository.TournamentRepository
-	sportRepo repository.SportRepository
-	teamRepo  repository.TeamRepository
-	classRepo repository.ClassRepository
+	tournRepo  repository.TournamentRepository
+	sportRepo  repository.SportRepository
+	teamRepo   repository.TeamRepository
+	classRepo  repository.ClassRepository
+	hubManager *websocket.HubManager
 }
 
-func NewTournamentHandler(tournRepo repository.TournamentRepository, sportRepo repository.SportRepository, teamRepo repository.TeamRepository, classRepo repository.ClassRepository) *TournamentHandler {
+func NewTournamentHandler(tournRepo repository.TournamentRepository, sportRepo repository.SportRepository, teamRepo repository.TeamRepository, classRepo repository.ClassRepository, hubManager *websocket.HubManager) *TournamentHandler {
 	return &TournamentHandler{
-		tournRepo: tournRepo,
-		sportRepo: sportRepo,
-		teamRepo:  teamRepo,
-		classRepo: classRepo,
+		tournRepo:  tournRepo,
+		sportRepo:  sportRepo,
+		teamRepo:   teamRepo,
+		classRepo:  classRepo,
+		hubManager: hubManager,
 	}
 }
 

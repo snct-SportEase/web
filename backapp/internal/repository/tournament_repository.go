@@ -17,7 +17,8 @@ type TournamentRepository interface {
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchStatus(matchID int, status string) error
-	UpdateMatchResult(matchID, team1Score, team22Score, winnerID int) error
+	UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error
+	GetTournamentIDByMatchID(matchID int) (int, error)
 }
 
 type tournamentRepository struct {
@@ -492,4 +493,10 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 	}
 
 	return tx.Commit()
+}
+
+func (r *tournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error) {
+	var tournamentID int
+	err := r.db.QueryRow("SELECT tournament_id FROM matches WHERE id = ?", matchID).Scan(&tournamentID)
+	return tournamentID, err
 }

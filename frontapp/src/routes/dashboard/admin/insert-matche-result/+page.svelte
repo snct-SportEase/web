@@ -12,6 +12,37 @@
 	let showConfirmModal = false;
 	let scoresToSubmit = null;
 
+	let ws;
+
+	$: if (selectedTournamentId && typeof window !== 'undefined') {
+		if (ws) {
+			ws.close();
+		}
+		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+		const host = window.location.host;
+		ws = new WebSocket(`${protocol}//${host}/api/ws/tournaments/${selectedTournamentId}`);
+
+		ws.onmessage = (event) => {
+			const data = JSON.parse(event.data);
+			if (data.type === 'update') {
+				// refetch tournament data
+				fetch(`/api/admin/events/${activeEventId}/tournaments`)
+					.then((res) => res.json())
+					.then((data) => {
+						tournaments = data;
+					});
+			}
+		};
+
+		ws.onclose = () => {
+			console.log('WebSocket connection closed');
+		};
+
+		ws.onerror = (error) => {
+			console.error('WebSocket error:', error);
+		};
+	}
+
 	onMount(async () => {
 		try {
 			const eventResponse = await fetch('/api/events/active');
@@ -27,6 +58,12 @@
 		} catch (error) {
 			console.error(error);
 		}
+
+		return () => {
+			if (ws) {
+				ws.close();
+			}
+		};
 	});
 
 	function openModal(match) {

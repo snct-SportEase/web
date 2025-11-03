@@ -81,5 +81,10 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 		return
 	}
 
+	tournamentID, err := h.tournRepo.GetTournamentIDByMatchID(matchID)
+	if err == nil && h.hubManager != nil {
+		h.hubManager.BroadcastTo("tournament:"+strconv.Itoa(tournamentID), gin.H{"type": "update"})
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Match result updated successfully"})
 }
