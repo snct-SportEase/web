@@ -17,7 +17,7 @@ type TournamentRepository interface {
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchStatus(matchID int, status string) error
-	UpdateMatchResult(matchID, team1Score, team2Score int) error
+	UpdateMatchResult(matchID, team1Score, team22Score, winnerID int) error
 }
 
 type tournamentRepository struct {
@@ -165,7 +165,7 @@ func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, tea
 		(*contestantCounter)++
 	}
 
-	return models.Side{ContestantID: contestantID}, team, nil
+	return models.Side{ContestantID: contestantID, TeamID: teamID}, team, nil
 }
 
 func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*models.MatchDB, error) {
@@ -405,7 +405,7 @@ func (r *tournamentRepository) UpdateMatchStatus(matchID int, status string) err
 	return err
 }
 
-func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score int) error {
+func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score, winnerIDInput int) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -421,9 +421,16 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 	if team1Score > team2Score {
 		winnerID = match.Team1ID.Int64
 		loserID = match.Team2ID.Int64
-	} else {
+	} else if team2Score > team1Score {
 		winnerID = match.Team2ID.Int64
 		loserID = match.Team1ID.Int64
+	} else {
+		winnerID = int64(winnerIDInput)
+		if winnerID == match.Team1ID.Int64 {
+			loserID = match.Team2ID.Int64
+		} else {
+			loserID = match.Team1ID.Int64
+		}
 	}
 
 	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, winnerID, matchID)

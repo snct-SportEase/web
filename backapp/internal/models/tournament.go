@@ -56,6 +56,7 @@ type Score struct {
 type Side struct {
 	Title        string  `json:"title,omitempty"`
 	ContestantID string  `json:"contestantId,omitempty"`
+	TeamID       int64   `json:"teamId,omitempty"`
 	Scores       []Score `json:"scores,omitempty"`
 	IsServing    bool    `json:"isServing,omitempty"`
 	IsWinner     bool    `json:"isWinner,omitempty"`

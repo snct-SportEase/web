@@ -60,6 +60,7 @@ func (h *TournamentHandler) UpdateMatchStatusHandler(c *gin.Context) {
 type UpdateMatchResultRequest struct {
 	Team1Score int `json:"team1_score"`
 	Team2Score int `json:"team2_score"`
+	WinnerID   int `json:"winner_id,omitempty"`
 }
 
 func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
@@ -75,7 +76,7 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 		return
 	}
 
-	if err := h.tournRepo.UpdateMatchResult(matchID, req.Team1Score, req.Team2Score); err != nil {
+	if err := h.tournRepo.UpdateMatchResult(matchID, req.Team1Score, req.Team2Score, req.WinnerID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match result", "details": err.Error()})
 		return
 	}

@@ -49,20 +49,27 @@
 		scoresToSubmit = null;
 	}
 
-	async function handleSubmit() {
+	async function handleSubmit(event) {
 		if (!selectedMatch || !scoresToSubmit) return;
 
 		const { team1_score, team2_score } = scoresToSubmit;
+		const winnerId = event?.detail?.winnerId;
+
+		const body = {
+			team1_score: team1_score,
+			team2_score: team2_score
+		};
+
+		if (winnerId) {
+			body.winner_id = winnerId;
+		}
 
 		const response = await fetch(`/api/admin/matches/${selectedMatch.id}/result`, {
 			method: 'PUT',
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify({
-				team1_score: team1_score,
-				team2_score: team2_score
-			})
+			body: JSON.stringify(body)
 		});
 
 		if (response.ok) {
@@ -169,6 +176,8 @@
     team2Score={scoresToSubmit?.team2_score}
     team1Name={selectedTournament?.data.contestants[selectedMatch?.sides?.[0]?.contestantId]?.players?.[0]?.title}
     team2Name={selectedTournament?.data.contestants[selectedMatch?.sides?.[1]?.contestantId]?.players?.[0]?.title}
+    team1Id={selectedMatch?.sides?.[0]?.teamId}
+    team2Id={selectedMatch?.sides?.[1]?.teamId}
     on:confirm={handleSubmit}
     on:cancel={closeConfirmModal}
 />
