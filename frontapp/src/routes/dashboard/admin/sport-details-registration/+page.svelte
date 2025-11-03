@@ -86,7 +86,6 @@
       if (wrapper) {
         wrapper.innerHTML = '';
         if (selectedTournament && selectedTournament.data) {
-          console.log(selectedTournament.data);
           createBracket(selectedTournament.data, wrapper);
         } else {
           wrapper.innerHTML = '<p>このトーナメント情報はありません。</p>';
