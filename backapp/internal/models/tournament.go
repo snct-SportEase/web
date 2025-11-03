@@ -19,10 +19,13 @@ type Tournament struct {
 
 type MatchDB struct {
 	ID                 int
+	TournamentID       int
 	Round              int
 	MatchNumberInRound int
 	Team1ID            sql.NullInt64
 	Team2ID            sql.NullInt64
+	Team1Score         sql.NullInt32
+	Team2Score         sql.NullInt32
 	WinnerID           sql.NullInt64
 	Status             string
 	NextMatchID        sql.NullInt64
@@ -45,22 +48,17 @@ type Contestant struct {
 }
 
 // Score represents a score for a side
-
 type Score struct {
-	MainScore interface{} `json:"mainScore"`
-	Subscore  interface{} `json:"subscore,omitempty"`
-	IsWinner  bool        `json:"isWinner,omitempty"`
+	MainScore int32 `json:"mainScore"`
 }
 
 // Side represents a side in a match
-
 type Side struct {
-	Title        string      `json:"title,omitempty"`
-	ContestantID string      `json:"contestantId,omitempty"`
-	Scores       []Score     `json:"scores,omitempty"`
-	CurrentScore interface{} `json:"currentScore,omitempty"`
-	IsServing    bool        `json:"isServing,omitempty"`
-	IsWinner     bool        `json:"isWinner,omitempty"`
+	Title        string  `json:"title,omitempty"`
+	ContestantID string  `json:"contestantId,omitempty"`
+	Scores       []Score `json:"scores,omitempty"`
+	IsServing    bool    `json:"isServing,omitempty"`
+	IsWinner     bool    `json:"isWinner,omitempty"`
 }
 
 // Match represents a match in the tournament

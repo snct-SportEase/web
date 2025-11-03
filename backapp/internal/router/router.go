@@ -114,6 +114,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
 			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
+			admin.PUT("/matches/:match_id/result", tournHandler.UpdateMatchResultHandler)
 
 			adminUsers := admin.Group("/users")
 			{

@@ -17,6 +17,7 @@ type TournamentRepository interface {
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchStatus(matchID int, status string) error
+	UpdateMatchResult(matchID, team1Score, team2Score int) error
 }
 
 type tournamentRepository struct {
@@ -59,6 +60,12 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 				if err != nil {
 					return nil, err
 				}
+				if m.Team1Score.Valid {
+					side.Scores = []models.Score{{MainScore: m.Team1Score.Int32}}
+				}
+				if m.WinnerID.Valid && m.WinnerID.Int64 == m.Team1ID.Int64 {
+					side.IsWinner = true
+				}
 				sides = append(sides, side)
 				if team != nil {
 					teamMap[int(m.Team1ID.Int64)] = team
@@ -69,6 +76,12 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 				side, team, err := r.getSide(m.Team2ID.Int64, &contestantCounter, teamMap, contestants)
 				if err != nil {
 					return nil, err
+				}
+				if m.Team2Score.Valid {
+					side.Scores = []models.Score{{MainScore: m.Team2Score.Int32}}
+				}
+				if m.WinnerID.Valid && m.WinnerID.Int64 == m.Team2ID.Int64 {
+					side.IsWinner = true
 				}
 				sides = append(sides, side)
 				if team != nil {
@@ -156,7 +169,7 @@ func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, tea
 }
 
 func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*models.MatchDB, error) {
-	rows, err := r.db.Query("SELECT id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time, is_bronze_match FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
+	rows, err := r.db.Query("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, team1_score, team2_score, winner_team_id, status, next_match_id, start_time, is_bronze_match FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,12 +178,21 @@ func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*
 	var matches []*models.MatchDB
 	for rows.Next() {
 		var m models.MatchDB
-		if err := rows.Scan(&m.ID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch); err != nil {
+		if err := rows.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.Team1Score, &m.Team2Score, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch); err != nil {
 			return nil, err
 		}
 		matches = append(matches, &m)
 	}
 	return matches, nil
+}
+
+func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.MatchDB, error) {
+	var m models.MatchDB
+	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time, is_bronze_match FROM matches WHERE id = ?", matchID)
+	if err := row.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch); err != nil {
+		return nil, err
+	}
+	return &m, nil
 }
 
 func (r *tournamentRepository) getTeamByID(teamID int64) (*models.Team, error) {
@@ -381,4 +403,86 @@ func (r *tournamentRepository) UpdateMatchStartTime(matchID int, startTime strin
 func (r *tournamentRepository) UpdateMatchStatus(matchID int, status string) error {
 	_, err := r.db.Exec("UPDATE matches SET status = ? WHERE id = ?", status, matchID)
 	return err
+}
+
+func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	match, err := r.getMatchByID(tx, matchID)
+	if err != nil {
+		return err
+	}
+
+	var winnerID, loserID int64
+	if team1Score > team2Score {
+		winnerID = match.Team1ID.Int64
+		loserID = match.Team2ID.Int64
+	} else {
+		winnerID = match.Team2ID.Int64
+		loserID = match.Team1ID.Int64
+	}
+
+	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, winnerID, matchID)
+	if err != nil {
+		return err
+	}
+
+	// Advance winner to the next match
+	if match.NextMatchID.Valid {
+		nextMatch, err := r.getMatchByID(tx, int(match.NextMatchID.Int64))
+		if err != nil {
+			return err
+		}
+
+		if nextMatch.Team1ID.Valid {
+			_, err = tx.Exec("UPDATE matches SET team2_id = ? WHERE id = ?", winnerID, nextMatch.ID)
+		} else {
+			_, err = tx.Exec("UPDATE matches SET team1_id = ? WHERE id = ?", winnerID, nextMatch.ID)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	// Handle bronze match for semi-final losers
+	if !match.IsBronzeMatch {
+		// Check if it's a semi-final match
+		var totalRounds int
+		err := tx.QueryRow("SELECT MAX(round) FROM matches WHERE tournament_id = ?", match.TournamentID).Scan(&totalRounds)
+		if err != nil {
+			return err
+		}
+
+		// Semi-finals are in the second to last round
+		if match.Round == totalRounds-1 {
+			var bronzeMatchID int64
+			err := tx.QueryRow("SELECT id FROM matches WHERE tournament_id = ? AND is_bronze_match = TRUE", match.TournamentID).Scan(&bronzeMatchID)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					// No bronze match, so we do nothing
+				} else {
+					return err
+				}
+			} else {
+				bronzeMatch, err := r.getMatchByID(tx, int(bronzeMatchID))
+				if err != nil {
+					return err
+				}
+				if bronzeMatch.Team1ID.Valid {
+					_, err = tx.Exec("UPDATE matches SET team2_id = ? WHERE id = ?", loserID, bronzeMatch.ID)
+				} else {
+					_, err = tx.Exec("UPDATE matches SET team1_id = ? WHERE id = ?", loserID, bronzeMatch.ID)
+				}
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return tx.Commit()
 }
