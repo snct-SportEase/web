@@ -4,7 +4,8 @@ import (
 	"backapp/internal/config"
 	"backapp/internal/models"
 	"backapp/internal/repository"
-	"backapp/internal/router" // routerをインポート
+	"backapp/internal/router"
+	"backapp/internal/websocket"
 	"database/sql"
 	"fmt"
 	"log"
@@ -36,8 +37,10 @@ func main() {
 		log.Printf("Warning: Failed to initialize event: %v", err)
 	}
 
+	hubManager := websocket.NewHubManager()
+
 	// ルーターをセットアップ
-	r := router.SetupRouter(db, cfg)
+	r := router.SetupRouter(db, cfg, hubManager)
 
 	log.Println("Starting server on :8080")
 	if err := r.Run(":8080"); err != nil {

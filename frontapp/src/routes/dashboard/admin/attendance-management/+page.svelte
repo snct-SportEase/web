@@ -62,8 +62,6 @@
   async function handleSubmit() {
     if (!selectedClassId || !classDetails) {
       errorMessage = 'クラスが選択されていません。';
-      console.log("selectedClassId:", selectedClassId);
-      console.log("classDetails:", classDetails);
       return;
     }
 

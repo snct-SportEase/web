@@ -5,13 +5,14 @@ import (
 	"backapp/internal/handler"
 	"backapp/internal/middleware"
 	"backapp/internal/repository"
+	"backapp/internal/websocket"
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRouter はGinルーターをセットアップし、ルーティングを定義します
-func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
+func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManager) *gin.Engine {
 	router := gin.Default()
 
 	// CORS middleware
@@ -38,7 +39,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
 
-	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo)
+	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo, hubManager)
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
@@ -47,6 +48,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 	mvpRepo := repository.NewMVPRepository(db)
 	mvpHandler := handler.NewMVPHandler(mvpRepo)
+
+	wsHandler := handler.NewWebSocketHandler(hubManager)
 
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
@@ -57,6 +60,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 	api := router.Group("/api")
 	{
+		api.GET("/ws/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
+
 		api.GET("/classes", classHandler.GetAllClasses)
 
 		api.GET("/events/active", middleware.AuthMiddleware(userRepo), eventHandler.GetActiveEvent)
@@ -114,6 +119,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
 			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
+			admin.PUT("/matches/:match_id/result", tournHandler.UpdateMatchResultHandler)
 
 			adminUsers := admin.Group("/users")
 			{
