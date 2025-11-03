@@ -111,8 +111,8 @@ func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) erro
 		}
 	}
 
-	query := "INSERT INTO event_sports (event_id, sport_id, description, rules, location) VALUES (?, ?, ?, ?, ?)"
-	_, err := r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.Rules, eventSport.Location)
+	query := "INSERT INTO event_sports (event_id, sport_id, description, rules, rules_type, rules_pdf_url, location) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	_, err := r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.Rules, eventSport.RulesType, eventSport.RulesPdfURL, eventSport.Location)
 	return err
 }
 
