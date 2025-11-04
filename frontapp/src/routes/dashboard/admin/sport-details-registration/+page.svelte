@@ -7,7 +7,6 @@
   import { createBracket } from 'bracketry';
   import { marked } from 'marked';
 
-  let events = [];
   let sports = [];
   let selectedEventId = null;
   let selectedSportId = null;
@@ -21,12 +20,19 @@
   let previewDiv;
   let selectedPdfFile = null;
   let pdfPreviewUrl = null;
+  let activeEventName = '';
 
   onMount(async () => {
-    // Fetch events
-    const res = await fetch('/api/admin/events');
+    // Fetch active event
+    const res = await fetch('/api/events/active');
     if (res.ok) {
-      events = await res.json();
+      const data = await res.json();
+      if (data.event_id) {
+        selectedEventId = data.event_id;
+        activeEventName = data.event_name;
+        await fetchSports(selectedEventId);
+        await fetchTournaments(selectedEventId);
+      }
     }
     renderBracket();
   });
@@ -578,127 +584,128 @@
 <div class="container mx-auto p-4">
   <h1 class="text-2xl font-bold mb-4">競技詳細情報登録</h1>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-    <div>
-      <label for="event-select" class="block text-sm font-medium text-gray-700">大会選択</label>
-      <select id="event-select" on:change={handleEventChange} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-        <option value="">大会を選択してください</option>
-        {#each events as event}
-          <option value={event.id}>{event.name}</option>
-        {/each}
-      </select>
-    </div>
-    <div>
-      <label for="sport-select" class="block text-sm font-medium text-gray-700">競技選択</label>
-      <select id="sport-select" on:change={handleSportChange} disabled={!selectedEventId} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-        <option value="">競技を選択してください</option>
-        {#each sports as sport}
-          <option value={sport.id}>{sport.name}</option>
-        {/each}
-      </select>
-    </div>
-  </div>
-
-  {#if selectedSportId}
-    <div class="mb-4">
-      <h2 class="text-xl font-semibold mb-2">競技概要</h2>
-      <textarea bind:value={sportDetails.description} rows="4" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
+  {#if selectedEventId}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label for="event-select" class="block text-sm font-medium text-gray-700">アクティブな大会</label>
+        <div class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 rounded-md">
+          {activeEventName}
+        </div>
+      </div>
+      <div>
+        <label for="sport-select" class="block text-sm font-medium text-gray-700">競技選択</label>
+        <select id="sport-select" on:change={handleSportChange} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+          <option value="">競技を選択してください</option>
+          {#each sports as sport}
+            <option value={sport.id}>{sport.name}</option>
+          {/each}
+        </select>
+      </div>
     </div>
 
-    <div class="mb-4">
-      <h2 class="text-xl font-semibold mb-2">ルール詳細</h2>
-      <div class="flex gap-4 mb-2">
-        <label class="flex items-center">
-          <input type="radio" bind:group={sportDetails.rules_type} value={'markdown'} class="mr-1">
-          Markdown
-        </label>
-        <label class="flex items-center">
-          <input type="radio" bind:group={sportDetails.rules_type} value={'pdf'} class="mr-1">
-          PDF
-        </label>
+    {#if selectedSportId}
+      <div class="mb-4">
+        <h2 class="text-xl font-semibold mb-2">競技概要</h2>
+        <textarea bind:value={sportDetails.description} rows="4" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
       </div>
 
-      {#if sportDetails.rules_type === 'markdown'}
-        <div>
-          <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
-            <button on:click={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
-            <button on:click={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
-            <button on:click={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
-            <button on:click={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
-            <button on:click={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
-            <button on:click={addLink} class="px-3 py-1">Link</button>
-            <button on:click={addList} class="px-3 py-1">List</button>
-            <button on:click={addTable} class="px-3 py-1">Table</button>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
-            <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
-              {@html marked(sportDetails.rules || '')}
-            </div>
-          </div>
-          <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
-          <button on:click={() => document.getElementById('image-upload').click()} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
-            画像アップロード
-          </button>
+      <div class="mb-4">
+        <h2 class="text-xl font-semibold mb-2">ルール詳細</h2>
+        <div class="flex gap-4 mb-2">
+          <label class="flex items-center">
+            <input type="radio" bind:group={sportDetails.rules_type} value={'markdown'} class="mr-1">
+            Markdown
+          </label>
+          <label class="flex items-center">
+            <input type="radio" bind:group={sportDetails.rules_type} value={'pdf'} class="mr-1">
+            PDF
+          </label>
         </div>
-      {:else}
-        <div class="flex flex-col gap-4">
-          <input type="file" accept=".pdf" on:change={handlePdfFileSelect} class="file-input file-input-bordered w-full max-w-xs">
-          {#if pdfPreviewUrl || sportDetails.rules_pdf_url}
-            <div class="border rounded-md h-96">
-              <embed src={pdfPreviewUrl || sportDetails.rules_pdf_url} type="application/pdf" width="100%" height="100%">
+
+        {#if sportDetails.rules_type === 'markdown'}
+          <div>
+            <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
+              <button on:click={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
+              <button on:click={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
+              <button on:click={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
+              <button on:click={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
+              <button on:click={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
+              <button on:click={addLink} class="px-3 py-1">Link</button>
+              <button on:click={addList} class="px-3 py-1">List</button>
+              <button on:click={addTable} class="px-3 py-1">Table</button>
             </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
+              <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
+                {@html marked(sportDetails.rules || '')}
+              </div>
+            </div>
+            <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
+            <button on:click={() => document.getElementById('image-upload').click()} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
+              画像アップロード
+            </button>
+          </div>
+        {:else}
+          <div class="flex flex-col gap-4">
+            <input type="file" accept=".pdf" on:change={handlePdfFileSelect} class="file-input file-input-bordered w-full max-w-xs">
+            {#if pdfPreviewUrl || sportDetails.rules_pdf_url}
+              <div class="border rounded-md h-96">
+                <embed src={pdfPreviewUrl || sportDetails.rules_pdf_url} type="application/pdf" width="100%" height="100%">
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <div class="flex justify-end mb-4">
+        <button on:click={handleSave} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">保存</button>
+      </div>
+
+      <div class="mb-4">
+        <h2 class="text-xl font-semibold mb-2">トーナメント情報</h2>
+        <div id="bracket-container">
+          {#if !selectedSportId}
+            <p>競技を選択してください。</p>
+          {:else if !selectedTournament}
+            <p>この競技のトーナメント情報はありません。</p>
           {/if}
         </div>
-      {/if}
-    </div>
-
-    <div class="flex justify-end mb-4">
-      <button on:click={handleSave} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">保存</button>
-    </div>
-
-    <div class="mb-4">
-      <h2 class="text-xl font-semibold mb-2">トーナメント情報</h2>
-      <div id="bracket-container">
-        {#if !selectedSportId}
-          <p>競技を選択してください。</p>
-        {:else if !selectedTournament}
-          <p>この競技のトーナメント情報はありません。</p>
-        {/if}
       </div>
-    </div>
 
-    <div class="mb-4">
-        <h2 class="text-xl font-semibold mb-2">試合開始時間</h2>
-        {#if selectedTournament?.data?.matches}
-            <div class="flex items-center gap-4 mb-4">
-              <input type="datetime-local" bind:value={bulkStartTime} class="border rounded px-2 py-1">
-              <button on:click={handleBulkTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
-              <button on:click={handleSaveAllMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
-            </div>
-            <div class="space-y-2">
-                {#each selectedTournament.data.matches as match}
-                    <div class="flex items-center justify-between p-2 border rounded">
-                        <span class="font-medium">Round {match.roundIndex + 1}, Match {match.order + 1}</span>
-                        <div class="flex items-center gap-4">
-                            <span class="text-sm text-gray-600">
-                                {#if match.matchStatus}
-                                    開始日時: {match.matchStatus}
-                                {/if}
-                            </span>
-                            <input 
-                                type="datetime-local" 
-                                class="border rounded px-2 py-1"
-                                value={match.startTime ? match.startTime.slice(0, 16) : ''} 
-                                on:change={(e) => updateMatchTimeLocally(match.id, e.target.value)}
-                            />
-                        </div>
-                    </div>
-                {/each}
-            </div>
-        {:else}
-            <p class="text-gray-600">トーナメントを選択してください。</p>
-        {/if}
-    </div>
+      <div class="mb-4">
+          <h2 class="text-xl font-semibold mb-2">試合開始時間</h2>
+          {#if selectedTournament?.data?.matches}
+              <div class="flex items-center gap-4 mb-4">
+                <input type="datetime-local" bind:value={bulkStartTime} class="border rounded px-2 py-1">
+                <button on:click={handleBulkTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
+                <button on:click={handleSaveAllMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
+              </div>
+              <div class="space-y-2">
+                  {#each selectedTournament.data.matches as match}
+                      <div class="flex items-center justify-between p-2 border rounded">
+                          <span class="font-medium">Round {match.roundIndex + 1}, Match {match.order + 1}</span>
+                          <div class="flex items-center gap-4">
+                              <span class="text-sm text-gray-600">
+                                  {#if match.matchStatus}
+                                      開始日時: {match.matchStatus}
+                                  {/if}
+                              </span>
+                              <input 
+                                  type="datetime-local" 
+                                  class="border rounded px-2 py-1"
+                                  value={match.startTime ? match.startTime.slice(0, 16) : ''} 
+                                  on:change={(e) => updateMatchTimeLocally(match.id, e.target.value)}
+                              />
+                          </div>
+                      </div>
+                  {/each}
+              </div>
+          {:else}
+              <p class="text-gray-600">トーナメントを選択してください。</p>
+          {/if}
+      </div>
+    {/if}
+  {:else}
+    <p>アクティブな大会が設定されていません。rootユーザーでアクティブな大会を設定してください。</p>
   {/if}
 </div>
