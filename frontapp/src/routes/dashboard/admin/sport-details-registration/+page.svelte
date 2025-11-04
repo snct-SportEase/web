@@ -7,6 +7,42 @@
   import { createBracket } from 'bracketry';
   import { marked } from 'marked';
 
+  const colorExtension = {
+    name: 'colorText',
+    level: 'inline',
+    start(src) {
+      return src.match(/##|#color\(/)?.index;
+    },
+    tokenizer(src, tokens) {
+      const redRule = /^##(.*?)##/;
+      let match = redRule.exec(src);
+      if (match) {
+        return {
+          type: 'colorText',
+          raw: match[0],
+          text: this.lexer.inlineTokens(match[1]),
+          color: 'red'
+        };
+      }
+
+      const customColorRule = /^#color\((#[0-9a-fA-F]{3,6}),\s*(.*?)\)/;
+      match = customColorRule.exec(src);
+      if (match) {
+        return {
+          type: 'colorText',
+          raw: match[0],
+          text: this.lexer.inlineTokens(match[2]),
+          color: match[1]
+        };
+      }
+    },
+    renderer(token) {
+      return `<span style="color: ${token.color};">${this.parser.parseInline(token.text)}</span>`;
+    }
+  };
+
+  marked.use({ extensions: [colorExtension] });
+
   let sports = [];
   let selectedEventId = null;
   let selectedSportId = null;
@@ -21,6 +57,7 @@
   let selectedPdfFile = null;
   let pdfPreviewUrl = null;
   let activeEventName = '';
+  let customColor = '#000000';
 
   onMount(async () => {
     // Fetch active event
@@ -430,8 +467,15 @@
     // Wait for Svelte to update the textarea value
     setTimeout(() => {
       rulesTextarea.focus();
-      rulesTextarea.selectionStart = start + prefix.length;
-      rulesTextarea.selectionEnd = end + prefix.length;
+      if (selectedText) {
+        // If text was selected, select the newly formatted text
+        rulesTextarea.selectionStart = start;
+        rulesTextarea.selectionEnd = start + newText.length;
+      } else {
+        // If no text was selected, place cursor in the middle
+        rulesTextarea.selectionStart = start + prefix.length;
+        rulesTextarea.selectionEnd = start + prefix.length;
+      }
     }, 0);
   }
 
@@ -539,6 +583,13 @@
     }, 0);
   }
 
+  function applyCustomColor() {
+    if (!rulesTextarea) return;
+    const prefix = `#color(${customColor}, `;
+    const suffix = `)`
+    applyMarkdown(prefix, suffix);
+  }
+
   function handleKeydown(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
       const textarea = event.target;
@@ -633,6 +684,11 @@
               <button on:click={addLink} class="px-3 py-1">Link</button>
               <button on:click={addList} class="px-3 py-1">List</button>
               <button on:click={addTable} class="px-3 py-1">Table</button>
+              <button on:click={() => applyMarkdown('##', '##')} class="px-3 py-1 text-red-600 font-bold">Red</button>
+              <div class="flex items-center gap-2 border border-gray-300 rounded-md p-1">
+                <input type="color" bind:value={customColor} class="w-8 h-7 p-0 border-none cursor-pointer" title="Select a color">
+                <button on:click={applyCustomColor} class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm hover:bg-gray-300">Apply</button>
+              </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
