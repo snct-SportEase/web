@@ -52,6 +52,14 @@ func (m *MockClassRepository) UpdateStudentCounts(eventID int, counts map[int]in
 	return args.Error(0)
 }
 
+func (m *MockClassRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.ClassScore), args.Error(1)
+}
+
 type MockEventRepository struct {
 	mock.Mock
 }

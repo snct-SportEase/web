@@ -13,6 +13,7 @@ type ClassRepository interface {
 	UpdateAttendance(classID int, eventID int, attendanceCount int) (int, error)
 	UpdateStudentCounts(eventID int, counts map[int]int) error
 	CreateClasses(eventID int, classNames []string) error
+	GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error)
 }
 
 type classRepository struct {
@@ -225,4 +226,83 @@ func (r *classRepository) UpdateStudentCounts(eventID int, counts map[int]int) e
 	}
 
 	return tx.Commit()
+}
+
+func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error) {
+	query := `
+		SELECT
+			cs.id,
+			cs.event_id,
+			cs.class_id,
+			c.name as class_name,
+			e.season,
+			cs.initial_points,
+			cs.survey_points,
+			cs.attendance_points,
+			cs.gym1_win1_points,
+			cs.gym1_win2_points,
+			cs.gym1_win3_points,
+			cs.gym1_champion_points,
+			cs.gym2_win1_points,
+			cs.gym2_win2_points,
+			cs.gym2_win3_points,
+			cs.gym2_champion_points,
+			cs.ground_win1_points,
+			cs.ground_win2_points,
+			cs.ground_win3_points,
+			cs.ground_champion_points,
+			cs.noon_game_points,
+			cs.total_points_current_event,
+			cs.rank_current_event,
+			cs.total_points_overall,
+			cs.rank_overall
+		FROM class_scores cs
+		JOIN classes c ON cs.class_id = c.id
+		JOIN events e ON cs.event_id = e.id
+		WHERE cs.event_id = ?
+		ORDER BY cs.rank_overall, cs.rank_current_event
+	`
+
+	rows, err := r.db.Query(query, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var scores []*models.ClassScore
+	for rows.Next() {
+		score := &models.ClassScore{}
+		if err := rows.Scan(
+			&score.ID,
+			&score.EventID,
+			&score.ClassID,
+			&score.ClassName,
+			&score.Season,
+			&score.InitialPoints,
+			&score.SurveyPoints,
+			&score.AttendancePoints,
+			&score.Gym1Win1Points,
+			&score.Gym1Win2Points,
+			&score.Gym1Win3Points,
+			&score.Gym1ChampionPoints,
+			&score.Gym2Win1Points,
+			&score.Gym2Win2Points,
+			&score.Gym2Win3Points,
+			&score.Gym2ChampionPoints,
+			&score.GroundWin1Points,
+			&score.GroundWin2Points,
+			&score.GroundWin3Points,
+			&score.GroundChampionPoints,
+			&score.NoonGamePoints,
+			&score.TotalPointsCurrentEvent,
+			&score.RankCurrentEvent,
+			&score.TotalPointsOverall,
+			&score.RankOverall,
+		); err != nil {
+			return nil, err
+		}
+		scores = append(scores, score)
+	}
+
+	return scores, nil
 }

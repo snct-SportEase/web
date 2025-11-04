@@ -63,6 +63,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		api.GET("/ws/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
 
 		api.GET("/classes", classHandler.GetAllClasses)
+		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), classHandler.GetClassScores)
 
 		api.GET("/events/active", middleware.AuthMiddleware(userRepo), eventHandler.GetActiveEvent)
 
