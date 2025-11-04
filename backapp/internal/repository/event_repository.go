@@ -13,6 +13,7 @@ type EventRepository interface {
 	SetActiveEvent(event_id *int) error
 	GetEventByYearAndSeason(year int, season string) (*models.Event, error)
 	CopyClassScores(fromEventID int, toEventID int) error
+	GetEventByID(id int) (*models.Event, error)
 }
 
 type eventRepository struct {
@@ -21,6 +22,19 @@ type eventRepository struct {
 
 func NewEventRepository(db *sql.DB) EventRepository {
 	return &eventRepository{db: db}
+}
+
+func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
+	query := "SELECT id, name, `year`, season, start_date, end_date FROM events WHERE id = ?"
+	event := &models.Event{}
+	err := r.db.QueryRow(query, id).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Not found
+		}
+		return nil, err
+	}
+	return event, nil
 }
 
 func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {

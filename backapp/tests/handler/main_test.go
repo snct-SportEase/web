@@ -3,6 +3,7 @@ package handler_test
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+
 	"github.com/stretchr/testify/mock"
 )
 
@@ -47,8 +48,8 @@ func (m *MockClassRepository) CreateClasses(eventID int, classNames []string) er
 }
 
 func (m *MockClassRepository) UpdateStudentCounts(eventID int, counts map[int]int) error {
-    args := m.Called(eventID, counts)
-    return args.Error(0)
+	args := m.Called(eventID, counts)
+	return args.Error(0)
 }
 
 type MockEventRepository struct {
@@ -94,6 +95,14 @@ func (m *MockEventRepository) GetEventByYearAndSeason(year int, season string) (
 func (m *MockEventRepository) CopyClassScores(fromEventID int, toEventID int) error {
 	args := m.Called(fromEventID, toEventID)
 	return args.Error(0)
+}
+
+func (m *MockEventRepository) GetEventByID(id int) (*models.Event, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Event), args.Error(1)
 }
 
 type MockWhitelistRepository struct {

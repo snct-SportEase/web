@@ -160,10 +160,21 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		return
 	}
 	if event_id == 0 {
-		c.JSON(http.StatusOK, gin.H{"event_id": nil})
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"event_id": event_id})
+
+	event, err := h.eventRepo.GetEventByID(event_id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if event == nil {
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"event_id": event.ID, "event_name": event.Name})
 }
 
 func (h *EventHandler) SetActiveEvent(c *gin.Context) {
