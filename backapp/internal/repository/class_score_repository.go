@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 )
 
 type ClassScoreRepository interface {
@@ -37,5 +38,52 @@ func (r *classScoreRepository) InitializeClassScores(eventID int, classIDs []int
 		}
 	}
 
+	// Update ranks manually within the transaction to avoid trigger conflicts
+	if err := r.updateClassRanksInTransaction(tx, eventID); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update ranks: %w", err)
+	}
+
 	return tx.Commit()
+}
+
+// updateClassRanksInTransaction updates class ranks within a transaction
+func (r *classScoreRepository) updateClassRanksInTransaction(tx *sql.Tx, eventID int) error {
+	// Update rank_current_event
+	updateCurrentRankQuery := `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_current_event = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+	_, err := tx.Exec(updateCurrentRankQuery, eventID, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to update current event ranks: %w", err)
+	}
+
+	// Update rank_overall
+	updateOverallRankQuery := `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_overall = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+	_, err = tx.Exec(updateOverallRankQuery, eventID, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to update overall ranks: %w", err)
+	}
+
+	return nil
 }
