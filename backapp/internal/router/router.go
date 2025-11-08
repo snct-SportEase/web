@@ -43,6 +43,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
+	qrCodeHandler := handler.NewQRCodeHandler(teamRepo, sportRepo, userRepo, eventRepo)
+
 	imageHandler := handler.NewImageHandler()
 	pdfHandler := handler.NewPdfHandler()
 
@@ -90,6 +92,15 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			events.Use(middleware.AuthMiddleware(userRepo))
 			// Get sports for a specific event
 			events.GET("/:id/sports", sportHandler.GetSportsByEventHandler)
+		}
+
+		// QR Code routes accessible to authenticated users
+		qrcode := api.Group("/qrcode")
+		{
+			qrcode.Use(middleware.AuthMiddleware(userRepo))
+			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
+			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
+			qrcode.POST("/verify", qrCodeHandler.VerifyQRCodeHandler)
 		}
 
 		admin := api.Group("/admin")
