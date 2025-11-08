@@ -92,7 +92,7 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 
 	points, err := h.classRepo.UpdateAttendance(req.ClassID, activeEventID, req.AttendanceCount)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register attendance and calculate points"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to register attendance and calculate points: %v", err)})
 		return
 	}
 

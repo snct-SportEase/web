@@ -4,6 +4,7 @@ DROP TRIGGER IF EXISTS update_total_points_before_update;
 DROP TRIGGER IF EXISTS after_class_scores_insert;
 DROP TRIGGER IF EXISTS after_class_scores_update;
 DROP PROCEDURE IF EXISTS update_class_ranks;
+DROP PROCEDURE IF EXISTS update_class_overall_ranks;
 
 -- 合計得点を更新するBEFOREトリガー
 DELIMITER //
@@ -84,7 +85,7 @@ END //
 DELIMITER ;
 
 
--- 全体のランキングを更新するBEFOREトリガー
+-- 全体のランキングを更新するストアドプロシージャ
 DELIMITER //
 CREATE PROCEDURE update_class_overall_ranks(p_event_id INT)
 BEGIN
@@ -99,4 +100,33 @@ BEGIN
     SET cs.rank_overall = ranked_data.new_rank
     WHERE cs.event_id = p_event_id;
 END //
+DELIMITER ;
+
+-- class_scoresテーブルのINSERT後にランキングを更新するトリガー
+DELIMITER //
+CREATE TRIGGER after_class_scores_insert
+AFTER INSERT ON class_scores
+FOR EACH ROW
+BEGIN
+    CALL update_class_ranks(NEW.event_id);
+    CALL update_class_overall_ranks(NEW.event_id);
+END;
+//
+DELIMITER ;
+
+-- class_scoresテーブルのUPDATE後にランキングを更新するトリガー
+DELIMITER //
+CREATE TRIGGER after_class_scores_update
+AFTER UPDATE ON class_scores
+FOR EACH ROW
+BEGIN
+    -- event_id が変更された場合、古い event_id のランキングも更新
+    IF OLD.event_id != NEW.event_id THEN
+        CALL update_class_ranks(OLD.event_id);
+        CALL update_class_overall_ranks(OLD.event_id);
+    END IF;
+    CALL update_class_ranks(NEW.event_id);
+    CALL update_class_overall_ranks(NEW.event_id);
+END;
+//
 DELIMITER ;

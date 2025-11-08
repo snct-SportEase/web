@@ -12,6 +12,7 @@
         description: '',
         rules: '',
         location: 'other',
+        rules_type: 'markdown', // Add default rules_type
     };
 
     let currentActiveEvent = null;

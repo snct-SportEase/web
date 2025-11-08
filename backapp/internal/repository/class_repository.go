@@ -13,6 +13,8 @@ type ClassRepository interface {
 	UpdateAttendance(classID int, eventID int, attendanceCount int) (int, error)
 	UpdateStudentCounts(eventID int, counts map[int]int) error
 	CreateClasses(eventID int, classNames []string) error
+	GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error)
+	UpdateClassRanks(eventID int) error
 }
 
 type classRepository struct {
@@ -157,6 +159,7 @@ func (r *classRepository) UpdateAttendance(classID int, eventID int, attendanceC
 	}
 
 	// 4. Update attendance_points in class_scores table
+	// Note: BEFORE UPDATE trigger will automatically calculate total_points_current_event and total_points_overall
 	scoreQuery := `
         INSERT INTO class_scores (event_id, class_id, attendance_points)
         VALUES (?, ?, ?)
@@ -168,20 +171,10 @@ func (r *classRepository) UpdateAttendance(classID int, eventID int, attendanceC
 		return 0, err
 	}
 
-	// 5. Update total_points_current_event
-	updateTotalQuery := `
-        UPDATE class_scores SET
-        total_points_current_event = COALESCE(initial_points, 0) + COALESCE(survey_points, 0) + COALESCE(attendance_points, 0) +
-                                   COALESCE(gym1_win1_points, 0) + COALESCE(gym1_win2_points, 0) + COALESCE(gym1_win3_points, 0) + COALESCE(gym1_champion_points, 0) +
-                                   COALESCE(gym2_win1_points, 0) + COALESCE(gym2_win2_points, 0) + COALESCE(gym2_win3_points, 0) + COALESCE(gym2_champion_points, 0) +
-                                   COALESCE(ground_win1_points, 0) + COALESCE(ground_win2_points, 0) + COALESCE(ground_win3_points, 0) + COALESCE(ground_champion_points, 0) +
-                                   COALESCE(noon_game_points, 0) + COALESCE(mvp_points, 0)
-        WHERE event_id = ? AND class_id = ?
-    `
-	_, err = tx.Exec(updateTotalQuery, eventID, classID)
-	if err != nil {
+	// 5. Update ranks for all classes in the event
+	if err := r.updateClassRanksInTransaction(tx, eventID); err != nil {
 		tx.Rollback()
-		return 0, err
+		return 0, fmt.Errorf("failed to update ranks: %w", err)
 	}
 
 	// 6. Log the score update
@@ -222,6 +215,167 @@ func (r *classRepository) UpdateStudentCounts(eventID int, counts map[int]int) e
 		if err != nil {
 			return fmt.Errorf("failed to update student_count for class %d: %w", classID, err)
 		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error) {
+	// Fetch sport mappings for the event.
+	sportMap := make(map[string]string) // map[location]sportName
+	sportRows, err := r.db.Query(`
+		SELECT es.location, s.name
+		FROM event_sports es
+		JOIN sports s ON es.sport_id = s.id
+		WHERE es.event_id = ?
+	`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sport mappings: %w", err)
+	}
+	defer sportRows.Close()
+
+	for sportRows.Next() {
+		var location, sportName string
+		if err := sportRows.Scan(&location, &sportName); err != nil {
+			return nil, fmt.Errorf("failed to scan sport mapping: %w", err)
+		}
+		sportMap[location] = sportName
+	}
+	if err = sportRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating sport mappings: %w", err)
+	}
+
+	// Fetch class scores
+	query := `
+		SELECT
+			cs.id,
+			cs.event_id,
+			cs.class_id,
+			c.name as class_name,
+			e.season,
+			cs.initial_points,
+			cs.survey_points,
+			cs.attendance_points,
+			cs.gym1_win1_points,
+			cs.gym1_win2_points,
+			cs.gym1_win3_points,
+			cs.gym1_champion_points,
+			cs.gym2_win1_points,
+			cs.gym2_win2_points,
+			cs.gym2_win3_points,
+			cs.gym2_champion_points,
+			cs.ground_win1_points,
+			cs.ground_win2_points,
+			cs.ground_win3_points,
+			cs.ground_champion_points,
+			cs.noon_game_points,
+			cs.total_points_current_event,
+			cs.rank_current_event,
+			cs.total_points_overall,
+			cs.rank_overall
+		FROM class_scores cs
+		JOIN classes c ON cs.class_id = c.id
+		JOIN events e ON cs.event_id = e.id
+		WHERE cs.event_id = ?
+		ORDER BY cs.rank_overall, cs.rank_current_event
+	`
+
+	rows, err := r.db.Query(query, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var scores []*models.ClassScore
+	for rows.Next() {
+		score := &models.ClassScore{}
+		if err := rows.Scan(
+			&score.ID,
+			&score.EventID,
+			&score.ClassID,
+			&score.ClassName,
+			&score.Season,
+			&score.InitialPoints,
+			&score.SurveyPoints,
+			&score.AttendancePoints,
+			&score.Gym1Win1Points,
+			&score.Gym1Win2Points,
+			&score.Gym1Win3Points,
+			&score.Gym1ChampionPoints,
+			&score.Gym2Win1Points,
+			&score.Gym2Win2Points,
+			&score.Gym2Win3Points,
+			&score.Gym2ChampionPoints,
+			&score.GroundWin1Points,
+			&score.GroundWin2Points,
+			&score.GroundWin3Points,
+			&score.GroundChampionPoints,
+			&score.NoonGamePoints,
+			&score.TotalPointsCurrentEvent,
+			&score.RankCurrentEvent,
+			&score.TotalPointsOverall,
+			&score.RankOverall,
+		); err != nil {
+			return nil, err
+		}
+		score.SportNames = sportMap // Assign the fetched sport map
+		scores = append(scores, score)
+	}
+
+	return scores, nil
+}
+
+// updateClassRanksInTransaction updates class ranks within a transaction
+func (r *classRepository) updateClassRanksInTransaction(tx *sql.Tx, eventID int) error {
+	// Update rank_current_event
+	updateCurrentRankQuery := `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_current_event = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+	_, err := tx.Exec(updateCurrentRankQuery, eventID, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to update current event ranks: %w", err)
+	}
+
+	// Update rank_overall
+	updateOverallRankQuery := `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_overall = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+	_, err = tx.Exec(updateOverallRankQuery, eventID, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to update overall ranks: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateClassRanks updates class ranks for the given event
+func (r *classRepository) UpdateClassRanks(eventID int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := r.updateClassRanksInTransaction(tx, eventID); err != nil {
+		return err
 	}
 
 	return tx.Commit()

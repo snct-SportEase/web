@@ -33,8 +33,14 @@ func main() {
 	}
 
 	// 初期イベントを作成
-	if err := initializeEvent(db, cfg); err != nil {
+	eventID, err := initializeEvent(db, cfg)
+	if err != nil {
 		log.Printf("Warning: Failed to initialize event: %v", err)
+	}
+
+	// class_scores テーブルを初期化
+	if err := initializeClassScores(db, eventID); err != nil {
+		log.Printf("Warning: Failed to initialize class scores: %v", err)
 	}
 
 	hubManager := websocket.NewHubManager()
@@ -78,23 +84,23 @@ func initializeRootUser(db *sql.DB, cfg *config.Config) error {
 }
 
 // initializeEvent は初期イベントと関連クラスを登録する
-func initializeEvent(db *sql.DB, cfg *config.Config) error {
+func initializeEvent(db *sql.DB, cfg *config.Config) (int64, error) {
 	if cfg.InitEventName == "" {
 		log.Println("INIT_EVENT_NAME is not set, skipping event initialization")
-		return nil
+		return 0, nil
 	}
 
 	// 既存イベントのチェック
-	var existingEventID int
+	var existingEventID int64
 	err := db.QueryRow("SELECT id FROM events WHERE name = ?", cfg.InitEventName).Scan(&existingEventID)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("failed to check for existing event: %w", err)
+		return 0, fmt.Errorf("failed to check for existing event: %w", err)
 	}
 
-	// イベントが既に存在する場合はスキップ
+	// イベントが既に存在する場合は、そのIDを返してスキップ
 	if err != sql.ErrNoRows {
-		log.Printf("Event '%s' already exists, skipping initialization.", cfg.InitEventName)
-		return nil
+		log.Printf("Event '%s' already exists with ID: %d, skipping initialization.", cfg.InitEventName, existingEventID)
+		return existingEventID, nil
 	}
 
 	// --- イベント作成 ---
@@ -103,21 +109,21 @@ func initializeEvent(db *sql.DB, cfg *config.Config) error {
 	// season の値チェック
 	season := cfg.InitEventSeason
 	if season != "spring" && season != "autumn" {
-		return fmt.Errorf("invalid season value: '%s'. must be 'spring' or 'autumn'", season)
+		return 0, fmt.Errorf("invalid season value: '%s'. must be 'spring' or 'autumn'", season)
 	}
 
 	year, err := strconv.Atoi(cfg.InitEventYear)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	layout := "2006-01-02"
 	startDate, err := time.Parse(layout, cfg.InitEventStartDate)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	endDate, err := time.Parse(layout, cfg.InitEventEndDate)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	event := &models.Event{
 		Name:       cfg.InitEventName,
@@ -129,7 +135,7 @@ func initializeEvent(db *sql.DB, cfg *config.Config) error {
 
 	eventID, err := eventRepo.CreateEvent(event)
 	if err != nil {
-		return fmt.Errorf("failed to create event: %w", err)
+		return 0, fmt.Errorf("failed to create event: %w", err)
 	}
 	log.Printf("Successfully created event '%s' with ID: %d", cfg.InitEventName, eventID)
 
@@ -143,16 +149,48 @@ func initializeEvent(db *sql.DB, cfg *config.Config) error {
 	}
 
 	if err := classRepo.CreateClasses(int(eventID), classNames); err != nil {
-		return fmt.Errorf("failed to create classes: %w", err)
+		return 0, fmt.Errorf("failed to create classes: %w", err)
 	}
 	log.Printf("Successfully created classes for event ID: %d", eventID)
 
 	// --- アクティブイベント設定 ---
 	activeEventID := int(eventID)
 	if err := eventRepo.SetActiveEvent(&activeEventID); err != nil {
-		return fmt.Errorf("failed to set active event: %w", err)
+		return 0, fmt.Errorf("failed to set active event: %w", err)
 	}
 	log.Printf("Successfully set active event to ID: %d", activeEventID)
 
+	return eventID, nil
+}
+
+// initializeClassScores は class_scores テーブルを初期化する
+func initializeClassScores(db *sql.DB, eventID int64) error {
+	if eventID == 0 {
+		log.Println("Event ID is 0, skipping class scores initialization")
+		return nil
+	}
+
+	classRepo := repository.NewClassRepository(db)
+	classes, err := classRepo.GetAllClasses(int(eventID))
+	if err != nil {
+		return fmt.Errorf("failed to get classes for event ID %d: %w", eventID, err)
+	}
+
+	if len(classes) == 0 {
+		log.Printf("No classes found for event ID %d, skipping class scores initialization.", eventID)
+		return nil
+	}
+
+	var classIDs []int
+	for _, class := range classes {
+		classIDs = append(classIDs, class.ID)
+	}
+
+	classScoreRepo := repository.NewClassScoreRepository(db)
+	if err := classScoreRepo.InitializeClassScores(int(eventID), classIDs); err != nil {
+		return fmt.Errorf("failed to initialize class scores: %w", err)
+	}
+
+	log.Printf("Successfully initialized class scores for event ID: %d", eventID)
 	return nil
 }
