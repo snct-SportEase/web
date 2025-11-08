@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 // SportRepository defines the interface for sport and event_sport related database operations.
@@ -98,9 +99,19 @@ func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport,
 
 // AssignSportToEvent assigns a sport to an event in the database.
 func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) error {
+	// Check if the sport is already assigned to the event
+	var count int
+	query := "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND sport_id = ?"
+	err := r.db.QueryRow(query, eventSport.EventID, eventSport.SportID).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return errors.New("この競技はすでにこの大会に割り当てられています。")
+	}
+
 	// Prevent duplicate locations, except for 'other'
 	if eventSport.Location != "other" {
-		var count int
 		query := "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND location = ?"
 		err := r.db.QueryRow(query, eventSport.EventID, eventSport.Location).Scan(&count)
 		if err != nil {
@@ -111,8 +122,11 @@ func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) erro
 		}
 	}
 
-	query := "INSERT INTO event_sports (event_id, sport_id, description, rules, rules_type, rules_pdf_url, location) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	_, err := r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.Rules, eventSport.RulesType, eventSport.RulesPdfURL, eventSport.Location)
+	query = "INSERT INTO event_sports (event_id, sport_id, description, rules, rules_type, rules_pdf_url, location) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	_, err = r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.Rules, eventSport.RulesType, eventSport.RulesPdfURL, eventSport.Location)
+	if err != nil {
+		fmt.Printf("Error inserting EventSport: %v\n", err)
+	}
 	return err
 }
 

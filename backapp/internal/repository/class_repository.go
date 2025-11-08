@@ -229,6 +229,31 @@ func (r *classRepository) UpdateStudentCounts(eventID int, counts map[int]int) e
 }
 
 func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error) {
+	// Fetch sport mappings for the event.
+	sportMap := make(map[string]string) // map[location]sportName
+	sportRows, err := r.db.Query(`
+		SELECT es.location, s.name
+		FROM event_sports es
+		JOIN sports s ON es.sport_id = s.id
+		WHERE es.event_id = ?
+	`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sport mappings: %w", err)
+	}
+	defer sportRows.Close()
+
+	for sportRows.Next() {
+		var location, sportName string
+		if err := sportRows.Scan(&location, &sportName); err != nil {
+			return nil, fmt.Errorf("failed to scan sport mapping: %w", err)
+		}
+		sportMap[location] = sportName
+	}
+	if err = sportRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating sport mappings: %w", err)
+	}
+
+	// Fetch class scores
 	query := `
 		SELECT
 			cs.id,
@@ -301,6 +326,7 @@ func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassSco
 		); err != nil {
 			return nil, err
 		}
+		score.SportNames = sportMap // Assign the fetched sport map
 		scores = append(scores, score)
 	}
 
