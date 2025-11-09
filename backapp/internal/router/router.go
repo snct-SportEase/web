@@ -44,6 +44,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	notificationRepo := repository.NewNotificationRepository(db)
 	roleRepo := repository.NewRoleRepository(db)
 	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+	notificationRequestRepo := repository.NewNotificationRequestRepository(db)
+	notificationRequestHandler := handler.NewNotificationRequestHandler(notificationRequestRepo, notificationRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
@@ -111,8 +113,16 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 		student := api.Group("/student")
 		{
-			student.Use(middleware.AuthMiddleware(userRepo))
+			student.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
 			student.GET("/class-progress", classHandler.GetClassProgress)
+
+			studentNotificationRequests := student.Group("/notification-requests")
+			{
+				studentNotificationRequests.GET("", notificationRequestHandler.ListStudentRequests)
+				studentNotificationRequests.POST("", notificationRequestHandler.CreateRequest)
+				studentNotificationRequests.GET("/:request_id", notificationRequestHandler.GetRequestDetail)
+				studentNotificationRequests.POST("/:request_id/messages", notificationRequestHandler.AddMessage)
+			}
 		}
 
 		notifications := api.Group("/notifications")
@@ -230,6 +240,14 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				rootNotifications.POST("", notificationHandler.CreateNotification)
 				rootNotifications.GET("/roles", notificationHandler.ListAvailableRoles)
+			}
+
+			rootNotificationRequests := root.Group("/notification-requests")
+			{
+				rootNotificationRequests.GET("", notificationRequestHandler.ListRootRequests)
+				rootNotificationRequests.GET("/:request_id", notificationRequestHandler.GetRequestDetail)
+				rootNotificationRequests.POST("/:request_id/messages", notificationRequestHandler.AddMessage)
+				rootNotificationRequests.POST("/:request_id/decision", notificationRequestHandler.DecideRequest)
 			}
 		}
 	}
