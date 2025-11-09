@@ -86,9 +86,11 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 	user := &models.User{ID: "user-1"}
 	class := &models.Class{ID: 10, Name: "IS3"}
 	team := &models.TeamWithSport{ID: 100, Name: "IS3-A", SportID: 1, SportName: "バスケットボール"}
+	displayNameA := "User A"
+	displayNameB := "User B"
 	members := []*models.User{
-		{ID: "user-a", Email: "a@example.com"},
-		{ID: "user-b", Email: "b@example.com"},
+		{ID: "user-a", Email: "a@example.com", DisplayName: &displayNameA},
+		{ID: "user-b", Email: "b@example.com", DisplayName: &displayNameB},
 	}
 
 	matchDetails := []*models.MatchDetail{
@@ -130,6 +132,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 	mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
 	mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 	mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
+	mockTeamRepo.On("GetTeamMembers", team.ID).Return(members, nil).Once()
 	mockTournamentRepo.On("GetMatchesForTeam", 1, team.ID).Return(matchDetails, nil).Once()
 
 	w := httptest.NewRecorder()
@@ -150,6 +153,10 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 	memberList, ok := response["members"].([]interface{})
 	assert.True(t, ok)
 	assert.Len(t, memberList, 2)
+	firstMember := memberList[0].(map[string]interface{})
+	assignments, ok := firstMember["assignments"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, assignments, 1)
 
 	progressData, ok := response["progress"].([]interface{})
 	assert.True(t, ok)

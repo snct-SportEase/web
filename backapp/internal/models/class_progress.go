@@ -14,6 +14,18 @@ type ClassProgress struct {
 	LastMatch      *ClassProgressMatch `json:"last_match,omitempty"`
 }
 
+type ClassMemberAssignment struct {
+	SportName string `json:"sport_name"`
+	TeamName  string `json:"team_name"`
+}
+
+type ClassMemberView struct {
+	ID          string                  `json:"id"`
+	Email       string                  `json:"email"`
+	DisplayName *string                 `json:"display_name,omitempty"`
+	Assignments []ClassMemberAssignment `json:"assignments"`
+}
+
 type ClassProgressMatch struct {
 	MatchID      int     `json:"match_id"`
 	Round        int     `json:"round"`

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -232,6 +233,19 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return
 	}
 
+	memberLookup := make(map[string]*models.ClassMemberView)
+	memberList := make([]*models.ClassMemberView, 0, len(members))
+	for _, m := range members {
+		view := &models.ClassMemberView{
+			ID:          m.ID,
+			Email:       m.Email,
+			DisplayName: m.DisplayName,
+			Assignments: []models.ClassMemberAssignment{},
+		}
+		memberLookup[m.ID] = view
+		memberList = append(memberList, view)
+	}
+
 	var progress []models.ClassProgress
 	for _, team := range teams {
 		matchDetails, err := h.tournamentRepo.GetMatchesForTeam(activeEventID, team.ID)
@@ -239,9 +253,47 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match details"})
 			return
 		}
+		teamMembers, err := h.teamRepo.GetTeamMembers(team.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
+			return
+		}
+		for _, tm := range teamMembers {
+			view, exists := memberLookup[tm.ID]
+			if !exists {
+				view = &models.ClassMemberView{
+					ID:          tm.ID,
+					Email:       tm.Email,
+					DisplayName: tm.DisplayName,
+					Assignments: []models.ClassMemberAssignment{},
+				}
+				memberLookup[tm.ID] = view
+				memberList = append(memberList, view)
+			}
+			view.Assignments = append(view.Assignments, models.ClassMemberAssignment{
+				SportName: team.SportName,
+				TeamName:  team.Name,
+			})
+		}
+
 		entry := buildClassProgress(team, matchDetails)
 		progress = append(progress, entry)
 	}
+
+	sort.SliceStable(memberList, func(i, j int) bool {
+		var left, right string
+		if memberList[i].DisplayName != nil && *memberList[i].DisplayName != "" {
+			left = *memberList[i].DisplayName
+		} else {
+			left = memberList[i].Email
+		}
+		if memberList[j].DisplayName != nil && *memberList[j].DisplayName != "" {
+			right = *memberList[j].DisplayName
+		} else {
+			right = memberList[j].Email
+		}
+		return left < right
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"class_id":   class.ID,
@@ -251,7 +303,7 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 			"student_count": class.StudentCount,
 			"attend_count":  class.AttendCount,
 		},
-		"members":  members,
+		"members":  memberList,
 		"progress": progress,
 	})
 }

@@ -3,7 +3,16 @@ import { BACKEND_URL } from '$env/static/private';
 
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ locals, fetch, request }) {
-  const returnData = { user: locals.user, classes: [], events: [] };
+  const returnData = {
+    user: locals.user,
+    classes: [],
+    events: [],
+    isClassRep: false,
+    className: null,
+    classInfo: null,
+    members: [],
+    progress: []
+  };
 
   try {
     // Fetch classes
@@ -30,6 +39,29 @@ export async function load({ locals, fetch, request }) {
       } catch (e) {
         console.error('Failed to fetch events:', e);
       }
+  }
+
+  const classRole = locals.user?.roles?.find(role => typeof role.name === 'string' && role.name.endsWith('_rep'));
+  if (classRole) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/student/class-progress`, {
+        headers: {
+          cookie: request.headers.get('cookie')
+        }
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        returnData.isClassRep = true;
+        returnData.className = payload.class_name ?? classRole.name.replace(/_rep$/, '');
+        returnData.classInfo = payload.class_info ?? null;
+        returnData.members = payload.members ?? [];
+        returnData.progress = payload.progress ?? [];
+      } else if (response.status === 403) {
+        returnData.isClassRep = false;
+      }
+    } catch (e) {
+      console.error('Failed to fetch class progress:', e);
+    }
   }
 
   return returnData;
