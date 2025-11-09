@@ -54,6 +54,41 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		// Mock for bronze match logic (not a semi-final)
 		mock.ExpectQuery(regexp.QuoteMeta("SELECT MAX(round) FROM matches WHERE tournament_id = ?")).WithArgs(tournamentID).WillReturnRows(sqlmock.NewRows([]string{"MAX(round)"}).AddRow(3))
 
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
+			WithArgs(tournamentID).
+			WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(1, 1, "gym1"))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+			WithArgs(winnerID).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(winnerID, "Winner Team", 101, 1, 1))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+			WithArgs(team2ID).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team2ID, "Loser Team", 102, 1, 1))
+
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO class_scores (event_id, class_id, gym1_win2_points) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE gym1_win2_points = gym1_win2_points + VALUES(gym1_win2_points)")).
+			WithArgs(1, 101, 10).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT season FROM events WHERE id = ?")).
+			WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
+
+		mock.ExpectExec(regexp.QuoteMeta(`
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_current_event = ranked_data.new_rank
+		WHERE cs.event_id = ?
+		`)).
+			WithArgs(1, 1).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
 		mock.ExpectCommit()
 
 		err = r.UpdateMatchResult(matchID, team1Score, team2Score, int(winnerID))
@@ -116,6 +151,41 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		// Mock update bronze match
 		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_id = ? WHERE id = ?")).
 			WithArgs(loserID, bronzeMatchID).WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
+			WithArgs(tournamentID).
+			WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(1, 1, "gym1"))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+			WithArgs(winnerID).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(winnerID, "Winner Team", 202, 1, 1))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+			WithArgs(loserID).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(loserID, "Loser Team", 201, 1, 1))
+
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO class_scores (event_id, class_id, gym1_win3_points) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE gym1_win3_points = gym1_win3_points + VALUES(gym1_win3_points)")).
+			WithArgs(1, 202, 10).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT season FROM events WHERE id = ?")).
+			WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
+
+		mock.ExpectExec(regexp.QuoteMeta(`
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_current_event = ranked_data.new_rank
+		WHERE cs.event_id = ?
+		`)).
+			WithArgs(1, 1).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		mock.ExpectCommit()
 
