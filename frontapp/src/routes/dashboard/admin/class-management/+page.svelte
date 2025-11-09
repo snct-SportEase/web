@@ -1,114 +1,86 @@
 <script>
-	import { onMount } from 'svelte';
-
 	export let data;
 
-	let classes = [];
-	let selectedClassId = null;
-	let classMembers = [];
-	let eventSports = [];
-	let allSports = [];
+	const {
+		classes: initialClasses = [],
+		classMembers: initialClassMembers = [],
+		eventSports: initialEventSports = [],
+		allSports: initialAllSports = [],
+		activeEventId: initialActiveEventId = null,
+		selectedClassId: initialSelectedClassId = null,
+		error: initialError = null
+	} = data ?? {};
+
+	let classes = [...initialClasses];
+	let selectedClassId = initialSelectedClassId;
+	let classMembers = [...initialClassMembers];
+	let eventSports = [...initialEventSports];
+	let allSports = [...initialAllSports];
 	let selectedSportId = null;
 	let selectedMembers = [];
 	let assignedMembers = [];
-	let loading = false;
-	let error = null;
+
+	let membersLoading = false;
+	let teamMembersLoading = false;
+	let sportsLoading = false;
+	let assignLoading = false;
+
+	let error = initialError;
 	let success = null;
-	let activeEventId = null;
+	let activeEventId = initialActiveEventId;
 
 	const isAdmin = data.isAdmin || false;
 
-	$: selectedClass = selectedClassId ? classes.find((c) => c.id === selectedClassId) : null;
-	$: selectedSport = selectedSportId
-		? eventSports.find((s) => s.sport_id === selectedSportId)
-		: null;
+if (selectedClassId !== null && typeof selectedClassId !== 'number') {
+	const parsedInitialClassId = Number(selectedClassId);
+	selectedClassId = Number.isNaN(parsedInitialClassId) ? null : parsedInitialClassId;
+}
 
-	onMount(async () => {
-		try {
-			const sessionToken = document.cookie
-				.split('; ')
-				.find((row) => row.startsWith('session_token='))
-				?.split('=')[1];
-			const headers = {
-				'Content-Type': 'application/json',
-				Cookie: `session_token=${sessionToken}`
-			};
-
-			// Get active event
-			const eventResponse = await fetch('/api/events/active', { headers });
-			if (!eventResponse.ok) throw new Error('Failed to get active event');
-			const eventData = await eventResponse.json();
-			activeEventId = eventData.event_id;
-
-			// Get managed classes
-			const classesResponse = await fetch('/api/admin/class-team/managed-class', { headers });
-			if (!classesResponse.ok) throw new Error('Failed to get managed classes');
-			classes = await classesResponse.json();
-			
-
-			// Auto-select first class
-			if (classes.length > 0) {
-				selectedClassId = classes[0].id;
-				await loadClassMembers(classes[0].id);
-			}
-
-			// Load sports for active event
-			if (activeEventId) {
-				const sportsResponse = await fetch(`/api/events/${activeEventId}/sports`, { headers });
-				if (sportsResponse.ok) {
-					eventSports = await sportsResponse.json();
-					
-				}
-
-				// Get all sports to get their names
-				const allSportsResponse = await fetch('/api/admin/allsports', { headers });
-				if (allSportsResponse.ok) {
-					allSports = await allSportsResponse.json();
-					
-				}
-			}
-		} catch (err) {
-			console.error('Error loading data:', err);
-			error = err.message || 'データの読み込みに失敗しました';
+	$: selectedClass =
+		selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null;
+	function toNumber(value) {
+		if (value === '' || value === null || value === undefined) {
+			return null;
 		}
-	});
+		const parsed = Number(value);
+		return Number.isNaN(parsed) ? null : parsed;
+	}
+
+	function authorizedFetch(url, options = {}) {
+		const { headers, ...rest } = options;
+		return fetch(url, {
+			credentials: 'include',
+			...rest,
+			headers: {
+				...(headers ?? {})
+			}
+		});
+	}
 
 	function getSportName(sportId) {
 		const sport = allSports.find((s) => s.id === sportId);
-		
-		
 		return sport ? sport.name : '不明な競技';
 	}
 
 	async function loadClassMembers(classId) {
 		if (!classId) return;
 
-		loading = true;
+		membersLoading = true;
 		error = null;
 
 		try {
-			const sessionToken = document.cookie
-				.split('; ')
-				.find((row) => row.startsWith('session_token='))
-				?.split('=')[1];
-			const headers = {
-				'Content-Type': 'application/json',
-				Cookie: `session_token=${sessionToken}`
-			};
-
-			const response = await fetch(`/api/admin/class-team/classes/${classId}/members`, { headers });
+			const response = await authorizedFetch(`/api/admin/class-team/classes/${classId}/members`);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'クラスメンバーの取得に失敗しました');
 			}
 			classMembers = await response.json();
-			
 			selectedMembers = [];
 		} catch (err) {
 			console.error('Error loading class members:', err);
 			error = err.message || 'クラスメンバーの取得に失敗しました';
 		} finally {
-			loading = false;
+			membersLoading = false;
 		}
 	}
 
@@ -118,41 +90,33 @@
 			return;
 		}
 
-		loading = true;
+		teamMembersLoading = true;
 		error = null;
 
 		try {
-			const sessionToken = document.cookie
-				.split('; ')
-				.find((row) => row.startsWith('session_token='))
-				?.split('=')[1];
-			const headers = {
-				'Content-Type': 'application/json',
-				Cookie: `session_token=${sessionToken}`
-			};
-
 			let url = `/api/admin/class-team/sports/${sportId}/members`;
 			if (isAdmin) {
 				url += `?class_id=${selectedClass.id}`;
 			}
 
-			const response = await fetch(url, { headers });
+			const response = await authorizedFetch(url);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'チームメンバーの取得に失敗しました');
 			}
 			assignedMembers = await response.json();
-			
 		} catch (err) {
 			console.error('Error loading team members:', err);
 			error = err.message || 'チームメンバーの取得に失敗しました';
 		} finally {
-			loading = false;
+			teamMembersLoading = false;
 		}
 	}
 
-	async function handleClassChange() {
-		if (selectedClassId) {
+	async function handleClassChange(event) {
+		const value = toNumber(event?.target?.value ?? selectedClassId);
+		selectedClassId = value;
+		if (selectedClassId !== null) {
 			await loadClassMembers(selectedClassId);
 			selectedSportId = null;
 			assignedMembers = [];
@@ -160,8 +124,9 @@
 		}
 	}
 
-	async function handleSportChange() {
-		if (selectedSportId) {
+	async function handleSportChange(event) {
+		selectedSportId = toNumber(event?.target?.value ?? selectedSportId);
+		if (selectedSportId !== null) {
 			await loadTeamMembers(selectedSportId);
 		} else {
 			assignedMembers = [];
@@ -177,25 +142,16 @@
 	}
 
 	async function assignMembers() {
-		if (!selectedClass || !selectedSport || selectedMembers.length === 0) {
+		if (!selectedClass || selectedSportId === null || selectedMembers.length === 0) {
 			error = 'クラス、競技、およびメンバーを選択してください';
 			return;
 		}
 
-		loading = true;
+		assignLoading = true;
 		error = null;
 		success = null;
 
 		try {
-			const sessionToken = document.cookie
-				.split('; ')
-				.find((row) => row.startsWith('session_token='))
-				?.split('=')[1];
-			const headers = {
-				'Content-Type': 'application/json',
-				Cookie: `session_token=${sessionToken}`
-			};
-
 			const requestBody = {
 				sport_id: selectedSportId,
 				user_ids: selectedMembers.map((m) => m.id)
@@ -205,9 +161,9 @@
 				requestBody.class_id = selectedClass.id;
 			}
 
-			const response = await fetch('/api/admin/class-team/assign-members', {
+			const response = await authorizedFetch('/api/admin/class-team/assign-members', {
 				method: 'POST',
-				headers,
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(requestBody)
 			});
 
@@ -219,8 +175,7 @@
 			const result = await response.json();
 			success = result.message || 'メンバーの割り当てが完了しました';
 
-			// Refresh team members
-			if (selectedSportId) {
+			if (selectedSportId !== null) {
 				await loadTeamMembers(selectedSportId);
 			}
 			selectedMembers = [];
@@ -228,7 +183,7 @@
 			console.error('Error assigning members:', err);
 			error = err.message || 'メンバーの割り当てに失敗しました';
 		} finally {
-			loading = false;
+			assignLoading = false;
 		}
 	}
 
@@ -258,14 +213,14 @@
 			<h2 class="text-xl font-semibold mb-4">クラス選択</h2>
 			{#if isAdmin}
 				<select
-					bind:value={selectedClassId}
+					value={selectedClassId ?? ''}
 					on:change={handleClassChange}
 					class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-					disabled={loading}
+					disabled={membersLoading || assignLoading}
 				>
-					<option value={null}>クラスを選択してください</option>
+					<option value=''>クラスを選択してください</option>
 					{#each classes as cls}
-						<option value={cls.id}>{cls.name}</option>
+						<option value={cls.id} selected={selectedClassId === cls.id}>{cls.name}</option>
 					{/each}
 				</select>
 			{:else if classes.length > 0}
@@ -278,7 +233,7 @@
 			<!-- Class Members -->
 			<div class="bg-white p-6 rounded-lg shadow">
 				<h2 class="text-xl font-semibold mb-4">クラスメンバー</h2>
-				{#if loading && classMembers.length === 0}
+				{#if membersLoading && classMembers.length === 0}
 					<p class="text-gray-500">読み込み中...</p>
 				{:else if classMembers.length === 0}
 					<p class="text-gray-500">メンバーが登録されていません</p>
@@ -319,38 +274,40 @@
 			<div class="bg-white p-6 rounded-lg shadow">
 				<h2 class="text-xl font-semibold mb-4">競技選択</h2>
 				<select
-					bind:value={selectedSportId}
+					value={selectedSportId ?? ''}
 					on:change={handleSportChange}
 					class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-					disabled={loading}
+					disabled={sportsLoading || membersLoading || assignLoading}
 				>
-					<option value={null}>競技を選択してください</option>
+					<option value=''>競技を選択してください</option>
 					{#each eventSports as eventSport}
-						<option value={eventSport.sport_id}>{getSportName(eventSport.sport_id)}</option>
+						<option value={eventSport.sport_id} selected={selectedSportId === eventSport.sport_id}>
+							{getSportName(eventSport.sport_id)}
+						</option>
 					{/each}
 				</select>
 			</div>
 
-			{#if selectedSport && selectedMembers.length > 0}
+			{#if selectedSportId !== null && selectedMembers.length > 0}
 				<!-- Assign Button -->
 				<div class="bg-white p-6 rounded-lg shadow">
 					<button
 						on:click={assignMembers}
-						disabled={loading}
+						disabled={assignLoading}
 						class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
 					>
-						{loading ? '割り当て中...' : `選択した${selectedMembers.length}名を割り当てる`}
+						{assignLoading ? '割り当て中...' : `選択した${selectedMembers.length}名を割り当てる`}
 					</button>
 				</div>
 			{/if}
 
-			{#if selectedSport}
+			{#if selectedSportId !== null}
 				<!-- Assigned Team Members -->
 				<div class="bg-white p-6 rounded-lg shadow">
 					<h2 class="text-xl font-semibold mb-4">
 						割り当て済みメンバー ({getSportName(selectedSportId)})
 					</h2>
-					{#if loading && assignedMembers.length === 0}
+					{#if teamMembersLoading && assignedMembers.length === 0}
 						<p class="text-gray-500">読み込み中...</p>
 					{:else if assignedMembers.length === 0}
 						<p class="text-gray-500">メンバーが割り当てられていません</p>
