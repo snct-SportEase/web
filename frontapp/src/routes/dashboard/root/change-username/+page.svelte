@@ -10,9 +10,6 @@
   let newDisplayName = '';
   let showModal = false;
 
-  // APIキーはここでは空文字列として扱い、実行環境から提供されることを想定
-  const apiKey = "";
-
   // 指数バックオフ付きのフェッチ関数
   async function fetchWithBackoff(url, options = {}, maxRetries = 5) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {

@@ -78,7 +78,7 @@
       } else {
         window.location.href = '/';
       }
-    } catch (error) {
+    } catch {
       window.location.href = '/';
     }
   }

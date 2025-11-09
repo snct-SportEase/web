@@ -5,7 +5,6 @@ services:
     image: traefik:v2.10
     container_name: sportease-traefik
     command:
-      - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"

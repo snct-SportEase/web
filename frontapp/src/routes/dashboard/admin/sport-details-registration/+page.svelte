@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import { createBracket } from 'bracketry';
   import { marked } from 'marked';
+  import SafeHtml from '$lib/components/SafeHtml.svelte';
 
   const colorExtension = {
     name: 'colorText',
@@ -13,7 +14,7 @@
     start(src) {
       return src.match(/##|#color\(/)?.index;
     },
-    tokenizer(src, tokens) {
+    tokenizer(src) {
       const redRule = /^##(.*?)##/;
       let match = redRule.exec(src);
       if (match) {
@@ -54,6 +55,10 @@
   let matchStartTimes = {};
   let rulesTextarea;
   let previewDiv;
+  let markdownPreviewHtml = '';
+  $: markdownPreviewHtml = sportDetails.rules_type === 'markdown'
+    ? marked.parse(sportDetails.rules || '')
+    : '';
   let selectedPdfFile = null;
   let pdfPreviewUrl = null;
   let activeEventName = '';
@@ -67,14 +72,14 @@
       if (data.event_id) {
         selectedEventId = data.event_id;
         activeEventName = data.event_name;
-        await fetchSports(selectedEventId);
+        await fetchSports();
         await fetchTournaments(selectedEventId);
       }
     }
     renderBracket();
   });
 
-  async function fetchSports(eventId) {
+  async function fetchSports() {
     const res = await fetch('/api/admin/allsports');
     if (res.ok) {
       sports = await res.json();
@@ -107,7 +112,7 @@
         if (typeof data === 'string') {
           try {
             data = JSON.parse(data);
-          } catch (e) {
+          } catch {
             data = null;
           }
         }
@@ -135,22 +140,6 @@
         }
       }
     }, 0);
-  }
-
-  async function handleEventChange(e) {
-    selectedEventId = e.target.value;
-    selectedSportId = null;
-    sports = [];
-    tournaments = [];
-    selectedTournamentId = null;
-    selectedTournament = null;
-    const wrapper = document.getElementById('bracket-container');
-    if(wrapper) wrapper.innerHTML = '';
-
-    if (selectedEventId) {
-      await fetchSports(selectedEventId);
-      await fetchTournaments(selectedEventId);
-    }
   }
 
   async function handleSportChange(e) {
@@ -349,7 +338,7 @@
         const hours = String(date.getHours()).padStart(2, '0');
         const minutes = String(date.getMinutes()).padStart(2, '0');
         return `${day}日 ${hours}:${minutes}`;
-    } catch (e) {
+    } catch {
         console.error("Invalid date format for startTime:", isoString);
         return '';
     }
@@ -692,9 +681,11 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
-              <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
-                {@html marked(sportDetails.rules || '')}
-              </div>
+              <SafeHtml
+                bind:element={previewDiv}
+                class="prose border p-4 rounded-md h-96 overflow-y-scroll"
+                html={markdownPreviewHtml}
+              />
             </div>
             <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
             <button on:click={() => document.getElementById('image-upload').click()} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">

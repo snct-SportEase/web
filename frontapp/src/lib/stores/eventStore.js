@@ -1,7 +1,7 @@
 import { writable, get, derived } from 'svelte/store';
 
 // activeEvent store holds the active event object or null
-const { subscribe, set, update } = writable(null);
+const { subscribe, set } = writable(null);
 
 export const activeEvent = {
     subscribe,

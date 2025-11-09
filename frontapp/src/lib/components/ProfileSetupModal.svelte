@@ -1,5 +1,4 @@
 <script>
-  import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
 
   /** @type {Array<{id: number, name: string}>} */

@@ -161,7 +161,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		Expires:  time.Now().Add(24 * time.Hour),
 		Path:     "/",
 		HttpOnly: false,
-		Secure:   c.Request.TLS != nil,
+		Secure:   middleware.IsRequestSecure(c.Request),
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -273,7 +273,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		Expires:  time.Now().Add(-1 * time.Hour),
 		Path:     "/",
 		HttpOnly: false,
-		Secure:   c.Request.TLS != nil,
+		Secure:   middleware.IsRequestSecure(c.Request),
 		SameSite: http.SameSiteLaxMode,
 	})
 

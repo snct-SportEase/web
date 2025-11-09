@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,6 +23,23 @@ func GetUserIDFromSession(token string) (string, bool) {
 
 func DeleteSession(token string) {
 	delete(sessionStore, token)
+}
+
+func IsRequestSecure(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+
+	proto := strings.ToLower(r.Header.Get("X-Forwarded-Proto"))
+	if proto == "https" {
+		return true
+	}
+
+	if strings.ToLower(r.Header.Get("X-Forwarded-Ssl")) == "on" {
+		return true
+	}
+
+	return false
 }
 
 func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {

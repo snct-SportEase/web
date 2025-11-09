@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import { BACKEND_URL } from '$env/static/private';
 
 /** @type {import('./$types').PageServerLoad} */

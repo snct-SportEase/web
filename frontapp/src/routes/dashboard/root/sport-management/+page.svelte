@@ -2,6 +2,9 @@
     import { onMount } from 'svelte';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { marked } from 'marked';
+    import SafeHtml from '$lib/components/SafeHtml.svelte';
+    let assignmentPreviewHtml = '';
+    $: assignmentPreviewHtml = marked.parse(newAssignment.rules || '');
 
     let allSports = [];
     let eventSports = [];
@@ -290,9 +293,7 @@
                         <!-- プレビュー -->
                         <div>
                             <p class="block text-sm font-medium text-gray-700 mb-1">プレビュー</p>
-                            <div class="prose mt-1 p-2 border rounded-md bg-gray-100 min-h-[8rem]">
-                                {@html marked(newAssignment.rules)}
-                            </div>
+                            <SafeHtml class="prose mt-1 p-2 border rounded-md bg-gray-100 min-h-[8rem]" html={assignmentPreviewHtml} />
                         </div>
                         
                         <button on:click={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150" disabled={!newAssignment.sport_id}>
