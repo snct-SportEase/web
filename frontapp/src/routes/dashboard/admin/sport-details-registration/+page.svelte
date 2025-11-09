@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import { createBracket } from 'bracketry';
   import { marked } from 'marked';
+  import SafeHtml from '$lib/components/SafeHtml.svelte';
 
   const colorExtension = {
     name: 'colorText',
@@ -54,6 +55,10 @@
   let matchStartTimes = {};
   let rulesTextarea;
   let previewDiv;
+  let markdownPreviewHtml = '';
+  $: markdownPreviewHtml = sportDetails.rules_type === 'markdown'
+    ? marked.parse(sportDetails.rules || '')
+    : '';
   let selectedPdfFile = null;
   let pdfPreviewUrl = null;
   let activeEventName = '';
@@ -692,9 +697,11 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
-              <div bind:this={previewDiv} class="prose border p-4 rounded-md h-96 overflow-y-scroll">
-                {@html marked(sportDetails.rules || '')}
-              </div>
+              <SafeHtml
+                bind:element={previewDiv}
+                class="prose border p-4 rounded-md h-96 overflow-y-scroll"
+                html={markdownPreviewHtml}
+              />
             </div>
             <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
             <button on:click={() => document.getElementById('image-upload').click()} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">

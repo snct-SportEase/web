@@ -257,8 +257,9 @@
                           <p class="text-sm font-semibold text-gray-800">{participant.name}</p>
                           <div class="grid grid-cols-2 gap-2">
                             <div class="space-y-1">
-                              <label class="text-xs font-semibold text-gray-600">順位</label>
+                              <label for={`match-${match.id}-participant-${index}-rank`} class="text-xs font-semibold text-gray-600">順位</label>
                               <input
+                                id={`match-${match.id}-participant-${index}-rank`}
                                 type="number"
                                 min="1"
                                 class="border rounded px-2 py-1 text-sm w-full"
@@ -267,8 +268,9 @@
                               />
                             </div>
                             <div class="space-y-1">
-                              <label class="text-xs font-semibold text-gray-600">得点</label>
+                              <label for={`match-${match.id}-participant-${index}-points`} class="text-xs font-semibold text-gray-600">得点</label>
                               <input
+                                id={`match-${match.id}-participant-${index}-points`}
                                 type="number"
                                 class="border rounded px-2 py-1 text-sm w-full"
                                 value={participant.points}

@@ -741,8 +741,9 @@
                       </div>
                       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div class="space-y-1">
-                          <label class="text-xs font-semibold text-gray-600">種別</label>
+                          <label for={`match-form-participant-${index}-type`} class="text-xs font-semibold text-gray-600">種別</label>
                           <select
+                            id={`match-form-participant-${index}-type`}
                             class="border rounded px-2 py-1 w-full"
                             value={participant.type}
                             on:change={(e) => setParticipantType(index, e.target.value)}
@@ -752,11 +753,12 @@
                           </select>
                         </div>
                         <div class="space-y-1">
-                          <label class="text-xs font-semibold text-gray-600">
+                          <label for={`match-form-participant-${index}-${participant.type === 'group' ? 'group' : 'class'}`} class="text-xs font-semibold text-gray-600">
                             {participant.type === 'group' ? 'グループ' : 'クラス'}
                           </label>
                           {#if participant.type === 'group'}
                             <select
+                              id={`match-form-participant-${index}-group`}
                               class="border rounded px-2 py-1 w-full"
                               value={participant.group_id}
                               on:change={(e) => updateParticipantField(index, 'group_id', e.target.value)}
@@ -768,6 +770,7 @@
                             </select>
                           {:else}
                             <select
+                              id={`match-form-participant-${index}-class`}
                               class="border rounded px-2 py-1 w-full"
                               value={participant.class_id}
                               on:change={(e) => updateParticipantField(index, 'class_id', e.target.value)}
@@ -780,8 +783,9 @@
                           {/if}
                         </div>
                         <div class="space-y-1">
-                          <label class="text-xs font-semibold text-gray-600">表示名（任意）</label>
+                          <label for={`match-form-participant-${index}-display-name`} class="text-xs font-semibold text-gray-600">表示名（任意）</label>
                           <input
+                            id={`match-form-participant-${index}-display-name`}
                             class="border rounded px-2 py-1 w-full"
                             value={participant.display_name}
                             on:input={(e) => updateParticipantField(index, 'display_name', e.target.value)}

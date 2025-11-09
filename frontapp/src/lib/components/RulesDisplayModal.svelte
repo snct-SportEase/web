@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { marked } from 'marked';
-    import { log } from 'console';
+  import SafeHtml from '$lib/components/SafeHtml.svelte';
 
   export let showModal = false;
   export let rulesType;
@@ -10,6 +10,10 @@
   export let sportName = '競技ルール';
 
   const dispatch = createEventDispatcher();
+
+  let renderedRules = '';
+
+  $: renderedRules = rulesType === 'markdown' ? marked.parse(rulesContent || '') : '';
 
   function closeModal() {
     showModal = false;
@@ -43,9 +47,10 @@
             {sportName} ルール
           </h3>
             {#if rulesType === 'markdown'}
-              <div class="prose mt-2 overflow-y-auto p-2 border rounded-md h-full">
-                {@html marked(rulesContent)}
-              </div>
+              <SafeHtml
+                class="prose mt-2 overflow-y-auto p-2 border rounded-md h-full"
+                html={renderedRules}
+              />
             {:else if rulesType === 'pdf' && rulesPdfUrl}
               <iframe src={rulesPdfUrl} class="mt-2 flex-grow overflow-y-auto p-2 border rounded-md h-full" title="{sportName} PDFルール"></iframe>
             {:else}
