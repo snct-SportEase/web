@@ -25,7 +25,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	eventRepo := repository.NewEventRepository(db)
 
 	classRepo := repository.NewClassRepository(db)
-	classHandler := handler.NewClassHandler(classRepo, eventRepo)
+	teamRepo := repository.NewTeamRepository(db)
+	tournRepo := repository.NewTournamentRepository(db)
+	classHandler := handler.NewClassHandler(classRepo, eventRepo, teamRepo, tournRepo)
 
 	authHandler := handler.NewAuthHandler(cfg, userRepo, eventRepo, classRepo)
 
@@ -33,8 +35,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo, eventRepo)
 
 	sportRepo := repository.NewSportRepository(db)
-	teamRepo := repository.NewTeamRepository(db)
-	tournRepo := repository.NewTournamentRepository(db)
 	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo, tournRepo)
 
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
@@ -107,6 +107,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
 			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
 			qrcode.POST("/verify", qrCodeHandler.VerifyQRCodeHandler)
+		}
+
+		student := api.Group("/student")
+		{
+			student.Use(middleware.AuthMiddleware(userRepo))
+			student.GET("/class-progress", classHandler.GetClassProgress)
 		}
 
 		notifications := api.Group("/notifications")

@@ -15,6 +15,7 @@ type TournamentRepository interface {
 	DeleteTournamentsByEventID(eventID int) error
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
+	GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchStatus(matchID int, status string) error
 	UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error
@@ -129,6 +130,77 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 	}
 
 	return tournaments, nil
+}
+
+func (r *tournamentRepository) GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error) {
+	query := `
+		SELECT
+			m.id,
+			t.id,
+			t.name,
+			s.name,
+			(
+				SELECT MAX(round)
+				FROM matches
+				WHERE tournament_id = t.id
+			) AS max_round,
+			m.round,
+			m.match_number_in_round,
+			m.team1_id,
+			m.team2_id,
+			m.team1_score,
+			m.team2_score,
+			m.winner_team_id,
+			m.status,
+			m.next_match_id,
+			m.start_time,
+			m.is_bronze_match,
+			team1.name,
+			team2.name
+		FROM matches m
+		JOIN tournaments t ON m.tournament_id = t.id
+		JOIN sports s ON t.sport_id = s.id
+		LEFT JOIN teams team1 ON m.team1_id = team1.id
+		LEFT JOIN teams team2 ON m.team2_id = team2.id
+		WHERE t.event_id = ? AND (m.team1_id = ? OR m.team2_id = ?)
+		ORDER BY t.id, m.round, m.match_number_in_round
+	`
+
+	rows, err := r.db.Query(query, eventID, teamID, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var matches []*models.MatchDetail
+	for rows.Next() {
+		var detail models.MatchDetail
+		if err := rows.Scan(
+			&detail.MatchID,
+			&detail.TournamentID,
+			&detail.TournamentName,
+			&detail.SportName,
+			&detail.MaxRound,
+			&detail.Round,
+			&detail.MatchNumber,
+			&detail.Team1ID,
+			&detail.Team2ID,
+			&detail.Team1Score,
+			&detail.Team2Score,
+			&detail.WinnerTeamID,
+			&detail.Status,
+			&detail.NextMatchID,
+			&detail.StartTime,
+			&detail.IsBronzeMatch,
+			&detail.Team1Name,
+			&detail.Team2Name,
+		); err != nil {
+			return nil, err
+		}
+		matches = append(matches, &detail)
+	}
+
+	return matches, nil
 }
 
 func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, teamMap map[int]*models.Team, contestants map[string]models.Contestant) (models.Side, *models.Team, error) {

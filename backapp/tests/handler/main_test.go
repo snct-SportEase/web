@@ -185,6 +185,14 @@ func (m *MockTeamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWith
 	return args.Get(0).([]*models.TeamWithSport), args.Error(1)
 }
 
+func (m *MockTeamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
+	args := m.Called(classID, eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.TeamWithSport), args.Error(1)
+}
+
 func (m *MockTeamRepository) GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error) {
 	args := m.Called(classID, sportID, eventID)
 	if args.Get(0) == nil {
@@ -209,6 +217,61 @@ func (m *MockTeamRepository) GetTeamMembers(teamID int) ([]*models.User, error) 
 func (m *MockTeamRepository) RemoveTeamMember(teamID int, userID string) error {
 	args := m.Called(teamID, userID)
 	return args.Error(0)
+}
+
+type MockTournamentRepository struct {
+	mock.Mock
+}
+
+func (m *MockTournamentRepository) SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {
+	args := m.Called(eventID, sportID, sportName, tournamentData, teams)
+	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) DeleteTournamentsByEventID(eventID int) error {
+	args := m.Called(eventID)
+	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) DeleteTournamentsByEventAndSportID(eventID int, sportID int) error {
+	args := m.Called(eventID, sportID)
+	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.Tournament, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Tournament), args.Error(1)
+}
+
+func (m *MockTournamentRepository) GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error) {
+	args := m.Called(eventID, teamID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.MatchDetail), args.Error(1)
+}
+
+func (m *MockTournamentRepository) UpdateMatchStartTime(matchID int, startTime string) error {
+	args := m.Called(matchID, startTime)
+	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) UpdateMatchStatus(matchID int, status string) error {
+	args := m.Called(matchID, status)
+	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error {
+	args := m.Called(matchID, team1Score, team2Score, winnerID)
+	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error) {
+	args := m.Called(matchID)
+	return args.Int(0), args.Error(1)
 }
 
 type MockSportRepository struct {

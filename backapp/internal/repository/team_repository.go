@@ -9,6 +9,7 @@ type TeamRepository interface {
 	CreateTeam(team *models.Team) (int64, error)
 	DeleteTeamsByEventAndSportID(eventID int, sportID int) error
 	GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error)
+	GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
 	GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error)
 	AddTeamMember(teamID int, userID string) error
 	GetTeamMembers(teamID int) ([]*models.User, error)
@@ -51,6 +52,30 @@ func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSpor
 		WHERE tm.user_id = ?
 	`
 	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []*models.TeamWithSport
+	for rows.Next() {
+		team := &models.TeamWithSport{}
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &team.SportName); err != nil {
+			return nil, err
+		}
+		teams = append(teams, team)
+	}
+	return teams, nil
+}
+
+func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
+	query := `
+		SELECT t.id, t.name, t.class_id, t.sport_id, t.event_id, s.name as sport_name
+		FROM teams t
+		INNER JOIN sports s ON t.sport_id = s.id
+		WHERE t.class_id = ? AND t.event_id = ?
+	`
+	rows, err := r.db.Query(query, classID, eventID)
 	if err != nil {
 		return nil, err
 	}
