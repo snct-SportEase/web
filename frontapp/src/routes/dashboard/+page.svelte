@@ -1,9 +1,8 @@
 <script>
-  import { page } from '$app/stores';
   import ProfileSetupModal from '$lib/components/ProfileSetupModal.svelte';
   import EventSetupModal from '$lib/components/EventSetupModal.svelte';
 
-  let { data } = $page;
+  export let data;
   $: user = data.user;
   $: classes = data.classes;
   $: events = data.events;
@@ -42,18 +41,11 @@
   ];
 
   let shortcutSections = [];
-  $: {
-    shortcutSections = [];
-    if (isRoot) {
-      shortcutSections.push({ title: 'Rootメニュー', shortcuts: rootShortcuts });
-    }
-    if (isAdmin) {
-      shortcutSections.push({ title: 'Adminメニュー', shortcuts: adminShortcuts });
-    }
-    if (isStudent) {
-      shortcutSections.push({ title: 'Studentメニュー', shortcuts: studentShortcuts });
-    }
-  }
+  $: shortcutSections = [
+    ...(isRoot ? [{ title: 'Rootメニュー', shortcuts: rootShortcuts }] : []),
+    ...(isAdmin ? [{ title: 'Adminメニュー', shortcuts: adminShortcuts }] : []),
+    ...(isStudent ? [{ title: 'Studentメニュー', shortcuts: studentShortcuts }] : [])
+  ];
 
   const classMembers = data.members ?? [];
   const progressEntries = data.progress ?? [];

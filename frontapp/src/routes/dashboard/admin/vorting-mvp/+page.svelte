@@ -37,9 +37,16 @@
     }
   });
 
-  async function vote() {
+  async function vote(event) {
+    event?.preventDefault?.();
+
     if (!selectedClass) {
-      alert('Please select a class to vote for.');
+      alert('投票するクラスを選択してください。');
+      return;
+    }
+
+    if (!reason.trim()) {
+      alert('投票理由を入力してください。');
       return;
     }
 
@@ -56,7 +63,7 @@
     });
 
     if (res.ok) {
-      alert('Vote successful!');
+      alert('投票が完了しました。');
       hasVoted = true;
       votedForClassId = parseInt(selectedClass);
       const votedClass = eligibleClasses.find(c => c.id === votedForClassId);
@@ -66,9 +73,9 @@
     } else {
       try {
         const error = await res.json();
-        alert(`Error: ${error.error}`);
+        alert(`エラー: ${error.error}`);
       } catch (e) {
-        alert('An unknown error occurred.');
+        alert('不明なエラーが発生しました。');
       }
     }
   }
@@ -83,27 +90,41 @@
     <p class="text-gray-600 mt-4">MVP投票は一人一票までです。</p>
   </div>
 {:else}
-  <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-    <!-- The form from before -->
-    <div class="mb-4">
-      <label for="class-select" class="block text-gray-700 font-bold mb-2">Eligible Class:</label>
-      <select id="class-select" bind:value={selectedClass} class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-        <option value="" disabled>Select a class</option>
+  <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" on:submit|preventDefault={vote}>
+    <div>
+      <label for="class-select" class="block text-gray-700 font-bold mb-2">投票対象クラス</label>
+      <select
+        id="class-select"
+        bind:value={selectedClass}
+        required
+        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      >
+        <option value="" disabled selected>クラスを選択してください</option>
         {#each eligibleClasses as c}
           <option value={c.id}>{c.name}</option>
         {/each}
       </select>
     </div>
 
-    <div class="mb-6">
-      <label for="reason" class="block text-gray-700 font-bold mb-2">Reason:</label>
-      <textarea id="reason" bind:value={reason} class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" rows="4" placeholder="Enter your reason here..."></textarea>
+    <div>
+      <label for="reason" class="block text-gray-700 font-bold mb-2">理由</label>
+      <textarea
+        id="reason"
+        bind:value={reason}
+        required
+        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+        rows="4"
+        placeholder="投票理由を入力してください"
+      ></textarea>
     </div>
 
     <div class="flex items-center justify-between">
-      <button on:click={vote} class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" type="button">
-        Vote
+      <button
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+        type="submit"
+      >
+        投票する
       </button>
     </div>
-  </div>
+  </form>
 {/if}

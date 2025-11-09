@@ -77,6 +77,18 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 		return err
 	}
 
+	// Ensure MVP points do not affect total points used for ranking
+	_, err = tx.Exec(`
+		UPDATE class_scores
+		SET
+			total_points_current_event = total_points_current_event - ?,
+			total_points_overall = total_points_overall - ?
+		WHERE event_id = ? AND class_id = ?
+	`, mvpPoints, mvpPoints, eventID, votedForClassID)
+	if err != nil {
+		return err
+	}
+
 	// Insert into score_logs
 	logReason := "MVP vote"
 	if reason != "" {
@@ -94,23 +106,59 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 		return err
 	}
 
-	if season == "spring" {
-		_, err = tx.Exec("CALL update_class_ranks(?)", eventID)
-		if err != nil {
-			return fmt.Errorf("failed to update ranks: %w", err)
-		}
-	} else if season == "autumn" {
-		_, err = tx.Exec("CALL update_class_ranks(?)", eventID)
-		if err != nil {
-			return fmt.Errorf("failed to update ranks: %w", err)
-		}
-		_, err = tx.Exec("CALL update_class_overall_ranks(?)", eventID)
-		if err != nil {
-			return fmt.Errorf("failed to update overall ranks: %w", err)
+	if err := updateCurrentEventRanks(tx, eventID); err != nil {
+		return err
+	}
+
+	if season == "autumn" {
+		if err := updateOverallRanks(tx, eventID); err != nil {
+			return err
 		}
 	}
 
 	return tx.Commit()
+}
+
+func updateCurrentEventRanks(tx *sql.Tx, eventID int) error {
+	const query = `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_current_event = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+
+	if _, err := tx.Exec(query, eventID, eventID); err != nil {
+		return fmt.Errorf("failed to update ranks: %w", err)
+	}
+
+	return nil
+}
+
+func updateOverallRanks(tx *sql.Tx, eventID int) error {
+	const query = `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_overall = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+
+	if _, err := tx.Exec(query, eventID, eventID); err != nil {
+		return fmt.Errorf("failed to update overall ranks: %w", err)
+	}
+
+	return nil
 }
 
 func (r *mvpRepository) GetMVPVotes(eventID int) ([]models.MVPVote, error) {
@@ -155,25 +203,15 @@ func (r *mvpRepository) GetMVPClass(eventID int) (*models.MVPResult, error) {
 	}
 
 	var query string
-	if season == "spring" {
-		query = `
-			SELECT c.name, cs.total_points_current_event + cs.mvp_points AS total_points
-			FROM class_scores cs
-			JOIN classes c ON cs.class_id = c.id
-			WHERE cs.event_id = ?
-			ORDER BY total_points DESC
-			LIMIT 1
-		`
-	} else {
-		query = `
-			SELECT c.name, cs.total_points_overall + cs.mvp_points AS total_points
-			FROM class_scores cs
-			JOIN classes c ON cs.class_id = c.id
-			WHERE cs.event_id = ?
-			ORDER BY total_points DESC
-			LIMIT 1
-		`
-	}
+	query = `
+		SELECT c.name, (cs.total_points_overall + cs.mvp_points) AS total_points
+		FROM class_scores cs
+		JOIN classes c ON cs.class_id = c.id
+		WHERE cs.event_id = ?
+			AND c.name IN ('1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2')
+		ORDER BY total_points DESC
+		LIMIT 1
+	`
 
 	var result models.MVPResult
 	err = r.db.QueryRow(query, eventID).Scan(&result.ClassName, &result.TotalPoints)

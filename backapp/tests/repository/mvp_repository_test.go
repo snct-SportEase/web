@@ -31,9 +31,10 @@ func TestMVPRepository_VoteMVP(t *testing.T) {
 		mock.ExpectQuery("SELECT COUNT(.+) FROM mvp_votes").WithArgs(userID, eventID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		mock.ExpectExec("INSERT INTO mvp_votes").WithArgs(userID, classID, eventID, reason, 3).WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectExec("INSERT INTO class_scores").WithArgs(eventID, classID, 3).WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec("UPDATE class_scores").WithArgs(3, 3, eventID, classID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, fmt.Sprintf("MVP vote: %s", reason)).WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-		mock.ExpectExec("CALL update_class_ranks").WithArgs(eventID).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec("UPDATE class_scores").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 
 		err := r.VoteMVP(userID, classID, eventID, reason)
@@ -51,10 +52,11 @@ func TestMVPRepository_VoteMVP(t *testing.T) {
 		mock.ExpectQuery("SELECT COUNT(.+) FROM mvp_votes").WithArgs(userID, eventID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		mock.ExpectExec("INSERT INTO mvp_votes").WithArgs(userID, classID, eventID, reason, 3).WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectExec("INSERT INTO class_scores").WithArgs(eventID, classID, 3).WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec("UPDATE class_scores").WithArgs(3, 3, eventID, classID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, "MVP vote").WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("autumn"))
-		mock.ExpectExec("CALL update_class_ranks").WithArgs(eventID).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectExec("CALL update_class_overall_ranks").WithArgs(eventID).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec("UPDATE class_scores").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec("UPDATE class_scores").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 
 		err := r.VoteMVP(userID, classID, eventID, reason)
@@ -98,7 +100,7 @@ func TestMVPRepository_GetMVPClass(t *testing.T) {
 		}
 
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-		mock.ExpectQuery("SELECT c.name, cs.total_points_current_event").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints))
+		mock.ExpectQuery(`SELECT c.name, \(cs.total_points_overall \+ cs.mvp_points\) AS total_points`).WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints))
 
 		result, err := r.GetMVPClass(eventID)
 		assert.NoError(t, err)
@@ -116,7 +118,7 @@ func TestMVPRepository_GetMVPClass(t *testing.T) {
 		}
 
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("autumn"))
-		mock.ExpectQuery("SELECT c.name, cs.total_points_overall").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints))
+		mock.ExpectQuery(`SELECT c.name, \(cs.total_points_overall \+ cs.mvp_points\) AS total_points`).WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints))
 
 		result, err := r.GetMVPClass(eventID)
 		assert.NoError(t, err)
@@ -140,7 +142,7 @@ func TestMVPRepository_GetMVPClass(t *testing.T) {
 		eventID := 3
 
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-		mock.ExpectQuery("SELECT c.name, cs.total_points_current_event").WithArgs(eventID).WillReturnError(sql.ErrNoRows)
+		mock.ExpectQuery(`SELECT c.name, \(cs.total_points_overall \+ cs.mvp_points\) AS total_points`).WithArgs(eventID).WillReturnError(sql.ErrNoRows)
 
 		result, err := r.GetMVPClass(eventID)
 		assert.NoError(t, err)
