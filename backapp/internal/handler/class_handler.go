@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"backapp/internal/models"
 	"backapp/internal/repository"
 	"encoding/csv"
 	"fmt"
@@ -12,14 +13,18 @@ import (
 )
 
 type ClassHandler struct {
-	classRepo repository.ClassRepository
-	eventRepo repository.EventRepository
+	classRepo      repository.ClassRepository
+	eventRepo      repository.EventRepository
+	teamRepo       repository.TeamRepository
+	tournamentRepo repository.TournamentRepository
 }
 
-func NewClassHandler(classRepo repository.ClassRepository, eventRepo repository.EventRepository) *ClassHandler {
+func NewClassHandler(classRepo repository.ClassRepository, eventRepo repository.EventRepository, teamRepo repository.TeamRepository, tournamentRepo repository.TournamentRepository) *ClassHandler {
 	return &ClassHandler{
-		classRepo: classRepo,
-		eventRepo: eventRepo,
+		classRepo:      classRepo,
+		eventRepo:      eventRepo,
+		teamRepo:       teamRepo,
+		tournamentRepo: tournamentRepo,
 	}
 }
 
@@ -180,4 +185,224 @@ func (h *ClassHandler) GetClassScores(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, scores)
+}
+
+func (h *ClassHandler) GetClassProgress(c *gin.Context) {
+	userValue, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	user, ok := userValue.(*models.User)
+	if !ok || user == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user"})
+		return
+	}
+
+	activeEventID, err := h.eventRepo.GetActiveEvent()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+		return
+	}
+	if activeEventID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No active event found"})
+		return
+	}
+
+	class, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class information"})
+		return
+	}
+	if class == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Class representative role is required"})
+		return
+	}
+
+	teams, err := h.teamRepo.GetTeamsByClassID(class.ID, activeEventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get teams"})
+		return
+	}
+
+	members, err := h.classRepo.GetClassMembers(class.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class members"})
+		return
+	}
+
+	var progress []models.ClassProgress
+	for _, team := range teams {
+		matchDetails, err := h.tournamentRepo.GetMatchesForTeam(activeEventID, team.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match details"})
+			return
+		}
+		entry := buildClassProgress(team, matchDetails)
+		progress = append(progress, entry)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"class_id":   class.ID,
+		"class_name": class.Name,
+		"class_info": gin.H{
+			"name":          class.Name,
+			"student_count": class.StudentCount,
+			"attend_count":  class.AttendCount,
+		},
+		"members":  members,
+		"progress": progress,
+	})
+}
+
+func buildClassProgress(team *models.TeamWithSport, matches []*models.MatchDetail) models.ClassProgress {
+	entry := models.ClassProgress{
+		SportName:      team.SportName,
+		TeamName:       team.Name,
+		TournamentName: "",
+		Status:         "試合情報なし",
+		CurrentRound:   "-",
+	}
+
+	if len(matches) == 0 {
+		return entry
+	}
+
+	entry.TournamentName = matches[0].TournamentName
+
+	maxRound := matches[0].MaxRound
+
+	var lastMatch *models.MatchDetail
+	var nextMatch *models.MatchDetail
+
+	for _, m := range matches {
+		if m.WinnerTeamID.Valid {
+			if lastMatch == nil || m.Round > lastMatch.Round || (m.Round == lastMatch.Round && m.MatchNumber > lastMatch.MatchNumber) {
+				copy := *m
+				lastMatch = &copy
+			}
+		} else {
+			if nextMatch == nil {
+				copy := *m
+				nextMatch = &copy
+			}
+		}
+	}
+
+	if nextMatch != nil {
+		entry.Status = stageLabel(nextMatch.Round, maxRound, nextMatch.IsBronzeMatch, nextMatch.NextMatchID.Valid) + "進出"
+		entry.CurrentRound = stageLabel(nextMatch.Round, maxRound, nextMatch.IsBronzeMatch, nextMatch.NextMatchID.Valid)
+		entry.NextMatch = buildProgressMatch(nextMatch, team.ID, "予定", maxRound)
+		if nextMatch.StartTime.Valid {
+			start := nextMatch.StartTime.String
+			entry.NextMatch.StartTime = &start
+		}
+		entry.NextMatch.MatchStatus = nextMatch.Status
+	}
+
+	if lastMatch != nil {
+		result := "敗戦"
+		if lastMatch.WinnerTeamID.Valid && int(lastMatch.WinnerTeamID.Int64) == team.ID {
+			result = "勝利"
+		}
+		entry.LastMatch = buildProgressMatch(lastMatch, team.ID, result, maxRound)
+		score := buildScoreString(lastMatch, team.ID)
+		if score != nil {
+			entry.LastMatch.Score = score
+		}
+		entry.LastMatch.MatchStatus = "終了"
+	}
+
+	if nextMatch == nil {
+		if lastMatch != nil {
+			if lastMatch.WinnerTeamID.Valid && int(lastMatch.WinnerTeamID.Int64) == team.ID {
+				if !lastMatch.NextMatchID.Valid && !lastMatch.IsBronzeMatch {
+					entry.Status = "優勝"
+					entry.CurrentRound = "決勝"
+				} else if lastMatch.IsBronzeMatch {
+					entry.Status = "3位決定戦勝利"
+					entry.CurrentRound = "3位決定戦"
+				} else {
+					entry.Status = stageLabel(lastMatch.Round, maxRound, lastMatch.IsBronzeMatch, lastMatch.NextMatchID.Valid) + "勝利"
+					entry.CurrentRound = stageLabel(lastMatch.Round, maxRound, lastMatch.IsBronzeMatch, lastMatch.NextMatchID.Valid)
+				}
+			} else {
+				entry.Status = stageLabel(lastMatch.Round, maxRound, lastMatch.IsBronzeMatch, lastMatch.NextMatchID.Valid) + "敗退"
+				entry.CurrentRound = stageLabel(lastMatch.Round, maxRound, lastMatch.IsBronzeMatch, lastMatch.NextMatchID.Valid)
+			}
+		}
+	} else {
+		if lastMatch != nil && lastMatch.WinnerTeamID.Valid && int(lastMatch.WinnerTeamID.Int64) == team.ID {
+			entry.Status = stageLabel(nextMatch.Round, maxRound, nextMatch.IsBronzeMatch, nextMatch.NextMatchID.Valid) + "進出"
+		} else if lastMatch == nil {
+			entry.Status = stageLabel(nextMatch.Round, maxRound, nextMatch.IsBronzeMatch, nextMatch.NextMatchID.Valid) + "予定"
+		}
+	}
+
+	return entry
+}
+
+func buildProgressMatch(detail *models.MatchDetail, teamID int, result string, maxRound int) *models.ClassProgressMatch {
+	match := &models.ClassProgressMatch{
+		MatchID:    detail.MatchID,
+		Round:      detail.Round,
+		RoundLabel: stageLabel(detail.Round, maxRound, detail.IsBronzeMatch, detail.NextMatchID.Valid),
+		Result:     result,
+	}
+
+	if detail.Team1ID.Valid && int(detail.Team1ID.Int64) == teamID {
+		if detail.Team2Name.Valid {
+			match.OpponentName = detail.Team2Name.String
+		} else if detail.Team2ID.Valid {
+			match.OpponentName = fmt.Sprintf("チーム%d", detail.Team2ID.Int64)
+		} else {
+			match.OpponentName = "未定"
+		}
+	} else if detail.Team2ID.Valid && int(detail.Team2ID.Int64) == teamID {
+		if detail.Team1Name.Valid {
+			match.OpponentName = detail.Team1Name.String
+		} else if detail.Team1ID.Valid {
+			match.OpponentName = fmt.Sprintf("チーム%d", detail.Team1ID.Int64)
+		} else {
+			match.OpponentName = "未定"
+		}
+	} else {
+		match.OpponentName = "未定"
+	}
+
+	return match
+}
+
+func buildScoreString(detail *models.MatchDetail, teamID int) *string {
+	if !detail.Team1Score.Valid || !detail.Team2Score.Valid {
+		return nil
+	}
+	var teamScore int32
+	var opponentScore int32
+	if detail.Team1ID.Valid && int(detail.Team1ID.Int64) == teamID {
+		teamScore = detail.Team1Score.Int32
+		opponentScore = detail.Team2Score.Int32
+	} else {
+		teamScore = detail.Team2Score.Int32
+		opponentScore = detail.Team1Score.Int32
+	}
+	score := fmt.Sprintf("%d - %d", teamScore, opponentScore)
+	return &score
+}
+
+func stageLabel(round, maxRound int, isBronze bool, hasNext bool) string {
+	if isBronze {
+		return "3位決定戦"
+	}
+	if round == maxRound && !hasNext {
+		return "決勝"
+	}
+	if round == maxRound-1 {
+		return "準決勝"
+	}
+	if round == maxRound-2 {
+		return "準々決勝"
+	}
+	return fmt.Sprintf("%d回戦", round+1)
 }
