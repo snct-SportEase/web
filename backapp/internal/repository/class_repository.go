@@ -17,6 +17,7 @@ type ClassRepository interface {
 	UpdateClassRanks(eventID int) error
 	GetClassByRepRole(userID string, eventID int) (*models.Class, error)
 	GetClassMembers(classID int) ([]*models.User, error)
+	SetNoonGamePoints(eventID int, points map[int]int) error
 }
 
 type classRepository struct {
@@ -447,4 +448,44 @@ func (r *classRepository) GetClassMembers(classID int) ([]*models.User, error) {
 	}
 
 	return users, nil
+}
+
+func (r *classRepository) SetNoonGamePoints(eventID int, points map[int]int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("UPDATE class_scores SET noon_game_points = 0 WHERE event_id = ?", eventID); err != nil {
+		return fmt.Errorf("failed to reset noon_game_points: %w", err)
+	}
+
+	if len(points) > 0 {
+		stmt, err := tx.Prepare(`
+			INSERT INTO class_scores (event_id, class_id, noon_game_points)
+			VALUES (?, ?, ?)
+			ON DUPLICATE KEY UPDATE noon_game_points = VALUES(noon_game_points)
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to prepare noon_game_points statement: %w", err)
+		}
+		defer stmt.Close()
+
+		for classID, value := range points {
+			if _, err := stmt.Exec(eventID, classID, value); err != nil {
+				return fmt.Errorf("failed to update noon_game_points for class %d: %w", classID, err)
+			}
+		}
+	}
+
+	if err := r.updateClassRanksInTransaction(tx, eventID); err != nil {
+		return fmt.Errorf("failed to update class ranks: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit noon_game_points transaction: %w", err)
+	}
+
+	return nil
 }
