@@ -96,6 +96,19 @@
 		location.reload();
 	}
 
+	function isClassSportRole(roleName) {
+		// {クラス名_競技名}形式のロールかどうかを判定
+		// アンダースコアが含まれていて、_repで終わっていない場合は、クラス名_競技名形式とみなす
+		const trimmed = roleName.trim();
+		if (trimmed.includes('_') && !trimmed.endsWith('_rep')) {
+			// デフォルトロールでないことを確認
+			if (!defaultRoles.includes(trimmed.toLowerCase())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	async function assignRole() {
 		if (selectedUsers.length === 0) {
 			alert('ユーザーを選択してください。');
@@ -108,6 +121,11 @@
 
 		if (defaultRoles.includes(role.trim().toLowerCase())) {
 			alert('デフォルトのロール（root, admin, student）は割り当てられません。');
+			return;
+		}
+
+		if (isClassSportRole(role.trim())) {
+			alert('{クラス名_競技名}形式のロールは、クラス・チーム管理ページから割り当ててください。');
 			return;
 		}
 
