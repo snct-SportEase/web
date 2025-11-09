@@ -15,32 +15,44 @@
   $: showEventSetup = isRoot && user?.is_init_root_first_login && events?.length === 0;
 
   const rootShortcuts = [
-    { title: 'ホワイトリスト管理', description: 'ログイン許可メールの登録', href: '/dashboard/root/whitelist-management' },
-    { title: '大会設定', description: '大会情報・競技の設定', href: '/dashboard/root/event-management' },
-    { title: 'スポーツ管理', description: '競技情報・トーナメント生成', href: '/dashboard/root/tournament-management' }
+    { title: '通知管理', description: '通知作成と配信先の管理', href: '/dashboard/root/notification' },
+    { title: '通知申請管理', description: '学生からの申請を確認・承認', href: '/dashboard/root/notification-requests' },
+    { title: '大会設定', description: '大会情報と開催設定', href: '/dashboard/root/event-management' },
+    { title: '競技管理', description: '競技情報とトーナメント生成', href: '/dashboard/root/sport-management' },
+    { title: 'ホワイトリスト', description: 'ログイン許可メールの登録', href: '/dashboard/root/whitelist-management' },
+    { title: 'ユーザー管理', description: 'ユーザー名やクラス人数を調整', href: '/dashboard/root/change-username' }
   ];
 
   const adminShortcuts = [
-    { title: 'クラス・チーム管理', description: 'メンバー割り当て・確認', href: '/dashboard/admin/class-management' },
+    { title: 'クラス・チーム割り当て', description: 'メンバー配置と確認', href: '/dashboard/admin/class-management' },
+    { title: 'ロール管理', description: 'ユーザーロールの付与・削除', href: '/dashboard/admin/role-management' },
     { title: '出席登録', description: '参加者の出席を記録', href: '/dashboard/admin/attendance-management' },
-    { title: '試合結果入力', description: '競技結果の登録と反映', href: '/dashboard/admin/insert-matche-result' }
+    { title: '試合結果入力', description: 'スコアと勝敗を登録', href: '/dashboard/admin/insert-matche-result' },
+    { title: 'QRコードツール', description: '大会QRの発行と読み取り', href: '/dashboard/admin/qr-code-reader' },
+    { title: '競技詳細登録', description: '競技ルールや資料の管理', href: '/dashboard/admin/sport-details-registration' }
   ];
 
   const studentShortcuts = [
-    { title: 'マイページ', description: '自分の参加競技や情報を確認', href: '/dashboard/student/my-page' },
-    { title: 'クラス情報', description: 'クラスの出席状況や競技の進捗', href: '/dashboard/student/class-info' },
-    { title: '競技詳細', description: '競技のルール・日程・結果', href: '/dashboard/student/sport-info' }
+    { title: 'マイページ', description: '自分の出場情報を確認', href: '/dashboard/student/my-page' },
+    { title: 'クラス情報', description: 'クラスの出席と試合状況', href: '/dashboard/student/class-info' },
+    { title: '通知一覧', description: '配信された通知を確認', href: '/dashboard/student/notification' },
+    { title: '通知申請', description: 'rootへの通知依頼を送信', href: '/dashboard/student/notification-request' },
+    { title: '競技詳細', description: '競技のルール・日程を確認', href: '/dashboard/student/sport-info' },
+    { title: 'QRコード発行', description: '参加証QRコードを生成', href: '/dashboard/student/issueqr-code' }
   ];
 
-  $: shortcutSections = [];
-  if (isRoot) {
-    shortcutSections.push({ title: 'Rootメニュー', shortcuts: rootShortcuts });
-  }
-  if (isAdmin) {
-    shortcutSections.push({ title: 'Adminメニュー', shortcuts: adminShortcuts });
-  }
-  if (isStudent) {
-    shortcutSections.push({ title: 'Studentメニュー', shortcuts: studentShortcuts });
+  let shortcutSections = [];
+  $: {
+    shortcutSections = [];
+    if (isRoot) {
+      shortcutSections.push({ title: 'Rootメニュー', shortcuts: rootShortcuts });
+    }
+    if (isAdmin) {
+      shortcutSections.push({ title: 'Adminメニュー', shortcuts: adminShortcuts });
+    }
+    if (isStudent) {
+      shortcutSections.push({ title: 'Studentメニュー', shortcuts: studentShortcuts });
+    }
   }
 
   const classMembers = data.members ?? [];
