@@ -41,6 +41,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo, hubManager)
 
+	notificationRepo := repository.NewNotificationRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
+	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
 	qrCodeHandler := handler.NewQRCodeHandler(teamRepo, sportRepo, userRepo, eventRepo)
@@ -103,6 +107,14 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
 			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
 			qrcode.POST("/verify", qrCodeHandler.VerifyQRCodeHandler)
+		}
+
+		notifications := api.Group("/notifications")
+		{
+			notifications.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
+			notifications.GET("", notificationHandler.ListNotifications)
+			notifications.POST("/subscription", notificationHandler.SaveSubscription)
+			notifications.DELETE("/subscription", notificationHandler.DeleteSubscription)
 		}
 
 		admin := api.Group("/admin")
@@ -206,6 +218,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootSports.GET("", sportHandler.GetAllSportsHandler)
 				rootSports.POST("", sportHandler.CreateSportHandler)
 				rootSports.GET("/:id/teams", sportHandler.GetTeamsBySportHandler)
+			}
+
+			rootNotifications := root.Group("/notifications")
+			{
+				rootNotifications.POST("", notificationHandler.CreateNotification)
+				rootNotifications.GET("/roles", notificationHandler.ListAvailableRoles)
 			}
 		}
 	}

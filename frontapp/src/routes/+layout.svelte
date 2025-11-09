@@ -5,8 +5,10 @@
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { ensurePushSubscription, userHasPushEligibleRole } from '$lib/utils/push.js';
 
   $: data = $page.data;
+  let pushSetupTriggered = false;
 
   onMount(() => {
     if (browser && 'serviceWorker' in navigator) {
@@ -15,6 +17,14 @@
       });
     }
   });
+
+  $: if (browser && data?.user && !pushSetupTriggered && userHasPushEligibleRole(data.user)) {
+    pushSetupTriggered = true;
+    ensurePushSubscription().catch((error) => {
+      console.error('[push] failed to ensure subscription', error);
+      pushSetupTriggered = false;
+    });
+  }
 
   function openSidebar() {
     isSidebarOpen.set(true);

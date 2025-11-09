@@ -342,3 +342,63 @@ func (m *MockUserRepository) DeleteUserRole(userID string, roleName string) erro
 	args := m.Called(userID, roleName)
 	return args.Error(0)
 }
+
+type MockNotificationRepository struct {
+	mock.Mock
+}
+
+func (m *MockNotificationRepository) CreateNotification(title, body, createdBy string, eventID *int) (int64, error) {
+	args := m.Called(title, body, createdBy, eventID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockNotificationRepository) AddNotificationTargets(notificationID int64, roles []string) error {
+	args := m.Called(notificationID, roles)
+	return args.Error(0)
+}
+
+func (m *MockNotificationRepository) GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error) {
+	args := m.Called(roleNames, authorID, includeAuthored, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Notification), args.Error(1)
+}
+
+func (m *MockNotificationRepository) GetUserIDsByRoles(roleNames []string) ([]string, error) {
+	args := m.Called(roleNames)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockNotificationRepository) GetPushSubscriptionsByUserIDs(userIDs []string) ([]models.PushSubscription, error) {
+	args := m.Called(userIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.PushSubscription), args.Error(1)
+}
+
+func (m *MockNotificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error {
+	args := m.Called(userID, endpoint, authKey, p256dhKey)
+	return args.Error(0)
+}
+
+func (m *MockNotificationRepository) DeletePushSubscription(userID, endpoint string) error {
+	args := m.Called(userID, endpoint)
+	return args.Error(0)
+}
+
+type MockRoleRepository struct {
+	mock.Mock
+}
+
+func (m *MockRoleRepository) GetAllRoles() ([]models.Role, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Role), args.Error(1)
+}

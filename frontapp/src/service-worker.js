@@ -77,3 +77,47 @@ self.addEventListener('fetch', (event) => {
 
 	event.respondWith(respond());
 });
+
+self.addEventListener('push', (event) => {
+	if (!event.data) {
+		return;
+	}
+
+	let payload;
+	try {
+		payload = event.data.json();
+	} catch (error) {
+		console.error('[service-worker] push payload JSON parse error', error);
+		payload = {
+			title: '新しい通知',
+			body: event.data.text()
+		};
+	}
+
+	const title = payload.title || '新しい通知';
+	const options = {
+		body: payload.body || '',
+		data: payload.data || {}
+	};
+
+	event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+
+	const targetUrl = '/dashboard/student/notification';
+	event.waitUntil(
+		self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+			for (const client of clientList) {
+				if ('focus' in client) {
+					client.focus();
+					return;
+				}
+			}
+			if (self.clients.openWindow) {
+				return self.clients.openWindow(targetUrl);
+			}
+		})
+	);
+});

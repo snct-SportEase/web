@@ -1,5 +1,6 @@
 <script>
   import { browser } from '$app/environment';
+  import { tick } from 'svelte';
 
   export let isOpen = false;
   export let currentDisplayName = '';
@@ -10,11 +11,18 @@
   let newDisplayName = currentDisplayName;
   let isLoading = false;
   let errorMessage = '';
+  let displayNameInput;
 
   // モーダルが開かれるたびに現在の表示名をリセット
   $: if (isOpen) {
     newDisplayName = currentDisplayName;
     errorMessage = '';
+  }
+
+  $: if (isOpen && browser) {
+    tick().then(() => {
+      displayNameInput?.focus();
+    });
   }
 
   async function handleSave() {
@@ -52,18 +60,44 @@
       handleCancel();
     }
   }
+
+  function handleOverlayKeydown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleCancel();
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleCancel();
+    }
+  }
 </script>
 
 <!-- モーダルの背景 -->
 {#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" on:click={handleCancel}>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
+    role="presentation"
+    tabindex="-1"
+    on:click={handleCancel}
+    on:keydown={handleOverlayKeydown}
+  >
     <!-- モーダルの本体 -->
-    <div class="w-full max-w-md p-6 space-y-4 bg-white rounded-lg shadow-xl" on:click|stopPropagation on:keydown={handleKeydown}>
+    <div
+      class="w-full max-w-md p-6 space-y-4 bg-white rounded-lg shadow-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-display-name-title"
+      tabindex="-1"
+      on:click|stopPropagation
+      on:keydown={handleKeydown}
+    >
       <div class="flex justify-between items-center">
-        <h2 class="text-xl font-bold text-gray-800">プロフィール管理</h2>
+        <h2 id="edit-display-name-title" class="text-xl font-bold text-gray-800">プロフィール管理</h2>
         <button
           type="button"
           on:click={handleCancel}
+          aria-label="プロフィール管理を閉じる"
           class="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,7 +111,7 @@
         <div class="bg-gray-50 p-3 rounded-md">
           <h3 class="text-sm font-medium text-gray-700 mb-2">現在のロール</h3>
           <div class="flex flex-wrap gap-2">
-            {#each userRoles as role}
+            {#each userRoles as role (role.name)}
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
                 {role.name}
               </span>
@@ -95,9 +129,9 @@
           id="displayName"
           bind:value={newDisplayName}
           disabled={isLoading}
+          bind:this={displayNameInput}
           class="w-full px-3 py-2 text-gray-900 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           placeholder="表示名を入力してください"
-          autofocus
         />
       </div>
 
