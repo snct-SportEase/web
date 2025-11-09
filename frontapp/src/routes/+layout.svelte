@@ -3,8 +3,18 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import { page } from '$app/stores';
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
 
   $: data = $page.data;
+
+  onMount(() => {
+    if (browser && 'serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js');
+      });
+    }
+  });
 
   function openSidebar() {
     isSidebarOpen.set(true);
