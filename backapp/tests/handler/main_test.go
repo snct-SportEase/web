@@ -65,6 +65,22 @@ func (m *MockClassRepository) UpdateClassRanks(eventID int) error {
 	return args.Error(0)
 }
 
+func (m *MockClassRepository) GetClassByRepRole(userID string, eventID int) (*models.Class, error) {
+	args := m.Called(userID, eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Class), args.Error(1)
+}
+
+func (m *MockClassRepository) GetClassMembers(classID int) ([]*models.User, error) {
+	args := m.Called(classID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.User), args.Error(1)
+}
+
 type MockEventRepository struct {
 	mock.Mock
 }
@@ -167,6 +183,32 @@ func (m *MockTeamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWith
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*models.TeamWithSport), args.Error(1)
+}
+
+func (m *MockTeamRepository) GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error) {
+	args := m.Called(classID, sportID, eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Team), args.Error(1)
+}
+
+func (m *MockTeamRepository) AddTeamMember(teamID int, userID string) error {
+	args := m.Called(teamID, userID)
+	return args.Error(0)
+}
+
+func (m *MockTeamRepository) GetTeamMembers(teamID int) ([]*models.User, error) {
+	args := m.Called(teamID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.User), args.Error(1)
+}
+
+func (m *MockTeamRepository) RemoveTeamMember(teamID int, userID string) error {
+	args := m.Called(teamID, userID)
+	return args.Error(0)
 }
 
 type MockSportRepository struct {

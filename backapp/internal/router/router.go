@@ -45,6 +45,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	qrCodeHandler := handler.NewQRCodeHandler(teamRepo, sportRepo, userRepo, eventRepo)
 
+	classTeamHandler := handler.NewClassTeamHandler(classRepo, teamRepo, userRepo, eventRepo, sportRepo)
+
 	imageHandler := handler.NewImageHandler()
 	pdfHandler := handler.NewPdfHandler()
 
@@ -159,6 +161,17 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				adminMvp.GET("/votes", mvpHandler.GetMVPVotes)
 				adminMvp.GET("/user-vote", mvpHandler.GetUserVote)
 			}
+
+		}
+
+		// Class and team management routes (accessible to admin/root or class_name_rep)
+		adminClassTeam := api.Group("/admin/class-team")
+		{
+			adminClassTeam.Use(middleware.AuthMiddleware(userRepo), middleware.AdminOrClassRepRequired(userRepo))
+			adminClassTeam.GET("/managed-class", classTeamHandler.GetManagedClassHandler)
+			adminClassTeam.GET("/classes/:class_id/members", classTeamHandler.GetClassMembersHandler)
+			adminClassTeam.POST("/assign-members", classTeamHandler.AssignTeamMembersHandler)
+			adminClassTeam.GET("/sports/:sport_id/members", classTeamHandler.GetTeamMembersHandler)
 		}
 
 		root := api.Group("/root")

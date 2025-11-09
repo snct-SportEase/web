@@ -15,6 +15,8 @@ type ClassRepository interface {
 	CreateClasses(eventID int, classNames []string) error
 	GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error)
 	UpdateClassRanks(eventID int) error
+	GetClassByRepRole(userID string, eventID int) (*models.Class, error)
+	GetClassMembers(classID int) ([]*models.User, error)
 }
 
 type classRepository struct {
@@ -379,4 +381,70 @@ func (r *classRepository) UpdateClassRanks(eventID int) error {
 	}
 
 	return tx.Commit()
+}
+
+// GetClassByRepRole gets the class that a user with class_name_rep role can manage
+func (r *classRepository) GetClassByRepRole(userID string, eventID int) (*models.Class, error) {
+	query := `
+		SELECT c.id, c.event_id, c.name, c.student_count, c.attend_count
+		FROM classes c
+		INNER JOIN user_roles ur ON ur.user_id = ?
+		INNER JOIN roles ro ON ur.role_id = ro.id
+		WHERE ro.name = CONCAT(c.name, '_rep') 
+		AND (ur.event_id = ? OR ur.event_id IS NULL)
+		AND c.event_id = ?
+		LIMIT 1
+	`
+	row := r.db.QueryRow(query, userID, eventID, eventID)
+
+	class := &models.Class{}
+	var eventIDPtr *int
+	err := row.Scan(&class.ID, &eventIDPtr, &class.Name, &class.StudentCount, &class.AttendCount)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Class not found
+		}
+		return nil, err
+	}
+	class.EventID = eventIDPtr
+	return class, nil
+}
+
+// GetClassMembers gets all users in a class
+func (r *classRepository) GetClassMembers(classID int) ([]*models.User, error) {
+	query := `
+		SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at
+		FROM users
+		WHERE class_id = ?
+		ORDER BY display_name, email
+	`
+	rows, err := r.db.Query(query, classID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		user := &models.User{}
+		var tempClassID sql.NullInt32
+		var tempDisplayName sql.NullString
+
+		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if tempDisplayName.Valid {
+			user.DisplayName = &tempDisplayName.String
+		}
+		if tempClassID.Valid {
+			val := int(tempClassID.Int32)
+			user.ClassID = &val
+		}
+
+		users = append(users, user)
+	}
+
+	return users, nil
 }

@@ -9,6 +9,10 @@ type TeamRepository interface {
 	CreateTeam(team *models.Team) (int64, error)
 	DeleteTeamsByEventAndSportID(eventID int, sportID int) error
 	GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error)
+	GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error)
+	AddTeamMember(teamID int, userID string) error
+	GetTeamMembers(teamID int) ([]*models.User, error)
+	RemoveTeamMember(teamID int, userID string) error
 }
 
 type teamRepository struct {
@@ -61,4 +65,70 @@ func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSpor
 		teams = append(teams, team)
 	}
 	return teams, nil
+}
+
+func (r *teamRepository) GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error) {
+	query := "SELECT id, name, class_id, sport_id, event_id FROM teams WHERE class_id = ? AND sport_id = ? AND event_id = ?"
+	row := r.db.QueryRow(query, classID, sportID, eventID)
+
+	team := &models.Team{}
+	err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Team not found
+		}
+		return nil, err
+	}
+	return team, nil
+}
+
+func (r *teamRepository) AddTeamMember(teamID int, userID string) error {
+	query := "INSERT INTO team_members (team_id, user_id) VALUES (?, ?)"
+	_, err := r.db.Exec(query, teamID, userID)
+	return err
+}
+
+func (r *teamRepository) GetTeamMembers(teamID int) ([]*models.User, error) {
+	query := `
+		SELECT u.id, u.email, u.display_name, u.class_id, u.is_profile_complete, u.created_at, u.updated_at
+		FROM users u
+		INNER JOIN team_members tm ON u.id = tm.user_id
+		WHERE tm.team_id = ?
+		ORDER BY u.display_name, u.email
+	`
+	rows, err := r.db.Query(query, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		user := &models.User{}
+		var tempClassID sql.NullInt32
+		var tempDisplayName sql.NullString
+
+		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if tempDisplayName.Valid {
+			user.DisplayName = &tempDisplayName.String
+		}
+		if tempClassID.Valid {
+			val := int(tempClassID.Int32)
+			user.ClassID = &val
+		}
+
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+func (r *teamRepository) RemoveTeamMember(teamID int, userID string) error {
+	query := "DELETE FROM team_members WHERE team_id = ? AND user_id = ?"
+	_, err := r.db.Exec(query, teamID, userID)
+	return err
 }

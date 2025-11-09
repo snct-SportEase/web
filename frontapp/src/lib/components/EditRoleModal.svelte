@@ -7,6 +7,18 @@
     const dispatch = createEventDispatcher();
     const defaultRoles = ['root', 'admin', 'student'];
 
+    function isClassSportRole(roleName) {
+        // {クラス名_競技名}形式のロールかどうかを判定
+        // アンダースコアが含まれていて、_repで終わっていない場合は、クラス名_競技名形式とみなす
+        if (roleName.includes('_') && !roleName.endsWith('_rep')) {
+            // デフォルトロールでないことを確認
+            if (!defaultRoles.includes(roleName.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function closeModal() {
         showModal = false;
     }
@@ -14,6 +26,11 @@
     async function deleteRole(roleName) {
         if (defaultRoles.includes(roleName)) {
             alert('デフォルトのロールは削除できません。');
+            return;
+        }
+
+        if (isClassSportRole(roleName)) {
+            alert('{クラス名_競技名}形式のロールは、クラス・チーム管理ページから削除してください。');
             return;
         }
 
@@ -52,10 +69,12 @@
                 {#each user.roles.filter(r => r.name !== 'student') as role}
                     <div class="flex items-center justify-between bg-gray-100 p-2 rounded-md">
                         <span class="text-sm font-medium text-gray-800">{role.name}</span>
-                        {#if !defaultRoles.includes(role.name)}
+                        {#if !defaultRoles.includes(role.name) && !isClassSportRole(role.name)}
                             <button on:click={() => deleteRole(role.name)} class="text-red-500 hover:text-red-700 font-semibold text-sm">
                                 削除
                             </button>
+                        {:else if isClassSportRole(role.name)}
+                            <span class="text-xs text-gray-500">クラス・チーム管理から削除</span>
                         {/if}
                     </div>
                 {/each}
