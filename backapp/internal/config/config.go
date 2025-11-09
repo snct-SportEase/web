@@ -7,12 +7,14 @@ import (
 )
 
 type Config struct {
-	DBHost, DBPort, DBUser, DBPassword, DBName            string
-	GoogleClientID, GoogleClientSecret, GoogleRedirectURL string
-	FrontendURL                                           string
-	InitRootUser                                          string
+	DBHost, DBPort, DBUser, DBPassword, DBName                           string
+	GoogleClientID, GoogleClientSecret, GoogleRedirectURL                string
+	FrontendURL                                                          string
+	InitRootUser                                                         string
 	InitEventName, InitEventSeason, InitEventStartDate, InitEventEndDate string
-	InitEventYear                                         string
+	InitEventYear                                                        string
+	WebPushPublicKey                                                     string
+	WebPushPrivateKey                                                    string
 }
 
 func Load() (*Config, error) {
@@ -33,6 +35,8 @@ func Load() (*Config, error) {
 		InitEventSeason:    os.Getenv("INIT_EVENT_SEASON"),
 		InitEventStartDate: os.Getenv("INIT_EVENT_START_DATE"),
 		InitEventEndDate:   os.Getenv("INIT_EVENT_END_DATE"),
+		WebPushPublicKey:   os.Getenv("WEBPUSH_PUBLIC_KEY"),
+		WebPushPrivateKey:  os.Getenv("WEBPUSH_PRIVATE_KEY"),
 	}
 	return cfg, nil
 }

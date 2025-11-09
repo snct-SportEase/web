@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
@@ -113,9 +114,10 @@ func TestGetClassMembers(t *testing.T) {
 	repo := NewClassRepository(db)
 	classID := 1
 
+	now := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	rows := sqlmock.NewRows([]string{"id", "email", "display_name", "class_id", "is_profile_complete", "created_at", "updated_at"}).
-		AddRow("user1", "user1@example.com", "User One", sql.NullInt32{Int32: int32(classID), Valid: true}, true, "2023-01-01T00:00:00Z", "2023-01-01T00:00:00Z").
-		AddRow("user2", "user2@example.com", "User Two", sql.NullInt32{Int32: int32(classID), Valid: true}, true, "2023-01-01T00:00:00Z", "2023-01-01T00:00:00Z")
+		AddRow("user1", "user1@example.com", "User One", sql.NullInt32{Int32: int32(classID), Valid: true}, true, now, now).
+		AddRow("user2", "user2@example.com", "User Two", sql.NullInt32{Int32: int32(classID), Valid: true}, true, now, now)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users WHERE class_id = ? ORDER BY display_name, email")).
 		WithArgs(classID).
