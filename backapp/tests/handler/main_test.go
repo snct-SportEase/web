@@ -81,6 +81,10 @@ func (m *MockClassRepository) GetClassMembers(classID int) ([]*models.User, erro
 	return args.Get(0).([]*models.User), args.Error(1)
 }
 
+func (m *MockClassRepository) SetNoonGamePoints(eventID int, points map[int]int) error {
+	return nil
+}
+
 type MockEventRepository struct {
 	mock.Mock
 }

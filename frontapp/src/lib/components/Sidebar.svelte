@@ -44,6 +44,9 @@
         <a href="/dashboard/root/tournament-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           トーナメント生成・管理
         </a>
+        <a href="/dashboard/root/noon-game" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          昼競技管理
+        </a>
         <a href="/dashboard/root/whitelist-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           ホワイトリスト
         </a>
@@ -84,6 +87,9 @@
         </a>
         <a href="/dashboard/admin/sport-details-registration" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           競技詳細情報登録
+        </a>
+        <a href="/dashboard/admin/noon-game-results" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          昼競技結果入力
         </a>
       </div>
     {/if}

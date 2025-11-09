@@ -40,6 +40,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
 
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo, hubManager)
+	noonRepo := repository.NewNoonGameRepository(db)
+	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo)
 
 	notificationRepo := repository.NewNotificationRepository(db)
 	roleRepo := repository.NewRoleRepository(db)
@@ -140,6 +142,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			adminEvent := admin.Group("/events")
 			{
 				adminEvent.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
+				adminEvent.GET("/:event_id/noon-game/session", noonHandler.GetSession)
 			}
 
 			admin.GET("/events", eventHandler.GetAllEvents)
@@ -162,6 +165,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
 			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
 			admin.PUT("/matches/:match_id/result", tournHandler.UpdateMatchResultHandler)
+			admin.PUT("/noon-game/matches/:match_id/result", noonHandler.RecordMatchResult)
 
 			adminUsers := admin.Group("/users")
 			{
@@ -222,6 +226,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.POST("/:event_id/tournaments/generate-preview", tournHandler.GenerateAllTournamentsPreviewHandler)
 				rootEvents.POST("/:event_id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)
 				rootEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
+				rootEvents.GET("/:event_id/noon-game/session", noonHandler.GetSession)
+				rootEvents.POST("/:event_id/noon-game/session", noonHandler.UpsertSession)
 			}
 			// Sport management routes that require 'root' role
 			rootClasses := root.Group("/classes")
@@ -234,6 +240,17 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootSports.GET("", sportHandler.GetAllSportsHandler)
 				rootSports.POST("", sportHandler.CreateSportHandler)
 				rootSports.GET("/:id/teams", sportHandler.GetTeamsBySportHandler)
+			}
+
+			rootNoon := root.Group("/noon-game")
+			{
+				rootNoon.POST("/sessions/:session_id/groups", noonHandler.SaveGroup)
+				rootNoon.PUT("/sessions/:session_id/groups/:group_id", noonHandler.SaveGroup)
+				rootNoon.DELETE("/sessions/:session_id/groups/:group_id", noonHandler.DeleteGroup)
+				rootNoon.POST("/sessions/:session_id/matches", noonHandler.SaveMatch)
+				rootNoon.PUT("/sessions/:session_id/matches/:match_id", noonHandler.SaveMatch)
+				rootNoon.DELETE("/sessions/:session_id/matches/:match_id", noonHandler.DeleteMatch)
+				rootNoon.POST("/sessions/:session_id/manual-points", noonHandler.AddManualPoint)
 			}
 
 			rootNotifications := root.Group("/notifications")
