@@ -38,6 +38,9 @@
         <a href="/dashboard/root/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           通知管理
         </a>
+        <a href="/dashboard/root/notification-requests" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          通知申請管理
+        </a>
         <a href="/dashboard/root/tournament-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           トーナメント生成・管理
         </a>
@@ -106,6 +109,9 @@
         </a>
         <a href="/dashboard/student/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           通知
+        </a>
+        <a href="/dashboard/student/notification-request" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          通知申請
         </a>
       </div>
     {/if}
