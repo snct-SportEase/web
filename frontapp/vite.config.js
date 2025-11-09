@@ -20,7 +20,7 @@ export default defineConfig({
 						provider: 'playwright',
 						instances: [{ browser: 'chromium' }]
 					},
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+					include: ['src/**/*.svelte.{test,spec}.{js,ts}', 'tests/pwa.spec.js'],
 					exclude: ['src/lib/server/**'],
 					setupFiles: ['./vitest-setup-client.js']
 				}
