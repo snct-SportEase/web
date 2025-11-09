@@ -289,7 +289,7 @@
 
                         <!-- プレビュー -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">プレビュー</label>
+                            <p class="block text-sm font-medium text-gray-700 mb-1">プレビュー</p>
                             <div class="prose mt-1 p-2 border rounded-md bg-gray-100 min-h-[8rem]">
                                 {@html marked(newAssignment.rules)}
                             </div>

@@ -193,7 +193,8 @@
 							<option value={domain}>{domain}</option>
 						{/each}
 					</select>
-      </div>
+				</div>
+			</div>
       <div>
         <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
         <select id="role" bind:value={newRole} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">

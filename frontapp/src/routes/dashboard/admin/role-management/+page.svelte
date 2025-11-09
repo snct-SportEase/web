@@ -182,8 +182,15 @@
                 {#if showUserList && filteredUsers.length > 0}
                     <ul class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
                         {#each filteredUsers as user}
-                            <li class="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-gray-100" on:click={() => selectUser(user)}>
-                                <span class="block truncate">{user.email}</span>
+                            <li class="text-gray-900 select-none relative">
+                                <button
+									type="button"
+									class="w-full text-left py-2 pl-3 pr-9 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-md"
+									on:click={() => selectUser(user)}
+									aria-label={`ユーザー ${user.email} を選択`}
+								>
+									<span class="block truncate">{user.email}</span>
+								</button>
                             </li>
                         {/each}
                     </ul>
@@ -193,7 +200,12 @@
                 {#each selectedUsers as user}
                     <span class="inline-flex items-center gap-x-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800">
                         {user.email}
-                        <button on:click={() => removeUser(user)} class="-mr-0.5 h-5 w-5 p-0.5 rounded-full inline-flex items-center justify-center text-indigo-500 hover:bg-indigo-200 hover:text-indigo-600">
+                        <button
+							type="button"
+							on:click={() => removeUser(user)}
+							class="-mr-0.5 h-5 w-5 p-0.5 rounded-full inline-flex items-center justify-center text-indigo-500 hover:bg-indigo-200 hover:text-indigo-600"
+							aria-label={`ユーザー ${user.email} をリストから削除`}
+						>
 							<svg class="h-3 w-3" fill="none" viewBox="0 0 12 12" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9l6-6M9 9L3 3"/></svg>
 						</button>
                     </span>
