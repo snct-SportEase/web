@@ -37,7 +37,7 @@
         errorMessage = errData.error || 'クラス詳細の取得に失敗しました。';
         classDetails = null; // Clear details on failure
       }
-    } catch (err) {
+    } catch {
       errorMessage = '通信エラーが発生しました。';
       classDetails = null; // Clear details on error
     } finally {

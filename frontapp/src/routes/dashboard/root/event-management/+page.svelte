@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import { get } from 'svelte/store';
   import { activeEvent } from '$lib/stores/eventStore.js';
 
   let events = [];

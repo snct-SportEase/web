@@ -71,7 +71,7 @@
 			} else {
 				verificationResult = { success: false, message: result.error };
 			}
-		} catch (error) {
+		} catch {
 			verificationResult = { success: false, message: 'An error occurred while verifying the QR code.' };
 		}
 	}
@@ -90,12 +90,12 @@
 					fps: 10,
 					qrbox: { width: 250, height: 250 }
 				},
-				(decodedText, decodedResult) => {
+				(decodedText) => {
 					scannedData = decodedText;
 					verifyQRCode(decodedText);
 					stopScan();
 				},
-				(error) => {
+				() => {
 					// console.warn(`QR code scanning error: ${error}`);
 				}
 			)

@@ -6,7 +6,6 @@
 		classMembers: initialClassMembers = [],
 		eventSports: initialEventSports = [],
 		allSports: initialAllSports = [],
-		activeEventId: initialActiveEventId = null,
 		selectedClassId: initialSelectedClassId = null,
 		error: initialError = null
 	} = data ?? {};
@@ -27,8 +26,6 @@
 
 	let error = initialError;
 	let success = null;
-	let activeEventId = initialActiveEventId;
-
 	const isAdmin = data.isAdmin || false;
 
 if (selectedClassId !== null && typeof selectedClassId !== 'number') {
@@ -187,9 +184,6 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 		}
 	}
 
-	function isMemberAssigned(userId) {
-		return assignedMembers.some((m) => m.id === userId);
-	}
 </script>
 
 <div class="max-w-6xl mx-auto p-6">

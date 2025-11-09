@@ -74,7 +74,7 @@
       try {
         const error = await res.json();
         alert(`エラー: ${error.error}`);
-      } catch (e) {
+      } catch {
         alert('不明なエラーが発生しました。');
       }
     }

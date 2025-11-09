@@ -5,8 +5,6 @@
 
   let session = null;
   let matches = [];
-  let groups = [];
-  let classes = [];
   let pointsSummary = [];
   let loading = false;
   let saving = {};
@@ -34,8 +32,6 @@
       const data = await res.json();
       session = data.session;
       matches = data.matches || [];
-      groups = data.groups || [];
-      classes = data.classes || [];
       pointsSummary = data.points_summary || [];
       initializeResultForms(matches);
     } catch (err) {

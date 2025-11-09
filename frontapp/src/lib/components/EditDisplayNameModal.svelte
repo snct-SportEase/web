@@ -6,7 +6,7 @@
   export let currentDisplayName = '';
   export let userRoles = [];
   export let onClose = () => {};
-  export let onSave = async (newDisplayName) => {};
+export let onSave = async () => {};
 
   let newDisplayName = currentDisplayName;
   let isLoading = false;

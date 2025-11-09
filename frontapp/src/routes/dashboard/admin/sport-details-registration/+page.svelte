@@ -14,7 +14,7 @@
     start(src) {
       return src.match(/##|#color\(/)?.index;
     },
-    tokenizer(src, tokens) {
+    tokenizer(src) {
       const redRule = /^##(.*?)##/;
       let match = redRule.exec(src);
       if (match) {
@@ -72,14 +72,14 @@
       if (data.event_id) {
         selectedEventId = data.event_id;
         activeEventName = data.event_name;
-        await fetchSports(selectedEventId);
+        await fetchSports();
         await fetchTournaments(selectedEventId);
       }
     }
     renderBracket();
   });
 
-  async function fetchSports(eventId) {
+  async function fetchSports() {
     const res = await fetch('/api/admin/allsports');
     if (res.ok) {
       sports = await res.json();
@@ -112,7 +112,7 @@
         if (typeof data === 'string') {
           try {
             data = JSON.parse(data);
-          } catch (e) {
+          } catch {
             data = null;
           }
         }
@@ -140,22 +140,6 @@
         }
       }
     }, 0);
-  }
-
-  async function handleEventChange(e) {
-    selectedEventId = e.target.value;
-    selectedSportId = null;
-    sports = [];
-    tournaments = [];
-    selectedTournamentId = null;
-    selectedTournament = null;
-    const wrapper = document.getElementById('bracket-container');
-    if(wrapper) wrapper.innerHTML = '';
-
-    if (selectedEventId) {
-      await fetchSports(selectedEventId);
-      await fetchTournaments(selectedEventId);
-    }
   }
 
   async function handleSportChange(e) {
@@ -354,7 +338,7 @@
         const hours = String(date.getHours()).padStart(2, '0');
         const minutes = String(date.getMinutes()).padStart(2, '0');
         return `${day}日 ${hours}:${minutes}`;
-    } catch (e) {
+    } catch {
         console.error("Invalid date format for startTime:", isoString);
         return '';
     }

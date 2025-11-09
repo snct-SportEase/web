@@ -5,9 +5,6 @@
     import { get } from 'svelte/store';
     import { dndzone } from 'svelte-dnd-action';
 
-    let sports = [];
-    let teams = [];
-    let selectedSportId = null;
     let isGenerating = false;
     let isSaving = false;
     let allTournaments = [];
@@ -18,41 +15,12 @@
     const flipDurationMs = 300;
 
     onMount(async () => {
-        try {
-            const response = await fetch(`/api/root/sports`);
-            if (response.ok) {
-                sports = await response.json();
-            } else {
-                console.error('Failed to fetch sports');
-            }
-        } catch (error) {
-            console.error('Error fetching sports:', error);
-        }
         await activeEvent.init();
         const currentEvent = get(activeEvent);
         if (currentEvent) {
             fetchTournamentsForActiveEvent();
         }
     });
-
-    async function fetchTeams(sportId) {
-        if (!sportId) {
-            teams = [];
-            return;
-        }
-        try {
-            const response = await fetch(`/api/root/sports/${sportId}/teams`);
-            if (response.ok) {
-                teams = await response.json();
-            } else {
-                console.error('Failed to fetch teams');
-                teams = [];
-            }
-        } catch (error) {
-            console.error('Error fetching teams:', error);
-            teams = [];
-        }
-    }
 
     async function previewAllTournaments() {
         const currentEvent = get(activeEvent);
@@ -237,17 +205,9 @@
                 if (newTeamName && newTeamName !== 'BYE') {
                     const newPlayers = teamDataMap[newTeamName];
                     if (newPlayers) {
-                        contestant.players = JSON.parse(JSON.stringify(newPlayers));
+                        contestant.players = newPlayers;
                     }
-                } else {
-                    contestant.players = [{ title: 'BYE' }];
                 }
-            }
-        });
-
-        newBracketData.matches.forEach(match => {
-            if (match.roundIndex > 0) {
-                delete match.sides;
             }
         });
 
@@ -303,11 +263,6 @@
         teamsForEditing = [];
     }
 
-    $: {
-        if (selectedSportId) {
-            fetchTeams(selectedSportId);
-        }
-    }
 </script>
 
 <style>

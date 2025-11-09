@@ -20,13 +20,13 @@ export async function handle({ event, resolve }) {
       if (response.ok) {
         try {
           event.locals.user = JSON.parse(responseText);
-        } catch (e) {
+        } catch {
           event.locals.user = null;
         }
       } else {
         event.locals.user = null;
       }
-    } catch (error) {
+    } catch {
       event.locals.user = null;
     }
   } else {
