@@ -270,11 +270,216 @@ func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.Ma
 
 func (r *tournamentRepository) getTeamByID(teamID int64) (*models.Team, error) {
 	var team models.Team
-	row := r.db.QueryRow("SELECT id, name, class_id FROM teams WHERE id = ?", teamID)
-	if err := row.Scan(&team.ID, &team.Name, &team.ClassID); err != nil {
+	row := r.db.QueryRow("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?", teamID)
+	if err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID); err != nil {
 		return nil, err
 	}
 	return &team, nil
+}
+
+func (r *tournamentRepository) getTeamByIDTx(tx *sql.Tx, teamID int64) (*models.Team, error) {
+	var team models.Team
+	row := tx.QueryRow("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?", teamID)
+	if err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID); err != nil {
+		return nil, err
+	}
+	return &team, nil
+}
+
+type locationScoreColumns struct {
+	win      [3]string
+	champion string
+}
+
+var locationColumns = map[string]locationScoreColumns{
+	"gym1": {
+		win:      [3]string{"gym1_win1_points", "gym1_win2_points", "gym1_win3_points"},
+		champion: "gym1_champion_points",
+	},
+	"gym2": {
+		win:      [3]string{"gym2_win1_points", "gym2_win2_points", "gym2_win3_points"},
+		champion: "gym2_champion_points",
+	},
+	"ground": {
+		win:      [3]string{"ground_win1_points", "ground_win2_points", "ground_win3_points"},
+		champion: "ground_champion_points",
+	},
+}
+
+func (r *tournamentRepository) getTournamentMetadata(tx *sql.Tx, tournamentID int) (int, string, error) {
+	var eventID, sportID int
+	var location sql.NullString
+
+	err := tx.QueryRow(
+		"SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?",
+		tournamentID,
+	).Scan(&eventID, &sportID, &location)
+	if err != nil {
+		return 0, "", err
+	}
+
+	loc := ""
+	if location.Valid {
+		loc = location.String
+	}
+
+	return eventID, loc, nil
+}
+
+func (r *tournamentRepository) addPoints(tx *sql.Tx, eventID int, classID int, column string, points int) error {
+	if column == "" || points == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`
+		INSERT INTO class_scores (event_id, class_id, %[1]s)
+		VALUES (?, ?, ?)
+		ON DUPLICATE KEY UPDATE %[1]s = %[1]s + VALUES(%[1]s)
+	`, column)
+
+	_, err := tx.Exec(query, eventID, classID, points)
+	return err
+}
+
+func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, winnerID, loserID int64, totalRounds int) error {
+	if winnerID == 0 || loserID == 0 {
+		return nil
+	}
+
+	eventID, location, err := r.getTournamentMetadata(tx, match.TournamentID)
+	if err != nil {
+		return err
+	}
+
+	if location == "noon_game" {
+		return nil
+	}
+
+	columns, ok := locationColumns[location]
+	if !ok {
+		return nil
+	}
+
+	winnerTeam, err := r.getTeamByIDTx(tx, winnerID)
+	if err != nil {
+		return err
+	}
+	loserTeam, err := r.getTeamByIDTx(tx, loserID)
+	if err != nil {
+		return err
+	}
+
+	if winnerTeam == nil || loserTeam == nil {
+		return nil
+	}
+
+	if winnerTeam.EventID != eventID || loserTeam.EventID != eventID {
+		return nil
+	}
+
+	pointsAwarded := false
+
+	if match.Round >= 0 && match.Round < len(columns.win) {
+		column := columns.win[match.Round]
+		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, column, 10); err != nil {
+			return err
+		}
+		pointsAwarded = true
+	}
+
+	if totalRounds <= 0 {
+		return nil
+	}
+
+	if match.IsBronzeMatch {
+		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 50); err != nil {
+			return err
+		}
+		pointsAwarded = true
+		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 40); err != nil {
+			return err
+		}
+
+		return r.updateRanks(tx, eventID)
+	}
+
+	if match.Round == totalRounds {
+		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 80); err != nil {
+			return err
+		}
+		pointsAwarded = true
+		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 60); err != nil {
+			return err
+		}
+		pointsAwarded = true
+	}
+
+	if pointsAwarded {
+		return r.updateRanks(tx, eventID)
+	}
+
+	return nil
+}
+
+func (r *tournamentRepository) updateRanks(tx *sql.Tx, eventID int) error {
+	var season string
+	if err := tx.QueryRow("SELECT season FROM events WHERE id = ?", eventID).Scan(&season); err != nil {
+		return err
+	}
+
+	if err := updateCurrentEventRanksTx(tx, eventID); err != nil {
+		return err
+	}
+
+	if season == "autumn" {
+		if err := updateOverallRanksTx(tx, eventID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func updateCurrentEventRanksTx(tx *sql.Tx, eventID int) error {
+	const query = `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_current_event = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+
+	if _, err := tx.Exec(query, eventID, eventID); err != nil {
+		return fmt.Errorf("failed to update current event ranks: %w", err)
+	}
+
+	return nil
+}
+
+func updateOverallRanksTx(tx *sql.Tx, eventID int) error {
+	const query = `
+		UPDATE class_scores cs
+		JOIN (
+			SELECT
+				class_id,
+				RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
+			FROM class_scores
+			WHERE event_id = ?
+		) ranked_data ON cs.class_id = ranked_data.class_id
+		SET cs.rank_overall = ranked_data.new_rank
+		WHERE cs.event_id = ?
+	`
+
+	if _, err := tx.Exec(query, eventID, eventID); err != nil {
+		return fmt.Errorf("failed to update overall ranks: %w", err)
+	}
+
+	return nil
 }
 
 func (r *tournamentRepository) marshal(data interface{}) (json.RawMessage, error) {
@@ -490,6 +695,8 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 		return err
 	}
 
+	alreadyFinished := match.WinnerID.Valid && match.Status == "finished"
+
 	var winnerID, loserID int64
 	if team1Score > team2Score {
 		winnerID = match.Team1ID.Int64
@@ -528,15 +735,17 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 		}
 	}
 
-	// Handle bronze match for semi-final losers
-	if !match.IsBronzeMatch {
-		// Check if it's a semi-final match
-		var totalRounds int
-		err := tx.QueryRow("SELECT MAX(round) FROM matches WHERE tournament_id = ?", match.TournamentID).Scan(&totalRounds)
-		if err != nil {
-			return err
-		}
+	var maxRound sql.NullInt64
+	if err := tx.QueryRow("SELECT MAX(round) FROM matches WHERE tournament_id = ?", match.TournamentID).Scan(&maxRound); err != nil {
+		return err
+	}
+	totalRounds := 0
+	if maxRound.Valid {
+		totalRounds = int(maxRound.Int64)
+	}
 
+	// Handle bronze match for semi-final losers
+	if !match.IsBronzeMatch && totalRounds > 0 {
 		// Semi-finals are in the second to last round
 		if match.Round == totalRounds-1 {
 			var bronzeMatchID int64
@@ -561,6 +770,12 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 					return err
 				}
 			}
+		}
+	}
+
+	if !alreadyFinished {
+		if err := r.applyScoring(tx, match, winnerID, loserID, totalRounds); err != nil {
+			return err
 		}
 	}
 
