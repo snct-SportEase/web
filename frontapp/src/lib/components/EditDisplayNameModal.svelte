@@ -76,7 +76,7 @@ export let onSave = async () => {};
 <!-- モーダルの背景 -->
 {#if isOpen}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
+    class="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm min-h-screen overflow-hidden"
     role="presentation"
     tabindex="-1"
     on:click={handleCancel}

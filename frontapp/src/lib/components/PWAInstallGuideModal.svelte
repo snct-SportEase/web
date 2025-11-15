@@ -34,7 +34,7 @@
 <!-- モーダルの背景 -->
 {#if isOpen}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto"
+    class="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto min-h-screen"
     role="presentation"
     tabindex="-1"
     on:click={onClose}
