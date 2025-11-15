@@ -1,12 +1,15 @@
 <script>
   import ProfileSetupModal from '$lib/components/ProfileSetupModal.svelte';
   import EventSetupModal from '$lib/components/EventSetupModal.svelte';
+  import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
 
   export let data;
   $: user = data.user;
   $: classes = data.classes;
   $: events = data.events;
   $: form = data.form;
+  
+  let showPWAInstallGuide = false;
 
   $: isRoot = user?.roles?.some(role => role.name === 'root');
   $: isAdmin = user?.roles?.some(role => role.name === 'admin' || role.name === 'root');
@@ -71,9 +74,6 @@
     <h1 class="text-3xl font-bold text-gray-900">
       ようこそ、{user?.display_name || user?.email || 'User'} さん
     </h1>
-    <p class="text-sm text-gray-600">
-      権限に合わせたメニューとクラス情報をここで確認できます。
-    </p>
   </section>
 
   {#if user && !user.is_profile_complete}
@@ -83,6 +83,38 @@
   {#if showEventSetup}
     <EventSetupModal />
   {/if}
+
+  <section class="space-y-6">
+    <div class="flex items-center justify-between">
+      <h2 class="text-2xl font-semibold text-gray-900">資料</h2>
+    </div>
+    
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <button
+        type="button"
+        on:click={() => showPWAInstallGuide = true}
+        class="group block rounded-lg border border-indigo-100 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow text-left"
+      >
+        <div class="flex items-center mb-2">
+          <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+          </svg>
+          <h4 class="text-base font-semibold text-indigo-700 group-hover:text-indigo-800">
+            PWAインストール方法
+          </h4>
+        </div>
+        <p class="mt-1 text-sm text-gray-600">OS別のPWAインストール手順をご覧いただけます</p>
+        <span class="mt-3 inline-flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
+          詳細を見る →
+        </span>
+      </button>
+    </div>
+  </section>
+
+  <PWAInstallGuideModal
+    isOpen={showPWAInstallGuide}
+    onClose={() => showPWAInstallGuide = false}
+  />
 
   <section class="space-y-6">
     <div class="flex items-center justify-between">

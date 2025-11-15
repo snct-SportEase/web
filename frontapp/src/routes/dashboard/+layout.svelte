@@ -1,12 +1,33 @@
 <script>
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
+  import { onMount } from 'svelte';
   import EditDisplayNameModal from '$lib/components/EditDisplayNameModal.svelte';
+  import PWANotificationBanner from '$lib/components/PWANotificationBanner.svelte';
+  import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
 
   let { data } = $page;
   $: user = data.user;
 
   let showEditDisplayNameModal = false;
+  let showPWANotification = false;
+  
+  onMount(() => {
+    if (browser) {
+      // 初回ログイン時のみ通知を表示（localStorageで管理）
+      const hasSeenNotification = localStorage.getItem('pwa-notification-seen');
+      if (!hasSeenNotification && (isPWAInstalled() || isPWAInstallable())) {
+        showPWANotification = true;
+      }
+    }
+  });
+
+  function handleClosePWANotification() {
+    showPWANotification = false;
+    if (browser) {
+      localStorage.setItem('pwa-notification-seen', 'true');
+    }
+  }
 
   function handleDisplayNameClick() {
     showEditDisplayNameModal = true;
@@ -121,5 +142,10 @@
     userRoles={user?.roles || []}
     onClose={handleCloseEditDisplayNameModal}
     onSave={handleSaveDisplayName}
+  />
+  
+  <PWANotificationBanner
+    show={showPWANotification}
+    onClose={handleClosePWANotification}
   />
 </div>
