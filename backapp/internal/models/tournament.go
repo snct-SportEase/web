@@ -18,19 +18,23 @@ type Tournament struct {
 // MatchDB represents the structure of a match in the database
 
 type MatchDB struct {
-	ID                 int
-	TournamentID       int
-	Round              int
-	MatchNumberInRound int
-	Team1ID            sql.NullInt64
-	Team2ID            sql.NullInt64
-	Team1Score         sql.NullInt32
-	Team2Score         sql.NullInt32
-	WinnerID           sql.NullInt64
-	Status             string
-	NextMatchID        sql.NullInt64
-	StartTime          sql.NullString
-	IsBronzeMatch      bool
+	ID                  int
+	TournamentID        int
+	Round               int
+	MatchNumberInRound  int
+	Team1ID             sql.NullInt64
+	Team2ID             sql.NullInt64
+	Team1Score          sql.NullInt32
+	Team2Score          sql.NullInt32
+	WinnerID            sql.NullInt64
+	Status              string
+	NextMatchID         sql.NullInt64
+	StartTime           sql.NullString
+	IsBronzeMatch       bool
+	IsLoserBracketMatch bool
+	LoserBracketRound   sql.NullInt64
+	LoserBracketBlock   sql.NullString
+	RainyModeStartTime  sql.NullString
 }
 
 // Player represents a player in a contestant
@@ -65,14 +69,18 @@ type Side struct {
 // Match represents a match in the tournament
 
 type Match struct {
-	ID            int    `json:"id,omitempty"`
-	RoundIndex    int    `json:"roundIndex"`
-	Order         int    `json:"order"`
-	Sides         []Side `json:"sides,omitempty"`
-	MatchStatus   string `json:"matchStatus,omitempty"`
-	StartTime     string `json:"startTime,omitempty"`
-	IsLive        bool   `json:"isLive,omitempty"`
-	IsBronzeMatch bool   `json:"isBronzeMatch,omitempty"`
+	ID                  int    `json:"id,omitempty"`
+	RoundIndex          int    `json:"roundIndex"`
+	Order               int    `json:"order"`
+	Sides               []Side `json:"sides,omitempty"`
+	MatchStatus         string `json:"matchStatus,omitempty"`
+	StartTime           string `json:"startTime,omitempty"`
+	RainyModeStartTime  string `json:"rainyModeStartTime,omitempty"`
+	IsLive              bool   `json:"isLive,omitempty"`
+	IsBronzeMatch       bool   `json:"isBronzeMatch,omitempty"`
+	IsLoserBracketMatch bool   `json:"isLoserBracketMatch,omitempty"`
+	LoserBracketRound   *int   `json:"loserBracketRound,omitempty"`
+	LoserBracketBlock   string `json:"loserBracketBlock,omitempty"`
 }
 
 // Round represents a round in the tournament

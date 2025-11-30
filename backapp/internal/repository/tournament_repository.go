@@ -17,9 +17,11 @@ type TournamentRepository interface {
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 	GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
+	UpdateMatchRainyModeStartTime(matchID int, rainyModeStartTime string) error
 	UpdateMatchStatus(matchID int, status string) error
 	UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error
 	GetTournamentIDByMatchID(matchID int) (int, error)
+	ApplyRainyModeStartTimes(eventID int) error
 }
 
 type tournamentRepository struct {
@@ -31,6 +33,14 @@ func NewTournamentRepository(db *sql.DB) TournamentRepository {
 }
 
 func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.Tournament, error) {
+	// Check if rainy mode is enabled for this event
+	var isRainyMode bool
+	err := r.db.QueryRow("SELECT is_rainy_mode FROM events WHERE id = ?", eventID).Scan(&isRainyMode)
+	if err != nil {
+		// If event not found or error, default to false
+		isRainyMode = false
+	}
+
 	rows, err := r.db.Query("SELECT id, name, sport_id FROM tournaments WHERE event_id = ?", eventID)
 	if err != nil {
 		return nil, err
@@ -91,16 +101,43 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 				}
 			}
 
+			var loserBracketRound *int
+			if m.LoserBracketRound.Valid {
+				round := int(m.LoserBracketRound.Int64)
+				loserBracketRound = &round
+			}
+			var loserBracketBlock string
+			if m.LoserBracketBlock.Valid {
+				loserBracketBlock = m.LoserBracketBlock.String
+			}
+
+			// Determine which start time to use
+			var effectiveStartTime string
+			var effectiveStartTimeForStatus string
+			if isRainyMode && m.RainyModeStartTime.Valid && m.RainyModeStartTime.String != "" {
+				// Use rainy mode start time when rainy mode is enabled
+				effectiveStartTime = m.RainyModeStartTime.String
+				effectiveStartTimeForStatus = m.RainyModeStartTime.String
+			} else if m.StartTime.Valid {
+				// Use normal start time
+				effectiveStartTime = m.StartTime.String
+				effectiveStartTimeForStatus = m.StartTime.String
+			}
+
 			bracketryMatches = append(bracketryMatches, models.Match{
-				ID:            m.ID,
-				RoundIndex:    m.Round,
-				Order:         m.MatchNumberInRound,
-				Sides:         sides,
-				MatchStatus:   m.StartTime.String,
-				IsBronzeMatch: m.IsBronzeMatch,
-				StartTime: func() string {
-					if m.StartTime.Valid {
-						return m.StartTime.String
+				ID:                  m.ID,
+				RoundIndex:          m.Round,
+				Order:               m.MatchNumberInRound,
+				Sides:               sides,
+				MatchStatus:         effectiveStartTimeForStatus,
+				IsBronzeMatch:       m.IsBronzeMatch,
+				IsLoserBracketMatch: m.IsLoserBracketMatch,
+				LoserBracketRound:   loserBracketRound,
+				LoserBracketBlock:   loserBracketBlock,
+				StartTime:           effectiveStartTime,
+				RainyModeStartTime: func() string {
+					if m.RainyModeStartTime.Valid {
+						return m.RainyModeStartTime.String
 					}
 					return ""
 				}(),
@@ -242,7 +279,7 @@ func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, tea
 }
 
 func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*models.MatchDB, error) {
-	rows, err := r.db.Query("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, team1_score, team2_score, winner_team_id, status, next_match_id, start_time, is_bronze_match FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
+	rows, err := r.db.Query("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, team1_score, team2_score, winner_team_id, status, next_match_id, start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
 	if err != nil {
 		return nil, err
 	}
@@ -251,8 +288,16 @@ func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*
 	var matches []*models.MatchDB
 	for rows.Next() {
 		var m models.MatchDB
-		if err := rows.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.Team1Score, &m.Team2Score, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch); err != nil {
+		var loserBracketRound sql.NullInt64
+		var loserBracketBlock sql.NullString
+		if err := rows.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.Team1Score, &m.Team2Score, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch, &m.IsLoserBracketMatch, &loserBracketRound, &loserBracketBlock, &m.RainyModeStartTime); err != nil {
 			return nil, err
+		}
+		if loserBracketRound.Valid {
+			m.LoserBracketRound = loserBracketRound
+		}
+		if loserBracketBlock.Valid {
+			m.LoserBracketBlock = loserBracketBlock
 		}
 		matches = append(matches, &m)
 	}
@@ -261,9 +306,17 @@ func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*
 
 func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.MatchDB, error) {
 	var m models.MatchDB
-	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time, is_bronze_match FROM matches WHERE id = ?", matchID)
-	if err := row.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch); err != nil {
+	var loserBracketRound sql.NullInt64
+	var loserBracketBlock sql.NullString
+	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?", matchID)
+	if err := row.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch, &m.IsLoserBracketMatch, &loserBracketRound, &loserBracketBlock, &m.RainyModeStartTime); err != nil {
 		return nil, err
+	}
+	if loserBracketRound.Valid {
+		m.LoserBracketRound = loserBracketRound
+	}
+	if loserBracketBlock.Valid {
+		m.LoserBracketBlock = loserBracketBlock
 	}
 	return &m, nil
 }
@@ -378,6 +431,21 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 	}
 
 	pointsAwarded := false
+
+	// 敗者戦二回戦の場合、勝者に10点付与（敗者戦ブロック優勝）
+	if match.IsLoserBracketMatch && match.LoserBracketRound.Valid && match.LoserBracketRound.Int64 == 2 {
+		// gym2の場合、gym2_loser_bracket_champion_pointsに10点追加
+		if location == "gym2" {
+			if err := r.addPoints(tx, eventID, winnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10); err != nil {
+				return err
+			}
+			pointsAwarded = true
+		}
+		// 敗者戦のスコアリング後は通常の処理をスキップ
+		if pointsAwarded {
+			return r.updateRanks(tx, eventID)
+		}
+	}
 
 	if match.Round >= 0 && match.Round < len(columns.win) {
 		column := columns.win[match.Round]
@@ -496,11 +564,17 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 		return err
 	}
 
-	tournamentName := fmt.Sprintf("%s Tournament", sportName)
+	// トーナメント名を生成
+	// sportNameが既に完全なトーナメント名の場合はそのまま使用（" Tournament"が含まれている場合）
+	// そうでない場合は "{sportName} Tournament" を生成
+	tournamentName := sportName
+	if !strings.Contains(sportName, " Tournament") {
+		tournamentName = fmt.Sprintf("%s Tournament", sportName)
+	}
 	res, err := tx.Exec("INSERT INTO tournaments (name, event_id, sport_id) VALUES (?, ?, ?)", tournamentName, eventID, sportID)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return fmt.Errorf("failed to insert tournament: %w (tournamentName: %s, eventID: %d, sportID: %d)", err, tournamentName, eventID, sportID)
 	}
 	tournamentID, err := res.LastInsertId()
 	if err != nil {
@@ -527,8 +601,20 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 			}
 		}
 
+		var loserBracketRound interface{}
+		if match.LoserBracketRound != nil {
+			loserBracketRound = *match.LoserBracketRound
+		} else {
+			loserBracketRound = nil
+		}
+		var loserBracketBlock interface{}
+		if match.LoserBracketBlock != "" {
+			loserBracketBlock = match.LoserBracketBlock
+		} else {
+			loserBracketBlock = nil
+		}
 		res, err := tx.Exec(
-			"INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 			tournamentID,
 			match.RoundIndex,
 			match.Order,
@@ -536,6 +622,9 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 			team2ID,
 			"pending",
 			match.IsBronzeMatch,
+			match.IsLoserBracketMatch,
+			loserBracketRound,
+			loserBracketBlock,
 		)
 		if err != nil {
 			tx.Rollback()
@@ -552,16 +641,56 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 		}
 	}
 
+	// roundMatchIDsが空でない場合のみ処理
+	if len(roundMatchIDs) == 0 {
+		return tx.Commit()
+	}
+
 	for i := 0; i < len(roundMatchIDs)-1; i++ {
 		for j, matchID := range roundMatchIDs[i] {
 			if match, ok := matchMetas[matchID]; ok && match.IsBronzeMatch {
 				continue
 			}
-			nextMatchID := roundMatchIDs[i+1][j/2]
-			_, err := tx.Exec("UPDATE matches SET next_match_id = ? WHERE id = ?", nextMatchID, matchID)
-			if err != nil {
-				tx.Rollback()
-				return err
+			match := matchMetas[matchID]
+
+			// 敗者戦の試合の場合は、ブロックとラウンドを考慮して次の試合を決定
+			if match.IsLoserBracketMatch && match.LoserBracketRound != nil && *match.LoserBracketRound == 1 {
+				// 敗者戦一回戦（ラウンド1）の勝者は、同じブロックの敗者戦二回戦（ラウンド2）に進む
+				var nextMatchID int64 = 0
+				if i+1 < len(roundMatchIDs) {
+					for _, candidateID := range roundMatchIDs[i+1] {
+						if candidateMatch, ok := matchMetas[candidateID]; ok {
+							if candidateMatch.IsLoserBracketMatch && candidateMatch.LoserBracketBlock == match.LoserBracketBlock {
+								// 同じブロックで、敗者戦二回戦（ラウンド2）の試合
+								if candidateMatch.LoserBracketRound != nil && *candidateMatch.LoserBracketRound == 2 {
+									// 同じブロックの敗者戦二回戦の試合（Orderは常に0）
+									nextMatchID = candidateID
+									break
+								}
+							}
+						}
+					}
+				}
+				if nextMatchID != 0 {
+					_, err := tx.Exec("UPDATE matches SET next_match_id = ? WHERE id = ?", nextMatchID, matchID)
+					if err != nil {
+						tx.Rollback()
+						return err
+					}
+				}
+			} else if match.IsLoserBracketMatch {
+				// 敗者戦二回戦の試合には次の試合なし（10点獲得で終了）
+				// 何もしない
+			} else {
+				// 本戦の試合の場合は従来通り
+				if i+1 < len(roundMatchIDs) && j/2 < len(roundMatchIDs[i+1]) {
+					nextMatchID := roundMatchIDs[i+1][j/2]
+					_, err := tx.Exec("UPDATE matches SET next_match_id = ? WHERE id = ?", nextMatchID, matchID)
+					if err != nil {
+						tx.Rollback()
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -678,6 +807,11 @@ func (r *tournamentRepository) UpdateMatchStartTime(matchID int, startTime strin
 	return err
 }
 
+func (r *tournamentRepository) UpdateMatchRainyModeStartTime(matchID int, rainyModeStartTime string) error {
+	_, err := r.db.Exec("UPDATE matches SET rainy_mode_start_time = ? WHERE id = ?", rainyModeStartTime, matchID)
+	return err
+}
+
 func (r *tournamentRepository) UpdateMatchStatus(matchID int, status string) error {
 	_, err := r.db.Exec("UPDATE matches SET status = ? WHERE id = ?", status, matchID)
 	return err
@@ -693,6 +827,18 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 	match, err := r.getMatchByID(tx, matchID)
 	if err != nil {
 		return err
+	}
+
+	// 雨天時モードのチェック: 昼競技とグラウンド競技をブロック
+	eventID, location, err := r.getTournamentMetadata(tx, match.TournamentID)
+	if err == nil {
+		var isRainyMode bool
+		err := tx.QueryRow("SELECT is_rainy_mode FROM events WHERE id = ?", eventID).Scan(&isRainyMode)
+		if err == nil && isRainyMode {
+			if location == "noon_game" || location == "ground" {
+				return fmt.Errorf("雨天時モードでは、昼競技とグラウンド競技の試合結果を更新できません")
+			}
+		}
 	}
 
 	alreadyFinished := match.WinnerID.Valid && match.Status == "finished"
@@ -786,4 +932,22 @@ func (r *tournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error
 	var tournamentID int
 	err := r.db.QueryRow("SELECT tournament_id FROM matches WHERE id = ?", matchID).Scan(&tournamentID)
 	return tournamentID, err
+}
+
+// ApplyRainyModeStartTimes applies rainy_mode_start_time to start_time for all matches in the event's tournaments
+// This is called when rainy mode is enabled
+func (r *tournamentRepository) ApplyRainyModeStartTimes(eventID int) error {
+	// Update all matches that have rainy_mode_start_time set
+	// Set start_time = rainy_mode_start_time where rainy_mode_start_time is not null
+	query := `
+		UPDATE matches m
+		INNER JOIN tournaments t ON m.tournament_id = t.id
+		SET m.start_time = m.rainy_mode_start_time,
+		    m.status = CASE WHEN m.status = 'pending' THEN 'scheduled' ELSE m.status END
+		WHERE t.event_id = ?
+		  AND m.rainy_mode_start_time IS NOT NULL
+		  AND m.rainy_mode_start_time != ''
+	`
+	_, err := r.db.Exec(query, eventID)
+	return err
 }

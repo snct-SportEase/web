@@ -32,6 +32,31 @@ func (h *TournamentHandler) UpdateMatchStartTimeHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Match start time updated successfully"})
 }
 
+type UpdateMatchRainyModeStartTimeRequest struct {
+	RainyModeStartTime string `json:"rainy_mode_start_time"`
+}
+
+func (h *TournamentHandler) UpdateMatchRainyModeStartTimeHandler(c *gin.Context) {
+	matchID, err := strconv.Atoi(c.Param("match_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
+		return
+	}
+
+	var req UpdateMatchRainyModeStartTimeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if err := h.tournRepo.UpdateMatchRainyModeStartTime(matchID, req.RainyModeStartTime); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match rainy mode start time"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Match rainy mode start time updated successfully"})
+}
+
 type UpdateMatchStatusRequest struct {
 	Status string `json:"status"`
 }

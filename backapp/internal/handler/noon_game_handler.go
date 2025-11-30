@@ -90,7 +90,11 @@ type manualPointRequest struct {
 }
 
 func (h *NoonGameHandler) GetSession(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id"})
 		return
@@ -137,7 +141,11 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 }
 
 func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id"})
 		return
@@ -486,6 +494,13 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 	}
 	if session == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "session not found for match"})
+		return
+	}
+
+	// 雨天時モードのチェック: 昼競技をブロック
+	event, err := h.eventRepo.GetEventByID(session.EventID)
+	if err == nil && event != nil && event.IsRainyMode {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "雨天時モードでは、昼競技の試合結果を記録できません"})
 		return
 	}
 

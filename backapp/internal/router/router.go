@@ -37,9 +37,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	sportRepo := repository.NewSportRepository(db)
 	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo, tournRepo)
 
-	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo)
+	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo, tournRepo)
 
-	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo, hubManager)
+	rainyModeRepo := repository.NewRainyModeRepository(db)
+	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)
+
+	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo, eventRepo, hubManager)
 	noonRepo := repository.NewNoonGameRepository(db)
 	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo)
 
@@ -165,6 +168,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.PUT("/events/:event_id/sports/:sport_id/classes/:class_id/capacity", sportHandler.UpdateClassCapacityHandler)
 
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
+			admin.PUT("/matches/:match_id/rainy-mode-start-time", tournHandler.UpdateMatchRainyModeStartTimeHandler)
 			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
 			admin.PUT("/matches/:match_id/result", tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/noon-game/matches/:match_id/result", noonHandler.RecordMatchResult)
@@ -223,14 +227,21 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				rootEvents.GET("", eventHandler.GetAllEvents)
 				rootEvents.POST("", eventHandler.CreateEvent)
-				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 				rootEvents.PUT("/active", eventHandler.SetActiveEvent)
-				rootEvents.POST("/:event_id/tournaments/generate-all", tournHandler.GenerateAllTournamentsHandler)
-				rootEvents.POST("/:event_id/tournaments/generate-preview", tournHandler.GenerateAllTournamentsPreviewHandler)
-				rootEvents.POST("/:event_id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)
-				rootEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
-				rootEvents.GET("/:event_id/noon-game/session", noonHandler.GetSession)
-				rootEvents.POST("/:event_id/noon-game/session", noonHandler.UpsertSession)
+				// More specific routes must come before the generic :id route
+				rootEvents.PUT("/:id/rainy-mode", eventHandler.SetRainyMode)
+				rootEvents.GET("/:id/rainy-mode/settings", rainyModeHandler.GetRainyModeSettingsHandler)
+				rootEvents.POST("/:id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
+				rootEvents.PUT("/:id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
+				rootEvents.DELETE("/:id/rainy-mode/settings/:sport_id/:class_id", rainyModeHandler.DeleteRainyModeSettingHandler)
+				rootEvents.POST("/:id/tournaments/generate-all", tournHandler.GenerateAllTournamentsHandler)
+				rootEvents.POST("/:id/tournaments/generate-preview", tournHandler.GenerateAllTournamentsPreviewHandler)
+				rootEvents.POST("/:id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)
+				rootEvents.GET("/:id/tournaments", tournHandler.GetTournamentsByEventHandler)
+				rootEvents.GET("/:id/noon-game/session", noonHandler.GetSession)
+				rootEvents.POST("/:id/noon-game/session", noonHandler.UpsertSession)
+				// Generic :id route should be last
+				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 			}
 			// Sport management routes that require 'root' role
 			rootClasses := root.Group("/classes")

@@ -23,8 +23,9 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 	t.Run("Success - Create Spring Event", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
 
 		startDate := time.Now()
 		endDate := startDate.Add(24 * time.Hour)
@@ -35,9 +36,9 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 			StartDate string `json:"start_date"`
 			EndDate   string `json:"end_date"`
 		}{
-			Name:       "2025春季スポーツ大会",
-			Year:       2025,
-			Season:     "spring",
+			Name:      "2025春季スポーツ大会",
+			Year:      2025,
+			Season:    "spring",
 			StartDate: startDate.Format("2006-01-02"),
 			EndDate:   endDate.Format("2006-01-02"),
 		}
@@ -60,8 +61,9 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 	t.Run("Success - Create Autumn Event with Spring Event existing", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
 
 		springEvent := &models.Event{ID: 1, Year: 2025, Season: "spring"}
 		autumnEventReq := struct {
@@ -71,11 +73,11 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 			StartDate string `json:"start_date"`
 			EndDate   string `json:"end_date"`
 		}{
-			Name:       "2025秋季スポーツ大会",
-			Year:       2025,
-			Season:     "autumn",
-			StartDate:  time.Now().Format("2006-01-02"),
-			EndDate:    time.Now().Add(24 * time.Hour).Format("2006-01-02"),
+			Name:      "2025秋季スポーツ大会",
+			Year:      2025,
+			Season:    "autumn",
+			StartDate: time.Now().Format("2006-01-02"),
+			EndDate:   time.Now().Add(24 * time.Hour).Format("2006-01-02"),
 		}
 
 		mockEventRepo.On("CreateEvent", mock.AnythingOfType("*models.Event")).Return(int64(2), nil).Once()
@@ -98,8 +100,9 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 	t.Run("Success - Create Autumn Event without Spring Event", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
 
 		autumnEventReq := struct {
 			Name      string `json:"name"`
@@ -108,11 +111,11 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 			StartDate string `json:"start_date"`
 			EndDate   string `json:"end_date"`
 		}{
-			Name:       "2026秋季スポーツ大会",
-			Year:       2026,
-			Season:     "autumn",
-			StartDate:  time.Now().Format("2006-01-02"),
-			EndDate:    time.Now().Add(24 * time.Hour).Format("2006-01-02"),
+			Name:      "2026秋季スポーツ大会",
+			Year:      2026,
+			Season:    "autumn",
+			StartDate: time.Now().Format("2006-01-02"),
+			EndDate:   time.Now().Add(24 * time.Hour).Format("2006-01-02"),
 		}
 
 		mockEventRepo.On("CreateEvent", mock.AnythingOfType("*models.Event")).Return(int64(3), nil).Once()

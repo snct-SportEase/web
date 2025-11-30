@@ -138,6 +138,11 @@ func (m *MockEventRepository) GetEventByID(id int) (*models.Event, error) {
 	return args.Get(0).(*models.Event), args.Error(1)
 }
 
+func (m *MockEventRepository) SetRainyMode(eventID int, isRainyMode bool) error {
+	args := m.Called(eventID, isRainyMode)
+	return args.Error(0)
+}
+
 type MockWhitelistRepository struct {
 	mock.Mock
 }
@@ -276,6 +281,11 @@ func (m *MockTournamentRepository) UpdateMatchStartTime(matchID int, startTime s
 	return args.Error(0)
 }
 
+func (m *MockTournamentRepository) UpdateMatchRainyModeStartTime(matchID int, rainyModeStartTime string) error {
+	args := m.Called(matchID, rainyModeStartTime)
+	return args.Error(0)
+}
+
 func (m *MockTournamentRepository) UpdateMatchStatus(matchID int, status string) error {
 	args := m.Called(matchID, status)
 	return args.Error(0)
@@ -289,6 +299,11 @@ func (m *MockTournamentRepository) UpdateMatchResult(matchID, team1Score, team2S
 func (m *MockTournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error) {
 	args := m.Called(matchID)
 	return args.Int(0), args.Error(1)
+}
+
+func (m *MockTournamentRepository) ApplyRainyModeStartTimes(eventID int) error {
+	args := m.Called(eventID)
+	return args.Error(0)
 }
 
 type MockSportRepository struct {
@@ -481,4 +496,34 @@ func (m *MockRoleRepository) GetAllRoles() ([]models.Role, error) {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]models.Role), args.Error(1)
+}
+
+type MockRainyModeRepository struct {
+	mock.Mock
+}
+
+func (m *MockRainyModeRepository) GetSettingsByEventID(eventID int) ([]*models.RainyModeSetting, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.RainyModeSetting), args.Error(1)
+}
+
+func (m *MockRainyModeRepository) GetSetting(eventID int, sportID int, classID int) (*models.RainyModeSetting, error) {
+	args := m.Called(eventID, sportID, classID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.RainyModeSetting), args.Error(1)
+}
+
+func (m *MockRainyModeRepository) UpsertSetting(setting *models.RainyModeSetting) error {
+	args := m.Called(setting)
+	return args.Error(0)
+}
+
+func (m *MockRainyModeRepository) DeleteSetting(eventID int, sportID int, classID int) error {
+	args := m.Called(eventID, sportID, classID)
+	return args.Error(0)
 }

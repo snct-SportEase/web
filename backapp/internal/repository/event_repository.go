@@ -14,6 +14,7 @@ type EventRepository interface {
 	GetEventByYearAndSeason(year int, season string) (*models.Event, error)
 	CopyClassScores(fromEventID int, toEventID int) error
 	GetEventByID(id int) (*models.Event, error)
+	SetRainyMode(eventID int, isRainyMode bool) error
 }
 
 type eventRepository struct {
@@ -25,9 +26,9 @@ func NewEventRepository(db *sql.DB) EventRepository {
 }
 
 func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date FROM events WHERE id = ?"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode FROM events WHERE id = ?"
 	event := &models.Event{}
-	err := r.db.QueryRow(query, id).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date)
+	err := r.db.QueryRow(query, id).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
@@ -38,8 +39,8 @@ func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
 }
 
 func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
-	query := "INSERT INTO events (name, `year`, season, start_date, end_date) VALUES (?, ?, ?, ?, ?)"
-	result, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date)
+	query := "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode) VALUES (?, ?, ?, ?, ?, ?)"
+	result, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode)
 	if err != nil {
 		return 0, err
 	}
@@ -51,7 +52,7 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 }
 
 func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -61,7 +62,7 @@ func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
 	var events []*models.Event
 	for rows.Next() {
 		event := &models.Event{}
-		if err := rows.Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date); err != nil {
+		if err := rows.Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode); err != nil {
 			return nil, err
 		}
 		events = append(events, event)
@@ -70,8 +71,8 @@ func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
 }
 
 func (r *eventRepository) UpdateEvent(event *models.Event) error {
-	query := "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ? WHERE id = ?"
-	_, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.ID)
+	query := "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ? WHERE id = ?"
+	_, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.ID)
 	return err
 }
 
@@ -105,9 +106,9 @@ func (r *eventRepository) SetActiveEvent(event_id *int) error {
 }
 
 func (r *eventRepository) GetEventByYearAndSeason(year int, season string) (*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date FROM events WHERE `year` = ? AND season = ?"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode FROM events WHERE `year` = ? AND season = ?"
 	event := &models.Event{}
-	err := r.db.QueryRow(query, year, season).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date)
+	err := r.db.QueryRow(query, year, season).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
@@ -126,5 +127,11 @@ func (r *eventRepository) CopyClassScores(fromEventID int, toEventID int) error 
 		ON DUPLICATE KEY UPDATE initial_points = VALUES(initial_points)
 	`
 	_, err := r.db.Exec(query, toEventID, fromEventID)
+	return err
+}
+
+func (r *eventRepository) SetRainyMode(eventID int, isRainyMode bool) error {
+	query := "UPDATE events SET is_rainy_mode = ? WHERE id = ?"
+	_, err := r.db.Exec(query, isRainyMode, eventID)
 	return err
 }

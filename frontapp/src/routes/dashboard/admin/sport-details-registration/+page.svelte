@@ -53,11 +53,20 @@
   let maxCapacity = null;
   let classes = [];
   let classCapacities = {}; // { classId: { min: number | null, max: number | null } }
+  
+  // Rainy mode capacity settings
+  let rainyModeCapacityMode = 'bulk'; // 'bulk' or 'per-class'
+  let rainyModeMinCapacity = null;
+  let rainyModeMaxCapacity = null;
+  let rainyModeClassCapacities = {}; // { classId: { min: number | null, max: number | null } }
   let tournaments = [];
   let selectedTournamentId = null;
   let selectedTournament = null;
+  let allMatchesForSport = []; // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合
   let bulkStartTime = '';
   let matchStartTimes = {};
+  let bulkRainyModeStartTime = '';
+  let matchRainyModeStartTimes = {};
   let rulesTextarea;
   let previewDiv;
   let markdownPreviewHtml = '';
@@ -150,6 +159,7 @@
     }
     selectedPdfFile = null;
     pdfPreviewUrl = null;
+    await fetchRainyModeSettings();
   }
 
   async function fetchTournaments(eventId) {
@@ -169,12 +179,43 @@
       });
       selectedTournamentId = null;
       selectedTournament = null;
+      // スポーツが選択されている場合は、全ての試合を更新
+      if (selectedSportId) {
+        updateAllMatchesForSport();
+      }
     }
   }
 
   function updateSelectedTournament() {
     selectedTournament = tournaments.find(t => t.id == selectedTournamentId) || null;
+    updateAllMatchesForSport();
     renderBracket();
+  }
+
+  // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合をまとめる
+  function updateAllMatchesForSport() {
+    if (!selectedSportId) {
+      allMatchesForSport = [];
+      return;
+    }
+
+    // 同じスポーツIDの全てのトーナメントを取得
+    const sportTournaments = tournaments.filter(t => t.sport_id == selectedSportId);
+    
+    // 全てのトーナメントの試合をまとめる
+    allMatchesForSport = [];
+    sportTournaments.forEach(tournament => {
+      if (tournament.data && tournament.data.matches) {
+        tournament.data.matches.forEach(match => {
+          // トーナメント名を追加して試合を識別しやすくする
+          allMatchesForSport.push({
+            ...match,
+            tournamentName: tournament.name,
+            tournamentId: tournament.id
+          });
+        });
+      }
+    });
   }
 
   function renderBracket() {
@@ -203,14 +244,20 @@
       } else if (selectedEventId) {
         await fetchClassCapacities();
       }
+      await fetchRainyModeSettings();
 
       if (tournaments.length === 0 && selectedEventId) {
         await fetchTournaments(selectedEventId);
       }
-      const t = tournaments.find(t => t.sport_id == selectedSportId);
-      selectedTournamentId = t ? t.id : null;
-      if (t) {
-        t.display_name = `${sportName} Tournament`;
+      // 本戦トーナメントを探す（" Tournament"が含まれ、敗者戦ではないもの）
+      const mainTournament = tournaments.find(t => 
+        t.sport_id == selectedSportId && 
+        t.name.includes(' Tournament') && 
+        !t.name.includes('敗者戦')
+      );
+      selectedTournamentId = mainTournament ? mainTournament.id : null;
+      if (mainTournament) {
+        mainTournament.display_name = `${sportName} Tournament`;
       }
       updateSelectedTournament();
     } else {
@@ -291,6 +338,102 @@
 
   function updateMatchTimeLocally(matchId, newTime) {
     matchStartTimes[matchId] = newTime;
+  }
+
+  function updateMatchRainyModeTimeLocally(matchId, newTime) {
+    matchRainyModeStartTimes[matchId] = newTime;
+  }
+
+  async function handleSaveAllRainyModeMatchTimes() {
+    const updates = Object.entries(matchRainyModeStartTimes);
+    if (updates.length === 0) {
+        alert('変更された雨天時試合開始時間がありません。');
+        return;
+    }
+
+    const confirmation = confirm(`${updates.length}件の雨天時試合開始時間を更新します。よろしいですか？`);
+    if (!confirmation) {
+        return;
+    }
+
+    try {
+        const updatePromises = updates.map(([matchId, startTime]) => {
+            return fetch(`/api/admin/matches/${matchId}/rainy-mode-start-time`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ rainy_mode_start_time: formatTime(startTime) })
+            });
+        });
+
+        const results = await Promise.all(updatePromises);
+        const failedUpdates = results.filter(res => !res.ok);
+
+        if (failedUpdates.length > 0) {
+            alert(`${failedUpdates.length}件の試合の更新に失敗しました。`);
+        } else {
+            alert('すべての雨天時試合開始時間を正常に更新しました。');
+            matchRainyModeStartTimes = {}; // Reset after successful save
+        }
+    } catch (error) {
+        console.error('Error during bulk rainy mode match time save:', error);
+        alert('雨天時試合開始時間の一括保存中にエラーが発生しました。');
+    } finally {
+        if (selectedEventId) {
+            await fetchTournaments(selectedEventId);
+            updateSelectedTournament();
+        }
+    }
+  }
+
+  async function handleBulkRainyModeTimeUpdate() {
+    if (!bulkRainyModeStartTime) {
+      alert('一括設定する雨天時開始時間を入力してください。');
+      return;
+    }
+    if (!allMatchesForSport || allMatchesForSport.length === 0) {
+      alert('試合がありません。');
+      return;
+    }
+
+    const formattedTime = new Date(bulkRainyModeStartTime).toLocaleString('ja-JP');
+    const confirmation = confirm(`すべての試合（本戦+敗者戦）の雨天時開始時間を ${formattedTime} に設定します。よろしいですか？`);
+    if (!confirmation) {
+      return;
+    }
+
+    try {
+      const updatePromises = allMatchesForSport.map(match => {
+        return fetch(`/api/admin/matches/${match.id}/rainy-mode-start-time`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ rainy_mode_start_time: formatTime(bulkRainyModeStartTime) })
+        });
+      });
+
+      const results = await Promise.all(updatePromises);
+
+      const failedUpdates = results.filter(res => !res.ok);
+
+      if (failedUpdates.length > 0) {
+        alert(`${failedUpdates.length}件の試合の更新に失敗しました。`);
+      } else {
+        alert('すべての試合の雨天時開始時間を更新しました。');
+      }
+
+    } catch (error) {
+      console.error('Error during bulk rainy mode update:', error);
+      alert('雨天時一括更新中にエラーが発生しました。');
+    } finally {
+      // Refetch data regardless of success or failure to get latest state
+      if (selectedEventId) {
+        await fetchTournaments(selectedEventId);
+        updateSelectedTournament();
+      }
+    }
   }
 
   async function handleSaveAllMatchTimes() {
@@ -767,6 +910,175 @@
     classCapacities[classId][field] = value === '' ? null : parseInt(value, 10);
     classCapacities = { ...classCapacities }; // Trigger reactivity
   }
+
+  // Rainy mode capacity functions
+  async function fetchRainyModeSettings() {
+    if (!selectedEventId || !selectedSportId) return;
+    
+    try {
+      const response = await fetch(`/api/root/events/${selectedEventId}/rainy-mode/settings`);
+      if (response.ok) {
+        const allSettings = await response.json();
+        // Filter settings for current sport
+        const sportSettings = allSettings.filter(s => s.sport_id == selectedSportId);
+        
+        // Initialize rainy mode capacities
+        if (sportSettings.length > 0 && classes.length > 0) {
+          // Check if all classes have the same values (bulk mode)
+          const firstSetting = sportSettings[0];
+          const allSame = classes.length === sportSettings.length && 
+            sportSettings.every(s => 
+              s.min_capacity === firstSetting.min_capacity && 
+              s.max_capacity === firstSetting.max_capacity
+            );
+          
+          if (allSame) {
+            // All classes have the same values, use bulk mode
+            rainyModeCapacityMode = 'bulk';
+            rainyModeMinCapacity = firstSetting.min_capacity ?? null;
+            rainyModeMaxCapacity = firstSetting.max_capacity ?? null;
+          } else {
+            // Different values or not all classes, use per-class mode
+            rainyModeCapacityMode = 'per-class';
+            rainyModeClassCapacities = {};
+            // Initialize all classes
+            classes.forEach(cls => {
+              const setting = sportSettings.find(s => s.class_id == cls.id);
+              rainyModeClassCapacities[cls.id] = {
+                min: setting?.min_capacity ?? null,
+                max: setting?.max_capacity ?? null
+              };
+            });
+            rainyModeClassCapacities = { ...rainyModeClassCapacities };
+          }
+        } else if (sportSettings.length > 0 && classes.length === 0) {
+          // Settings exist but classes not loaded yet, use first setting as bulk
+          const firstSetting = sportSettings[0];
+          rainyModeCapacityMode = 'bulk';
+          rainyModeMinCapacity = firstSetting.min_capacity ?? null;
+          rainyModeMaxCapacity = firstSetting.max_capacity ?? null;
+        } else {
+          // No settings found, reset to defaults
+          rainyModeCapacityMode = 'bulk';
+          rainyModeMinCapacity = null;
+          rainyModeMaxCapacity = null;
+          rainyModeClassCapacities = {};
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch rainy mode settings:', error);
+      // Reset to defaults on error
+      rainyModeCapacityMode = 'bulk';
+      rainyModeMinCapacity = null;
+      rainyModeMaxCapacity = null;
+      rainyModeClassCapacities = {};
+    }
+  }
+
+  async function handleSaveRainyModeCapacity() {
+    if (!selectedEventId || !selectedSportId) {
+      alert('競技を選択してください。');
+      return;
+    }
+
+    if (rainyModeCapacityMode === 'bulk') {
+      // Validate
+      if (rainyModeMinCapacity !== null && rainyModeMaxCapacity !== null && rainyModeMinCapacity > rainyModeMaxCapacity) {
+        alert('最低定員は最高定員以下である必要があります。');
+        return;
+      }
+
+      // For bulk mode, we need to save for all classes
+      if (classes.length === 0) {
+        alert('クラス情報が取得できませんでした。');
+        return;
+      }
+
+      try {
+        const updatePromises = classes.map(async (cls) => {
+          const response = await fetch(`/api/root/events/${selectedEventId}/rainy-mode/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sport_id: selectedSportId,
+              class_id: cls.id,
+              min_capacity: rainyModeMinCapacity,
+              max_capacity: rainyModeMaxCapacity,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update rainy mode capacity');
+          }
+          return response;
+        });
+
+        await Promise.all(updatePromises);
+        alert('雨天時定員設定を更新しました。');
+        await fetchRainyModeSettings();
+      } catch (error) {
+        console.error(error);
+        alert(`更新エラー: ${error.message}`);
+      }
+    } else {
+      // Per-class capacity saving
+      await handleSaveRainyModeClassCapacities();
+    }
+  }
+
+  async function handleSaveRainyModeClassCapacities() {
+    if (!selectedEventId || !selectedSportId) {
+      alert('競技を選択してください。');
+      return;
+    }
+
+    // Validate all class capacities
+    for (const [classId, capacity] of Object.entries(rainyModeClassCapacities)) {
+      if (capacity.min !== null && capacity.max !== null && capacity.min > capacity.max) {
+        const className = classes.find(c => c.id == classId)?.name || '不明なクラス';
+        alert(`${className}: 最低定員は最高定員以下である必要があります。`);
+        return;
+      }
+    }
+
+    try {
+      // Save each class capacity
+      const updatePromises = Object.entries(rainyModeClassCapacities).map(async ([classId, capacity]) => {
+          const response = await fetch(`/api/root/events/${selectedEventId}/rainy-mode/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sport_id: selectedSportId,
+              class_id: classId,
+              min_capacity: capacity.min,
+              max_capacity: capacity.max,
+            }),
+          });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to update rainy mode capacity for class ${classId}`);
+        }
+        return response;
+      });
+
+      await Promise.all(updatePromises);
+      alert('すべてのクラスの雨天時定員設定を更新しました。');
+      await fetchRainyModeSettings();
+    } catch (error) {
+      console.error(error);
+      alert(`更新エラー: ${error.message}`);
+    }
+  }
+
+  function updateRainyModeClassCapacity(classId, field, value) {
+    if (!rainyModeClassCapacities[classId]) {
+      rainyModeClassCapacities[classId] = { min: null, max: null };
+    }
+    rainyModeClassCapacities[classId][field] = value === '' ? null : parseInt(value, 10);
+    rainyModeClassCapacities = { ...rainyModeClassCapacities }; // Trigger reactivity
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -901,6 +1213,116 @@
         {/if}
       </div>
 
+      <!-- Rainy Mode Capacity Settings -->
+      <div class="mb-4 border-t pt-4">
+        <h2 class="text-xl font-semibold mb-2">雨天時定員設定</h2>
+        <p class="text-sm text-gray-600 mb-4">雨天時モード時の各競技・クラスごとの登録可能人数の上限・下限を設定できます。試合開始時間は「試合開始時間」セクションで設定できます。</p>
+        
+        <!-- Mode Selection -->
+        <div class="flex gap-4 mb-4">
+          <label class="flex items-center">
+            <input type="radio" bind:group={rainyModeCapacityMode} value={'bulk'} class="mr-1">
+            一括設定
+          </label>
+          <label class="flex items-center">
+            <input type="radio" bind:group={rainyModeCapacityMode} value={'per-class'} class="mr-1">
+            クラスごと設定
+          </label>
+        </div>
+
+        {#if rainyModeCapacityMode === 'bulk'}
+          <!-- Bulk Rainy Mode Capacity Setting -->
+          <div class="space-y-4">
+            <div class="flex items-center gap-4">
+              <div class="flex items-center gap-2">
+                <label for="rainy-min-capacity" class="text-sm font-medium text-gray-700">最低定員</label>
+                <input 
+                  type="number" 
+                  id="rainy-min-capacity"
+                  bind:value={rainyModeMinCapacity}
+                  placeholder="未設定"
+                  min="0"
+                  class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <span class="text-gray-500">〜</span>
+              <div class="flex items-center gap-2">
+                <label for="rainy-max-capacity" class="text-sm font-medium text-gray-700">最高定員</label>
+                <input 
+                  type="number" 
+                  id="rainy-max-capacity"
+                  bind:value={rainyModeMaxCapacity}
+                  placeholder="未設定"
+                  min="0"
+                  class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+            <button 
+              on:click={handleSaveRainyModeCapacity}
+              class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+            >
+              雨天時定員設定を保存
+            </button>
+          </div>
+          <p class="text-sm text-gray-600 mt-2">
+            現在の設定: 定員 {rainyModeMinCapacity ?? '未設定'} 〜 {rainyModeMaxCapacity ?? '未設定'}
+          </p>
+        {:else}
+          <!-- Per-Class Rainy Mode Capacity Setting -->
+          {#if classes.length > 0}
+            <div class="space-y-2 mb-4">
+              <div class="overflow-x-auto">
+                <table class="min-w-full border border-gray-300 rounded-md">
+                  <thead class="bg-gray-100">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">クラス名</th>
+                      <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">最低定員</th>
+                      <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">最高定員</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each classes as cls}
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm text-gray-900">{cls.name}</td>
+                        <td class="px-4 py-2">
+                          <input 
+                            type="number" 
+                            placeholder="未設定"
+                            min="0"
+                            value={rainyModeClassCapacities[cls.id]?.min ?? ''}
+                            on:input={(e) => updateRainyModeClassCapacity(cls.id, 'min', e.target.value)}
+                            class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        </td>
+                        <td class="px-4 py-2">
+                          <input 
+                            type="number" 
+                            placeholder="未設定"
+                            min="0"
+                            value={rainyModeClassCapacities[cls.id]?.max ?? ''}
+                            on:input={(e) => updateRainyModeClassCapacity(cls.id, 'max', e.target.value)}
+                            class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+              <button 
+                on:click={handleSaveRainyModeCapacity}
+                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+              >
+                すべてのクラスの雨天時定員設定を保存
+              </button>
+            </div>
+          {:else}
+            <p class="text-sm text-gray-600">クラス情報を読み込み中...</p>
+          {/if}
+        {/if}
+      </div>
+
       <div class="mb-4">
         <h2 class="text-xl font-semibold mb-2">ルール詳細</h2>
         <div class="flex gap-4 mb-2">
@@ -974,30 +1396,83 @@
       <div class="mb-4">
           <h2 class="text-xl font-semibold mb-2">試合開始時間</h2>
           {#if selectedTournament?.data?.matches}
-              <div class="flex items-center gap-4 mb-4">
-                <input type="datetime-local" bind:value={bulkStartTime} class="border rounded px-2 py-1">
-                <button on:click={handleBulkTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
-                <button on:click={handleSaveAllMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
+              <!-- 通常モードの試合開始時間 -->
+              <div class="mb-6">
+                <h3 class="text-lg font-medium mb-2">通常モード</h3>
+                <div class="flex items-center gap-4 mb-4">
+                  <input type="datetime-local" bind:value={bulkStartTime} class="border rounded px-2 py-1">
+                  <button on:click={handleBulkTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
+                  <button on:click={handleSaveAllMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
+                </div>
+                <div class="space-y-2">
+                    {#each selectedTournament.data.matches as match}
+                        <div class="flex items-center justify-between p-2 border rounded">
+                            <span class="font-medium">Round {match.roundIndex + 1}, Match {match.order + 1}</span>
+                            <div class="flex items-center gap-4">
+                                <span class="text-sm text-gray-600">
+                                    {#if match.matchStatus}
+                                        開始日時: {match.matchStatus}
+                                    {/if}
+                                </span>
+                                <input 
+                                    type="datetime-local" 
+                                    class="border rounded px-2 py-1"
+                                    value={match.startTime ? match.startTime.slice(0, 16) : ''} 
+                                    on:change={(e) => updateMatchTimeLocally(match.id, e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    {/each}
+                </div>
               </div>
-              <div class="space-y-2">
-                  {#each selectedTournament.data.matches as match}
-                      <div class="flex items-center justify-between p-2 border rounded">
-                          <span class="font-medium">Round {match.roundIndex + 1}, Match {match.order + 1}</span>
-                          <div class="flex items-center gap-4">
-                              <span class="text-sm text-gray-600">
-                                  {#if match.matchStatus}
-                                      開始日時: {match.matchStatus}
+              
+              <!-- 雨天時モードの試合開始時間（本戦+敗者戦） -->
+              <div class="mb-6 border-t pt-4">
+                <h3 class="text-lg font-medium mb-2">雨天時モード（本戦+敗者戦）</h3>
+                <p class="text-sm text-gray-600 mb-4">雨天時モード時の本戦と敗者戦の試合開始時間を設定できます。雨天時モードが有効になる前に設定しておくことができます。</p>
+                {#if allMatchesForSport && allMatchesForSport.length > 0}
+                  <div class="flex items-center gap-4 mb-4">
+                    <input type="datetime-local" bind:value={bulkRainyModeStartTime} class="border rounded px-2 py-1">
+                    <button on:click={handleBulkRainyModeTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
+                    <button on:click={handleSaveAllRainyModeMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
+                  </div>
+                  <div class="space-y-2">
+                      {#each allMatchesForSport as match}
+                          <div class="flex items-center justify-between p-2 border rounded {match.isLoserBracketMatch ? 'bg-yellow-50' : ''}">
+                              <div class="flex items-center gap-2">
+                                <span class="font-medium">
+                                  {#if match.isLoserBracketMatch}
+                                    敗者戦{match.loserBracketBlock ? match.loserBracketBlock + 'ブロック' : ''} Round {match.roundIndex + 1}, Match {match.order + 1}
+                                    {#if match.loserBracketRound}
+                                      (敗者戦ラウンド {match.loserBracketRound})
+                                    {/if}
+                                  {:else}
+                                    本戦 Round {match.roundIndex + 1}, Match {match.order + 1}
                                   {/if}
-                              </span>
-                              <input 
-                                  type="datetime-local" 
-                                  class="border rounded px-2 py-1"
-                                  value={match.startTime ? match.startTime.slice(0, 16) : ''} 
-                                  on:change={(e) => updateMatchTimeLocally(match.id, e.target.value)}
-                              />
+                                </span>
+                                <span class="text-xs text-gray-500">({match.tournamentName})</span>
+                              </div>
+                              <div class="flex items-center gap-4">
+                                  <span class="text-sm text-gray-600">
+                                      {#if match.rainyModeStartTime}
+                                          雨天時開始日時: {match.rainyModeStartTime}
+                                      {:else}
+                                          未設定
+                                      {/if}
+                                  </span>
+                                  <input 
+                                      type="datetime-local" 
+                                      class="border rounded px-2 py-1"
+                                      value={match.rainyModeStartTime ? match.rainyModeStartTime.slice(0, 16) : ''} 
+                                      on:change={(e) => updateMatchRainyModeTimeLocally(match.id, e.target.value)}
+                                  />
+                              </div>
                           </div>
-                      </div>
-                  {/each}
+                      {/each}
+                  </div>
+                {:else}
+                  <p class="text-sm text-gray-500 italic">試合がありません。トーナメントが生成された後に試合が表示されます。</p>
+                {/if}
               </div>
           {:else}
               <p class="text-gray-600">トーナメントを選択してください。</p>

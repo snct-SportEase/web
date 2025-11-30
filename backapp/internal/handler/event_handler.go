@@ -11,12 +11,13 @@ import (
 )
 
 type EventHandler struct {
-	eventRepo     repository.EventRepository
-	whitelistRepo repository.WhitelistRepository
+	eventRepo      repository.EventRepository
+	whitelistRepo  repository.WhitelistRepository
+	tournamentRepo repository.TournamentRepository
 }
 
-func NewEventHandler(eventRepo repository.EventRepository, whitelistRepo repository.WhitelistRepository) *EventHandler {
-	return &EventHandler{eventRepo: eventRepo, whitelistRepo: whitelistRepo}
+func NewEventHandler(eventRepo repository.EventRepository, whitelistRepo repository.WhitelistRepository, tournamentRepo repository.TournamentRepository) *EventHandler {
+	return &EventHandler{eventRepo: eventRepo, whitelistRepo: whitelistRepo, tournamentRepo: tournamentRepo}
 }
 
 func (h *EventHandler) CreateEvent(c *gin.Context) {
@@ -211,4 +212,39 @@ func (h *EventHandler) SetActiveEvent(c *gin.Context) {
 		"message":  "Active event set successfully",
 		"event_id": req.EventID,
 	})
+}
+
+func (h *EventHandler) SetRainyMode(c *gin.Context) {
+	eventIDStr := c.Param("id")
+	eventID, err := strconv.Atoi(eventIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+
+	var req struct {
+		IsRainyMode bool `json:"is_rainy_mode"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.eventRepo.SetRainyMode(eventID, req.IsRainyMode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If rainy mode is being enabled, apply rainy mode start times to tournaments
+	if req.IsRainyMode {
+		err = h.tournamentRepo.ApplyRainyModeStartTimes(eventID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to apply rainy mode start times", "details": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Rainy mode updated successfully", "is_rainy_mode": req.IsRainyMode})
 }

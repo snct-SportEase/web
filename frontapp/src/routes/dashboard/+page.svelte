@@ -21,6 +21,7 @@
     { title: '通知申請管理', description: '学生からの申請を確認・承認', href: '/dashboard/root/notification-requests' },
     { title: '大会設定', description: '大会情報と開催設定', href: '/dashboard/root/event-management' },
     { title: '競技管理', description: '競技情報とトーナメント生成', href: '/dashboard/root/sport-management' },
+    { title: '雨天時モード管理', description: '雨天時モードの切り替えと設定', href: '/dashboard/root/rainy-mode' },
     { title: 'ホワイトリスト', description: 'ログイン許可メールの登録', href: '/dashboard/root/whitelist-management' },
     { title: 'ユーザー管理', description: 'ユーザー名やクラス人数を調整', href: '/dashboard/root/change-username' }
   ];

@@ -32,6 +32,9 @@
         <a href="/dashboard/root/event-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           大会情報登録・管理
         </a>
+        <a href="/dashboard/root/rainy-mode" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          雨天時モード管理
+        </a>
         <a href="/dashboard/root/sport-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           競技情報登録・管理
         </a>

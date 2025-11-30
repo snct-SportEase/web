@@ -5,6 +5,7 @@ import (
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
@@ -19,21 +20,27 @@ type TournamentHandler struct {
 	sportRepo  repository.SportRepository
 	teamRepo   repository.TeamRepository
 	classRepo  repository.ClassRepository
+	eventRepo  repository.EventRepository
 	hubManager *websocket.HubManager
 }
 
-func NewTournamentHandler(tournRepo repository.TournamentRepository, sportRepo repository.SportRepository, teamRepo repository.TeamRepository, classRepo repository.ClassRepository, hubManager *websocket.HubManager) *TournamentHandler {
+func NewTournamentHandler(tournRepo repository.TournamentRepository, sportRepo repository.SportRepository, teamRepo repository.TeamRepository, classRepo repository.ClassRepository, eventRepo repository.EventRepository, hubManager *websocket.HubManager) *TournamentHandler {
 	return &TournamentHandler{
 		tournRepo:  tournRepo,
 		sportRepo:  sportRepo,
 		teamRepo:   teamRepo,
 		classRepo:  classRepo,
+		eventRepo:  eventRepo,
 		hubManager: hubManager,
 	}
 }
 
 func (h *TournamentHandler) GetTournamentsByEventHandler(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return
@@ -49,7 +56,11 @@ func (h *TournamentHandler) GetTournamentsByEventHandler(c *gin.Context) {
 }
 
 func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return
@@ -87,6 +98,8 @@ func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context)
 				teamsSlice[i] = *t
 			}
 		}
+
+		// 本戦トーナメントを追加
 		generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
 			EventID:        eventID,
 			SportID:        sport.ID,
@@ -94,13 +107,51 @@ func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context)
 			TournamentData: *tournamentData,
 			ShuffledTeams:  teamsSlice,
 		})
+
+		// gym2の場合は敗者戦A/Bブロックトーナメントも生成
+		if eventSport.Location == "gym2" {
+			// 本戦の一回戦の試合を確認（8試合である必要がある）
+			var firstRoundMatches []models.Match
+			for _, match := range tournamentData.Matches {
+				if match.RoundIndex == 0 && !match.IsBronzeMatch {
+					firstRoundMatches = append(firstRoundMatches, match)
+				}
+			}
+
+			// 一回戦は8試合（16チーム）である必要がある
+			if len(firstRoundMatches) == 8 {
+				// 敗者戦Aブロックトーナメント
+				loserBracketA := generateLoserBracketTournament("A")
+				generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
+					EventID:        eventID,
+					SportID:        sport.ID,
+					SportName:      fmt.Sprintf("%s Tournament - 敗者戦Aブロック", sport.Name),
+					TournamentData: *loserBracketA,
+					ShuffledTeams:  []models.Team{}, // 敗者戦は試合後に決定
+				})
+
+				// 敗者戦Bブロックトーナメント
+				loserBracketB := generateLoserBracketTournament("B")
+				generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
+					EventID:        eventID,
+					SportID:        sport.ID,
+					SportName:      fmt.Sprintf("%s Tournament - 敗者戦Bブロック", sport.Name),
+					TournamentData: *loserBracketB,
+					ShuffledTeams:  []models.Team{}, // 敗者戦は試合後に決定
+				})
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, generatedTournaments)
 }
 
 func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return
@@ -125,19 +176,26 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 		for i := range t.ShuffledTeams {
 			shuffledTeamsPtr[i] = &t.ShuffledTeams[i]
 		}
+		log.Printf("[BulkCreateTournaments] Saving tournament for sport: %s (EventID: %d, SportID: %d)", t.SportName, t.EventID, t.SportID)
 		err := h.tournRepo.SaveTournament(t.EventID, t.SportID, t.SportName, &t.TournamentData, shuffledTeamsPtr)
 		if err != nil {
+			log.Printf("[BulkCreateTournaments] ERROR: Failed to save tournament for sport %s: %v", t.SportName, err)
 			// Attempt to rollback or handle partial save might be needed here
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + t.SportName, "details": err.Error()})
 			return
 		}
+		log.Printf("[BulkCreateTournaments] Successfully saved tournament for sport: %s", t.SportName)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Tournaments created successfully."})
 }
 
 func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return
@@ -171,10 +229,41 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 			continue
 		}
 
+		// 本戦トーナメントを保存
 		err = h.tournRepo.SaveTournament(eventID, sport.ID, sport.Name, tournamentData, shuffledTeams)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + sport.Name, "details": err.Error()})
 			return
+		}
+
+		// gym2の場合は敗者戦A/Bブロックトーナメントも生成
+		if eventSport.Location == "gym2" {
+			// 本戦の一回戦の試合を確認（8試合である必要がある）
+			var firstRoundMatches []models.Match
+			for _, match := range tournamentData.Matches {
+				if match.RoundIndex == 0 && !match.IsBronzeMatch {
+					firstRoundMatches = append(firstRoundMatches, match)
+				}
+			}
+
+			// 一回戦は8試合（16チーム）である必要がある
+			if len(firstRoundMatches) == 8 {
+				// 敗者戦Aブロックトーナメント
+				loserBracketA := generateLoserBracketTournament("A")
+				err = h.tournRepo.SaveTournament(eventID, sport.ID, fmt.Sprintf("%s Tournament - 敗者戦Aブロック", sport.Name), loserBracketA, []*models.Team{})
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket A tournament for sport " + sport.Name, "details": err.Error()})
+					return
+				}
+
+				// 敗者戦Bブロックトーナメント
+				loserBracketB := generateLoserBracketTournament("B")
+				err = h.tournRepo.SaveTournament(eventID, sport.ID, fmt.Sprintf("%s Tournament - 敗者戦Bブロック", sport.Name), loserBracketB, []*models.Team{})
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket B tournament for sport " + sport.Name, "details": err.Error()})
+					return
+				}
+			}
 		}
 	}
 
@@ -303,3 +392,57 @@ func generateTournamentStructure(teams []*models.Team, roundBusyClasses map[int]
 	return &tournamentData, shuffledTeams, nil
 }
 
+// generateLoserBracketTournament は敗者戦トーナメントを生成します
+// block: "A" または "B"
+// Aブロック: 本戦1-4試合の敗者
+// Bブロック: 本戦5-8試合の敗者
+func generateLoserBracketTournament(block string) *models.TournamentData {
+	// 敗者戦トーナメントのラウンド
+	rounds := []models.Round{
+		{Name: "一回戦"},
+		{Name: "二回戦"},
+	}
+
+	loserRound1Round := 1
+	loserRound2Round := 2
+
+	// 敗者戦一回戦（2試合）
+	loserRound1Matches := []models.Match{
+		{
+			RoundIndex:          0,
+			Order:               0,
+			IsLoserBracketMatch: true,
+			LoserBracketRound:   &loserRound1Round,
+			LoserBracketBlock:   block,
+			Sides:               []models.Side{{}, {}}, // 敗者は試合後に決定
+		},
+		{
+			RoundIndex:          0,
+			Order:               1,
+			IsLoserBracketMatch: true,
+			LoserBracketRound:   &loserRound1Round,
+			LoserBracketBlock:   block,
+			Sides:               []models.Side{{}, {}},
+		},
+	}
+
+	// 敗者戦二回戦（1試合）- 勝者に10点付与
+	loserRound2Matches := []models.Match{
+		{
+			RoundIndex:          1,
+			Order:               0,
+			IsLoserBracketMatch: true,
+			LoserBracketRound:   &loserRound2Round,
+			LoserBracketBlock:   block,
+			Sides:               []models.Side{{}, {}},
+		},
+	}
+
+	matches := append(loserRound1Matches, loserRound2Matches...)
+
+	return &models.TournamentData{
+		Rounds:      rounds,
+		Matches:     matches,
+		Contestants: map[string]models.Contestant{},
+	}
+}

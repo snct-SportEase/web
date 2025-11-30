@@ -39,7 +39,8 @@ const buildScoreBreakdown = (classScore) => {
 				{ key: 'gym2_win1_points', label: '1勝点' },
 				{ key: 'gym2_win2_points', label: '2勝点' },
 				{ key: 'gym2_win3_points', label: '3勝点' },
-				{ key: 'gym2_champion_points', label: '優勝点' }
+				{ key: 'gym2_champion_points', label: '優勝点' },
+				{ key: 'gym2_loser_bracket_champion_points', label: '敗者戦ブロック優勝' }
 			]
 		},
 		{

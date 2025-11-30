@@ -24,6 +24,7 @@
 		{ key: 'gym2_win2_points', label: `${getSportName('gym2')}2勝点` },
 		{ key: 'gym2_win3_points', label: `${getSportName('gym2')}3勝点` },
 		{ key: 'gym2_champion_points', label: `${getSportName('gym2')}優勝点` },
+		{ key: 'gym2_loser_bracket_champion_points', label: '敗者戦ブロック優勝' },
 		{ key: 'ground_win1_points', label: `${getSportName('ground')}1勝点` },
 		{ key: 'ground_win2_points', label: `${getSportName('ground')}2勝点` },
 		{ key: 'ground_win3_points', label: `${getSportName('ground')}3勝点` },

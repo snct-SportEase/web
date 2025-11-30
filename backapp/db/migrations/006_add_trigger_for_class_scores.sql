@@ -24,6 +24,7 @@ BEGIN
         IFNULL(NEW.gym2_win2_points, 0) +
         IFNULL(NEW.gym2_win3_points, 0) +
         IFNULL(NEW.gym2_champion_points, 0) +
+        IFNULL(NEW.gym2_loser_bracket_champion_points, 0) +
         IFNULL(NEW.ground_win1_points, 0) +
         IFNULL(NEW.ground_win2_points, 0) +
         IFNULL(NEW.ground_win3_points, 0) +
@@ -54,6 +55,7 @@ BEGIN
         IFNULL(NEW.gym2_win2_points, 0) +
         IFNULL(NEW.gym2_win3_points, 0) +
         IFNULL(NEW.gym2_champion_points, 0) +
+        IFNULL(NEW.gym2_loser_bracket_champion_points, 0) +
         IFNULL(NEW.ground_win1_points, 0) +
         IFNULL(NEW.ground_win2_points, 0) +
         IFNULL(NEW.ground_win3_points, 0) +
