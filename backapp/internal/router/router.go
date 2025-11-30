@@ -205,6 +205,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			adminClassTeam.GET("/managed-class", classTeamHandler.GetManagedClassHandler)
 			adminClassTeam.GET("/classes/:class_id/members", classTeamHandler.GetClassMembersHandler)
 			adminClassTeam.POST("/assign-members", classTeamHandler.AssignTeamMembersHandler)
+			adminClassTeam.DELETE("/remove-member", classTeamHandler.RemoveTeamMemberHandler)
 			adminClassTeam.GET("/sports/:sport_id/members", classTeamHandler.GetTeamMembersHandler)
 		}
 
