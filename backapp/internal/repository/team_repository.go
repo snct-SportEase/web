@@ -14,6 +14,8 @@ type TeamRepository interface {
 	AddTeamMember(teamID int, userID string) error
 	GetTeamMembers(teamID int) ([]*models.User, error)
 	RemoveTeamMember(teamID int, userID string) error
+	UpdateTeamCapacity(eventID int, sportID int, classID int, minCapacity *int, maxCapacity *int) error
+	GetTeamCapacity(eventID int, sportID int, classID int) (*models.Team, error)
 }
 
 type teamRepository struct {
@@ -93,17 +95,28 @@ func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.
 }
 
 func (r *teamRepository) GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error) {
-	query := "SELECT id, name, class_id, sport_id, event_id FROM teams WHERE class_id = ? AND sport_id = ? AND event_id = ?"
+	query := "SELECT id, name, class_id, sport_id, event_id, min_capacity, max_capacity FROM teams WHERE class_id = ? AND sport_id = ? AND event_id = ?"
 	row := r.db.QueryRow(query, classID, sportID, eventID)
 
 	team := &models.Team{}
-	err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID)
+	var minCap, maxCap sql.NullInt64
+	err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &minCap, &maxCap)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Team not found
 		}
 		return nil, err
 	}
+
+	if minCap.Valid {
+		val := int(minCap.Int64)
+		team.MinCapacity = &val
+	}
+	if maxCap.Valid {
+		val := int(maxCap.Int64)
+		team.MaxCapacity = &val
+	}
+
 	return team, nil
 }
 
@@ -156,4 +169,36 @@ func (r *teamRepository) RemoveTeamMember(teamID int, userID string) error {
 	query := "DELETE FROM team_members WHERE team_id = ? AND user_id = ?"
 	_, err := r.db.Exec(query, teamID, userID)
 	return err
+}
+
+func (r *teamRepository) UpdateTeamCapacity(eventID int, sportID int, classID int, minCapacity *int, maxCapacity *int) error {
+	query := "UPDATE teams SET min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ? AND class_id = ?"
+	_, err := r.db.Exec(query, minCapacity, maxCapacity, eventID, sportID, classID)
+	return err
+}
+
+func (r *teamRepository) GetTeamCapacity(eventID int, sportID int, classID int) (*models.Team, error) {
+	query := "SELECT id, name, class_id, sport_id, event_id, min_capacity, max_capacity FROM teams WHERE event_id = ? AND sport_id = ? AND class_id = ?"
+	row := r.db.QueryRow(query, eventID, sportID, classID)
+
+	team := &models.Team{}
+	var minCap, maxCap sql.NullInt64
+	err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &minCap, &maxCap)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Team not found
+		}
+		return nil, err
+	}
+
+	if minCap.Valid {
+		val := int(minCap.Int64)
+		team.MinCapacity = &val
+	}
+	if maxCap.Valid {
+		val := int(maxCap.Int64)
+		team.MaxCapacity = &val
+	}
+
+	return team, nil
 }

@@ -184,6 +184,47 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 		}
 	}
 
+	async function removeMember(user) {
+		if (!selectedClass || selectedSportId === null) return;
+		if (!confirm(`${user.display_name || user.email} をチームから削除しますか？`)) return;
+
+		assignLoading = true; // Use same loading state
+		error = null;
+		success = null;
+
+		try {
+			const requestBody = {
+				sport_id: selectedSportId,
+				user_id: user.id
+			};
+
+			if (isAdmin && selectedClass) {
+				requestBody.class_id = selectedClass.id;
+			}
+
+			const response = await authorizedFetch('/api/admin/class-team/remove-member', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(requestBody)
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'メンバーの削除に失敗しました');
+			}
+
+			const result = await response.json();
+			success = result.message || 'メンバーを削除しました';
+
+			await loadTeamMembers(selectedSportId);
+		} catch (err) {
+			console.error('Error removing member:', err);
+			error = err.message || 'メンバーの削除に失敗しました';
+		} finally {
+			assignLoading = false;
+		}
+	}
+
 </script>
 
 <div class="max-w-6xl mx-auto p-6">
@@ -312,6 +353,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 									<tr>
 										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">表示名</th>
 										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">メールアドレス</th>
+										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
 									</tr>
 								</thead>
 								<tbody class="bg-white divide-y divide-gray-200">
@@ -321,6 +363,15 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 												{member.display_name || '未設定'}
 											</td>
 											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
+											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+												<button
+													on:click={() => removeMember(member)}
+													disabled={assignLoading}
+													class="text-red-600 hover:text-red-900 disabled:text-gray-400"
+												>
+													削除
+												</button>
+											</td>
 										</tr>
 									{/each}
 								</tbody>

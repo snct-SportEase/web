@@ -243,6 +243,54 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		}
 	}
 
+	// --- Capacity Check ---
+	var maxCapacity *int
+
+	// 1. Check team specific capacity
+	if team.MaxCapacity != nil {
+		maxCapacity = team.MaxCapacity
+	} else {
+		// 2. Check event sport default capacity
+		eventSport, err := h.sportRepo.GetSportDetails(activeEventID, req.SportID)
+		if err == nil && eventSport != nil {
+			maxCapacity = eventSport.MaxCapacity
+		}
+	}
+
+	if maxCapacity != nil {
+		// Get current members
+		currentMembers, err := h.teamRepo.GetTeamMembers(team.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current team members for capacity check"})
+			return
+		}
+		
+		// Check capacity
+		currentCount := len(currentMembers)
+		addCount := 0
+		
+		// Filter out users who are already members to avoid double counting
+		// Although AddTeamMember ignores duplicates, for capacity check we should be precise
+		existingMemberMap := make(map[string]bool)
+		for _, m := range currentMembers {
+			existingMemberMap[m.ID] = true
+		}
+		
+		for _, uid := range req.UserIDs {
+			if !existingMemberMap[uid] {
+				addCount++
+			}
+		}
+		
+		if currentCount + addCount > *maxCapacity {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("定員オーバーです。現在のメンバー数: %d, 追加人数: %d, 定員: %d", currentCount, addCount, *maxCapacity),
+			})
+			return
+		}
+	}
+	// --- End Capacity Check ---
+
 	// Create role name: class_name_sport_name
 	roleName := fmt.Sprintf("%s_%s", managedClass.Name, sport.Name)
 
@@ -275,6 +323,108 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Team members assigned successfully. %d users assigned.", assignedCount)})
+}
+
+// RemoveTeamMemberHandler removes a user from a team and removes the class_name_sport_name role
+func (h *ClassTeamHandler) RemoveTeamMemberHandler(c *gin.Context) {
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	currentUser := userCtx.(*models.User)
+
+	var req struct {
+		ClassID *int   `json:"class_id"` // Optional for admin users
+		SportID int    `json:"sport_id"`
+		UserID  string `json:"user_id"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Get active event
+	activeEventID, err := h.eventRepo.GetActiveEvent()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+		return
+	}
+
+	if activeEventID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No active event found"})
+		return
+	}
+
+	// Verify that the user can manage a class and get the class
+	var managedClass *models.Class
+	isAdmin := false
+	for _, role := range currentUser.Roles {
+		if role.Name == "admin" || role.Name == "root" {
+			isAdmin = true
+			break
+		}
+	}
+
+	if !isAdmin {
+		// For class rep users, get their managed class
+		var err error
+		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
+		if err != nil || managedClass == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
+			return
+		}
+	} else {
+		// For admin users, get the class from class_id in the request
+		if req.ClassID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required for admin users"})
+			return
+		}
+		var err error
+		managedClass, err = h.classRepo.GetClassByID(*req.ClassID)
+		if err != nil || managedClass == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
+			return
+		}
+	}
+
+	// Get sport information
+	sport, err := h.sportRepo.GetSportByID(req.SportID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Sport not found"})
+		return
+	}
+
+	// Get team
+	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, req.SportID, activeEventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
+		return
+	}
+
+	if team == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+		return
+	}
+
+	// Remove from team_members
+	err = h.teamRepo.RemoveTeamMember(team.ID, req.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove team member"})
+		return
+	}
+
+	// Remove role
+	roleName := fmt.Sprintf("%s_%s", managedClass.Name, sport.Name)
+	err = h.userRepo.DeleteUserRole(req.UserID, roleName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove user role"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Team member removed successfully"})
 }
 
 // GetTeamMembersHandler returns all members of a team

@@ -19,6 +19,9 @@
     };
 
     let currentActiveEvent = null;
+    let editingCapacity = null; // { event_id, sport_id } or null
+    let editingMinCapacity = null;
+    let editingMaxCapacity = null;
 
     const allLocations = ['gym1', 'gym2', 'ground', 'noon_game', 'other'];
 
@@ -183,6 +186,51 @@
         const sport = allSports.find(s => s.id === sportId);
         return sport ? sport.name : '不明な競技';
     }
+
+    function startEditCapacity(eventId, sportId) {
+        const eventSport = eventSports.find(es => es.event_id === eventId && es.sport_id === sportId);
+        editingCapacity = { event_id: eventId, sport_id: sportId };
+        editingMinCapacity = eventSport?.min_capacity ?? null;
+        editingMaxCapacity = eventSport?.max_capacity ?? null;
+    }
+
+    function cancelEditCapacity() {
+        editingCapacity = null;
+        editingMinCapacity = null;
+        editingMaxCapacity = null;
+    }
+
+    async function saveCapacity(eventId, sportId) {
+        // Validate
+        if (editingMinCapacity !== null && editingMaxCapacity !== null && editingMinCapacity > editingMaxCapacity) {
+            alert('最低定員は最高定員以下である必要があります。');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/events/${eventId}/sports/${sportId}/capacity`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    min_capacity: editingMinCapacity,
+                    max_capacity: editingMaxCapacity,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to update capacity');
+            }
+
+            // Refresh the list
+            await fetchEventSports(currentActiveEvent.id);
+            cancelEditCapacity();
+            alert('定員設定を更新しました。');
+        } catch (error) {
+            console.error(error);
+            alert(`更新エラー: ${error.message}`);
+        }
+    }
 </script>
 
 <div class="container mx-auto p-6 lg:p-10 space-y-12">
@@ -311,6 +359,7 @@
                                         <th class="px-4 py-2 text-left font-semibold text-gray-700">競技名</th>
                                         <th class="px-4 py-2 text-left font-semibold text-gray-700 w-1/4">場所</th>
                                         <th class="px-4 py-2 text-left font-semibold text-gray-700 w-1/2">概要</th>
+                                        <th class="px-4 py-2 text-left font-semibold text-gray-700">定員設定</th>
                                         <th class="px-4 py-2 text-left font-semibold text-gray-700">アクション</th>
                                     </tr>
                                 </thead>
@@ -321,6 +370,51 @@
                                             <td class="px-4 py-3 text-gray-600">{es.location}</td>
                                             <td class="px-4 py-3 text-gray-600 truncate max-w-xs">{es.description || '概要なし'}</td>
                                             <td class="px-4 py-3">
+                                                {#if editingCapacity && editingCapacity.event_id === es.event_id && editingCapacity.sport_id === es.sport_id}
+                                                    <div class="flex items-center gap-2">
+                                                        <input 
+                                                            type="number" 
+                                                            bind:value={editingMinCapacity}
+                                                            placeholder="最低"
+                                                            min="0"
+                                                            class="w-16 px-2 py-1 text-xs border rounded"
+                                                        />
+                                                        <span class="text-gray-500">〜</span>
+                                                        <input 
+                                                            type="number" 
+                                                            bind:value={editingMaxCapacity}
+                                                            placeholder="最高"
+                                                            min="0"
+                                                            class="w-16 px-2 py-1 text-xs border rounded"
+                                                        />
+                                                        <button 
+                                                            on:click={() => saveCapacity(es.event_id, es.sport_id)}
+                                                            class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                                                        >
+                                                            保存
+                                                        </button>
+                                                        <button 
+                                                            on:click={cancelEditCapacity}
+                                                            class="text-xs px-2 py-1 bg-gray-400 text-white rounded hover:bg-gray-500"
+                                                        >
+                                                            取消
+                                                        </button>
+                                                    </div>
+                                                {:else}
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-sm text-gray-700">
+                                                            {es.min_capacity ?? '未設定'} 〜 {es.max_capacity ?? '未設定'}
+                                                        </span>
+                                                        <button 
+                                                            on:click={() => startEditCapacity(es.event_id, es.sport_id)}
+                                                            class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                        >
+                                                            編集
+                                                        </button>
+                                                    </div>
+                                                {/if}
+                                            </td>
+                                            <td class="px-4 py-3">
                                                 <button on:click={() => deleteAssignedSport(es.sport_id)} class="text-red-600 hover:text-red-800 font-semibold text-xs py-1 px-3 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-150">
                                                     解除
                                                 </button>
@@ -328,7 +422,7 @@
                                         </tr>
                                     {:else}
                                         <tr>
-                                            <td colspan="4" class="text-center py-6 text-gray-500 italic">
+                                            <td colspan="5" class="text-center py-6 text-gray-500 italic">
                                                 この大会に割り当てられた競技はありません。
                                             </td>
                                         </tr>

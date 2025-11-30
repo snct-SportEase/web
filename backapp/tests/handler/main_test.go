@@ -223,6 +223,19 @@ func (m *MockTeamRepository) RemoveTeamMember(teamID int, userID string) error {
 	return args.Error(0)
 }
 
+func (m *MockTeamRepository) UpdateTeamCapacity(eventID int, sportID int, classID int, minCapacity *int, maxCapacity *int) error {
+	args := m.Called(eventID, sportID, classID, minCapacity, maxCapacity)
+	return args.Error(0)
+}
+
+func (m *MockTeamRepository) GetTeamCapacity(eventID int, sportID int, classID int) (*models.Team, error) {
+	args := m.Called(eventID, sportID, classID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Team), args.Error(1)
+}
+
 type MockTournamentRepository struct {
 	mock.Mock
 }
