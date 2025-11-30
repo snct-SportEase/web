@@ -161,6 +161,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 			admin.GET("/events/:event_id/sports/:sport_id/details", sportHandler.GetSportDetailsHandler)
 			admin.PUT("/events/:event_id/sports/:sport_id/details", sportHandler.UpdateSportDetailsHandler)
+			admin.PUT("/events/:event_id/sports/:sport_id/capacity", sportHandler.UpdateCapacityHandler)
+			admin.PUT("/events/:event_id/sports/:sport_id/classes/:class_id/capacity", sportHandler.UpdateClassCapacityHandler)
 
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
 			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)

@@ -48,6 +48,11 @@
   let selectedEventId = null;
   let selectedSportId = null;
   let sportDetails = { description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null };
+  let capacityMode = 'bulk'; // 'bulk' or 'per-class'
+  let minCapacity = null;
+  let maxCapacity = null;
+  let classes = [];
+  let classCapacities = {}; // { classId: { min: number | null, max: number | null } }
   let tournaments = [];
   let selectedTournamentId = null;
   let selectedTournament = null;
@@ -73,6 +78,7 @@
         selectedEventId = data.event_id;
         activeEventName = data.event_name;
         await fetchSports();
+        await fetchClasses();
         await fetchTournaments(selectedEventId);
       }
     }
@@ -86,6 +92,45 @@
     }
   }
 
+  async function fetchClasses() {
+    if (!selectedEventId) return;
+    const res = await fetch('/api/admin/class-team/managed-class');
+    if (res.ok) {
+      classes = await res.json();
+      // Initialize class capacities
+      if (selectedSportId) {
+        await fetchClassCapacities();
+      }
+    }
+  }
+
+  async function fetchClassCapacities() {
+    if (!selectedEventId || !selectedSportId) return;
+    
+    // Fetch teams for this sport to get class information and capacities
+    const teamsRes = await fetch(`/api/root/sports/${selectedSportId}/teams`);
+    if (teamsRes.ok) {
+      const teams = await teamsRes.json();
+      // Initialize class capacities from teams
+      classCapacities = {};
+      classes.forEach(cls => {
+        const team = teams.find(t => t.class_id === cls.id && t.event_id === selectedEventId);
+        if (team) {
+          classCapacities[cls.id] = {
+            min: team.min_capacity ?? null,
+            max: team.max_capacity ?? null
+          };
+        } else {
+          classCapacities[cls.id] = {
+            min: null,
+            max: null
+          };
+        }
+      });
+      classCapacities = { ...classCapacities }; // Trigger reactivity
+    }
+  }
+
   async function fetchSportDetails(eventId, sportId) {
     const res = await fetch(`/api/admin/events/${eventId}/sports/${sportId}/details`);
     if (res.ok) {
@@ -96,8 +141,12 @@
         rules_type: details.rules_type || 'markdown',
         rules_pdf_url: details.rules_pdf_url || null
       };
+      minCapacity = details.min_capacity ?? null;
+      maxCapacity = details.max_capacity ?? null;
     } else {
       sportDetails = { description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null };
+      minCapacity = null;
+      maxCapacity = null;
     }
     selectedPdfFile = null;
     pdfPreviewUrl = null;
@@ -148,6 +197,12 @@
       await fetchSportDetails(selectedEventId, selectedSportId);
       const selectedSport = sports.find(s => s.id == selectedSportId);
       const sportName = selectedSport ? selectedSport.name : '';
+
+      if (classes.length === 0 && selectedEventId) {
+        await fetchClasses();
+      } else if (selectedEventId) {
+        await fetchClassCapacities();
+      }
 
       if (tournaments.length === 0 && selectedEventId) {
         await fetchTournaments(selectedEventId);
@@ -619,6 +674,99 @@
       }
     }
   }
+
+  async function handleSaveCapacity() {
+    if (!selectedEventId || !selectedSportId) {
+      alert('競技を選択してください。');
+      return;
+    }
+
+    if (capacityMode === 'bulk') {
+      // Validate
+      if (minCapacity !== null && maxCapacity !== null && minCapacity > maxCapacity) {
+        alert('最低定員は最高定員以下である必要があります。');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/events/${selectedEventId}/sports/${selectedSportId}/capacity`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            min_capacity: minCapacity,
+            max_capacity: maxCapacity,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update capacity');
+        }
+
+        alert('定員設定を更新しました。');
+        await fetchSportDetails(selectedEventId, selectedSportId);
+      } catch (error) {
+        console.error(error);
+        alert(`更新エラー: ${error.message}`);
+      }
+    } else {
+      // Per-class capacity saving
+      await handleSaveClassCapacities();
+    }
+  }
+
+  async function handleSaveClassCapacities() {
+    if (!selectedEventId || !selectedSportId) {
+      alert('競技を選択してください。');
+      return;
+    }
+
+    // Validate all class capacities
+    for (const [classId, capacity] of Object.entries(classCapacities)) {
+      if (capacity.min !== null && capacity.max !== null && capacity.min > capacity.max) {
+        const className = classes.find(c => c.id == classId)?.name || '不明なクラス';
+        alert(`${className}: 最低定員は最高定員以下である必要があります。`);
+        return;
+      }
+    }
+
+    try {
+      // Save each class capacity
+      const updatePromises = Object.entries(classCapacities).map(async ([classId, capacity]) => {
+        // Note: This API endpoint may need to be created in the backend
+        // For now, we'll use a placeholder endpoint
+        const response = await fetch(`/api/admin/events/${selectedEventId}/sports/${selectedSportId}/classes/${classId}/capacity`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            min_capacity: capacity.min,
+            max_capacity: capacity.max,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to update capacity for class ${classId}`);
+        }
+        return response;
+      });
+
+      await Promise.all(updatePromises);
+      alert('すべてのクラスの定員設定を更新しました。');
+      await fetchClassCapacities();
+    } catch (error) {
+      console.error(error);
+      alert(`更新エラー: ${error.message}`);
+    }
+  }
+
+  function updateClassCapacity(classId, field, value) {
+    if (!classCapacities[classId]) {
+      classCapacities[classId] = { min: null, max: null };
+    }
+    classCapacities[classId][field] = value === '' ? null : parseInt(value, 10);
+    classCapacities = { ...classCapacities }; // Trigger reactivity
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -647,6 +795,110 @@
       <div class="mb-4">
         <h2 class="text-xl font-semibold mb-2">競技概要</h2>
         <textarea bind:value={sportDetails.description} rows="4" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md"></textarea>
+      </div>
+
+      <div class="mb-4">
+        <h2 class="text-xl font-semibold mb-2">定員設定</h2>
+        
+        <!-- Mode Selection -->
+        <div class="flex gap-4 mb-4">
+          <label class="flex items-center">
+            <input type="radio" bind:group={capacityMode} value={'bulk'} class="mr-1">
+            一括設定
+          </label>
+          <label class="flex items-center">
+            <input type="radio" bind:group={capacityMode} value={'per-class'} class="mr-1">
+            クラスごと設定
+          </label>
+        </div>
+
+        {#if capacityMode === 'bulk'}
+          <!-- Bulk Capacity Setting -->
+          <div class="flex items-center gap-4 mb-2">
+            <div class="flex items-center gap-2">
+              <label for="min-capacity" class="text-sm font-medium text-gray-700">最低定員</label>
+              <input 
+                type="number" 
+                id="min-capacity"
+                bind:value={minCapacity}
+                placeholder="未設定"
+                min="0"
+                class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <span class="text-gray-500">〜</span>
+            <div class="flex items-center gap-2">
+              <label for="max-capacity" class="text-sm font-medium text-gray-700">最高定員</label>
+              <input 
+                type="number" 
+                id="max-capacity"
+                bind:value={maxCapacity}
+                placeholder="未設定"
+                min="0"
+                class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <button 
+              on:click={handleSaveCapacity}
+              class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+            >
+              定員設定を保存
+            </button>
+          </div>
+          <p class="text-sm text-gray-600">現在の設定: {minCapacity ?? '未設定'} 〜 {maxCapacity ?? '未設定'}</p>
+        {:else}
+          <!-- Per-Class Capacity Setting -->
+          {#if classes.length > 0}
+            <div class="space-y-2 mb-4">
+              <div class="overflow-x-auto">
+                <table class="min-w-full border border-gray-300 rounded-md">
+                  <thead class="bg-gray-100">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">クラス名</th>
+                      <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">最低定員</th>
+                      <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">最高定員</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each classes as cls}
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm text-gray-900">{cls.name}</td>
+                        <td class="px-4 py-2">
+                          <input 
+                            type="number" 
+                            placeholder="未設定"
+                            min="0"
+                            value={classCapacities[cls.id]?.min ?? ''}
+                            on:input={(e) => updateClassCapacity(cls.id, 'min', e.target.value)}
+                            class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        </td>
+                        <td class="px-4 py-2">
+                          <input 
+                            type="number" 
+                            placeholder="未設定"
+                            min="0"
+                            value={classCapacities[cls.id]?.max ?? ''}
+                            on:input={(e) => updateClassCapacity(cls.id, 'max', e.target.value)}
+                            class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+              <button 
+                on:click={handleSaveCapacity}
+                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+              >
+                すべてのクラスの定員設定を保存
+              </button>
+            </div>
+          {:else}
+            <p class="text-sm text-gray-600">クラス情報を読み込み中...</p>
+          {/if}
+        {/if}
       </div>
 
       <div class="mb-4">

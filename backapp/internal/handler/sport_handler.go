@@ -243,3 +243,103 @@ func (h *SportHandler) UpdateSportDetailsHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Sport details updated successfully"})
 }
+
+// UpdateCapacityHandler handles the request to update capacity settings for a sport.
+func (h *SportHandler) UpdateCapacityHandler(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+	sportID, err := strconv.Atoi(c.Param("sport_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sport ID"})
+		return
+	}
+
+	var req struct {
+		MinCapacity *int `json:"min_capacity"`
+		MaxCapacity *int `json:"max_capacity"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Validate min_capacity <= max_capacity if both are set
+	if req.MinCapacity != nil && req.MaxCapacity != nil && *req.MinCapacity > *req.MaxCapacity {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "最低定員は最高定員以下である必要があります"})
+		return
+	}
+
+	// Get current sport details
+	currentDetails, err := h.sportRepo.GetSportDetails(eventID, sportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve sport details"})
+		return
+	}
+
+	// Update only capacity fields
+	currentDetails.MinCapacity = req.MinCapacity
+	currentDetails.MaxCapacity = req.MaxCapacity
+
+	if err := h.sportRepo.UpdateSportDetails(eventID, sportID, *currentDetails); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update capacity"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Capacity updated successfully"})
+}
+
+// UpdateClassCapacityHandler handles the request to update capacity settings for a specific class in a sport.
+func (h *SportHandler) UpdateClassCapacityHandler(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+	sportID, err := strconv.Atoi(c.Param("sport_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sport ID"})
+		return
+	}
+	classID, err := strconv.Atoi(c.Param("class_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
+		return
+	}
+
+	var req struct {
+		MinCapacity *int `json:"min_capacity"`
+		MaxCapacity *int `json:"max_capacity"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Validate min_capacity <= max_capacity if both are set
+	if req.MinCapacity != nil && req.MaxCapacity != nil && *req.MinCapacity > *req.MaxCapacity {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "最低定員は最高定員以下である必要があります"})
+		return
+	}
+
+	// Verify that the team exists
+	team, err := h.teamRepo.GetTeamByClassAndSport(classID, sportID, eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve team"})
+		return
+	}
+	if team == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found for the specified class, sport, and event"})
+		return
+	}
+
+	// Update team capacity
+	if err := h.teamRepo.UpdateTeamCapacity(eventID, sportID, classID, req.MinCapacity, req.MaxCapacity); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update capacity"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Class capacity updated successfully"})
+}
