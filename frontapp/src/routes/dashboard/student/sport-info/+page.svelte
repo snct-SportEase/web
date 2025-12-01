@@ -67,6 +67,13 @@
   }
 
   function openRulesModal(sport) {
+    // PDFの場合は別タブで開く
+    if (sport.rules_type === 'pdf' && sport.rules_pdf_url) {
+      window.open(sport.rules_pdf_url, '_blank');
+      return;
+    }
+    
+    // マークダウンの場合はモーダルを開く
     selectedSportName = getSportName(sport.sport_id);
     selectedRulesType = sport.rules_type;
     selectedRulesContent = sport.rules;
