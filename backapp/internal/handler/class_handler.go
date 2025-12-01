@@ -235,6 +235,9 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return
 	}
 
+	// 実際のクラスメンバー数を取得
+	actualStudentCount := len(members)
+
 	memberLookup := make(map[string]*models.ClassMemberView)
 	memberList := make([]*models.ClassMemberView, 0, len(members))
 	for _, m := range members {
@@ -302,7 +305,7 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		"class_name": class.Name,
 		"class_info": gin.H{
 			"name":          class.Name,
-			"student_count": class.StudentCount,
+			"student_count": actualStudentCount,
 			"attend_count":  class.AttendCount,
 		},
 		"members":  memberList,
