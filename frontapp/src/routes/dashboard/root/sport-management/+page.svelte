@@ -22,6 +22,7 @@
     let editingCapacity = null; // { event_id, sport_id } or null
     let editingMinCapacity = null;
     let editingMaxCapacity = null;
+    let isAssigning = false; // 割り当て処理中のフラグ
 
     const allLocations = ['gym1', 'gym2', 'ground', 'noon_game', 'other'];
 
@@ -117,6 +118,10 @@
     }
 
     async function assignSport() {
+        if (isAssigning) {
+            return; // 既に処理中の場合は何もしない
+        }
+        
         if (!currentActiveEvent) {
             alert('アクティブな大会が設定されていません。');
             return;
@@ -126,6 +131,8 @@
             return;
         }
 
+        isAssigning = true; // 処理開始
+        
         try {
             // /api/admin/events/:id/sports は管理者権限が必要
             const response = await fetch(`/api/admin/events/${currentActiveEvent.id}/sports`, { 
@@ -141,14 +148,24 @@
                 throw new Error(errorData.error || 'Failed to assign sport to event');
             }
             
-            // Reset form
-            newAssignment = { sport_id: null, description: '', rules: '', location: 'other' };
-
+            // 割り当て成功後、確実にリストを更新してからフォームをリセット
             await fetchEventSports(currentActiveEvent.id); // Refresh the list
+            
+            // Reset form (rules_typeも含める)
+            newAssignment = { 
+                sport_id: null, 
+                description: '', 
+                rules: '', 
+                location: 'other',
+                rules_type: 'markdown'
+            };
+            
             alert('競技を大会に割り当てました。');
         } catch (error) {
             console.error(error);
             alert(`割り当てエラー: ${error.message}`);
+        } finally {
+            isAssigning = false; // 処理完了
         }
     }
 
@@ -344,8 +361,8 @@
                             <SafeHtml class="prose mt-1 p-2 border rounded-md bg-gray-100 min-h-[8rem]" html={assignmentPreviewHtml} />
                         </div>
                         
-                        <button on:click={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150" disabled={!newAssignment.sport_id}>
-                            大会に競技を割り当てる
+                        <button on:click={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={!newAssignment.sport_id || isAssigning}>
+                            {isAssigning ? '割り当て中...' : '大会に競技を割り当てる'}
                         </button>
                     </div>
 
