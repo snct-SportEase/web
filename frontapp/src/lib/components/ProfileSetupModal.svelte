@@ -63,7 +63,7 @@
 </script>
 
 <!-- モーダルの背景 -->
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+<div class="fixed top-0 left-0 right-0 bottom-0 z-50 flex items-center justify-center bg-black min-h-screen w-full overflow-hidden">
   <!-- モーダルの本体 -->
   <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
     <h2 class="text-2xl font-bold text-center text-gray-800">プロフィールを設定してください</h2>
@@ -88,17 +88,23 @@
         <!-- クラス選択 -->
         <div>
           <label for="classId" class="block text-sm font-medium text-gray-700">クラス</label>
-          <select
-            id="classId"
-            name="classId"
-            required
-            class="w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="" disabled selected>クラスを選択してください</option>
-            {#each classes as cls}
-              <option value={cls.id}>{cls.name}</option>
-            {/each}
-          </select>
+          {#if classes.length === 0}
+            <div class="w-full px-3 py-2 mt-1 text-sm text-gray-500 bg-gray-100 border border-gray-300 rounded-md">
+              クラスがまだ設定されていません。管理者に連絡してください。
+            </div>
+          {:else}
+            <select
+              id="classId"
+              name="classId"
+              required
+              class="w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="" disabled selected>クラスを選択してください</option>
+              {#each classes as cls}
+                <option value={cls.id}>{cls.name}</option>
+              {/each}
+            </select>
+          {/if}
         </div>
       </div>
 
@@ -111,7 +117,7 @@
       <div class="mt-6">
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || classes.length === 0}
           class="w-full px-4 py-2 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? '保存中...' : '保存して開始する'}

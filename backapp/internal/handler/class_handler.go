@@ -37,7 +37,9 @@ func (h *ClassHandler) GetAllClasses(c *gin.Context) {
 	}
 	fmt.Printf("activeEventID: %d\n", activeEventID)
 	if activeEventID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No active event found"})
+		// アクティブなイベントがない場合は空の配列を返す
+		// 初回ログイン時など、イベントがまだ設定されていない場合に対応
+		c.JSON(http.StatusOK, []*models.Class{})
 		return
 	}
 
