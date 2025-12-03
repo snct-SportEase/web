@@ -10,7 +10,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - --entrypoints.local3300.address=:3300
+      # - --entrypoints.local3300.address=:3300
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.myresolver.acme.email=${LETSENCRYPT_EMAIL}" # IMPORTANT: Change this in .env file!
@@ -18,8 +18,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080" # Traefik Dashboard
-      - "3300:3300" # Frontapp"
+      # - "8080:8080" # Traefik Dashboard
+      # - "3300:3300" # Frontapp"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - "./letsencrypt:/letsencrypt"
@@ -70,8 +70,8 @@ services:
        - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
        - "traefik.http.routers.backend-https.entrypoints=websecure"
        - "traefik.http.routers.backend-https.tls.certresolver=myresolver"
-       - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
-       - "traefik.http.routers.backend.entrypoints=local3300"
+       # - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
+       #- "traefik.http.routers.backend.entrypoints=local3300"
        - "traefik.http.services.backend.loadbalancer.server.port=8080"
 
   sportease-frontapp:
@@ -92,8 +92,8 @@ services:
       - "traefik.http.routers.frontend-http.entrypoints=web"
 
       # localhost:3300用
-      - "traefik.http.routers.frontend-localhost.rule=Host(`localhost`)"
-      - "traefik.http.routers.frontend-localhost.entrypoints=local3300"
+      # - "traefik.http.routers.frontend-localhost.rule=Host(`localhost`)"
+      # - "traefik.http.routers.frontend-localhost.entrypoints=local3300"
 
       # 2. HTTPからHTTPSへリダイレクトするミドルウェアを定義・適用
       - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
