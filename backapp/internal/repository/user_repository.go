@@ -59,7 +59,8 @@ func NewUserRepository(db *sql.DB) UserRepository {
 
 func (r *userRepository) GetRoleByEmail(email string) (string, error) {
 	var roleName string
-	err := r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? AND event_id IS NULL", email).Scan(&roleName)
+	// event_id IS NULL を優先し、なければ event_id が設定されているエントリも使用
+	err := r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? ORDER BY event_id IS NULL DESC LIMIT 1", email).Scan(&roleName)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", errors.New("email not in whitelist") // Not in whitelist, return error
@@ -238,8 +239,9 @@ func (r *userRepository) CreateUser(user *models.User) error {
 	}
 
 	// emailに基づいてwhitelisted_emailsからroleを取得
+	// event_id IS NULL を優先し、なければ event_id が設定されているエントリも使用
 	var roleName string
-	err = r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? AND event_id IS NULL", user.Email).Scan(&roleName)
+	err = r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? ORDER BY event_id IS NULL DESC LIMIT 1", user.Email).Scan(&roleName)
 	if err != nil {
 		// ホワイトリストにない場合はエラーを返す
 		if err == sql.ErrNoRows {
