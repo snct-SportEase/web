@@ -12,7 +12,9 @@
   const isAdmin = hasRole('admin');
   const isRoot = hasRole('root');
 
-  function closeSidebar() {
+  function closeSidebar(event) {
+    event.preventDefault();
+    event.stopPropagation();
     isSidebarOpen.set(false);
   }
 </script>
@@ -20,7 +22,13 @@
 <aside class="w-64 bg-gray-800 text-white flex flex-col transition-all duration-300" class:closed={!$isSidebarOpen}>
   <div class="h-16 flex items-center justify-between px-4">
     <a href="/dashboard" class="flex items-center"><span class="text-2xl font-bold">SportEase</span></a>
-    <button on:click={closeSidebar} class="p-2 rounded-md hover:bg-gray-700" aria-label="サイドバーを閉じる">
+    <button 
+      type="button" 
+      on:click={closeSidebar} 
+      class="flex items-center justify-center min-w-[48px] min-h-[48px] p-3 rounded-md hover:bg-gray-700 active:bg-gray-600 touch-manipulation transition-colors" 
+      aria-label="サイドバーを閉じる"
+      style="touch-action: manipulation;"
+    >
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
     </button>
   </div>
