@@ -12,8 +12,41 @@
 
   onMount(() => {
     if (browser && 'serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js');
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/service-worker.js');
+          
+          // Check for updates periodically (every hour)
+          setInterval(() => {
+            registration.update();
+          }, 60 * 60 * 1000);
+          
+          // Listen for service worker updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                // When the new service worker is activated, reload the page
+                if (newWorker.state === 'activated') {
+                  // Check if there's a controller change (new SW is controlling the page)
+                  if (navigator.serviceWorker.controller) {
+                    window.location.reload();
+                  }
+                }
+              });
+            }
+          });
+          
+          // Also check for updates when the page becomes visible again
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+              registration.update();
+            }
+          });
+        } catch (error) {
+          console.error('Service Worker registration failed:', error);
+        }
       });
     }
   });

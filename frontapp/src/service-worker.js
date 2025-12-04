@@ -15,7 +15,12 @@ self.addEventListener('install', (event) => {
 		await cache.addAll(ASSETS);
 	}
 
-	event.waitUntil(addFilesToCache());
+	// Skip waiting to activate the new service worker immediately
+	event.waitUntil(
+		addFilesToCache().then(() => {
+			return self.skipWaiting();
+		})
+	);
 });
 
 self.addEventListener('activate', (event) => {
@@ -26,7 +31,12 @@ self.addEventListener('activate', (event) => {
 		}
 	}
 
-	event.waitUntil(deleteOldCaches());
+	// Claim all clients to take control immediately
+	event.waitUntil(
+		deleteOldCaches().then(() => {
+			return self.clients.claim();
+		})
+	);
 });
 
 self.addEventListener('fetch', (event) => {
