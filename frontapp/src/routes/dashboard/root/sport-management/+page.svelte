@@ -1,5 +1,6 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
+    import { afterNavigate } from '$app/navigation';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { marked } from 'marked';
     import SafeHtml from '$lib/components/SafeHtml.svelte';
@@ -28,12 +29,24 @@
 
     $: usedLocations = eventSports ? eventSports.map(es => es.location).filter(loc => loc !== 'other') : [];
 
-    onMount(async () => {
+    let unsubscribe = null;
+
+    // データを初期化・再取得する関数
+    async function initializeData() {
         // 競技名解決のために、先に全競技マスタを読み込んでおく
         await fetchAllSports();
 
-        // Subscribe to the active event store
-        const unsubscribe = activeEvent.subscribe(value => {
+        // Initialize and fetch the active event data
+        await activeEvent.init();
+    }
+
+    // アクティブイベントのサブスクリプションを設定する関数
+    function setupSubscription() {
+        if (unsubscribe) {
+            unsubscribe(); // 既存のサブスクリプションをクリーンアップ
+        }
+
+        unsubscribe = activeEvent.subscribe(value => {
             currentActiveEvent = value;
             if (value) {
                 // アクティブイベントが変わったら、割り当て済み競技を再取得
@@ -42,11 +55,27 @@
                 eventSports = []; // クリア
             }
         });
+    }
 
-        // Initialize and fetch the active event data
-        await activeEvent.init();
+    onMount(async () => {
+        await initializeData();
+        setupSubscription();
+    });
 
-        return unsubscribe; // Cleanup subscription on destroy
+    // ページ遷移時にデータを再取得（このページに遷移した時のみ）
+    afterNavigate(async ({ to }) => {
+        // このページに遷移した時だけデータを再取得
+        if (to && to.url.pathname === '/dashboard/root/sport-management') {
+            await initializeData();
+            // サブスクリプションは既に設定されているので、再設定は不要
+            // ただし、currentActiveEventが更新されるので、eventSportsも自動的に更新される
+        }
+    });
+
+    onDestroy(() => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
     });
 
     // $: {
