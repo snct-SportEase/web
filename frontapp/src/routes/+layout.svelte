@@ -49,6 +49,65 @@
         }
       });
     }
+
+    // プルダウンリフレッシュ機能（モバイル用）
+    if (browser) {
+      let touchStartY = 0;
+      let touchCurrentY = 0;
+      let isPulling = false;
+      const PULL_THRESHOLD = 80; // リロードをトリガーする距離（ピクセル）
+
+      const handleTouchStart = (e) => {
+        // スクロール位置が最上部の場合のみ有効
+        if (window.scrollY === 0) {
+          touchStartY = e.touches[0].clientY;
+          isPulling = true;
+        }
+      };
+
+      const handleTouchMove = (e) => {
+        if (!isPulling) return;
+        
+        touchCurrentY = e.touches[0].clientY;
+        const pullDistance = touchCurrentY - touchStartY;
+
+        // 下方向へのスワイプのみ許可
+        if (pullDistance > 0 && window.scrollY === 0) {
+          // 視覚的フィードバック（オプション：必要に応じて実装）
+          // ここではデフォルトのブラウザ動作に任せる
+        } else {
+          isPulling = false;
+        }
+      };
+
+      const handleTouchEnd = (e) => {
+        if (!isPulling) return;
+
+        const pullDistance = touchCurrentY - touchStartY;
+        
+        // 一定距離以上下にスワイプした場合、リロード
+        if (pullDistance >= PULL_THRESHOLD && window.scrollY === 0) {
+          window.location.reload();
+        }
+
+        // リセット
+        isPulling = false;
+        touchStartY = 0;
+        touchCurrentY = 0;
+      };
+
+      // タッチイベントリスナーを追加
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+      document.addEventListener('touchmove', handleTouchMove, { passive: true });
+      document.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+      // クリーンアップ
+      return () => {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
   });
 
   // 通知の自動設定は無効化（ユーザーが明示的に有効化するまで待つ）
