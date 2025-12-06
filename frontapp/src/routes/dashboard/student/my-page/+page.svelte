@@ -187,10 +187,12 @@
 					<div class="grid grid-cols-1 gap-4">
 						<div class="rounded-xl bg-white/20 backdrop-blur-sm p-4 border border-white/30">
 							<p class="text-sm text-white/80 mb-1">{primaryRankLabel}</p>
-							<p class="text-4xl font-bold tracking-tight mb-1">{myClassScore.primaryRank}位</p>
+							<p class="text-4xl font-bold tracking-tight mb-1">
+								{myClassScore.primaryRank === null || myClassScore.primaryRank === undefined ? '未開始' : `${myClassScore.primaryRank}位`}
+							</p>
 							<p class="text-sm text-white/90">獲得 {myClassScore.primaryPoints} 点</p>
 						</div>
-						{#if myClassScore.secondaryRank}
+						{#if myClassScore.secondaryRank !== null && myClassScore.secondaryRank !== undefined}
 							<div class="rounded-xl bg-white/15 backdrop-blur-sm p-4 border border-white/20">
 								<p class="text-sm text-white/80 mb-1">{secondaryRankLabel}</p>
 								<p class="text-2xl font-semibold mb-1">{myClassScore.secondaryRank}位</p>

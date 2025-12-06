@@ -1,5 +1,6 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { beforeNavigate, afterNavigate } from '$app/navigation';
 	import QRCode from 'qrcode';
 	import { browser } from '$app/environment';
 
@@ -18,7 +19,16 @@
 	let error = null;
 	let activeEventId = null;
 
-	onMount(async () => {
+	// クリーンアップ関数
+	function cleanup() {
+		if (countdownInterval) {
+			clearInterval(countdownInterval);
+			countdownInterval = null;
+		}
+	}
+
+	// データを初期化・再取得する関数
+	async function initializeData() {
 		try {
 			// Get active event
 			const eventResponse = await fetch('/api/events/active');
@@ -51,18 +61,37 @@
 			console.error('Error loading teams:', err);
 			error = err.message || 'チーム情報の取得に失敗しました';
 		}
+	}
 
-		return () => {
-			if (countdownInterval) {
-				clearInterval(countdownInterval);
-			}
-		};
+	onMount(async () => {
+		await initializeData();
+	});
+
+	// ページ遷移前にクリーンアップ（他のページに遷移する時）
+	beforeNavigate(({ to, cancel }) => {
+		// このページから他のページに遷移する時はクリーンアップ
+		if (to && to.url.pathname !== '/dashboard/student/issueqr-code') {
+			cleanup();
+		}
+	});
+
+	// ページ遷移時にデータを再取得（このページに遷移した時のみ）
+	afterNavigate(async ({ to, from }) => {
+		// このページに遷移した時だけデータを再取得（他のページから遷移してきた場合のみ）
+		if (to && to.url.pathname === '/dashboard/student/issueqr-code' && 
+		    from && from.url.pathname !== '/dashboard/student/issueqr-code') {
+			await initializeData();
+		}
+	});
+
+	onDestroy(() => {
+		// クリーンアップ: インターバルを確実にクリア
+		cleanup();
 	});
 
 	function startCountdown(expiresAtTimestamp) {
-		if (countdownInterval) {
-			clearInterval(countdownInterval);
-		}
+		// 既存のインターバルをクリア
+		cleanup();
 
 		function updateCountdown() {
 			const now = Math.floor(Date.now() / 1000);
@@ -70,7 +99,7 @@
 
 			if (remaining <= 0) {
 				remainingTime = '00:00';
-				clearInterval(countdownInterval);
+				cleanup();
 				qrCodeImage = null;
 				return;
 			}
@@ -151,10 +180,7 @@
 	}
 
 	function resetQRCode() {
-		if (countdownInterval) {
-			clearInterval(countdownInterval);
-			countdownInterval = null;
-		}
+		cleanup();
 		qrCodeData = null;
 		qrCodeImage = null;
 		expiresAt = null;

@@ -120,6 +120,31 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 }
 
 func updateCurrentEventRanks(tx *sql.Tx, eventID int) error {
+	// Check if all classes have 0 points (competition not started)
+	var maxPoints int
+	err := tx.QueryRow(`
+		SELECT COALESCE(MAX(total_points_current_event), 0)
+		FROM class_scores
+		WHERE event_id = ?
+	`, eventID).Scan(&maxPoints)
+	if err != nil {
+		return fmt.Errorf("failed to check max points: %w", err)
+	}
+
+	if maxPoints == 0 {
+		// All classes have 0 points, set all ranks to 0
+		_, err = tx.Exec(`
+			UPDATE class_scores
+			SET rank_current_event = 0
+			WHERE event_id = ?
+		`, eventID)
+		if err != nil {
+			return fmt.Errorf("failed to reset current event ranks: %w", err)
+		}
+		return nil
+	}
+
+	// Normal ranking
 	const query = `
 		UPDATE class_scores cs
 		JOIN (
@@ -141,6 +166,31 @@ func updateCurrentEventRanks(tx *sql.Tx, eventID int) error {
 }
 
 func updateOverallRanks(tx *sql.Tx, eventID int) error {
+	// Check if all classes have 0 points (competition not started)
+	var maxPoints int
+	err := tx.QueryRow(`
+		SELECT COALESCE(MAX(total_points_overall), 0)
+		FROM class_scores
+		WHERE event_id = ?
+	`, eventID).Scan(&maxPoints)
+	if err != nil {
+		return fmt.Errorf("failed to check max points: %w", err)
+	}
+
+	if maxPoints == 0 {
+		// All classes have 0 points, set all ranks to 0
+		_, err = tx.Exec(`
+			UPDATE class_scores
+			SET rank_overall = 0
+			WHERE event_id = ?
+		`, eventID)
+		if err != nil {
+			return fmt.Errorf("failed to reset overall ranks: %w", err)
+		}
+		return nil
+	}
+
+	// Normal ranking
 	const query = `
 		UPDATE class_scores cs
 		JOIN (

@@ -71,16 +71,31 @@ DELIMITER ;
 DELIMITER //
 CREATE PROCEDURE update_class_ranks(p_event_id INT)
 BEGIN
-    UPDATE class_scores AS cs
-    JOIN (
-        SELECT
-            class_id,
-            RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
-        FROM class_scores
-        WHERE event_id = p_event_id
-    ) AS ranked_data ON cs.class_id = ranked_data.class_id
-    SET cs.rank_current_event = ranked_data.new_rank
-    WHERE cs.event_id = p_event_id;
+    DECLARE max_points INT DEFAULT 0;
+    
+    -- 全クラスの最大得点を取得
+    SELECT COALESCE(MAX(total_points_current_event), 0) INTO max_points
+    FROM class_scores
+    WHERE event_id = p_event_id;
+    
+    -- 全クラスの得点が0の場合（競技未開始）、順位を0に設定
+    IF max_points = 0 THEN
+        UPDATE class_scores
+        SET rank_current_event = 0
+        WHERE event_id = p_event_id;
+    ELSE
+        -- 通常の順位付け
+        UPDATE class_scores AS cs
+        JOIN (
+            SELECT
+                class_id,
+                RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
+            FROM class_scores
+            WHERE event_id = p_event_id
+        ) AS ranked_data ON cs.class_id = ranked_data.class_id
+        SET cs.rank_current_event = ranked_data.new_rank
+        WHERE cs.event_id = p_event_id;
+    END IF;
 END //
 DELIMITER ;
 
@@ -89,16 +104,31 @@ DELIMITER ;
 DELIMITER //
 CREATE PROCEDURE update_class_overall_ranks(p_event_id INT)
 BEGIN
-    UPDATE class_scores AS cs
-    JOIN (
-        SELECT
-            class_id,
-            RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
-        FROM class_scores
-        WHERE event_id = p_event_id
-    ) AS ranked_data ON cs.class_id = ranked_data.class_id
-    SET cs.rank_overall = ranked_data.new_rank
-    WHERE cs.event_id = p_event_id;
+    DECLARE max_points INT DEFAULT 0;
+    
+    -- 全クラスの最大得点を取得
+    SELECT COALESCE(MAX(total_points_overall), 0) INTO max_points
+    FROM class_scores
+    WHERE event_id = p_event_id;
+    
+    -- 全クラスの得点が0の場合（競技未開始）、順位を0に設定
+    IF max_points = 0 THEN
+        UPDATE class_scores
+        SET rank_overall = 0
+        WHERE event_id = p_event_id;
+    ELSE
+        -- 通常の順位付け
+        UPDATE class_scores AS cs
+        JOIN (
+            SELECT
+                class_id,
+                RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
+            FROM class_scores
+            WHERE event_id = p_event_id
+        ) AS ranked_data ON cs.class_id = ranked_data.class_id
+        SET cs.rank_overall = ranked_data.new_rank
+        WHERE cs.event_id = p_event_id;
+    END IF;
 END //
 DELIMITER ;
 

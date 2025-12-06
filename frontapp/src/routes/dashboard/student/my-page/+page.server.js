@@ -154,10 +154,12 @@ export const load = async ({ fetch, locals, request }) => {
 		}
 
 		const season = myClassScore.season;
-		const primaryRank = season === 'spring' ? myClassScore.rank_current_event : myClassScore.rank_overall;
+		const primaryRankRaw = season === 'spring' ? myClassScore.rank_current_event : myClassScore.rank_overall;
+		const primaryRank = (primaryRankRaw === 0 || primaryRankRaw === null || primaryRankRaw === undefined) ? null : primaryRankRaw;
 		const primaryPoints =
 			season === 'spring' ? myClassScore.total_points_current_event : myClassScore.total_points_overall;
-		const secondaryRank = season === 'spring' ? myClassScore.rank_overall : myClassScore.rank_current_event;
+		const secondaryRankRaw = season === 'spring' ? myClassScore.rank_overall : myClassScore.rank_current_event;
+		const secondaryRank = (secondaryRankRaw === 0 || secondaryRankRaw === null || secondaryRankRaw === undefined) ? null : secondaryRankRaw;
 		const secondaryPoints =
 			season === 'spring' ? myClassScore.total_points_overall : myClassScore.total_points_current_event;
 

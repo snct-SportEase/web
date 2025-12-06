@@ -45,14 +45,21 @@
 	});
 
 	// Sort scores by rank (1st, 2nd, 3rd, etc.)
+	// Rank 0 (未開始) should be sorted last
 	$: sortedScores = [...scores].sort((a, b) => {
 		const rankA = season === 'spring' ? a.rank_current_event : a.rank_overall;
 		const rankB = season === 'spring' ? b.rank_current_event : b.rank_overall;
-		return rankA - rankB;
+		// If rank is 0, null, or undefined, treat it as Infinity for sorting (put it last)
+		const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
+		const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
+		return normalizedRankA - normalizedRankB;
 	});
 
 	// Helper function to get rank style classes
 	function getRankStyle(rank) {
+		if (rank === 0 || rank === null || rank === undefined) {
+			return 'bg-gray-100 border-2 border-gray-300 shadow';
+		}
 		if (rank === 1) {
 			return 'rank-first relative overflow-hidden scale-105';
 		} else if (rank === 2) {
@@ -65,6 +72,7 @@
 
 	// Helper function to get rank badge text
 	function getRankBadge(rank) {
+		if (rank === 0 || rank === null || rank === undefined) return '未開始';
 		if (rank === 1) return '🥇';
 		if (rank === 2) return '🥈';
 		if (rank === 3) return '🥉';
@@ -170,12 +178,13 @@
 		{#each sortedScores as score}
 			{@const rank = season === 'spring' ? score.rank_current_event : score.rank_overall}
 			{@const totalPoints = season === 'spring' ? score.total_points_current_event : score.total_points_overall}
+			{@const isNotStarted = rank === 0 || rank === null || rank === undefined}
 			<div class="transition-all duration-300 rounded-xl p-6 mb-6 hover:-translate-y-1 hover:shadow-xl {getRankStyle(rank)}">
 				{#if rank === 1}
 					<span class="absolute top-2.5 right-2.5 text-2xl pointer-events-none animate-pulse">✨</span>
 				{/if}
 				<div class="text-3xl font-bold text-center mb-4 drop-shadow-md">{getRankBadge(rank)}</div>
-				<div class="text-2xl font-bold text-center mb-4 {rank === 1 ? 'text-amber-900 text-[1.75rem] drop-shadow-[2px_2px_4px_rgba(0,0,0,0.3),0_0_10px_rgba(255,255,255,0.5)]' : rank === 2 ? 'text-gray-700 drop-shadow-sm' : rank === 3 ? 'text-amber-900 drop-shadow-sm' : 'text-gray-800 drop-shadow-sm'}">
+				<div class="text-2xl font-bold text-center mb-4 {rank === 1 ? 'text-amber-900 text-[1.75rem] drop-shadow-[2px_2px_4px_rgba(0,0,0,0.3),0_0_10px_rgba(255,255,255,0.5)]' : rank === 2 ? 'text-gray-700 drop-shadow-sm' : rank === 3 ? 'text-amber-900 drop-shadow-sm' : isNotStarted ? 'text-gray-600 drop-shadow-sm' : 'text-gray-800 drop-shadow-sm'}">
 					{score.class_name}
 				</div>
 				
