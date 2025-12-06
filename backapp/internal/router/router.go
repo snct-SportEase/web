@@ -121,6 +121,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			student.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
 			student.GET("/class-progress", classHandler.GetClassProgress)
 
+			studentEvents := student.Group("/events")
+			{
+				studentEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
+			}
+
 			studentNotificationRequests := student.Group("/notification-requests")
 			{
 				studentNotificationRequests.GET("", notificationRequestHandler.ListStudentRequests)

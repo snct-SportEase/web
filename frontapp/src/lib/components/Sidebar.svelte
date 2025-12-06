@@ -138,6 +138,9 @@
         <a href="/dashboard/student/sport-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           競技一覧・詳細閲覧
         </a>
+        <a href="/dashboard/student/tournament" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
+          トーナメント
+        </a>
         <a href="/dashboard/student/issueqr-code" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700">
           QRコード発行
         </a>
