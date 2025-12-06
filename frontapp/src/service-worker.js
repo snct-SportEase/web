@@ -107,7 +107,13 @@ self.addEventListener('push', (event) => {
 	const title = payload.title || '新しい通知';
 	const options = {
 		body: payload.body || '',
-		data: payload.data || {}
+		data: payload.data || {},
+		tag: 'sportease-notification',
+		badge: '/icon-96.png',
+		icon: '/icon-192.png',
+		requireInteraction: false,
+		silent: false,
+		renotify: true
 	};
 
 	event.waitUntil(self.registration.showNotification(title, options));
