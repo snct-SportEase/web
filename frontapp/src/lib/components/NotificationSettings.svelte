@@ -1,6 +1,7 @@
 <script>
   import { browser } from '$app/environment';
   import { ensurePushSubscription, userHasPushEligibleRole } from '$lib/utils/push.js';
+  import { env as publicEnv } from '$env/dynamic/public';
   import { onMount } from 'svelte';
 
   export let user;
@@ -15,6 +16,7 @@
   let showDebugDetails = false;
 
   $: canEnableNotifications = userHasPushEligibleRole(user);
+  $: vapidKeySet = browser ? (publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '') !== '' : false;
 
   onMount(() => {
     if (browser) {
@@ -90,7 +92,9 @@
     errorMessage = '';
 
     try {
+      console.log('[notification] 通知の有効化を開始します');
       const result = await ensurePushSubscription();
+      console.log('[notification] 通知の有効化結果:', result);
       
       if (result.status === 'subscribed') {
         isSubscribed = true;
@@ -104,9 +108,10 @@
         } else if (result.reason === 'unsupported') {
           errorMessage = 'このブラウザは通知をサポートしていません。';
         } else if (result.reason === 'missing-vapid-key') {
-          errorMessage = '通知設定が不完全です。管理者にお問い合わせください。';
+          errorMessage = 'VAPID公開鍵が設定されていません。本番環境の環境変数 PUBLIC_WEBPUSH_PUBLIC_KEY を設定してください。';
+          console.error('[notification] VAPID公開鍵が設定されていません。環境変数を確認してください。');
         } else {
-          errorMessage = '通知の有効化に失敗しました。';
+          errorMessage = `通知の有効化に失敗しました。理由: ${result.reason || '不明'}`;
         }
       } else {
         errorMessage = result.reason || '通知の有効化に失敗しました。';
@@ -255,6 +260,13 @@
   {/if}
 
   {#if canEnableNotifications && isSupported}
+    {#if !vapidKeySet}
+      <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p class="font-semibold">VAPID公開鍵が設定されていません</p>
+        <p class="mt-1">本番環境の環境変数 <code class="bg-red-100 px-1 rounded">PUBLIC_WEBPUSH_PUBLIC_KEY</code> を設定してください。</p>
+        <p class="mt-1 text-xs">現在の値: {(publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY) || '(未設定)'}</p>
+      </div>
+    {/if}
     <div class="flex items-center justify-between">
       <div class="flex-1">
         {#if isSubscribed}
@@ -285,13 +297,15 @@
           <button
             type="button"
             on:click={enableNotifications}
-            disabled={isLoading || permissionStatus === 'denied'}
+            disabled={isLoading || permissionStatus === 'denied' || !vapidKeySet}
             class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {#if isLoading}
               処理中...
             {:else if permissionStatus === 'denied'}
               通知が拒否されています
+            {:else if !vapidKeySet}
+              VAPIDキー未設定
             {:else}
               通知を有効にする
             {/if}
@@ -321,7 +335,13 @@
           </span>
         </div>
         <div class="flex items-center">
-          <span class="text-gray-600 w-32">VAPIDキー:</span>
+          <span class="text-gray-600 w-32">VAPIDキー(フロント):</span>
+          <span class="font-medium {vapidKeySet ? 'text-green-600' : 'text-red-600'}">
+            {vapidKeySet ? '設定済み' : '未設定'}
+          </span>
+        </div>
+        <div class="flex items-center">
+          <span class="text-gray-600 w-32">VAPIDキー(バック):</span>
           <span class="font-medium {debugInfo.vapid_key_configured ? 'text-green-600' : 'text-red-600'}">
             {debugInfo.vapid_key_configured ? '設定済み' : '未設定'}
           </span>

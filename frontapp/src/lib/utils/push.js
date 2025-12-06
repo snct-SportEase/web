@@ -17,7 +17,8 @@ export async function ensurePushSubscription() {
 		return { status: 'skipped', reason: 'not-browser' };
 	}
 
-	const vapidKey = publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? '';
+	// PUBLIC_WEBPUSH_PUBLIC_KEY または PUBLIC_WEBPUSH_KEY のどちらかをサポート
+	const vapidKey = publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '';
 
 	if (!vapidKey) {
 		return { status: 'skipped', reason: 'missing-vapid-key' };
@@ -62,6 +63,8 @@ async function setupSubscription(vapidKey) {
 		}
 
 		const body = JSON.stringify(subscription.toJSON());
+		console.log('[push] 購読情報をサーバーに送信します:', subscription.endpoint);
+		
 		const response = await fetch('/api/notifications/subscription', {
 			method: 'POST',
 			headers: {
@@ -73,9 +76,12 @@ async function setupSubscription(vapidKey) {
 
 		if (!response.ok) {
 			const text = await response.text();
+			console.error('[push] 購読情報の保存に失敗しました:', response.status, text);
 			throw new Error(`Failed to register push subscription: ${response.status} ${text}`);
 		}
 
+		const result = await response.json();
+		console.log('[push] 購読情報の保存に成功しました:', result);
 		return { status: 'subscribed' };
 	} catch (error) {
 		console.error('[push] push subscription failed', error);
