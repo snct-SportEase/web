@@ -139,6 +139,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		{
 			notifications.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
 			notifications.GET("", notificationHandler.ListNotifications)
+			notifications.GET("/subscription", notificationHandler.GetSubscription)
 			notifications.POST("/subscription", notificationHandler.SaveSubscription)
 			notifications.DELETE("/subscription", notificationHandler.DeleteSubscription)
 		}

@@ -238,6 +238,38 @@ func (h *NotificationHandler) DeleteSubscription(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "購読情報を削除しました"})
 }
 
+func (h *NotificationHandler) GetSubscription(c *gin.Context) {
+	userValue, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できませんでした"})
+		return
+	}
+
+	user, ok := userValue.(*models.User)
+	if !ok || user == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザー情報の解析に失敗しました"})
+		return
+	}
+
+	subs, err := h.NotificationRepo.GetPushSubscriptionsByUserID(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読情報の取得に失敗しました"})
+		return
+	}
+
+	// エンドポイントのみを返す（セキュリティのため）
+	endpoints := make([]string, 0, len(subs))
+	for _, sub := range subs {
+		endpoints = append(endpoints, sub.Endpoint)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subscribed": len(subs) > 0,
+		"endpoints":  endpoints,
+		"count":      len(subs),
+	})
+}
+
 func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body string, targetRoles []string) {
 	if h.VAPIDPrivateKey == "" || h.VAPIDPublicKey == "" {
 		log.Println("[notification] VAPIDキーが設定されていないためPush通知をスキップします")

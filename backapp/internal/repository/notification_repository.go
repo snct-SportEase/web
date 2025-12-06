@@ -13,6 +13,7 @@ type NotificationRepository interface {
 	GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error)
 	GetUserIDsByRoles(roleNames []string) ([]string, error)
 	GetPushSubscriptionsByUserIDs(userIDs []string) ([]models.PushSubscription, error)
+	GetPushSubscriptionsByUserID(userID string) ([]models.PushSubscription, error)
 	UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error
 	DeletePushSubscription(userID, endpoint string) error
 }
@@ -231,6 +232,31 @@ func (r *notificationRepository) GetPushSubscriptionsByUserIDs(userIDs []string)
 	return subs, nil
 }
 
+func (r *notificationRepository) GetPushSubscriptionsByUserID(userID string) ([]models.PushSubscription, error) {
+	query := `
+		SELECT id, user_id, endpoint, auth_key, p256dh_key, created_at
+		FROM push_subscriptions
+		WHERE user_id = ?
+	`
+
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []models.PushSubscription
+	for rows.Next() {
+		var sub models.PushSubscription
+		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.Endpoint, &sub.AuthKey, &sub.P256dhKey, &sub.CreatedAt); err != nil {
+			return nil, err
+		}
+		subs = append(subs, sub)
+	}
+
+	return subs, nil
+}
+
 func (r *notificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error {
 	query := `
 		INSERT INTO push_subscriptions (user_id, endpoint, auth_key, p256dh_key)
@@ -247,4 +273,3 @@ func (r *notificationRepository) DeletePushSubscription(userID, endpoint string)
 	_, err := r.db.Exec("DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?", userID, endpoint)
 	return err
 }
-

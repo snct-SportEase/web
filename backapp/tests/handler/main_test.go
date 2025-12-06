@@ -486,6 +486,14 @@ func (m *MockNotificationRepository) GetPushSubscriptionsByUserIDs(userIDs []str
 	return args.Get(0).([]models.PushSubscription), args.Error(1)
 }
 
+func (m *MockNotificationRepository) GetPushSubscriptionsByUserID(userID string) ([]models.PushSubscription, error) {
+	args := m.Called(userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.PushSubscription), args.Error(1)
+}
+
 func (m *MockNotificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error {
 	args := m.Called(userID, endpoint, authKey, p256dhKey)
 	return args.Error(0)

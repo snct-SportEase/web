@@ -51,13 +51,14 @@
     }
   });
 
-  $: if (browser && data?.user && !pushSetupTriggered && userHasPushEligibleRole(data.user)) {
-    pushSetupTriggered = true;
-    ensurePushSubscription().catch((error) => {
-      console.error('[push] failed to ensure subscription', error);
-      pushSetupTriggered = false;
-    });
-  }
+  // 通知の自動設定は無効化（ユーザーが明示的に有効化するまで待つ）
+  // $: if (browser && data?.user && !pushSetupTriggered && userHasPushEligibleRole(data.user)) {
+  //   pushSetupTriggered = true;
+  //   ensurePushSubscription().catch((error) => {
+  //     console.error('[push] failed to ensure subscription', error);
+  //     pushSetupTriggered = false;
+  //   });
+  // }
 
   function openSidebar() {
     isSidebarOpen.set(true);
