@@ -5,6 +5,7 @@ import (
 	"backapp/internal/repository"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"sort"
@@ -324,11 +325,17 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		})
 
 		if err != nil {
-			log.Printf("[notification] Push送信に失敗しました: %v\n", err)
+			log.Printf("[notification] Push送信に失敗しました: endpoint=%s, error=%v\n", sub.Endpoint, err)
 			continue
 		}
 
 		if resp != nil {
+			if resp.StatusCode >= 400 {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				log.Printf("[notification] Push送信が失敗しました: endpoint=%s, status=%d, body=%s\n", sub.Endpoint, resp.StatusCode, string(bodyBytes))
+			} else {
+				log.Printf("[notification] Push送信成功: endpoint=%s, status=%d\n", sub.Endpoint, resp.StatusCode)
+			}
 			resp.Body.Close()
 		}
 	}

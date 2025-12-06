@@ -182,6 +182,24 @@
     }
     return 'text-gray-600';
   }
+
+  // デバッグ情報を表示（開発環境のみ）
+  function showDebugInfo() {
+    if (!browser) return '';
+    const debug = {
+      isHTTPS: window.location.protocol === 'https:',
+      origin: window.location.origin,
+      notificationSupport: 'Notification' in window,
+      serviceWorkerSupport: 'serviceWorker' in navigator,
+      pushManagerSupport: 'PushManager' in window,
+      permission: Notification.permission,
+      isSupported: isSupported,
+      isSubscribed: isSubscribed,
+      subscriptionCount: subscriptionCount
+    };
+    console.log('[Notification Debug]', debug);
+    return JSON.stringify(debug, null, 2);
+  }
 </script>
 
 <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -258,6 +276,15 @@
         {/if}
       </div>
     </div>
+  {/if}
+
+  {#if browser && import.meta.env.DEV}
+    <details class="mt-4">
+      <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
+        デバッグ情報を表示
+      </summary>
+      <pre class="mt-2 rounded bg-gray-100 p-3 text-xs overflow-auto">{showDebugInfo()}</pre>
+    </details>
   {/if}
 </div>
 
