@@ -123,7 +123,7 @@
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  {#if !$isSidebarOpen || !isMobile}
+  {#if !$isSidebarOpen || (browser && !isMobile)}
     <header class="bg-white shadow-sm p-4 sticky top-0 z-50">
       <div class="flex justify-between items-center">
         <div class="flex items-center">

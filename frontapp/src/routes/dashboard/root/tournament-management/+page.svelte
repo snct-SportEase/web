@@ -1,9 +1,11 @@
 <script>
     import { onMount } from 'svelte';
-    import { createBracket } from 'bracketry';
+    import { browser } from '$app/environment';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
     import { dndzone } from 'svelte-dnd-action';
+    
+    let createBracket = null;
 
     let isGenerating = false;
     let isSaving = false;
@@ -15,6 +17,10 @@
     const flipDurationMs = 300;
 
     onMount(async () => {
+        if (browser) {
+            const bracketryModule = await import('bracketry');
+            createBracket = bracketryModule.createBracket;
+        }
         await activeEvent.init();
         const currentEvent = get(activeEvent);
         if (currentEvent) {
@@ -23,6 +29,7 @@
     });
 
     async function previewAllTournaments() {
+        if (!browser) return;
         const currentEvent = get(activeEvent);
         if (!currentEvent) {
             alert('アクティブな大会が設定されていません。');
@@ -98,6 +105,7 @@
     }
 
     async function fetchTournamentsForActiveEvent() {
+        if (!browser) return;
         const currentEvent = get(activeEvent);
         if (!currentEvent) return;
 
@@ -131,6 +139,7 @@
     }
 
     function renderAllBrackets() {
+        if (!browser) return;
         setTimeout(() => {
             allTournaments.forEach(tournament => {
                 renderBracket(tournament);
@@ -139,6 +148,7 @@
     }
 
     function renderBracket(tournament) {
+        if (!browser || !createBracket) return;
         const wrapper = document.getElementById(`bracket-${tournament.id}`);
         if (wrapper && tournament.data) {
             wrapper.innerHTML = '';
@@ -229,6 +239,7 @@
     }
 
     function saveTeamOrder(tournament) {
+        if (!browser) return;
         const newTeamNames = teamsForEditing.map(t => t.name);
         const newBracketData = updateBracketDataWithNewTeams(tournament.data, newTeamNames);
 
