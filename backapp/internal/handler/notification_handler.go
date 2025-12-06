@@ -195,11 +195,15 @@ func (h *NotificationHandler) SaveSubscription(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[notification] 購読情報の保存を試行: userID=%s, endpoint=%s\n", user.ID, req.Endpoint)
+
 	if err := h.NotificationRepo.UpsertPushSubscription(user.ID, req.Endpoint, req.Keys.Auth, req.Keys.P256dh); err != nil {
+		log.Printf("[notification] 購読情報の保存に失敗しました: userID=%s, endpoint=%s, error=%v\n", user.ID, req.Endpoint, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読情報の保存に失敗しました"})
 		return
 	}
 
+	log.Printf("[notification] 購読情報の保存に成功しました: userID=%s, endpoint=%s\n", user.ID, req.Endpoint)
 	c.JSON(http.StatusCreated, gin.H{"message": "購読情報を保存しました"})
 }
 
@@ -271,7 +275,50 @@ func (h *NotificationHandler) GetSubscription(c *gin.Context) {
 	})
 }
 
+func (h *NotificationHandler) GetNotificationDebugInfo(c *gin.Context) {
+	userValue, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できませんでした"})
+		return
+	}
+
+	user, ok := userValue.(*models.User)
+	if !ok || user == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザー情報の解析に失敗しました"})
+		return
+	}
+
+	subs, err := h.NotificationRepo.GetPushSubscriptionsByUserID(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読情報の取得に失敗しました"})
+		return
+	}
+
+	// VAPIDキーの設定状態（セキュリティのため、公開鍵のみ表示）
+	vapidKeyConfigured := h.VAPIDPublicKey != "" && h.VAPIDPrivateKey != ""
+
+	debugInfo := gin.H{
+		"user_id":              user.ID,
+		"subscription_count":   len(subs),
+		"vapid_key_configured": vapidKeyConfigured,
+		"vapid_public_key_set": h.VAPIDPublicKey != "",
+		"subscriptions":        make([]gin.H, 0),
+	}
+
+	for _, sub := range subs {
+		debugInfo["subscriptions"] = append(debugInfo["subscriptions"].([]gin.H), gin.H{
+			"id":         sub.ID,
+			"endpoint":   sub.Endpoint,
+			"created_at": sub.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, debugInfo)
+}
+
 func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body string, targetRoles []string) {
+	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, targetRoles=%v\n", notificationID, title, targetRoles)
+
 	if h.VAPIDPrivateKey == "" || h.VAPIDPublicKey == "" {
 		log.Println("[notification] VAPIDキーが設定されていないためPush通知をスキップします")
 		return
@@ -282,7 +329,9 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		log.Printf("[notification] ユーザー抽出に失敗しました: %v\n", err)
 		return
 	}
+	log.Printf("[notification] 対象ユーザー数: %d, userIDs=%v\n", len(userIDs), userIDs)
 	if len(userIDs) == 0 {
+		log.Println("[notification] 対象ユーザーが0人のためPush通知をスキップします")
 		return
 	}
 
@@ -292,7 +341,9 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		return
 	}
 
+	log.Printf("[notification] 購読情報数: %d\n", len(subs))
 	if len(subs) == 0 {
+		log.Println("[notification] 購読情報が0件のためPush通知をスキップします")
 		return
 	}
 
@@ -308,7 +359,8 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		return
 	}
 
-	for _, sub := range subs {
+	log.Printf("[notification] %d件の購読に対してPush通知を送信します\n", len(subs))
+	for i, sub := range subs {
 		subscription := &webpush.Subscription{
 			Endpoint: sub.Endpoint,
 			Keys: webpush.Keys{
@@ -316,6 +368,8 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 				P256dh: sub.P256dhKey,
 			},
 		}
+
+		log.Printf("[notification] [%d/%d] Push送信試行: userID=%s, endpoint=%s\n", i+1, len(subs), sub.UserID, sub.Endpoint)
 
 		resp, err := webpush.SendNotification(payload, subscription, &webpush.Options{
 			Subscriber:      "mailto:notifications@sportease.local",
@@ -325,20 +379,21 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		})
 
 		if err != nil {
-			log.Printf("[notification] Push送信に失敗しました: endpoint=%s, error=%v\n", sub.Endpoint, err)
+			log.Printf("[notification] [%d/%d] Push送信に失敗しました: userID=%s, endpoint=%s, error=%v\n", i+1, len(subs), sub.UserID, sub.Endpoint, err)
 			continue
 		}
 
 		if resp != nil {
 			if resp.StatusCode >= 400 {
 				bodyBytes, _ := io.ReadAll(resp.Body)
-				log.Printf("[notification] Push送信が失敗しました: endpoint=%s, status=%d, body=%s\n", sub.Endpoint, resp.StatusCode, string(bodyBytes))
+				log.Printf("[notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode, string(bodyBytes))
 			} else {
-				log.Printf("[notification] Push送信成功: endpoint=%s, status=%d\n", sub.Endpoint, resp.StatusCode)
+				log.Printf("[notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode)
 			}
 			resp.Body.Close()
 		}
 	}
+	log.Printf("[notification] 通知送信完了: notificationID=%d\n", notificationID)
 }
 
 func normalizeTargetRoles(requested []string, available []models.Role) ([]string, error) {

@@ -45,6 +45,24 @@
 
 ## 診断手順
 
+### ステップ0: バックエンドのログを確認（最重要）
+通知送信時に以下のログが出力されます。**本番環境のバックエンドログを確認してください**：
+
+```
+[notification] 通知送信開始: notificationID=1, title=..., targetRoles=[...]
+[notification] 対象ユーザー数: X, userIDs=[...]
+[notification] 購読情報数: X
+[notification] X件の購読に対してPush通知を送信します
+[notification] [1/X] Push送信試行: userID=..., endpoint=...
+[notification] [1/X] Push送信成功: userID=..., endpoint=..., status=201
+```
+
+**よくある問題**：
+- `VAPIDキーが設定されていないためPush通知をスキップします` → 環境変数を確認
+- `対象ユーザーが0人のためPush通知をスキップします` → ロールの設定を確認
+- `購読情報が0件のためPush通知をスキップします` → ユーザーが通知を有効化しているか確認
+- `Push送信に失敗しました` → エラーメッセージを確認
+
 ### ステップ1: ブラウザのコンソールで確認
 ```javascript
 // ブラウザの開発者ツールのコンソールで実行
@@ -91,6 +109,38 @@ SELECT * FROM notifications ORDER BY created_at DESC LIMIT 10;
 - `/api/notifications/subscription` のPOSTリクエストが成功しているか
 - レスポンスのステータスコードが201か確認
 
+### ステップ6: 診断エンドポイントで確認
+以下のエンドポイントで詳細な診断情報を取得できます：
+
+```bash
+# ブラウザのコンソールで実行
+fetch('/api/notifications/debug', { credentials: 'include' })
+  .then(r => r.json())
+  .then(console.log);
+```
+
+レスポンス例：
+```json
+{
+  "user_id": "user-123",
+  "subscription_count": 2,
+  "vapid_key_configured": true,
+  "vapid_public_key_set": true,
+  "subscriptions": [
+    {
+      "id": 1,
+      "endpoint": "https://fcm.googleapis.com/...",
+      "created_at": "2025-12-06T..."
+    }
+  ]
+}
+```
+
+**確認ポイント**：
+- `subscription_count` が0より大きいか（通知を有効化しているか）
+- `vapid_key_configured` が `true` か（VAPIDキーが設定されているか）
+- `subscriptions` にエンドポイントが含まれているか
+
 ## よくある問題と解決方法
 
 ### 問題1: VAPIDキーが設定されていない
@@ -118,6 +168,21 @@ SELECT * FROM notifications ORDER BY created_at DESC LIMIT 10;
 - データベースに購読情報が保存されているか確認
 - `/api/notifications/subscription` のPOSTリクエストが成功しているか確認
 - バックエンドのログでエラーがないか確認
+- 診断エンドポイント `/api/notifications/debug` で購読情報を確認
+
+### 問題6: 対象ユーザーが0人
+**症状**: バックエンドログに「対象ユーザーが0人のためPush通知をスキップします」
+**解決方法**: 
+- 通知の送信先ロールが正しく設定されているか確認
+- ユーザーに該当するロールが割り当てられているか確認
+- ロール名の大文字小文字が一致しているか確認
+
+### 問題7: 購読情報が0件
+**症状**: バックエンドログに「購読情報が0件のためPush通知をスキップします」
+**解決方法**: 
+- ユーザーが通知を有効化しているか確認
+- 通知設定ページで「通知を有効にする」ボタンをクリックしているか確認
+- データベースの `push_subscriptions` テーブルにレコードがあるか確認
 
 ### 問題5: 通知許可が拒否されている
 **症状**: ブラウザの通知許可が「拒否」になっている

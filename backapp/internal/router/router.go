@@ -142,6 +142,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			notifications.GET("/subscription", notificationHandler.GetSubscription)
 			notifications.POST("/subscription", notificationHandler.SaveSubscription)
 			notifications.DELETE("/subscription", notificationHandler.DeleteSubscription)
+			notifications.GET("/debug", notificationHandler.GetNotificationDebugInfo)
 		}
 
 		admin := api.Group("/admin")

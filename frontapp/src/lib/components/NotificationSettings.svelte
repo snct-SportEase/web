@@ -11,6 +11,8 @@
   let isSupported = false;
   let errorMessage = '';
   let subscriptionCount = 0;
+  let debugInfo = null;
+  let showDebugDetails = false;
 
   $: canEnableNotifications = userHasPushEligibleRole(user);
 
@@ -19,6 +21,7 @@
       checkNotificationSupport();
       checkPermissionStatus();
       loadSubscriptionStatus();
+      loadDebugInfo();
     }
   });
 
@@ -54,6 +57,24 @@
     }
   }
 
+  async function loadDebugInfo() {
+    if (!browser || !canEnableNotifications) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/notifications/debug', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        debugInfo = await response.json();
+      }
+    } catch (error) {
+      console.error('[notification] Failed to load debug info:', error);
+    }
+  }
+
   async function enableNotifications() {
     if (!browser || !isSupported) {
       errorMessage = 'このブラウザは通知をサポートしていません。';
@@ -74,6 +95,7 @@
       if (result.status === 'subscribed') {
         isSubscribed = true;
         await loadSubscriptionStatus();
+        await loadDebugInfo();
         errorMessage = '';
       } else if (result.status === 'skipped') {
         if (result.reason === 'permission-denied') {
@@ -147,6 +169,7 @@
 
         isSubscribed = false;
         subscriptionCount = 0;
+        await loadDebugInfo();
         errorMessage = '';
       }
     } catch (error) {
@@ -278,10 +301,55 @@
     </div>
   {/if}
 
+  {#if browser && debugInfo}
+    <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h4 class="text-sm font-semibold text-gray-700">診断情報</h4>
+        <button
+          type="button"
+          on:click={() => showDebugDetails = !showDebugDetails}
+          class="text-sm text-indigo-600 hover:text-indigo-700"
+        >
+          {showDebugDetails ? '非表示' : '詳細を表示'}
+        </button>
+      </div>
+      <div class="space-y-1 text-sm">
+        <div class="flex items-center">
+          <span class="text-gray-600 w-32">購読数:</span>
+          <span class="font-medium {debugInfo.subscription_count > 0 ? 'text-green-600' : 'text-red-600'}">
+            {debugInfo.subscription_count}件
+          </span>
+        </div>
+        <div class="flex items-center">
+          <span class="text-gray-600 w-32">VAPIDキー:</span>
+          <span class="font-medium {debugInfo.vapid_key_configured ? 'text-green-600' : 'text-red-600'}">
+            {debugInfo.vapid_key_configured ? '設定済み' : '未設定'}
+          </span>
+        </div>
+        {#if showDebugDetails}
+          <div class="mt-3 pt-3 border-t border-gray-200">
+            <p class="text-xs text-gray-500 mb-2">購読詳細:</p>
+            {#if debugInfo.subscriptions && debugInfo.subscriptions.length > 0}
+              <ul class="space-y-1">
+                {#each debugInfo.subscriptions as sub}
+                  <li class="text-xs text-gray-600">
+                    <span class="font-medium">ID {sub.id}:</span> {sub.endpoint.substring(0, 50)}...
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <p class="text-xs text-gray-500">購読情報がありません</p>
+            {/if}
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
   {#if browser && import.meta.env.DEV}
     <details class="mt-4">
       <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
-        デバッグ情報を表示
+        デバッグ情報を表示（開発環境のみ）
       </summary>
       <pre class="mt-2 rounded bg-gray-100 p-3 text-xs overflow-auto">{showDebugInfo()}</pre>
     </details>
