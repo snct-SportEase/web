@@ -34,7 +34,7 @@
 <!-- モーダルの背景 -->
 {#if isOpen}
   <div
-    class="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto min-h-screen"
+    class="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto min-h-screen py-4"
     role="presentation"
     tabindex="-1"
     on:click={onClose}
@@ -42,7 +42,7 @@
   >
     <!-- モーダルの本体 -->
     <div
-      class="w-full max-w-3xl m-4 p-6 space-y-6 bg-white rounded-lg shadow-xl"
+      class="w-full max-w-3xl m-4 bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-2rem)]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-install-guide-title"
@@ -50,13 +50,14 @@
       on:click|stopPropagation
       on:keydown={handleKeydown}
     >
-      <div class="flex justify-between items-center">
+      <!-- ヘッダー（固定） -->
+      <div class="flex justify-between items-center p-6 pb-4 border-b border-gray-200 flex-shrink-0">
         <h2 id="pwa-install-guide-title" class="text-2xl font-bold text-gray-800">PWAインストール方法</h2>
         <button
           type="button"
           on:click={onClose}
           aria-label="モーダルを閉じる"
-          class="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
+          class="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 flex-shrink-0 ml-4"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -64,7 +65,8 @@
         </button>
       </div>
 
-      <div class="space-y-6">
+      <!-- コンテンツ（スクロール可能） -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
         <!-- iOS Safari -->
         <section class="border border-gray-200 rounded-lg p-5">
           <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
@@ -146,8 +148,8 @@
         </section>
       </div>
 
-      <!-- 閉じるボタン -->
-      <div class="flex justify-end pt-4 border-t border-gray-200">
+      <!-- 閉じるボタン（固定） -->
+      <div class="flex justify-end p-6 pt-4 border-t border-gray-200 flex-shrink-0">
         <button
           type="button"
           on:click={onClose}
