@@ -5,12 +5,14 @@
   import EditDisplayNameModal from '$lib/components/EditDisplayNameModal.svelte';
   import PWANotificationBanner from '$lib/components/PWANotificationBanner.svelte';
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
+  import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
 
   let { data } = $page;
   $: user = data.user;
 
   let showEditDisplayNameModal = false;
   let showPWANotification = false;
+  let isMobile = false;
   
   onMount(() => {
     if (browser) {
@@ -19,6 +21,17 @@
       if (!hasSeenNotification && (isPWAInstalled() || isPWAInstallable())) {
         showPWANotification = true;
       }
+      
+      // 画面サイズを判定
+      const checkMobile = () => {
+        isMobile = window.innerWidth < 768;
+      };
+      checkMobile();
+      window.addEventListener('resize', checkMobile);
+      
+      return () => {
+        window.removeEventListener('resize', checkMobile);
+      };
     }
   });
 
@@ -103,34 +116,45 @@
       window.location.href = '/';
     }
   }
+
+  function openSidebar() {
+    isSidebarOpen.set(true);
+  }
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  <header class="bg-white shadow-sm p-4">
-    <div class="flex justify-between items-center">
-      <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800 pl-12">Dashboard</h1></a>
-      <div class="flex items-center">
-        <button 
-          type="button"
-          on:click={handleDisplayNameClick}
-          class="mr-4 flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          title="表示名をクリックして変更"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-          </svg>
-          <span>{user?.display_name || user?.email || 'User'}</span>
-        </button>
-        <button 
-          type="button" 
-          on:click={handleLogout}
-          class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors duration-200"
-        >
-          Logout
-        </button>
+  {#if !$isSidebarOpen || !isMobile}
+    <header class="bg-white shadow-sm p-4 sticky top-0 z-50">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center">
+          <button type="button" on:click={openSidebar} class="mr-4 p-2 rounded-md hover:bg-gray-100" aria-label="サイドバーを開く">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+          <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800">Dashboard</h1></a>
+        </div>
+        <div class="flex items-center">
+          <button 
+            type="button"
+            on:click={handleDisplayNameClick}
+            class="mr-4 flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            title="表示名をクリックして変更"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+            <span>{user?.display_name || user?.email || 'User'}</span>
+          </button>
+          <button 
+            type="button" 
+            on:click={handleLogout}
+            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors duration-200"
+          >
+            Logout
+          </button>
+        </div>
       </div>
-    </div>
-  </header>
+    </header>
+  {/if}
 
   <main class="p-8">
     <slot />
