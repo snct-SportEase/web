@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"backapp/internal/models"
 	"backapp/internal/repository"
 	"fmt"
 	"net/http"
@@ -39,6 +40,40 @@ func (h *AttendanceHandler) GetClassDetailsHandler(c *gin.Context) {
 		return
 	}
 
+	// Get user from context
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	user := userCtx.(*models.User)
+
+	// Check if user is admin or root
+	isAdmin := false
+	for _, role := range user.Roles {
+		if role.Name == "admin" || role.Name == "root" {
+			isAdmin = true
+			break
+		}
+	}
+
+	// If user is admin and has a class_name_rep role, restrict to that class only
+	if isAdmin {
+		managedClass, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
+			return
+		}
+		// If managedClass exists, user can only get details for that class
+		if managedClass != nil {
+			if managedClass.ID != classID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to view details for your managed class"})
+				return
+			}
+		}
+	}
+
 	classDetails, err := h.classRepo.GetClassDetails(classID, activeEventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
@@ -72,6 +107,40 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 	if activeEventID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No active event found"})
 		return
+	}
+
+	// Get user from context
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	user := userCtx.(*models.User)
+
+	// Check if user is admin or root
+	isAdmin := false
+	for _, role := range user.Roles {
+		if role.Name == "admin" || role.Name == "root" {
+			isAdmin = true
+			break
+		}
+	}
+
+	// If user is admin and has a class_name_rep role, restrict to that class only
+	if isAdmin {
+		managedClass, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
+			return
+		}
+		// If managedClass exists, user can only register attendance for that class
+		if managedClass != nil {
+			if managedClass.ID != req.ClassID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to register attendance for your managed class"})
+				return
+			}
+		}
 	}
 
 	class, err := h.classRepo.GetClassByID(req.ClassID)

@@ -14,15 +14,22 @@ export async function load({ fetch, locals }) {
     let managedClass = null;
     const user = locals.user;
 
-    if (user && user.role && user.role.endsWith('_rep')) {
-      const className = user.role.replace('_rep', '');
-      const classDetailsResponse = await fetch(`${BACKEND_URL}/api/class/name/${className}`);
+    // Check if user has a class_name_rep role
+    if (user && user.roles) {
+      const classRole = user.roles.find(
+        (role) => typeof role?.name === 'string' && role.name.endsWith('_rep')
+      );
 
-      if (classDetailsResponse.ok) {
-        managedClass = await classDetailsResponse.json();
-      } else {
-        // It's okay if this fails, the user can still select manually
-        console.warn(`Could not automatically fetch class details for role ${user.role}`);
+      if (classRole) {
+        const className = classRole.name.slice(0, -4); // Remove '_rep' suffix
+        const classDetailsResponse = await fetch(`${BACKEND_URL}/api/class/name/${className}`);
+
+        if (classDetailsResponse.ok) {
+          managedClass = await classDetailsResponse.json();
+        } else {
+          // It's okay if this fails, the user can still select manually
+          console.warn(`Could not automatically fetch class details for role ${classRole.name}`);
+        }
       }
     }
 
