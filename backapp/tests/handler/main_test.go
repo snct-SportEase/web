@@ -172,6 +172,16 @@ func (m *MockWhitelistRepository) UpdateNullEventIDs(eventID int) error {
 	return args.Error(0)
 }
 
+func (m *MockWhitelistRepository) DeleteWhitelistedEmail(email string) error {
+	args := m.Called(email)
+	return args.Error(0)
+}
+
+func (m *MockWhitelistRepository) DeleteWhitelistedEmails(emails []string) error {
+	args := m.Called(emails)
+	return args.Error(0)
+}
+
 type MockTeamRepository struct {
 	mock.Mock
 }

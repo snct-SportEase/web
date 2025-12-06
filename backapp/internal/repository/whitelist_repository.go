@@ -16,6 +16,8 @@ type WhitelistRepository interface {
 	GetAllWhitelistedEmails() ([]WhitelistEntry, error)
 	AddWhitelistedEmails(entries []WhitelistEntry) error
 	UpdateNullEventIDs(eventID int) error
+	DeleteWhitelistedEmail(email string) error
+	DeleteWhitelistedEmails(emails []string) error
 }
 
 type whitelistRepository struct {
@@ -98,4 +100,38 @@ func (r *whitelistRepository) UpdateNullEventIDs(eventID int) error {
 	query := `UPDATE whitelisted_emails SET event_id = ? WHERE event_id IS NULL`
 	_, err := r.db.Exec(query, eventID)
 	return err
+}
+
+func (r *whitelistRepository) DeleteWhitelistedEmail(email string) error {
+	query := `DELETE FROM whitelisted_emails WHERE email = ?`
+	_, err := r.db.Exec(query, email)
+	return err
+}
+
+func (r *whitelistRepository) DeleteWhitelistedEmails(emails []string) error {
+	if len(emails) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`DELETE FROM whitelisted_emails WHERE email = ?`)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+
+	for _, email := range emails {
+		_, err := stmt.Exec(email)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit()
 }

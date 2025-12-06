@@ -92,6 +92,10 @@
   let csvFile = null;
   let message = '';
   let errorMessage = '';
+  
+  // 削除機能用の状態変数
+  let selectedEmails = new Set();
+  let isDeleting = false;
 
   async function addEmail() {
     errorMessage = '';
@@ -148,6 +152,100 @@
       whitelist = await res.json();
     } catch (error) {
       errorMessage = error.message;
+    }
+  }
+
+  // チェックボックスのトグル
+  function toggleEmail(email) {
+    const newSet = new Set(selectedEmails);
+    if (newSet.has(email)) {
+      newSet.delete(email);
+    } else {
+      newSet.add(email);
+    }
+    selectedEmails = newSet; // リアクティブ更新
+  }
+
+  // すべて選択/解除
+  function toggleAll() {
+    const newSet = new Set();
+    if (selectedEmails.size !== sortedWhitelist.length) {
+      sortedWhitelist.forEach(entry => newSet.add(entry.email));
+    }
+    selectedEmails = newSet; // リアクティブ更新
+  }
+
+  // 単一削除
+  async function deleteEmail(email) {
+    if (!confirm(`「${email}」をホワイトリストから削除しますか？`)) {
+      return;
+    }
+
+    errorMessage = '';
+    message = '';
+    isDeleting = true;
+
+    try {
+      const response = await fetch('/api/root/whitelist', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to delete email');
+      }
+      message = 'Email deleted successfully!';
+      // Refresh whitelist
+      const res = await fetch('/api/root/whitelist');
+      whitelist = await res.json();
+      selectedEmails.clear();
+    } catch (error) {
+      errorMessage = error.message;
+    } finally {
+      isDeleting = false;
+    }
+  }
+
+  // 複数削除
+  async function deleteSelectedEmails() {
+    if (selectedEmails.size === 0) {
+      errorMessage = '削除するメールアドレスを選択してください。';
+      return;
+    }
+
+    const emails = Array.from(selectedEmails);
+    if (!confirm(`${emails.length}件のメールアドレスをホワイトリストから削除しますか？`)) {
+      return;
+    }
+
+    errorMessage = '';
+    message = '';
+    isDeleting = true;
+
+    try {
+      const response = await fetch('/api/root/whitelist/bulk', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ emails })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to delete emails');
+      }
+      message = `${emails.length}件のメールアドレスを削除しました！`;
+      // Refresh whitelist
+      const res = await fetch('/api/root/whitelist');
+      whitelist = await res.json();
+      selectedEmails.clear();
+    } catch (error) {
+      errorMessage = error.message;
+    } finally {
+      isDeleting = false;
     }
   }
 </script>
@@ -249,10 +347,35 @@
 			</div>
 		</div>
 
+		<!-- 削除ボタン -->
+		{#if sortedWhitelist && sortedWhitelist.length > 0}
+			<div class="mb-4 flex justify-between items-center">
+				<div class="text-sm text-gray-600">
+					{selectedEmails.size}件選択中
+				</div>
+				<button
+					on:click={deleteSelectedEmails}
+					disabled={selectedEmails.size === 0 || isDeleting}
+					class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+				>
+					{isDeleting ? '削除中...' : '選択した項目を削除'}
+				</button>
+			</div>
+		{/if}
+
 		<div class="overflow-x-auto rounded-lg border border-gray-200">
 			<table class="min-w-full divide-y divide-gray-200">
 				<thead class="bg-gray-50">
 					<tr>
+						<!-- チェックボックス列 -->
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							<input
+								type="checkbox"
+								checked={sortedWhitelist && sortedWhitelist.length > 0 && selectedEmails.size === sortedWhitelist.length}
+								on:change={toggleAll}
+								class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+							/>
+						</th>
 						<!-- Email Sort Header -->
 						<th
 							scope="col"
@@ -291,6 +414,10 @@
 								{/if}
 							</div>
 						</th>
+						<!-- 操作列 -->
+						<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							操作
+						</th>
 					</tr>
 				</thead>
 				<tbody class="bg-white divide-y divide-gray-200">
@@ -298,13 +425,30 @@
 					{#if sortedWhitelist && sortedWhitelist.length > 0}
 						{#each sortedWhitelist as entry}
 							<tr class="hover:bg-gray-50 transition duration-100">
+								<td class="px-6 py-4 whitespace-nowrap">
+									<input
+										type="checkbox"
+										checked={selectedEmails.has(entry.email)}
+										on:change={() => toggleEmail(entry.email)}
+										class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+									/>
+								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{entry.email}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.role}</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm">
+									<button
+										on:click={() => deleteEmail(entry.email)}
+										disabled={isDeleting}
+										class="text-red-600 hover:text-red-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+									>
+										削除
+									</button>
+								</td>
 							</tr>
 						{/each}
 					{:else}
 						<tr>
-							<td colspan="2" class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
+							<td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
                   {#if data.error}
                     データの読み込み中にエラーが発生しました: {data.error}
                   {:else if whitelist && whitelist.length > 0}

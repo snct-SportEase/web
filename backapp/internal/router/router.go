@@ -221,6 +221,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				whitelist.GET("", whitelistHandler.GetWhitelistHandler)
 				whitelist.POST("", whitelistHandler.AddWhitelistedEmailHandler)
 				whitelist.POST("/csv", whitelistHandler.BulkAddWhitelistedEmailsHandler)
+				whitelist.DELETE("", whitelistHandler.DeleteWhitelistedEmailHandler)
+				whitelist.DELETE("/bulk", whitelistHandler.DeleteWhitelistedEmailsHandler)
 			}
 			// Event management routes that require 'root' role
 			rootEvents := root.Group("/events")

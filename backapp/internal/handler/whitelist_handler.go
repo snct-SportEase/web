@@ -113,3 +113,47 @@ func (h *WhitelistHandler) BulkAddWhitelistedEmailsHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully added emails from CSV"})
 }
+
+func (h *WhitelistHandler) DeleteWhitelistedEmailHandler(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if req.Email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
+		return
+	}
+
+	if err := h.WhitelistRepo.DeleteWhitelistedEmail(req.Email); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete email from whitelist"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email deleted from whitelist successfully"})
+}
+
+func (h *WhitelistHandler) DeleteWhitelistedEmailsHandler(c *gin.Context) {
+	var req struct {
+		Emails []string `json:"emails" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if len(req.Emails) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one email is required"})
+		return
+	}
+
+	if err := h.WhitelistRepo.DeleteWhitelistedEmails(req.Emails); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete emails from whitelist"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Emails deleted from whitelist successfully"})
+}
