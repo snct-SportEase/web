@@ -13,23 +13,43 @@
   const isRoot = hasRole('root');
 
   function closeSidebar(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    isSidebarOpen.set(false);
+  }
+
+  function handleTouchStart(event) {
     event.preventDefault();
     event.stopPropagation();
-    isSidebarOpen.set(false);
+    closeSidebar(event);
+  }
+
+  function handleClick(event) {
+    closeSidebar(event);
+  }
+
+  function handleTouchEnd(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeSidebar(event);
   }
 </script>
 
 <aside class="w-64 bg-gray-800 text-white flex flex-col transition-all duration-300" class:closed={!$isSidebarOpen}>
-  <div class="h-16 flex items-center justify-between px-4">
-    <a href="/dashboard" class="flex items-center"><span class="text-2xl font-bold">SportEase</span></a>
+  <div class="h-16 flex items-center justify-between px-4 relative">
+    <a href="/dashboard" class="flex items-center z-10"><span class="text-2xl font-bold">SportEase</span></a>
     <button 
       type="button" 
-      on:click={closeSidebar} 
-      class="flex items-center justify-center min-w-[48px] min-h-[48px] p-3 rounded-md hover:bg-gray-700 active:bg-gray-600 touch-manipulation transition-colors" 
+      on:click={handleClick}
+      on:touchstart|stopPropagation={handleTouchStart}
+      on:touchend|stopPropagation={handleTouchEnd}
+      class="flex items-center justify-center w-12 h-12 rounded-md hover:bg-gray-700 active:bg-gray-600 transition-colors cursor-pointer" 
       aria-label="サイドバーを閉じる"
-      style="touch-action: manipulation;"
+      style="touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0.1); pointer-events: auto; position: absolute; top: 0.5rem; right: 0.5rem; z-index: 10000; -webkit-user-select: none; user-select: none; background-color: transparent; border: none;"
     >
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      <svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
     </button>
   </div>
   <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
