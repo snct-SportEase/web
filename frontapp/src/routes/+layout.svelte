@@ -63,10 +63,25 @@
   function openSidebar() {
     isSidebarOpen.set(true);
   }
+
+  function closeSidebar() {
+    isSidebarOpen.set(false);
+  }
 </script>
 
 <div class="app-container">
   {#if data.user}
+    <!-- モバイル用オーバーレイ背景 -->
+    {#if $isSidebarOpen}
+      <button 
+        type="button"
+        class="sidebar-overlay md:hidden"
+        on:click={closeSidebar}
+        on:touchstart|stopPropagation={closeSidebar}
+        on:keydown={(e) => e.key === 'Enter' || e.key === ' ' ? closeSidebar() : null}
+        aria-label="メニューを閉じる"
+      ></button>
+    {/if}
     <Sidebar user={data.user} />
   {/if}
   <main class="main-content">
