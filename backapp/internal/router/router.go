@@ -282,6 +282,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootNotifications.GET("/roles", notificationHandler.ListAvailableRoles)
 			}
 
+			rootUsers := root.Group("/users")
+			{
+				rootUsers.GET("", authHandler.FindUsersHandler)
+				rootUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByAdmin)
+			}
+
 			rootNotificationRequests := root.Group("/notification-requests")
 			{
 				rootNotificationRequests.GET("", notificationRequestHandler.ListRootRequests)
