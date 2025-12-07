@@ -4,7 +4,7 @@
 -->
 <script>
   import { onMount } from 'svelte';
-  import { createBracket } from 'bracketry';
+  import { browser } from '$app/environment';
   import { marked } from 'marked';
   import SafeHtml from '$lib/components/SafeHtml.svelte';
 
@@ -91,7 +91,7 @@
         await fetchTournaments(selectedEventId);
       }
     }
-    renderBracket();
+    await renderBracket();
   });
 
   async function fetchSports() {
@@ -186,10 +186,10 @@
     }
   }
 
-  function updateSelectedTournament() {
+  async function updateSelectedTournament() {
     selectedTournament = tournaments.find(t => t.id == selectedTournamentId) || null;
     updateAllMatchesForSport();
-    renderBracket();
+    await renderBracket();
   }
 
   // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合をまとめる
@@ -218,13 +218,20 @@
     });
   }
 
-  function renderBracket() {
-    setTimeout(() => {
+  async function renderBracket() {
+    if (!browser) return;
+    setTimeout(async () => {
       const wrapper = document.getElementById('bracket-container');
       if (wrapper) {
         wrapper.innerHTML = '';
         if (selectedTournament && selectedTournament.data) {
-          createBracket(selectedTournament.data, wrapper);
+          try {
+            const { createBracket } = await import('bracketry');
+            createBracket(selectedTournament.data, wrapper);
+          } catch (error) {
+            console.error('Failed to load createBracket:', error);
+            wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';
+          }
         } else {
           wrapper.innerHTML = '<p>このトーナメント情報はありません。</p>';
         }
@@ -263,8 +270,10 @@
     } else {
       selectedTournamentId = null;
       selectedTournament = null;
-      const wrapper = document.getElementById('bracket-container');
-      if(wrapper) wrapper.innerHTML = '';
+      if (browser) {
+        const wrapper = document.getElementById('bracket-container');
+        if(wrapper) wrapper.innerHTML = '';
+      }
     }
   }
 
@@ -1362,7 +1371,7 @@
               />
             </div>
             <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
-            <button on:click={() => document.getElementById('image-upload').click()} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
+            <button on:click={() => { if (browser) { const el = document.getElementById('image-upload'); if (el) el.click(); } }} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
               画像アップロード
             </button>
           </div>

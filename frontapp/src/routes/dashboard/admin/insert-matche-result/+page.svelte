@@ -1,8 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import InsertMatchResultModal from '$lib/components/InsertMatchResultModal.svelte';
 	import ConfirmMatchResultModal from '$lib/components/ConfirmMatchResultModal.svelte';
-	import { createBracket } from 'bracketry';
 
 	let tournaments = [];
 	let selectedTournamentId = '';
@@ -123,13 +123,20 @@
 
 	$: selectedTournament = tournaments.find((t) => t.id === selectedTournamentId);
 
-	function renderBracket() {
-		setTimeout(() => {
+	async function renderBracket() {
+		if (!browser) return;
+		setTimeout(async () => {
 			const wrapper = document.getElementById('bracket-container');
 			if (wrapper) {
 				wrapper.innerHTML = '';
 				if (selectedTournament && selectedTournament.data) {
-					createBracket(selectedTournament.data, wrapper);
+					try {
+						const { createBracket } = await import('bracketry');
+						createBracket(selectedTournament.data, wrapper);
+					} catch (error) {
+						console.error('Failed to load createBracket:', error);
+						wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';
+					}
 				} else {
 					wrapper.innerHTML = '<p>このトーナメント情報はありません。</p>';
 				}

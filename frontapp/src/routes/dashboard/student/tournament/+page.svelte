@@ -1,6 +1,6 @@
 <script>
     import { onMount } from 'svelte';
-    import { createBracket } from 'bracketry';
+    import { browser } from '$app/environment';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
 
@@ -50,19 +50,27 @@
         }
     }
 
-    function renderAllBrackets() {
-        setTimeout(() => {
-            allTournaments.forEach(tournament => {
-                renderBracket(tournament);
-            });
+    async function renderAllBrackets() {
+        if (!browser) return;
+        setTimeout(async () => {
+            for (const tournament of allTournaments) {
+                await renderBracket(tournament);
+            }
         }, 0);
     }
 
-    function renderBracket(tournament) {
+    async function renderBracket(tournament) {
+        if (!browser) return;
         const wrapper = document.getElementById(`bracket-${tournament.id}`);
         if (wrapper && tournament.data) {
             wrapper.innerHTML = '';
-            createBracket(tournament.data, wrapper);
+            try {
+                const { createBracket } = await import('bracketry');
+                createBracket(tournament.data, wrapper);
+            } catch (error) {
+                console.error('Failed to load createBracket:', error);
+                wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';
+            }
         }
     }
 </script>
