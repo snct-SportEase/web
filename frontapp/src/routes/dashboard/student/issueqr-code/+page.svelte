@@ -1,6 +1,5 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
-	import { beforeNavigate, afterNavigate } from '$app/navigation';
 	import QRCode from 'qrcode';
 	import { browser } from '$app/environment';
 
@@ -8,7 +7,12 @@
 	let selectedTeamId = '';
 	let qrCodeData = null;
 
-	$: selectedTeam = selectedTeamId
+	$: {
+		console.log('[QR Code] selectedTeamId変更:', selectedTeamId);
+		console.log('[QR Code] teams:', teams, 'length:', teams?.length, 'isArray:', Array.isArray(teams));
+	}
+	
+	$: selectedTeam = selectedTeamId && teams && Array.isArray(teams)
 		? teams.find((t) => `${t.event_id}-${t.sport_id}` === selectedTeamId)
 		: null;
 	let qrCodeImage = null;
@@ -29,59 +33,92 @@
 
 	// データを初期化・再取得する関数
 	async function initializeData() {
+		console.log('[QR Code] initializeData: 開始');
 		try {
 			// Get active event
+			console.log('[QR Code] アクティブイベントを取得中...');
 			const eventResponse = await fetch('/api/events/active');
-			if (!eventResponse.ok) throw new Error('Failed to get active event');
+			if (!eventResponse.ok) {
+				console.error('[QR Code] イベント取得失敗:', eventResponse.status, eventResponse.statusText);
+				throw new Error('Failed to get active event');
+			}
 			const eventData = await eventResponse.json();
+			console.log('[QR Code] イベントデータ:', eventData);
 			activeEventId = eventData.event_id;
+			console.log('[QR Code] activeEventId:', activeEventId);
 
 			// Get user teams
 			const sessionToken = document.cookie
 				.split('; ')
 				.find((row) => row.startsWith('session_token='))
 				?.split('=')[1];
+			console.log('[QR Code] sessionToken:', sessionToken ? '存在' : 'なし');
+			
 			const headers = {
 				'Content-Type': 'application/json',
 				Cookie: `session_token=${sessionToken}`
 			};
 
+			console.log('[QR Code] チーム情報を取得中...');
 			const teamsResponse = await fetch('/api/qrcode/teams', { headers });
+			console.log('[QR Code] teamsResponse status:', teamsResponse.status, teamsResponse.ok);
+			
 			if (!teamsResponse.ok) {
 				const errorText = await teamsResponse.text();
+				console.error('[QR Code] チーム取得失敗:', teamsResponse.status, errorText);
 				throw new Error(`Failed to load teams: ${errorText}`);
 			}
-			teams = await teamsResponse.json();
+			
+			const teamsData = await teamsResponse.json();
+			console.log('[QR Code] 取得したチームデータ:', teamsData);
+			console.log('[QR Code] teamsDataの型:', typeof teamsData, Array.isArray(teamsData));
+			
+			// teamsがnullまたはundefinedの場合は空配列に設定
+			if (!teamsData) {
+				console.warn('[QR Code] teamsDataがnullまたはundefinedです。空配列に設定します。');
+				teams = [];
+			} else if (!Array.isArray(teamsData)) {
+				console.warn('[QR Code] teamsDataが配列ではありません。空配列に設定します。', teamsData);
+				teams = [];
+			} else {
+				teams = teamsData;
+			}
+			
+			console.log('[QR Code] teams初期値:', teams, 'length:', teams?.length);
 
 			// Filter teams by active event
-			if (activeEventId) {
-				teams = teams.filter((team) => team.event_id === activeEventId);
+			if (activeEventId && teams && Array.isArray(teams)) {
+				console.log('[QR Code] イベントIDでフィルタリング中...', 'activeEventId:', activeEventId, 'teams数:', teams.length);
+				teams = teams.filter((team) => {
+					const matches = team.event_id === activeEventId;
+					console.log('[QR Code] チーム:', team.event_id, '===', activeEventId, '?', matches);
+					return matches;
+				});
+				console.log('[QR Code] フィルタリング後のteams:', teams, 'length:', teams?.length);
+			} else {
+				console.log('[QR Code] フィルタリングをスキップ:', {
+					activeEventId,
+					teamsIsArray: Array.isArray(teams),
+					teams
+				});
 			}
+			
+			console.log('[QR Code] initializeData: 完了', 'teams:', teams, 'length:', teams?.length);
 		} catch (err) {
-			console.error('Error loading teams:', err);
+			console.error('[QR Code] Error loading teams:', err);
+			console.error('[QR Code] Error stack:', err.stack);
 			error = err.message || 'チーム情報の取得に失敗しました';
+			// エラー時もteamsを空配列に設定
+			teams = [];
+			console.log('[QR Code] エラー後のteams:', teams);
 		}
 	}
 
 	onMount(async () => {
+		console.log('[QR Code] onMount: 開始');
+		console.log('[QR Code] onMount: teams初期値:', teams);
 		await initializeData();
-	});
-
-	// ページ遷移前にクリーンアップ（他のページに遷移する時）
-	beforeNavigate(({ to, cancel }) => {
-		// このページから他のページに遷移する時はクリーンアップ
-		if (to && to.url.pathname !== '/dashboard/student/issueqr-code') {
-			cleanup();
-		}
-	});
-
-	// ページ遷移時にデータを再取得（このページに遷移した時のみ）
-	afterNavigate(async ({ to, from }) => {
-		// このページに遷移した時だけデータを再取得（他のページから遷移してきた場合のみ）
-		if (to && to.url.pathname === '/dashboard/student/issueqr-code' && 
-		    from && from.url.pathname !== '/dashboard/student/issueqr-code') {
-			await initializeData();
-		}
+		console.log('[QR Code] onMount: 完了', 'teams:', teams, 'length:', teams?.length);
 	});
 
 	onDestroy(() => {
@@ -190,7 +227,7 @@
 	}
 </script>
 
-<div class="max-w-4xl mx-auto p-6">
+<div class="max-w-4xl mx-auto p-6 page-content">
 	<h1 class="text-2xl font-bold mb-6">QRコード発行</h1>
 
 	{#if error}
@@ -199,7 +236,7 @@
 		</div>
 	{/if}
 
-	{#if teams.length === 0}
+	{#if !teams || !Array.isArray(teams) || teams.length === 0}
 		<div class="p-6 bg-gray-100 rounded-lg text-center">
 			<p class="text-gray-600">
 				参加登録されている競技がありません。競技に参加登録してからQRコードを発行してください。
@@ -216,9 +253,11 @@
 					disabled={loading || qrCodeImage !== null}
 				>
 					<option value="">競技を選択してください</option>
-					{#each teams as team}
-						<option value={`${team.event_id}-${team.sport_id}`}>{team.sport_name}</option>
-					{/each}
+					{#if teams && Array.isArray(teams)}
+						{#each teams as team}
+							<option value={`${team.event_id}-${team.sport_id}`}>{team.sport_name}</option>
+						{/each}
+					{/if}
 				</select>
 
 				{#if selectedTeam && !qrCodeImage}
@@ -280,7 +319,9 @@
 </div>
 
 <style>
-	:global(body) {
+	/* このページのコンテンツエリアの背景色を設定 */
+	.page-content {
 		background-color: #f3f4f6;
+		min-height: calc(100vh - 200px);
 	}
 </style>
