@@ -164,7 +164,7 @@
     </header>
   {/if}
 
-  <main class="p-8">
+  <main class="p-8 min-h-full">
     <slot />
   </main>
 
