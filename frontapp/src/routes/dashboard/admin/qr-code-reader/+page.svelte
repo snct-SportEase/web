@@ -142,13 +142,6 @@
 		</button>
 	</div>
 
-	{#if scannedData}
-		<div class="mt-4 p-4 bg-gray-100 border border-gray-400 text-gray-700 rounded">
-			<p class="font-bold">Scanned QR Code:</p>
-			<p class="break-all">{scannedData}</p>
-		</div>
-	{/if}
-
 	{#if verificationResult}
 		{#if verificationResult.success}
 			<div class="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
