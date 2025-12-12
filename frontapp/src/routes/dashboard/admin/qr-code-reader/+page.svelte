@@ -77,15 +77,12 @@
 	}
 
 	function startScan() {
-		if (!cameraId) {
-			errorMessage = 'No camera found.';
-			return;
-		}
-
 		html5QrCode = new Html5Qrcode('qr-code-full-region');
+		// 背面カメラ（アウトカメラ）を優先的に使用
+		const cameraConfig = { facingMode: 'environment' };
 		html5QrCode
 			.start(
-				cameraId,
+				cameraConfig,
 				{
 					fps: 10,
 					qrbox: { width: 250, height: 250 }
