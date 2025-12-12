@@ -24,7 +24,7 @@ func TestQRCodeHandler_GetUserTeamsHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -77,7 +77,7 @@ func TestQRCodeHandler_GetUserTeamsHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -101,7 +101,7 @@ func TestQRCodeHandler_GetUserTeamsHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -139,7 +139,7 @@ func TestQRCodeHandler_GenerateQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -216,7 +216,7 @@ func TestQRCodeHandler_GenerateQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		reqBody := models.QRCodeRequest{
 			EventID: 1,
@@ -248,7 +248,7 @@ func TestQRCodeHandler_GenerateQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -282,7 +282,7 @@ func TestQRCodeHandler_GenerateQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -335,7 +335,7 @@ func TestQRCodeHandler_GenerateQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -377,7 +377,7 @@ func TestQRCodeHandler_GenerateQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		user := &models.User{
@@ -435,16 +435,19 @@ func TestQRCodeHandler_GenerateQRCodeHandler(t *testing.T) {
 func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("Success - Verify valid QR code", func(t *testing.T) {
+	t.Run("Success - Verify valid QR code and confirm participation", func(t *testing.T) {
 		mockTeamRepo := new(MockTeamRepository)
 		mockSportRepo := new(MockSportRepository)
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, mockClassRepo)
 
 		userID := "test-user-id"
 		displayName := "Test User"
+		classID := 1
+		teamID := 1
 
 		// Create a valid QR code data
 		timestamp := time.Now().Unix()
@@ -473,16 +476,28 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 
 		teams := []*models.TeamWithSport{
 			{
-				ID:        1,
+				ID:        teamID,
 				Name:      "Team A",
-				ClassID:   1,
+				ClassID:   classID,
 				SportID:   1,
 				EventID:   1,
 				SportName: "Basketball",
 			},
 		}
 
+		team := &models.Team{
+			ID:          teamID,
+			Name:        "Team A",
+			ClassID:     classID,
+			SportID:     1,
+			EventID:     1,
+			MinCapacity: nil, // No capacity requirement
+			MaxCapacity: nil,
+		}
+
 		mockTeamRepo.On("GetTeamsByUserID", userID).Return(teams, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", classID, 1, 1).Return(team, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", teamID, userID).Return(nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -507,6 +522,103 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		assert.Greater(t, response["remaining_time"], float64(0))
 
 		mockTeamRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - Verify QR code with capacity warning", func(t *testing.T) {
+		mockTeamRepo := new(MockTeamRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		userID := "test-user-id"
+		displayName := "Test User"
+		classID := 1
+		teamID := 1
+		minCapacity := 5
+		confirmedCount := 3 // Below minimum
+
+		// Create a valid QR code data
+		timestamp := time.Now().Unix()
+		expiresAt := timestamp + 300 // 5 minutes from now
+		qrData := models.QRCodeData{
+			EventID:     1,
+			SportID:     1,
+			SportName:   "Basketball",
+			UserID:      userID,
+			DisplayName: displayName,
+			Timestamp:   timestamp,
+			ExpiresAt:   expiresAt,
+		}
+
+		// Encode QR code
+		combinedData := map[string]interface{}{
+			"token": "test-token",
+			"data":  qrData,
+		}
+		combinedJSON, _ := json.Marshal(combinedData)
+		qrCodeData := base64.URLEncoding.EncodeToString(combinedJSON)
+
+		reqBody := models.QRCodeVerifyRequest{
+			QRCodeData: qrCodeData,
+		}
+
+		teams := []*models.TeamWithSport{
+			{
+				ID:        teamID,
+				Name:      "Team A",
+				ClassID:   classID,
+				SportID:   1,
+				EventID:   1,
+				SportName: "Basketball",
+			},
+		}
+
+		team := &models.Team{
+			ID:          teamID,
+			Name:        "Team A",
+			ClassID:     classID,
+			SportID:     1,
+			EventID:     1,
+			MinCapacity: &minCapacity,
+			MaxCapacity: nil,
+		}
+
+		class := &models.Class{
+			ID:   classID,
+			Name: "1-1",
+		}
+
+		mockTeamRepo.On("GetTeamsByUserID", userID).Return(teams, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", classID, 1, 1).Return(team, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", teamID, userID).Return(nil).Once()
+		mockTeamRepo.On("GetConfirmedTeamMembersCount", teamID).Return(confirmedCount, nil).Once()
+		mockClassRepo.On("GetClassByID", classID).Return(class, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/qrcode/verify", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.VerifyQRCodeHandler(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, true, response["valid"])
+		assert.Contains(t, response, "capacity_warning")
+		assert.Contains(t, response["capacity_warning"], "1-1クラス")
+		assert.Contains(t, response["capacity_warning"], "最低人数")
+
+		mockTeamRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
 	})
 
 	t.Run("Failure - Invalid request body", func(t *testing.T) {
@@ -515,7 +627,7 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -541,7 +653,7 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		reqBody := models.QRCodeVerifyRequest{
 			QRCodeData: "invalid-base64-!@#$",
@@ -572,7 +684,7 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -628,7 +740,7 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -696,7 +808,7 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -753,7 +865,7 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo)
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
 
 		// Create invalid QR code data (malformed data field)
 		invalidData := map[string]interface{}{

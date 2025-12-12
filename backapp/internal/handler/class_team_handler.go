@@ -509,3 +509,108 @@ func (h *ClassTeamHandler) GetTeamMembersHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, members)
 }
+
+// GetConfirmedTeamMembersHandler returns all confirmed (参加本登録済み) members of a team
+func (h *ClassTeamHandler) GetConfirmedTeamMembersHandler(c *gin.Context) {
+	userCtx, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	currentUser := userCtx.(*models.User)
+
+	sportIDStr := c.Param("sport_id")
+	sportID, err := strconv.Atoi(sportIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sport ID"})
+		return
+	}
+
+	// Get active event
+	activeEventID, err := h.eventRepo.GetActiveEvent()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+		return
+	}
+
+	// Verify that the user can manage a class
+	var managedClass *models.Class
+	isAdmin := false
+	for _, role := range currentUser.Roles {
+		if role.Name == "admin" || role.Name == "root" {
+			isAdmin = true
+			break
+		}
+	}
+
+	if !isAdmin {
+		// For class rep users, get their managed class
+		var err error
+		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
+		if err != nil || managedClass == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
+			return
+		}
+	} else {
+		// For admin users, we need class_id from query parameter
+		classIDStr := c.Query("class_id")
+		if classIDStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required for admin users"})
+			return
+		}
+		classID, err := strconv.Atoi(classIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
+			return
+		}
+		managedClass, err = h.classRepo.GetClassByID(classID)
+		if err != nil || managedClass == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
+			return
+		}
+	}
+
+	// Get team
+	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, sportID, activeEventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
+		return
+	}
+
+	if team == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"members":         []*models.User{},
+			"confirmed_count": 0,
+			"min_capacity":    nil,
+			"capacity_ok":     true,
+		})
+		return
+	}
+
+	// Get confirmed team members
+	members, err := h.teamRepo.GetConfirmedTeamMembers(team.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get confirmed team members"})
+		return
+	}
+
+	// Get confirmed count and check capacity
+	confirmedCount, err := h.teamRepo.GetConfirmedTeamMembersCount(team.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get confirmed team members count"})
+		return
+	}
+
+	capacityOK := true
+	if team.MinCapacity != nil {
+		capacityOK = confirmedCount >= *team.MinCapacity
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"members":         members,
+		"confirmed_count": confirmedCount,
+		"min_capacity":    team.MinCapacity,
+		"capacity_ok":     capacityOK,
+	})
+}

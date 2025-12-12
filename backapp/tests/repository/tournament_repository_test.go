@@ -83,6 +83,14 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(1).
 			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
 
+		mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT COALESCE(MAX(total_points_current_event), 0)
+		FROM class_scores
+		WHERE event_id = ?
+		`)).
+			WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
+
 		mock.ExpectExec(regexp.QuoteMeta(`
 		UPDATE class_scores cs
 		JOIN (
@@ -190,6 +198,14 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(1).
 			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
 
+		mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT COALESCE(MAX(total_points_current_event), 0)
+		FROM class_scores
+		WHERE event_id = ?
+		`)).
+			WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
+
 		mock.ExpectExec(regexp.QuoteMeta(`
 		UPDATE class_scores cs
 		JOIN (
@@ -285,6 +301,14 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta("SELECT season FROM events WHERE id = ?")).
 			WithArgs(eventID).
 			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
+
+		mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT COALESCE(MAX(total_points_current_event), 0)
+		FROM class_scores
+		WHERE event_id = ?
+		`)).
+			WithArgs(eventID).
+			WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
 
 		mock.ExpectExec(regexp.QuoteMeta(`
 		UPDATE class_scores cs

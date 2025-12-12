@@ -16,6 +16,9 @@ type TeamRepository interface {
 	RemoveTeamMember(teamID int, userID string) error
 	UpdateTeamCapacity(eventID int, sportID int, classID int, minCapacity *int, maxCapacity *int) error
 	GetTeamCapacity(eventID int, sportID int, classID int) (*models.Team, error)
+	ConfirmTeamMember(teamID int, userID string) error
+	GetConfirmedTeamMembers(teamID int) ([]*models.User, error)
+	GetConfirmedTeamMembersCount(teamID int) (int, error)
 }
 
 type teamRepository struct {
@@ -201,4 +204,73 @@ func (r *teamRepository) GetTeamCapacity(eventID int, sportID int, classID int) 
 	}
 
 	return team, nil
+}
+
+// ConfirmTeamMember marks a team member as confirmed (参加本登録)
+func (r *teamRepository) ConfirmTeamMember(teamID int, userID string) error {
+	query := "UPDATE team_members SET is_confirmed = true WHERE team_id = ? AND user_id = ?"
+	result, err := r.db.Exec(query, teamID, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows // Team member not found
+	}
+	return nil
+}
+
+// GetConfirmedTeamMembers returns all confirmed team members
+func (r *teamRepository) GetConfirmedTeamMembers(teamID int) ([]*models.User, error) {
+	query := `
+		SELECT u.id, u.email, u.display_name, u.class_id, u.is_profile_complete, u.created_at, u.updated_at
+		FROM users u
+		INNER JOIN team_members tm ON u.id = tm.user_id
+		WHERE tm.team_id = ? AND tm.is_confirmed = true
+		ORDER BY u.display_name, u.email
+	`
+	rows, err := r.db.Query(query, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		user := &models.User{}
+		var tempClassID sql.NullInt32
+		var tempDisplayName sql.NullString
+
+		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if tempDisplayName.Valid {
+			user.DisplayName = &tempDisplayName.String
+		}
+		if tempClassID.Valid {
+			val := int(tempClassID.Int32)
+			user.ClassID = &val
+		}
+
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+// GetConfirmedTeamMembersCount returns the count of confirmed team members
+func (r *teamRepository) GetConfirmedTeamMembersCount(teamID int) (int, error) {
+	query := "SELECT COUNT(*) FROM team_members WHERE team_id = ? AND is_confirmed = true"
+	var count int
+	err := r.db.QueryRow(query, teamID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }

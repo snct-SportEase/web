@@ -251,6 +251,24 @@ func (m *MockTeamRepository) GetTeamCapacity(eventID int, sportID int, classID i
 	return args.Get(0).(*models.Team), args.Error(1)
 }
 
+func (m *MockTeamRepository) ConfirmTeamMember(teamID int, userID string) error {
+	args := m.Called(teamID, userID)
+	return args.Error(0)
+}
+
+func (m *MockTeamRepository) GetConfirmedTeamMembers(teamID int) ([]*models.User, error) {
+	args := m.Called(teamID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.User), args.Error(1)
+}
+
+func (m *MockTeamRepository) GetConfirmedTeamMembersCount(teamID int) (int, error) {
+	args := m.Called(teamID)
+	return args.Int(0), args.Error(1)
+}
+
 type MockTournamentRepository struct {
 	mock.Mock
 }

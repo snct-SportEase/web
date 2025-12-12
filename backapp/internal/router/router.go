@@ -54,7 +54,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
-	qrCodeHandler := handler.NewQRCodeHandler(teamRepo, sportRepo, userRepo, eventRepo)
+	qrCodeHandler := handler.NewQRCodeHandler(teamRepo, sportRepo, userRepo, eventRepo, classRepo)
 
 	classTeamHandler := handler.NewClassTeamHandler(classRepo, teamRepo, userRepo, eventRepo, sportRepo)
 
@@ -218,6 +218,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			adminClassTeam.POST("/assign-members", classTeamHandler.AssignTeamMembersHandler)
 			adminClassTeam.DELETE("/remove-member", classTeamHandler.RemoveTeamMemberHandler)
 			adminClassTeam.GET("/sports/:sport_id/members", classTeamHandler.GetTeamMembersHandler)
+			adminClassTeam.GET("/sports/:sport_id/confirmed-members", classTeamHandler.GetConfirmedTeamMembersHandler)
 		}
 
 		root := api.Group("/root")

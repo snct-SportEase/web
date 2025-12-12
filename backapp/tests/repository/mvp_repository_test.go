@@ -34,7 +34,8 @@ func TestMVPRepository_VoteMVP(t *testing.T) {
 		mock.ExpectExec("UPDATE class_scores").WithArgs(3, 3, eventID, classID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, fmt.Sprintf("MVP vote: %s", reason)).WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-		mock.ExpectExec("UPDATE class_scores").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery("SELECT COALESCE\\(MAX\\(total_points_current_event\\), 0\\)").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
+		mock.ExpectExec("UPDATE class_scores cs").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 
 		err := r.VoteMVP(userID, classID, eventID, reason)
@@ -55,8 +56,10 @@ func TestMVPRepository_VoteMVP(t *testing.T) {
 		mock.ExpectExec("UPDATE class_scores").WithArgs(3, 3, eventID, classID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, "MVP vote").WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("autumn"))
-		mock.ExpectExec("UPDATE class_scores").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectExec("UPDATE class_scores").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery("SELECT COALESCE\\(MAX\\(total_points_current_event\\), 0\\)").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
+		mock.ExpectExec("UPDATE class_scores cs").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery("SELECT COALESCE\\(MAX\\(total_points_overall\\), 0\\)").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_overall), 0)"}).AddRow(10))
+		mock.ExpectExec("UPDATE class_scores cs").WithArgs(eventID, eventID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 
 		err := r.VoteMVP(userID, classID, eventID, reason)

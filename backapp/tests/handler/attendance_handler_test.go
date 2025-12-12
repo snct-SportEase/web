@@ -29,13 +29,22 @@ func TestGetClassDetailsHandler(t *testing.T) {
 			AttendancePoints: 10,
 		}
 
+		user := &models.User{
+			ID: "test-user-id",
+			Roles: []models.Role{
+				{Name: "admin"},
+			},
+		}
+
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, nil).Once() // Admin has no managed class
 		mockClassRepo.On("GetClassDetails", 1, 1).Return(expectedDetails, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
 		c.Params = gin.Params{gin.Param{Key: "classID", Value: "1"}}
 
 		h.GetClassDetailsHandler(c)
@@ -58,12 +67,20 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		activeEventID := 1
 
+		user := &models.User{
+			ID: "test-user-id",
+			Roles: []models.Role{
+				{Name: "admin"},
+			},
+		}
+
 		reqBody := handler.RegisterAttendanceRequest{
 			ClassID:         1,
 			AttendanceCount: 20,
 		}
 		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(nil, nil).Once() // Admin has no managed class
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 		mockClassRepo.On("UpdateAttendance", reqBody.ClassID, activeEventID, reqBody.AttendanceCount).Return(10, nil).Once()
 
@@ -71,6 +88,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
 
 		jsonBody, _ := json.Marshal(reqBody)
 		c.Request, _ = http.NewRequest(http.MethodPost, "/register", bytes.NewBuffer(jsonBody))
@@ -90,6 +108,13 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		activeEventID := 1
 		differentEventID := 2
 
+		user := &models.User{
+			ID: "test-user-id",
+			Roles: []models.Role{
+				{Name: "admin"},
+			},
+		}
+
 		reqBody := handler.RegisterAttendanceRequest{
 			ClassID:         1,
 			AttendanceCount: 20,
@@ -97,12 +122,14 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		class := &models.Class{ID: 1, EventID: &differentEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(nil, nil).Once() // Admin has no managed class
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
 		jsonBody, _ := json.Marshal(reqBody)
 		c.Request, _ = http.NewRequest(http.MethodPost, "/register", bytes.NewBuffer(jsonBody))
 		c.Request.Header.Set("Content-Type", "application/json")
@@ -120,6 +147,13 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		activeEventID := 1
 
+		user := &models.User{
+			ID: "test-user-id",
+			Roles: []models.Role{
+				{Name: "admin"},
+			},
+		}
+
 		reqBody := handler.RegisterAttendanceRequest{
 			ClassID:         1,
 			AttendanceCount: 30,
@@ -127,12 +161,14 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(nil, nil).Once() // Admin has no managed class
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
 		jsonBody, _ := json.Marshal(reqBody)
 		c.Request, _ = http.NewRequest(http.MethodPost, "/register", bytes.NewBuffer(jsonBody))
 		c.Request.Header.Set("Content-Type", "application/json")

@@ -133,6 +133,9 @@
         <a href="/dashboard/admin/qr-code-reader" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/qr-code-reader')}>
           QRコード読み取り
         </a>
+        <a href="/dashboard/admin/confirmed-participants" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/confirmed-participants')}>
+          QRコード参加本登録確認
+        </a>
         <a href="/dashboard/admin/insert-matche-result" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/insert-matche-result')}>
           試合結果入力
         </a>

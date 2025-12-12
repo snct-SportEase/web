@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -18,15 +19,17 @@ type QRCodeHandler struct {
 	sportRepo repository.SportRepository
 	userRepo  repository.UserRepository
 	eventRepo repository.EventRepository
+	classRepo repository.ClassRepository
 }
 
 // NewQRCodeHandler creates a new instance of QRCodeHandler
-func NewQRCodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository) *QRCodeHandler {
+func NewQRCodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *QRCodeHandler {
 	return &QRCodeHandler{
 		teamRepo:  teamRepo,
 		sportRepo: sportRepo,
 		userRepo:  userRepo,
 		eventRepo: eventRepo,
+		classRepo: classRepo,
 	}
 }
 
@@ -193,23 +196,68 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 		return
 	}
 
-	isAssigned := false
+	var targetTeam *models.TeamWithSport
 	for _, team := range teams {
 		if team.EventID == qrData.EventID && team.SportID == qrData.SportID {
-			isAssigned = true
+			targetTeam = team
 			break
 		}
 	}
 
-	if !isAssigned {
+	if targetTeam == nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "このユーザーはこの競技に参加登録されていません"})
 		return
+	}
+
+	// Get full team details including capacity
+	team, err := h.teamRepo.GetTeamByClassAndSport(targetTeam.ClassID, qrData.SportID, qrData.EventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team details"})
+		return
+	}
+
+	if team == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Team not found"})
+		return
+	}
+
+	// Confirm team member (参加本登録)
+	err = h.teamRepo.ConfirmTeamMember(team.ID, qrData.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to confirm team member"})
+		return
+	}
+
+	// Check minimum capacity requirement
+	var capacityWarning *string
+	if team.MinCapacity != nil {
+		confirmedCount, err := h.teamRepo.GetConfirmedTeamMembersCount(team.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team capacity"})
+			return
+		}
+
+		if confirmedCount < *team.MinCapacity {
+			// Get class name for warning message
+			class, err := h.classRepo.GetClassByID(targetTeam.ClassID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class information"})
+				return
+			}
+			className := "不明"
+			if class != nil {
+				className = class.Name
+			}
+			warningMsg := fmt.Sprintf("%sクラスの%sの参加本登録済みメンバー数（%d人）が最低人数（%d人）に達していません",
+				className, qrData.SportName, confirmedCount, *team.MinCapacity)
+			capacityWarning = &warningMsg
+		}
 	}
 
 	// Calculate remaining time
 	remainingTime := qrData.ExpiresAt - currentTime
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"valid":          true,
 		"event_id":       qrData.EventID,
 		"sport_id":       qrData.SportID,
@@ -219,5 +267,11 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 		"timestamp":      qrData.Timestamp,
 		"expires_at":     qrData.ExpiresAt,
 		"remaining_time": remainingTime,
-	})
+	}
+
+	if capacityWarning != nil {
+		response["capacity_warning"] = *capacityWarning
+	}
+
+	c.JSON(http.StatusOK, response)
 }
