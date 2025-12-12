@@ -140,8 +140,8 @@
 				class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 			>
 				<option value={null}>クラスを選択してください</option>
-				{#each classes as class}
-					<option value={class.id}>{class.name}</option>
+				{#each classes as classItem}
+					<option value={classItem.id}>{classItem.name}</option>
 				{/each}
 			</select>
 		</div>
