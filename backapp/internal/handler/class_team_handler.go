@@ -264,25 +264,25 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current team members for capacity check"})
 			return
 		}
-		
+
 		// Check capacity
 		currentCount := len(currentMembers)
 		addCount := 0
-		
+
 		// Filter out users who are already members to avoid double counting
 		// Although AddTeamMember ignores duplicates, for capacity check we should be precise
 		existingMemberMap := make(map[string]bool)
 		for _, m := range currentMembers {
 			existingMemberMap[m.ID] = true
 		}
-		
+
 		for _, uid := range req.UserIDs {
 			if !existingMemberMap[uid] {
 				addCount++
 			}
 		}
-		
-		if currentCount + addCount > *maxCapacity {
+
+		if currentCount+addCount > *maxCapacity {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": fmt.Sprintf("定員オーバーです。現在のメンバー数: %d, 追加人数: %d, 定員: %d", currentCount, addCount, *maxCapacity),
 			})
@@ -536,27 +536,28 @@ func (h *ClassTeamHandler) GetConfirmedTeamMembersHandler(c *gin.Context) {
 
 	// Verify that the user can manage a class
 	var managedClass *models.Class
+	isRoot := false
 	isAdmin := false
+	hasClassRepRole := false
+
 	for _, role := range currentUser.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
+		if role.Name == "root" {
+			isRoot = true
 			break
+		}
+		if role.Name == "admin" {
+			isAdmin = true
+		}
+		if len(role.Name) > 4 && role.Name[len(role.Name)-4:] == "_rep" {
+			hasClassRepRole = true
 		}
 	}
 
-	if !isAdmin {
-		// For class rep users, get their managed class
-		var err error
-		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
-			return
-		}
-	} else {
-		// For admin users, we need class_id from query parameter
+	if isRoot {
+		// Root users can access any class
 		classIDStr := c.Query("class_id")
 		if classIDStr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required for admin users"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required"})
 			return
 		}
 		classID, err := strconv.Atoi(classIDStr)
@@ -569,6 +570,43 @@ func (h *ClassTeamHandler) GetConfirmedTeamMembersHandler(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
 			return
 		}
+	} else if hasClassRepRole {
+		// Admin users with class_name_rep role can only access their managed class
+		var err error
+		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
+		if err != nil || managedClass == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
+			return
+		}
+		// Verify that the requested class_id matches the managed class (if provided)
+		classIDStr := c.Query("class_id")
+		if classIDStr != "" {
+			requestedClassID, err := strconv.Atoi(classIDStr)
+			if err != nil || requestedClassID != managedClass.ID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You can only access your managed class"})
+				return
+			}
+		}
+	} else if isAdmin {
+		// Admin users without class_name_rep role can access any class
+		classIDStr := c.Query("class_id")
+		if classIDStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required"})
+			return
+		}
+		classID, err := strconv.Atoi(classIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
+			return
+		}
+		managedClass, err = h.classRepo.GetClassByID(classID)
+		if err != nil || managedClass == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
+			return
+		}
+	} else {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
+		return
 	}
 
 	// Get team
