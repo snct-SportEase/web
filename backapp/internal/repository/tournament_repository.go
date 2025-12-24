@@ -1166,6 +1166,36 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 			return err
 		}
 
+		// 次の試合が既に終了している場合、その試合の結果を無効化
+		if nextMatch.WinnerID.Valid && nextMatch.Status == "finished" {
+			// 次の試合の勝者と敗者を取得
+			nextMatchWinnerID := nextMatch.WinnerID.Int64
+			nextMatchLoserID := nextMatch.Team1ID.Int64
+			if nextMatchLoserID == nextMatchWinnerID {
+				nextMatchLoserID = nextMatch.Team2ID.Int64
+			}
+
+			// 次の試合の勝者に付与された点数をリセット
+			if nextMatchWinnerID != 0 && nextMatchLoserID != 0 {
+				if err := r.revertScoring(tx, nextMatch, nextMatchWinnerID, nextMatchLoserID, eventID, location); err != nil {
+					return err
+				}
+			}
+
+			// 次の試合の結果を無効化
+			_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, winner_team_id = NULL, status = 'pending' WHERE id = ?", nextMatch.ID)
+			if err != nil {
+				return err
+			}
+
+			// さらにその次の試合も連鎖的に無効化（再帰的に処理）
+			if nextMatch.NextMatchID.Valid {
+				if err := r.invalidateSubsequentMatches(tx, int(nextMatch.NextMatchID.Int64), eventID, location); err != nil {
+					return err
+				}
+			}
+		}
+
 		// 前の勝者を次の試合から削除
 		if nextMatch.Team1ID.Valid && nextMatch.Team1ID.Int64 == previousWinnerID {
 			_, err = tx.Exec("UPDATE matches SET team1_id = NULL WHERE id = ?", nextMatch.ID)
@@ -1417,6 +1447,52 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	}
 
 	return r.updateRanks(tx, eventID)
+}
+
+// invalidateSubsequentMatches invalidates all subsequent matches that depend on the given match
+// This is used when a match result is corrected and subsequent matches need to be invalidated
+func (r *tournamentRepository) invalidateSubsequentMatches(tx *sql.Tx, matchID int, eventID int, location string) error {
+	match, err := r.getMatchByID(tx, matchID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil // Match not found, nothing to invalidate
+		}
+		return err
+	}
+
+	// 既に終了していない場合は何もしない
+	if !match.WinnerID.Valid || match.Status != "finished" {
+		return nil
+	}
+
+	// この試合の勝者と敗者を取得
+	winnerID := match.WinnerID.Int64
+	loserID := match.Team1ID.Int64
+	if loserID == winnerID {
+		loserID = match.Team2ID.Int64
+	}
+
+	// この試合の勝者に付与された点数をリセット
+	if winnerID != 0 && loserID != 0 {
+		if err := r.revertScoring(tx, match, winnerID, loserID, eventID, location); err != nil {
+			return err
+		}
+	}
+
+	// この試合の結果を無効化
+	_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, winner_team_id = NULL, status = 'pending' WHERE id = ?", matchID)
+	if err != nil {
+		return err
+	}
+
+	// さらにその次の試合も連鎖的に無効化（再帰的に処理）
+	if match.NextMatchID.Valid {
+		if err := r.invalidateSubsequentMatches(tx, int(match.NextMatchID.Int64), eventID, location); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *tournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error) {
