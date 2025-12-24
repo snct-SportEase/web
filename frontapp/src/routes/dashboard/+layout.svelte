@@ -129,7 +129,7 @@
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  {#if !$isSidebarOpen || (browser && !isMobile)}
+  {#if (!$isSidebarOpen || (browser && !isMobile)) && user?.is_profile_complete}
     <header class="bg-white shadow-sm p-4 sticky top-0 z-[100] pointer-events-auto">
       <div class="flex justify-between items-center pointer-events-auto">
         <div class="flex items-center pointer-events-auto">
