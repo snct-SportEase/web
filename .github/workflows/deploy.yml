@@ -28,8 +28,18 @@ jobs:
             
             # Dockerコンテナを再構築して起動
             # --build をつけることでDockerfileの変更も反映されます
-            docker compose build --no-cache
-            docker compose up -d --build
+            docker compose down -v
+
+            docker compose -f docker-compose.production.yml build --no-cache
+            docker compose -f docker-compose.production.yml up -d --build
+
+            sleep 10
+
+            docker compose -f docker-compose.production.yml up -d --build
+
+            sleep 10
+
+            docker compose -f docker-compose.production.yml up -d --build
             
             # 不要になった古いイメージを削除（ディスク容量節約）
             docker image prune -f
