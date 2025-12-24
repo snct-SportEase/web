@@ -10,6 +10,12 @@
 
     const dispatch = createEventDispatcher();
 
+    // モーダルが開かれたときにスコアをリセット
+    $: if (showModal && selectedMatch) {
+        team1Score = 0;
+        team2Score = 0;
+    }
+
     function closeModal() {
         dispatch('close');
     }
