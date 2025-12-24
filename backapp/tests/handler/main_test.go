@@ -324,6 +324,11 @@ func (m *MockTournamentRepository) UpdateMatchResult(matchID, team1Score, team2S
 	return args.Error(0)
 }
 
+func (m *MockTournamentRepository) UpdateMatchResultForCorrection(matchID, team1Score, team2Score, winnerID int) error {
+	args := m.Called(matchID, team1Score, team2Score, winnerID)
+	return args.Error(0)
+}
+
 func (m *MockTournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error) {
 	args := m.Called(matchID)
 	return args.Int(0), args.Error(1)
@@ -332,6 +337,11 @@ func (m *MockTournamentRepository) GetTournamentIDByMatchID(matchID int) (int, e
 func (m *MockTournamentRepository) ApplyRainyModeStartTimes(eventID int) error {
 	args := m.Called(eventID)
 	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) IsMatchResultAlreadyEntered(matchID int) (bool, error) {
+	args := m.Called(matchID)
+	return args.Bool(0), args.Error(1)
 }
 
 type MockSportRepository struct {

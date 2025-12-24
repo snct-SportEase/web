@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"backapp/internal/models"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -95,15 +97,59 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 		return
 	}
 
+	// 既に入力済みの試合結果かどうかをチェック
+	alreadyEntered, err := h.tournRepo.IsMatchResultAlreadyEntered(matchID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check match status", "details": err.Error()})
+		return
+	}
+
+	// 既に入力済みの場合は、root権限のみ許可
+	if alreadyEntered {
+		userVal, exists := c.Get("user")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+			return
+		}
+		user, ok := userVal.(*models.User)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
+			return
+		}
+
+		// root権限を持っているかチェック
+		hasRootRole := false
+		for _, role := range user.Roles {
+			if role.Name == "root" {
+				hasRootRole = true
+				break
+			}
+		}
+
+		if !hasRootRole {
+			c.JSON(http.StatusForbidden, gin.H{"error": "既に入力済みの試合結果の修正はroot権限のみ可能です"})
+			return
+		}
+	}
+
 	var req UpdateMatchResultRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	if err := h.tournRepo.UpdateMatchResult(matchID, req.Team1Score, req.Team2Score, req.WinnerID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match result", "details": err.Error()})
-		return
+	// 既に入力済みの場合は修正用メソッドを使用（次の試合のチームも更新）
+	if alreadyEntered {
+		if err := h.tournRepo.UpdateMatchResultForCorrection(matchID, req.Team1Score, req.Team2Score, req.WinnerID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to correct match result", "details": err.Error()})
+			return
+		}
+	} else {
+		// 未入力の場合は通常の更新メソッドを使用
+		if err := h.tournRepo.UpdateMatchResult(matchID, req.Team1Score, req.Team2Score, req.WinnerID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match result", "details": err.Error()})
+			return
+		}
 	}
 
 	tournamentID, err := h.tournRepo.GetTournamentIDByMatchID(matchID)

@@ -1,8 +1,13 @@
 <script>
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	import InsertMatchResultModal from '$lib/components/InsertMatchResultModal.svelte';
 	import ConfirmMatchResultModal from '$lib/components/ConfirmMatchResultModal.svelte';
+
+	let { data } = $page;
+	$: user = data.user;
+	$: isRoot = user?.roles?.some(role => role.name === 'root');
 
 	let tournaments = [];
 	let selectedTournamentId = '';
@@ -128,7 +133,17 @@
 			const tournamentsResponse = await fetch(`/api/admin/events/${activeEventId}/tournaments`);
 			tournaments = await tournamentsResponse.json();
 		} else {
-			alert('試合結果の更新に失敗しました');
+			let errorMessage = '試合結果の更新に失敗しました';
+			if (response.status === 403) {
+				const errorData = await response.json().catch(() => ({}));
+				errorMessage = errorData.error || '既に入力済みの試合結果の修正はroot権限のみ可能です';
+			} else if (response.status === 400 || response.status === 500) {
+				const errorData = await response.json().catch(() => ({}));
+				if (errorData.error) {
+					errorMessage = errorData.error;
+				}
+			}
+			alert(errorMessage);
 		}
 	}
 
@@ -219,6 +234,11 @@
 							<p class="font-bold text-green-600">Winner: {winnerName}</p>
 						{:else if score1 !== undefined && score1 === score2}
 							<p class="font-bold text-yellow-600">Draw</p>
+						{/if}
+						{#if isRoot}
+							<button on:click={() => openModal(match)} class="mt-2 text-orange-600 hover:underline text-sm"
+								>結果を修正（rootのみ）</button
+							>
 						{/if}
 					{:else}
 						<button on:click={() => openModal(match)} class="text-blue-500 hover:underline"
