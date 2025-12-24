@@ -161,7 +161,7 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		return
 	}
 	if event_id == 0 {
-		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil})
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil})
 		return
 	}
 
@@ -171,11 +171,15 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		return
 	}
 	if event == nil {
-		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil})
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"event_id": event.ID, "event_name": event.Name})
+	c.JSON(http.StatusOK, gin.H{
+		"event_id":                       event.ID,
+		"event_name":                     event.Name,
+		"competition_guidelines_pdf_url": event.CompetitionGuidelinesPdfUrl,
+	})
 }
 
 func (h *EventHandler) SetActiveEvent(c *gin.Context) {
@@ -247,4 +251,41 @@ func (h *EventHandler) SetRainyMode(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Rainy mode updated successfully", "is_rainy_mode": req.IsRainyMode})
+}
+
+func (h *EventHandler) UpdateCompetitionGuidelines(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+
+	var req struct {
+		PdfUrl *string `json:"pdf_url"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	event, err := h.eventRepo.GetEventByID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if event == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+
+	event.CompetitionGuidelinesPdfUrl = req.PdfUrl
+	err = h.eventRepo.UpdateEvent(event)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, event)
 }

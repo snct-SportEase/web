@@ -135,3 +135,335 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 }
+
+func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - Update competition guidelines with PDF URL", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		eventID := 1
+		pdfUrl := "https://example.com/uploads/pdfs/guidelines.pdf"
+		event := &models.Event{
+			ID:                          eventID,
+			Name:                        "2025春季スポーツ大会",
+			Year:                        2025,
+			Season:                      "spring",
+			CompetitionGuidelinesPdfUrl: nil,
+		}
+
+		reqBody := map[string]interface{}{
+			"pdf_url": pdfUrl,
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+		mockEventRepo.On("UpdateEvent", mock.MatchedBy(func(e *models.Event) bool {
+			return e.ID == eventID && e.CompetitionGuidelinesPdfUrl != nil && *e.CompetitionGuidelinesPdfUrl == pdfUrl
+		})).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/competition-guidelines", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateCompetitionGuidelines(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - Delete competition guidelines (set to null)", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		eventID := 1
+		existingPdfUrl := "https://example.com/uploads/pdfs/old-guidelines.pdf"
+		event := &models.Event{
+			ID:                          eventID,
+			Name:                        "2025春季スポーツ大会",
+			Year:                        2025,
+			Season:                      "spring",
+			CompetitionGuidelinesPdfUrl: &existingPdfUrl,
+		}
+
+		reqBody := map[string]interface{}{
+			"pdf_url": nil,
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+		mockEventRepo.On("UpdateEvent", mock.MatchedBy(func(e *models.Event) bool {
+			return e.ID == eventID && e.CompetitionGuidelinesPdfUrl == nil
+		})).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/competition-guidelines", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateCompetitionGuidelines(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Error - Invalid event ID", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		reqBody := map[string]interface{}{
+			"pdf_url": "https://example.com/uploads/pdfs/guidelines.pdf",
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "invalid"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/invalid/competition-guidelines", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateCompetitionGuidelines(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Contains(t, response["error"], "Invalid event ID")
+		mockEventRepo.AssertNotCalled(t, "GetEventByID", mock.Anything)
+		mockEventRepo.AssertNotCalled(t, "UpdateEvent", mock.Anything)
+	})
+
+	t.Run("Error - Event not found", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		eventID := 999
+		reqBody := map[string]interface{}{
+			"pdf_url": "https://example.com/uploads/pdfs/guidelines.pdf",
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return((*models.Event)(nil), nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "999"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/999/competition-guidelines", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateCompetitionGuidelines(c)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Contains(t, response["error"], "Event not found")
+		mockEventRepo.AssertExpectations(t)
+		mockEventRepo.AssertNotCalled(t, "UpdateEvent", mock.Anything)
+	})
+
+	t.Run("Error - Invalid JSON", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+
+		invalidJSON := "{invalid json}"
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/competition-guidelines", bytes.NewBufferString(invalidJSON))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateCompetitionGuidelines(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockEventRepo.AssertNotCalled(t, "GetEventByID", mock.Anything)
+		mockEventRepo.AssertNotCalled(t, "UpdateEvent", mock.Anything)
+	})
+
+	t.Run("Error - GetEventByID returns error", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		eventID := 1
+		reqBody := map[string]interface{}{
+			"pdf_url": "https://example.com/uploads/pdfs/guidelines.pdf",
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return((*models.Event)(nil), assert.AnError).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/competition-guidelines", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateCompetitionGuidelines(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		mockEventRepo.AssertExpectations(t)
+		mockEventRepo.AssertNotCalled(t, "UpdateEvent", mock.Anything)
+	})
+
+	t.Run("Error - UpdateEvent returns error", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		eventID := 1
+		pdfUrl := "https://example.com/uploads/pdfs/guidelines.pdf"
+		event := &models.Event{
+			ID:                          eventID,
+			Name:                        "2025春季スポーツ大会",
+			Year:                        2025,
+			Season:                      "spring",
+			CompetitionGuidelinesPdfUrl: nil,
+		}
+
+		reqBody := map[string]interface{}{
+			"pdf_url": pdfUrl,
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+		mockEventRepo.On("UpdateEvent", mock.AnythingOfType("*models.Event")).Return(assert.AnError).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/competition-guidelines", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateCompetitionGuidelines(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		mockEventRepo.AssertExpectations(t)
+	})
+}
+
+func TestEventHandler_GetActiveEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - Get active event with competition guidelines", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		eventID := 1
+		pdfUrl := "https://example.com/uploads/pdfs/guidelines.pdf"
+		event := &models.Event{
+			ID:                          eventID,
+			Name:                        "2025春季スポーツ大会",
+			Year:                        2025,
+			Season:                      "spring",
+			CompetitionGuidelinesPdfUrl: &pdfUrl,
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Equal(t, float64(eventID), response["event_id"])
+		assert.Equal(t, event.Name, response["event_name"])
+		assert.Equal(t, pdfUrl, response["competition_guidelines_pdf_url"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - Get active event without competition guidelines", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		eventID := 1
+		event := &models.Event{
+			ID:                          eventID,
+			Name:                        "2025春季スポーツ大会",
+			Year:                        2025,
+			Season:                      "spring",
+			CompetitionGuidelinesPdfUrl: nil,
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Equal(t, float64(eventID), response["event_id"])
+		assert.Equal(t, event.Name, response["event_name"])
+		assert.Nil(t, response["competition_guidelines_pdf_url"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - No active event", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockWhitelistRepo := new(MockWhitelistRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(0, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Nil(t, response["event_id"])
+		assert.Nil(t, response["event_name"])
+		assert.Nil(t, response["competition_guidelines_pdf_url"])
+		mockEventRepo.AssertExpectations(t)
+		mockEventRepo.AssertNotCalled(t, "GetEventByID", mock.Anything)
+	})
+}

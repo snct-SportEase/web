@@ -250,6 +250,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.GET("/:id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				rootEvents.GET("/:id/noon-game/session", noonHandler.GetSession)
 				rootEvents.POST("/:id/noon-game/session", noonHandler.UpsertSession)
+				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				// Generic :id route should be last
 				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 			}

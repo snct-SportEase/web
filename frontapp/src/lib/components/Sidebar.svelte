@@ -117,6 +117,9 @@
         <a href="/dashboard/root/identify-mvp" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/identify-mvp')}>
           MVP確認
         </a>
+        <a href="/dashboard/root/competition-guidelines-upload" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/competition-guidelines-upload')}>
+          競技要項アップロード
+        </a>
       </div>
     {/if}
     
