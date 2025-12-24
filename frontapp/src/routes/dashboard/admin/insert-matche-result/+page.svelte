@@ -11,6 +11,7 @@
 	let showModal = false;
 	let showConfirmModal = false;
 	let scoresToSubmit = null;
+	let isRainyMode = false;
 
 	let ws;
 
@@ -51,6 +52,16 @@
 			activeEventId = eventData.event_id;
 
 			if (activeEventId) {
+				// アクティブイベントの詳細を取得して雨天時モードの状態を確認
+				const eventsResponse = await fetch('/api/root/events');
+				if (eventsResponse.ok) {
+					const events = await eventsResponse.json();
+					const activeEvent = events.find(e => e.id === activeEventId);
+					if (activeEvent) {
+						isRainyMode = activeEvent.is_rainy_mode || false;
+					}
+				}
+
 				const tournamentsResponse = await fetch(`/api/admin/events/${activeEventId}/tournaments`);
 				if (!tournamentsResponse.ok) throw new Error('Failed to fetch tournaments');
 				tournaments = await tournamentsResponse.json();
@@ -122,6 +133,11 @@
 	}
 
 	$: selectedTournament = tournaments.find((t) => t.id === selectedTournamentId);
+	// 敗者戦トーナメントが選択されていて、雨天時モードが無効な場合は選択を解除
+	$: if (selectedTournament && selectedTournament.name.includes('敗者戦') && !isRainyMode) {
+		selectedTournamentId = '';
+		selectedTournament = null;
+	}
 
 	async function renderBracket() {
 		if (!browser) return;
@@ -162,7 +178,10 @@
 	>
 		<option value="">トーナメントを選択してください</option>
 		{#each tournaments as tournament}
-			<option value={tournament.id}>{tournament.name}</option>
+			{@const isLoserBracket = tournament.name.includes('敗者戦')}
+			{#if !isLoserBracket || isRainyMode}
+				<option value={tournament.id}>{tournament.name}</option>
+			{/if}
 		{/each}
 	</select>
 </div>
@@ -171,34 +190,43 @@
 	<h2 class="text-xl font-bold mt-6 mb-2">{selectedTournament.name}</h2>
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 		{#each selectedTournament.data.matches as match}
-			<div class="border rounded-lg p-4">
-				<p class="font-semibold">Round {match.roundIndex + 1} - Match {match.order + 1}</p>
-				<p>
-					{selectedTournament.data.contestants[match.sides?.[0]?.contestantId]?.players?.[0]
-						?.title ?? 'TBD'}
-					vs
-					{selectedTournament.data.contestants[match.sides?.[1]?.contestantId]?.players?.[0]
-						?.title ?? 'TBD'}
-				</p>
-				{#if match.sides?.some((side) => side.isWinner)}
-					{@const score1 = match.sides?.[0]?.scores?.[0]?.mainScore}
-					{@const score2 = match.sides?.[1]?.scores?.[0]?.mainScore}
-					<p>Score: {score1 ?? 'N/A'} - {score2 ?? 'N/A'}</p>
-					{@const winnerSide = match.sides?.find((side) => side.isWinner)}
-					{#if winnerSide}
-						{@const winnerName =
-							selectedTournament.data.contestants[winnerSide.contestantId]?.players?.[0]?.title ??
-							'TBD'}
-						<p class="font-bold text-green-600">Winner: {winnerName}</p>
-					{:else if score1 !== undefined && score1 === score2}
-						<p class="font-bold text-yellow-600">Draw</p>
+			{@const isLoserBracketMatch = match.isLoserBracketMatch}
+			{#if !isLoserBracketMatch || isRainyMode}
+				<div class="border rounded-lg p-4 {isLoserBracketMatch ? 'bg-yellow-50' : ''}">
+					<p class="font-semibold">
+						{#if isLoserBracketMatch}
+							敗者戦{match.loserBracketBlock ? match.loserBracketBlock + 'ブロック' : ''} Round {match.roundIndex + 1} - Match {match.order + 1}
+						{:else}
+							Round {match.roundIndex + 1} - Match {match.order + 1}
+						{/if}
+					</p>
+					<p>
+						{selectedTournament.data.contestants[match.sides?.[0]?.contestantId]?.players?.[0]
+							?.title ?? 'TBD'}
+						vs
+						{selectedTournament.data.contestants[match.sides?.[1]?.contestantId]?.players?.[0]
+							?.title ?? 'TBD'}
+					</p>
+					{#if match.sides?.some((side) => side.isWinner)}
+						{@const score1 = match.sides?.[0]?.scores?.[0]?.mainScore}
+						{@const score2 = match.sides?.[1]?.scores?.[0]?.mainScore}
+						<p>Score: {score1 ?? 'N/A'} - {score2 ?? 'N/A'}</p>
+						{@const winnerSide = match.sides?.find((side) => side.isWinner)}
+						{#if winnerSide}
+							{@const winnerName =
+								selectedTournament.data.contestants[winnerSide.contestantId]?.players?.[0]?.title ??
+								'TBD'}
+							<p class="font-bold text-green-600">Winner: {winnerName}</p>
+						{:else if score1 !== undefined && score1 === score2}
+							<p class="font-bold text-yellow-600">Draw</p>
+						{/if}
+					{:else}
+						<button on:click={() => openModal(match)} class="text-blue-500 hover:underline"
+							>結果を入力</button
+						>
 					{/if}
-				{:else}
-					<button on:click={() => openModal(match)} class="text-blue-500 hover:underline"
-						>結果を入力</button
-					>
-				{/if}
-			</div>
+				</div>
+			{/if}
 		{/each}
 	</div>
 

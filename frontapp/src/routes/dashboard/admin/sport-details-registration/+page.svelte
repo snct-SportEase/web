@@ -77,6 +77,7 @@
   let pdfPreviewUrl = null;
   let activeEventName = '';
   let customColor = '#000000';
+  let isRainyMode = false;
 
   onMount(async () => {
     // Fetch active event
@@ -86,6 +87,8 @@
       if (data.event_id) {
         selectedEventId = data.event_id;
         activeEventName = data.event_name;
+        // アクティブイベントの詳細を取得して雨天時モードの状態を確認
+        await fetchActiveEventDetails();
         await fetchSports();
         await fetchClasses();
         await fetchTournaments(selectedEventId);
@@ -93,6 +96,22 @@
     }
     await renderBracket();
   });
+
+  async function fetchActiveEventDetails() {
+    if (!selectedEventId) return;
+    try {
+      const res = await fetch('/api/root/events');
+      if (res.ok) {
+        const events = await res.json();
+        const activeEvent = events.find(e => e.id === selectedEventId);
+        if (activeEvent) {
+          isRainyMode = activeEvent.is_rainy_mode || false;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch active event details:', error);
+    }
+  }
 
   async function fetchSports() {
     const res = await fetch('/api/admin/allsports');
@@ -188,11 +207,17 @@
 
   async function updateSelectedTournament() {
     selectedTournament = tournaments.find(t => t.id == selectedTournamentId) || null;
+    // 敗者戦トーナメントが選択されていて、雨天時モードが無効な場合は選択を解除
+    if (selectedTournament && selectedTournament.name.includes('敗者戦') && !isRainyMode) {
+      selectedTournament = null;
+      selectedTournamentId = null;
+    }
     updateAllMatchesForSport();
     await renderBracket();
   }
 
   // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合をまとめる
+  // 注意: 設定セクションでは雨天時モード無効時でも敗者戦を表示する（事前設定のため）
   function updateAllMatchesForSport() {
     if (!selectedSportId) {
       allMatchesForSport = [];
@@ -266,6 +291,8 @@
       if (mainTournament) {
         mainTournament.display_name = `${sportName} Tournament`;
       }
+      // 雨天時モードの状態を更新（スポーツ変更時に再確認）
+      await fetchActiveEventDetails();
       updateSelectedTournament();
     } else {
       selectedTournamentId = null;
@@ -1438,8 +1465,8 @@
               <!-- 雨天時モードの試合開始時間（本戦+敗者戦） -->
               <div class="mb-6 border-t pt-4">
                 <h3 class="text-lg font-medium mb-2">雨天時モード（本戦+敗者戦）</h3>
-                <p class="text-sm text-gray-600 mb-4">雨天時モード時の本戦と敗者戦の試合開始時間を設定できます。雨天時モードが有効になる前に設定しておくことができます。</p>
-                {#if allMatchesForSport && allMatchesForSport.length > 0}
+                <p class="text-sm text-gray-600 mb-4">雨天時モード時の本戦と敗者戦の試合開始時間を設定できます。雨天時モードが有効になった後に表示・設定できます。</p>
+                {#if isRainyMode && allMatchesForSport && allMatchesForSport.length > 0}
                   <div class="flex items-center gap-4 mb-4">
                     <input type="datetime-local" bind:value={bulkRainyModeStartTime} class="border rounded px-2 py-1">
                     <button on:click={handleBulkRainyModeTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>

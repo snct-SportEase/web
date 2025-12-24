@@ -6,11 +6,13 @@
 
     let allTournaments = [];
     let isLoading = false;
+    let isRainyMode = false;
 
     onMount(async () => {
         await activeEvent.init();
         const currentEvent = get(activeEvent);
         if (currentEvent) {
+            isRainyMode = currentEvent.is_rainy_mode || false;
             fetchTournamentsForActiveEvent();
         }
     });
@@ -85,12 +87,15 @@
     {:else if allTournaments && allTournaments.length > 0}
         <div class="space-y-8">
             {#each allTournaments as tournament (tournament.id)}
-                <div class="p-4 border rounded-lg bg-white shadow-sm">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-bold text-gray-800">{tournament.name}</h3>
+                {@const isLoserBracket = tournament.name.includes('敗者戦')}
+                {#if !isLoserBracket || isRainyMode}
+                    <div class="p-4 border rounded-lg bg-white shadow-sm">
+                        <div class="mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">{tournament.name}</h3>
+                        </div>
+                        <div id="bracket-{tournament.id}"></div>
                     </div>
-                    <div id="bracket-{tournament.id}"></div>
-                </div>
+                {/if}
             {/each}
         </div>
     {:else}
