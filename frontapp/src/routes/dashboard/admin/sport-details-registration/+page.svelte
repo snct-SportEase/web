@@ -278,9 +278,11 @@
       }
       await fetchRainyModeSettings();
 
-      if (tournaments.length === 0 && selectedEventId) {
-        await fetchTournaments(selectedEventId);
-      }
+      // 雨天時モードの状態を更新（スポーツ変更時に再確認）
+      await fetchActiveEventDetails();
+      // トーナメントデータを再取得（雨天時モードが有効になった場合、敗者戦トーナメントの対戦相手が反映される）
+      await fetchTournaments(selectedEventId);
+      
       // 本戦トーナメントを探す（" Tournament"が含まれ、敗者戦ではないもの）
       const mainTournament = tournaments.find(t => 
         t.sport_id == selectedSportId && 
@@ -291,8 +293,6 @@
       if (mainTournament) {
         mainTournament.display_name = `${sportName} Tournament`;
       }
-      // 雨天時モードの状態を更新（スポーツ変更時に再確認）
-      await fetchActiveEventDetails();
       updateSelectedTournament();
     } else {
       selectedTournamentId = null;

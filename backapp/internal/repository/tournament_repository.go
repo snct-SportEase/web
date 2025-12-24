@@ -359,7 +359,7 @@ var locationColumns = map[string]locationScoreColumns{
 	},
 }
 
-func (r *tournamentRepository) getTournamentMetadata(tx *sql.Tx, tournamentID int) (int, string, error) {
+func (r *tournamentRepository) getTournamentMetadata(tx *sql.Tx, tournamentID int) (int, int, string, error) {
 	var eventID, sportID int
 	var location sql.NullString
 
@@ -368,7 +368,7 @@ func (r *tournamentRepository) getTournamentMetadata(tx *sql.Tx, tournamentID in
 		tournamentID,
 	).Scan(&eventID, &sportID, &location)
 	if err != nil {
-		return 0, "", err
+		return 0, 0, "", err
 	}
 
 	loc := ""
@@ -376,7 +376,7 @@ func (r *tournamentRepository) getTournamentMetadata(tx *sql.Tx, tournamentID in
 		loc = location.String
 	}
 
-	return eventID, loc, nil
+	return eventID, sportID, loc, nil
 }
 
 func (r *tournamentRepository) addPoints(tx *sql.Tx, eventID int, classID int, column string, points int) error {
@@ -399,7 +399,7 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 		return nil
 	}
 
-	eventID, location, err := r.getTournamentMetadata(tx, match.TournamentID)
+	eventID, _, location, err := r.getTournamentMetadata(tx, match.TournamentID)
 	if err != nil {
 		return err
 	}
@@ -880,7 +880,7 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 	}
 
 	// 雨天時モードのチェック: 昼競技とグラウンド競技をブロック
-	eventID, location, err := r.getTournamentMetadata(tx, match.TournamentID)
+	eventID, sportID, location, err := r.getTournamentMetadata(tx, match.TournamentID)
 	if err == nil {
 		var isRainyMode bool
 		err := tx.QueryRow("SELECT is_rainy_mode FROM events WHERE id = ?", eventID).Scan(&isRainyMode)
@@ -889,6 +889,8 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 				return fmt.Errorf("雨天時モードでは、昼競技とグラウンド競技の試合結果を更新できません")
 			}
 		}
+	} else {
+		return err
 	}
 
 	alreadyFinished := match.WinnerID.Valid && match.Status == "finished"
@@ -963,6 +965,63 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 					_, err = tx.Exec("UPDATE matches SET team1_id = ? WHERE id = ?", loserID, bronzeMatch.ID)
 				}
 				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Handle loser bracket tournament assignment for first round losers (gym2 only)
+	if !match.IsBronzeMatch && !match.IsLoserBracketMatch && match.Round == 0 && location == "gym2" {
+		// Get loser bracket tournaments (A and B blocks)
+		var loserBracketAID, loserBracketBID int64
+		errA := tx.QueryRow("SELECT id FROM tournaments WHERE event_id = ? AND sport_id = ? AND name LIKE ?", eventID, sportID, "%敗者戦Aブロック%").Scan(&loserBracketAID)
+		errB := tx.QueryRow("SELECT id FROM tournaments WHERE event_id = ? AND sport_id = ? AND name LIKE ?", eventID, sportID, "%敗者戦Bブロック%").Scan(&loserBracketBID)
+		
+		if errA == nil && errB == nil {
+			// Determine which loser bracket match to assign based on match order
+			// Aブロック: 本戦1-4試合の敗者
+			// Bブロック: 本戦5-8試合の敗者
+			matchOrder := match.MatchNumberInRound
+			
+			var targetTournamentID int64
+			var targetMatchOrder int
+			var isTeam1 bool
+			
+			if matchOrder < 4 {
+				// Aブロック
+				targetTournamentID = loserBracketAID
+				targetMatchOrder = matchOrder / 2  // 0 or 1
+				isTeam1 = (matchOrder % 2) == 0    // true for orders 0,2; false for 1,3
+			} else if matchOrder < 8 {
+				// Bブロック
+				targetTournamentID = loserBracketBID
+				targetMatchOrder = (matchOrder - 4) / 2  // 0 or 1
+				isTeam1 = ((matchOrder - 4) % 2) == 0    // true for orders 4,6; false for 5,7
+			}
+			
+			if targetTournamentID > 0 {
+				// Find the target match in the loser bracket tournament
+				// Loser bracket round 1 matches have loser_bracket_round = 1
+				var targetMatchID int64
+				loserRound1 := 1
+				err := tx.QueryRow(
+					"SELECT id FROM matches WHERE tournament_id = ? AND round = ? AND match_number_in_round = ? AND is_loser_bracket_match = TRUE AND loser_bracket_round = ?",
+					targetTournamentID, 0, targetMatchOrder, loserRound1,
+				).Scan(&targetMatchID)
+				
+				if err == nil {
+					if isTeam1 {
+						// Set team1_id
+						_, err = tx.Exec("UPDATE matches SET team1_id = ? WHERE id = ?", loserID, targetMatchID)
+					} else {
+						// Set team2_id
+						_, err = tx.Exec("UPDATE matches SET team2_id = ? WHERE id = ?", loserID, targetMatchID)
+					}
+					if err != nil {
+						return err
+					}
+				} else if err != sql.ErrNoRows {
 					return err
 				}
 			}

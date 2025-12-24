@@ -13,8 +13,44 @@
         const currentEvent = get(activeEvent);
         if (currentEvent) {
             isRainyMode = currentEvent.is_rainy_mode || false;
-            fetchTournamentsForActiveEvent();
+            await fetchTournamentsForActiveEvent();
         }
+        
+        // ページがフォーカスされた時にトーナメントデータを再取得
+        const handleFocus = async () => {
+            const currentEvent = get(activeEvent);
+            if (currentEvent) {
+                // イベント情報を再取得して雨天時モードの状態を確認
+                try {
+                    const res = await fetch('/api/root/events');
+                    if (res.ok) {
+                        const events = await res.json();
+                        const active = events.find(e => e.id === currentEvent.id);
+                        if (active) {
+                            const newIsRainyMode = active.is_rainy_mode || false;
+                            if (newIsRainyMode !== isRainyMode || newIsRainyMode) {
+                                // 雨天時モードが変更された場合、または雨天時モードが有効な場合は再取得
+                                isRainyMode = newIsRainyMode;
+                                activeEvent._set(active);
+                                await fetchTournamentsForActiveEvent();
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking rainy mode:', error);
+                }
+            }
+        };
+        
+        if (browser) {
+            window.addEventListener('focus', handleFocus);
+        }
+        
+        return () => {
+            if (browser) {
+                window.removeEventListener('focus', handleFocus);
+            }
+        };
     });
 
     async function fetchTournamentsForActiveEvent() {
