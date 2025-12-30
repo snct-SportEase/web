@@ -106,6 +106,12 @@ func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
 	// Set the event_id from the URL parameter
 	eventSport.EventID = eventID
 
+	// 昼競技(noon_game)は競技割り当て(通常競技)ではなく、/noon-game で管理する
+	if eventSport.Location == "noon_game" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "昼競技(noon_game)は /noon-game で管理してください"})
+		return
+	}
+
 	if err := h.sportRepo.AssignSportToEvent(&eventSport); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign sport to the event"})
 		return
