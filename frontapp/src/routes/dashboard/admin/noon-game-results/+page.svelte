@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import { get } from 'svelte/store';
   import { dndzone } from 'svelte-dnd-action';
@@ -324,22 +324,38 @@
             
             // 既存の順序で参加者を再構築（順位はリストの位置から自動計算）
             participants = existingForm.participants.map((existingParticipant, index) => {
-              const entry = match.entries.find(e => e.id === existingParticipant.entry_id);
-              if (!entry) return null;
+              const entry = match.entries.find(e => e.id === existingParticipant.entry_id || e.id === existingParticipant.id);
               
               // リストの位置（インデックス+1）を順位として使用（ドラッグ&ドロップで設定した順序を保持）
               const rankValue = String(index + 1);
               
+              // 名前の取得：既存の名前を最優先（既にドラッグ&ドロップで設定されている名前を保持）
+              let name = existingParticipant.name;
+              
+              // 既存の名前が空の場合のみ、entryから取得
+              if (!name || name === '' || name.startsWith('参加者')) {
+                if (entry) {
+                  name = entry.resolved_name || entry.display_name || name || '';
+                }
+              }
+              
+              // 名前がまだ空の場合は、フォールバック
+              if (!name || name === '') {
+                name = `参加者 ${index + 1}`;
+              }
+              
+              const entryId = entry ? entry.id : (existingParticipant.entry_id || existingParticipant.id);
+              
               return {
-                id: entry.id,
-                entry_id: entry.id,
-                name: entry.resolved_name || entry.display_name || existingParticipant.name,
+                id: entryId,
+                entry_id: entryId,
+                name: name,
                 rank: rankValue,
                 points: existingParticipant.points !== null && existingParticipant.points !== undefined 
                   ? existingParticipant.points 
                   : null
               };
-            }).filter(p => p !== null);
+            }).filter(p => p !== null && p.entry_id);
             
             // 新しいエントリを最後に追加
             for (const entry of missingEntries) {
@@ -347,10 +363,14 @@
               const rankValue = detail && detail.rank !== undefined && detail.rank !== null 
                 ? String(detail.rank) 
                 : '';
+              
+              // 名前の取得
+              const name = entry.resolved_name || entry.display_name || `参加者 ${participants.length + 1}`;
+              
               participants.push({
                 id: entry.id,
                 entry_id: entry.id,
-                name: entry.resolved_name || entry.display_name || `参加者 ${participants.length + 1}`,
+                name: name,
                 rank: rankValue,
                 points: detail ? detail.points : null
               });
@@ -362,10 +382,14 @@
               const rankValue = detail && detail.rank !== undefined && detail.rank !== null 
                 ? String(detail.rank) 
                 : '';
+              
+              // 名前の取得
+              const name = entry.resolved_name || entry.display_name || `参加者 ${index + 1}`;
+              
               return {
                 id: entry.id,
                 entry_id: entry.id,
-                name: entry.resolved_name || entry.display_name || `参加者 ${index + 1}`,
+                name: name,
                 rank: rankValue,
                 points: detail ? detail.points : null,
                 _rank: detail && detail.rank !== undefined && detail.rank !== null ? detail.rank : 999
@@ -521,44 +545,131 @@
     };
   }
 
-  function handleDnd(e, formKey) {
+  function handleDndConsider(e, formKey) {
+    // considerイベントでは順序を更新（dndzoneが期待する動作）
+    console.log('[DND] consider event:', formKey, e.detail);
     const form = templateRunForms[formKey];
-    if (!form || !Array.isArray(form.participants)) return;
-    
-    const newParticipants = e.detail.items;
-    // 順位をリストの位置（インデックス+1）で自動設定
-    const participantsWithRank = newParticipants.map((participant, index) => {
-      const rank = index + 1;
-      return {
-        ...participant,
-        rank: String(rank)
-      };
+    if (!form || !Array.isArray(form.participants)) {
+      return;
+    }
+    // considerイベントで順序を更新することで、finalizeイベントでのエラーを回避
+    let newParticipants = e.detail.items.filter(p => {
+      const id = String(p.id || '');
+      return !id.startsWith('id:dnd-shadow-placeholder-');
     });
     
-    // 同順位チェック（同じ順位が複数ある場合は点数入力が必要）
-    const rankCounts = {};
-    participantsWithRank.forEach(p => {
-      const rank = Number(p.rank);
-      rankCounts[rank] = (rankCounts[rank] || 0) + 1;
+    // 既存のプロパティを保持しながら順序を更新
+    const existingMap = new Map();
+    form.participants.forEach(p => {
+      const key = p.entry_id || p.id;
+      if (key) existingMap.set(key, p);
     });
     
-    // 同順位がある場合は点数をクリア（再入力が必要）
-    const finalParticipants = participantsWithRank.map(p => {
-      const rank = Number(p.rank);
-      if (rankCounts[rank] > 1) {
-        // 同順位がある場合は点数をnullにする（既に点数が入力されている場合は保持）
-        return { ...p, points: p.points || null };
-      }
-      return p;
+    const updatedParticipants = newParticipants.map((p, index) => {
+      const key = p.entry_id || p.id;
+      const existing = existingMap.get(key);
+      return existing || p;
     });
     
     templateRunForms = {
       ...templateRunForms,
       [formKey]: {
         ...form,
-        participants: finalParticipants
+        participants: updatedParticipants
       }
     };
+  }
+
+  function handleDndFinalize(e, formKey) {
+    console.log('[DND] finalize event start:', formKey, e.detail);
+    
+    try {
+      const form = templateRunForms[formKey];
+      if (!form || !Array.isArray(form.participants)) {
+        console.error('[DND] Form not found or invalid:', formKey, form);
+        return;
+      }
+      
+      console.log('[DND] Current participants:', form.participants);
+      let newParticipants = e.detail.items;
+      console.log('[DND] New participants from dndzone:', newParticipants);
+      
+      // dndzoneのプレースホルダー要素を除外
+      newParticipants = newParticipants.filter(p => {
+        const id = String(p.id || '');
+        return !id.startsWith('id:dnd-shadow-placeholder-');
+      });
+      
+      console.log('[DND] Filtered participants (without placeholder):', newParticipants);
+      
+      // 既存のparticipantsをentry_idでマッピング（名前やその他のプロパティを保持するため）
+      const existingParticipantsMap = new Map();
+      form.participants.forEach(p => {
+        const key = p.entry_id || p.id;
+        if (key) {
+          existingParticipantsMap.set(key, p);
+        }
+      });
+      
+      console.log('[DND] Existing participants map:', Array.from(existingParticipantsMap.entries()));
+      
+      // 順位をリストの位置（インデックス+1）で自動設定し、既存のプロパティを保持
+      const participantsWithRank = newParticipants.map((participant, index) => {
+        const rank = index + 1;
+        const entryId = participant.entry_id || participant.id;
+        const existing = existingParticipantsMap.get(entryId);
+        
+        console.log('[DND] Processing participant:', { index, rank, entryId, existing, participant });
+        
+        // 既存のparticipantからすべてのプロパティを取得（名前を保持）
+        return {
+          id: existing?.id || entryId,
+          entry_id: existing?.entry_id || entryId,
+          name: existing?.name || participant.name || `参加者 ${index + 1}`,
+          rank: String(rank),
+          points: existing?.points !== undefined && existing?.points !== null ? existing.points : (participant.points !== undefined ? participant.points : null)
+        };
+      });
+      
+      console.log('[DND] Participants with rank:', participantsWithRank);
+      
+      // 同順位チェック（同じ順位が複数ある場合は点数入力が必要）
+      const rankCounts = {};
+      participantsWithRank.forEach(p => {
+        const rank = Number(p.rank);
+        rankCounts[rank] = (rankCounts[rank] || 0) + 1;
+      });
+      
+      // 同順位がある場合は点数をクリア（再入力が必要）
+      const finalParticipants = participantsWithRank.map(p => {
+        const rank = Number(p.rank);
+        if (rankCounts[rank] > 1) {
+          // 同順位がある場合は点数をnullにする（既に点数が入力されている場合は保持）
+          return { ...p, points: p.points !== null && p.points !== undefined ? p.points : null };
+        }
+        return p;
+      });
+      
+      console.log('[DND] Final participants:', finalParticipants);
+      
+      // dndzoneの内部処理が完全に完了するまで待つ
+      // requestAnimationFrameを2回使用して、次の2フレームまで待つ
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          console.log('[DND] Updating templateRunForms after animation frames');
+          templateRunForms = {
+            ...templateRunForms,
+            [formKey]: {
+              ...form,
+              participants: finalParticipants
+            }
+          };
+          console.log('[DND] finalize event completed:', formKey);
+        });
+      });
+    } catch (error) {
+      console.error('[DND] Error in handleDndFinalize:', error, formKey, error.stack);
+    }
   }
 
   function updateTemplateParticipantPoints(formKey, index, value) {
@@ -648,8 +759,8 @@
                             items: form.participants,
                             flipDurationMs: 200
                           }}
-                          on:consider={(e) => handleDnd(e, formKey)}
-                          on:finalize={(e) => handleDnd(e, formKey)}
+                          on:consider={(e) => handleDndConsider(e, formKey)}
+                          on:finalize={(e) => handleDndFinalize(e, formKey)}
                           class="space-y-2"
                         >
                           {#each form.participants as participant, index (participant.id || participant.entry_id)}
