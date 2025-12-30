@@ -156,6 +156,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				// Templates (noon-game)
 				adminEvent.POST("/:event_id/noon-game/templates/year-relay/run", noonHandler.CreateYearRelayRun)
 				adminEvent.POST("/:event_id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
+				adminEvent.POST("/:event_id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
 			}
 
 			admin.GET("/events", eventHandler.GetAllEvents)
@@ -185,6 +186,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/blocks/:block/result", noonHandler.RecordYearRelayBlockResult)
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/overall/result", noonHandler.RecordYearRelayOverallBonus)
 			admin.PUT("/noon-game/template-runs/:run_id/course-relay/result", noonHandler.RecordCourseRelayResult)
+			admin.PUT("/noon-game/template-runs/:run_id/tug-of-war/result", noonHandler.RecordTugOfWarResult)
 
 			adminUsers := admin.Group("/users")
 			{
