@@ -155,8 +155,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				adminEvent.GET("/:event_id/noon-game/session", noonHandler.GetSession)
 				// Templates (noon-game)
 				adminEvent.POST("/:event_id/noon-game/templates/year-relay/run", noonHandler.CreateYearRelayRun)
-				adminEvent.POST("/:event_id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
-				adminEvent.POST("/:event_id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
 			}
 
 			admin.GET("/events", eventHandler.GetAllEvents)
@@ -183,6 +181,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
 			admin.PUT("/matches/:match_id/result", tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/noon-game/matches/:match_id/result", noonHandler.RecordMatchResult)
+			admin.GET("/noon-game/matches/:match_id/template-run", noonHandler.GetTemplateRunByMatchID)
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/blocks/:block/result", noonHandler.RecordYearRelayBlockResult)
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/overall/result", noonHandler.RecordYearRelayOverallBonus)
 			admin.PUT("/noon-game/template-runs/:run_id/course-relay/result", noonHandler.RecordCourseRelayResult)
@@ -258,6 +257,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.GET("/:id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				rootEvents.GET("/:id/noon-game/session", noonHandler.GetSession)
 				rootEvents.POST("/:id/noon-game/session", noonHandler.UpsertSession)
+				rootEvents.POST("/:id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
+				rootEvents.POST("/:id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				// Generic :id route should be last
 				rootEvents.PUT("/:id", eventHandler.UpdateEvent)

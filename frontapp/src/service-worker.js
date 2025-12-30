@@ -45,6 +45,12 @@ self.addEventListener('fetch', (event) => {
 
 	async function respond() {
 		const url = new URL(event.request.url);
+		
+		// Skip caching for unsupported schemes (chrome-extension, etc.)
+		if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+			return fetch(event.request);
+		}
+
 		const cache = await caches.open(CACHE);
 
 		// `build`/`files` can always be served from the cache
@@ -67,7 +73,8 @@ self.addEventListener('fetch', (event) => {
 				throw new Error('invalid response from fetch');
 			}
 
-			if (response.status === 200) {
+			// Only cache successful responses with http/https protocol
+			if (response.status === 200 && (url.protocol === 'http:' || url.protocol === 'https:')) {
 				cache.put(event.request, response.clone());
 			}
 

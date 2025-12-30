@@ -5,6 +5,7 @@ import (
 	"backapp/internal/repository"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -29,7 +30,6 @@ func NewNoonGameHandler(noonRepo repository.NoonGameRepository, classRepo reposi
 }
 
 // CreateYearRelayRun は学年対抗リレー(テンプレート)の run を作成し、A/B/総合ボーナス用の試合を生成します。
-// 前提: 既に event に対する noon_game_session が存在していること（root が昼競技管理で作成済み）。
 func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Param("event_id"))
 	if err != nil {
@@ -48,14 +48,72 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		return
 	}
 
+	var req createTemplateRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// リクエストボディが空でもエラーにしない（後方互換性のため）
+		req = createTemplateRunRequest{}
+	}
+
 	session, err := h.noonRepo.GetSessionByEvent(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
 		return
 	}
 	if session == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "昼競技セッションが未作成です。rootで先にセッションを作成してください。"})
+		// セッションが存在しない場合はリクエストから設定を取得、またはデフォルト値を使用
+		sessionName := fmt.Sprintf("学年対抗リレー_%d", eventID)
+		if req.Session != nil && req.Session.Name != "" {
+			sessionName = req.Session.Name
+		}
+		mode := "group"
+		if req.Session != nil && req.Session.Mode != "" {
+			mode = strings.ToLower(strings.TrimSpace(req.Session.Mode))
+		}
+		session = &models.NoonGameSession{
+			EventID:             eventID,
+			Name:                sessionName,
+			Description:         nil,
+			Mode:                mode,
+			WinPoints:           0,
+			LossPoints:          0,
+			DrawPoints:          0,
+			ParticipationPoints: 0,
+			AllowManualPoints:   false,
+		}
+		if req.Session != nil {
+			if req.Session.Description != nil {
+				session.Description = req.Session.Description
+			}
+			session.WinPoints = req.Session.WinPoints
+			session.LossPoints = req.Session.LossPoints
+			session.DrawPoints = req.Session.DrawPoints
+			session.ParticipationPoints = req.Session.ParticipationPoints
+			if req.Session.AllowManualPoints != nil {
+				session.AllowManualPoints = *req.Session.AllowManualPoints
+			}
+		}
+		session, err = h.noonRepo.UpsertSession(session)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session", "details": err.Error()})
+			return
+		}
+	} else {
+		// 既にセッションが存在する場合は、そのセッションを使用（1つのイベントにつき1つのセッションのみ）
+		// セッション設定の更新は行わない（テンプレート作成時は既存セッションを使用）
+	}
+
+	// 既にテンプレートランが存在する場合は、既存のテンプレートと関連データを削除してから新しいテンプレートを作成
+	existingRuns, err := h.noonRepo.ListTemplateRunsBySession(session.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs", "details": err.Error()})
 		return
+	}
+	if len(existingRuns) > 0 {
+		// 既存のテンプレートランと関連データ（試合、グループなど）を削除
+		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(session.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run", "details": err.Error()})
+			return
+		}
 	}
 
 	// 6チーム固定（専教含む）
@@ -147,13 +205,22 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		return
 	}
 
-	run, err := h.noonRepo.CreateTemplateRun(&models.NoonGameTemplateRun{
-		SessionID:   session.ID,
-		TemplateKey: noonTemplateYearRelay,
-		Name:        fmt.Sprintf("学年対抗リレー (event_id=%d)", eventID),
-		CreatedBy:   user.ID,
-	})
+	if user.ID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user ID is required"})
+		return
+	}
+	if len(user.ID) != 36 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("user ID must be a valid UUID (36 characters), got %d characters: %q", len(user.ID), user.ID)})
+		return
+	}
+	// 学年対抗リレーの点数設定
+	var pointsByRankJSON interface{}
+	if req.Session != nil && req.Session.PointsByRank != nil {
+		pointsByRankJSON = req.Session.PointsByRank
+	}
+	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(session.ID, noonTemplateYearRelay, fmt.Sprintf("学年対抗リレー (event_id=%d)", eventID), user.ID, pointsByRankJSON)
 	if err != nil {
+		log.Printf("ERROR: CreateYearRelayRun failed to create template run: session_id=%d, user_id=%q, error=%v", session.ID, user.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run", "details": err.Error()})
 		return
 	}
@@ -182,7 +249,6 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 }
 
 // CreateCourseRelayRun はコース対抗リレー(テンプレート)の run を作成し、4チームの試合を生成します。
-// 前提: 既に event に対する noon_game_session が存在していること（root が昼競技管理で作成済み）。
 func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Param("event_id"))
 	if err != nil {
@@ -201,14 +267,72 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		return
 	}
 
+	var req createTemplateRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// リクエストボディが空でもエラーにしない（後方互換性のため）
+		req = createTemplateRunRequest{}
+	}
+
 	session, err := h.noonRepo.GetSessionByEvent(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
 		return
 	}
 	if session == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "昼競技セッションが未作成です。rootで先にセッションを作成してください。"})
+		// セッションが存在しない場合はリクエストから設定を取得、またはデフォルト値を使用
+		sessionName := fmt.Sprintf("コース対抗リレー_%d", eventID)
+		if req.Session != nil && req.Session.Name != "" {
+			sessionName = req.Session.Name
+		}
+		mode := "group"
+		if req.Session != nil && req.Session.Mode != "" {
+			mode = strings.ToLower(strings.TrimSpace(req.Session.Mode))
+		}
+		session = &models.NoonGameSession{
+			EventID:             eventID,
+			Name:                sessionName,
+			Description:         nil,
+			Mode:                mode,
+			WinPoints:           0,
+			LossPoints:          0,
+			DrawPoints:          0,
+			ParticipationPoints: 0,
+			AllowManualPoints:   false,
+		}
+		if req.Session != nil {
+			if req.Session.Description != nil {
+				session.Description = req.Session.Description
+			}
+			session.WinPoints = req.Session.WinPoints
+			session.LossPoints = req.Session.LossPoints
+			session.DrawPoints = req.Session.DrawPoints
+			session.ParticipationPoints = req.Session.ParticipationPoints
+			if req.Session.AllowManualPoints != nil {
+				session.AllowManualPoints = *req.Session.AllowManualPoints
+			}
+		}
+		session, err = h.noonRepo.UpsertSession(session)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session", "details": err.Error()})
+			return
+		}
+	} else {
+		// 既にセッションが存在する場合は、そのセッションを使用（1つのイベントにつき1つのセッションのみ）
+		// セッション設定の更新は行わない（テンプレート作成時は既存セッションを使用）
+	}
+
+	// 既にテンプレートランが存在する場合は、既存のテンプレートと関連データを削除してから新しいテンプレートを作成
+	existingRuns, err := h.noonRepo.ListTemplateRunsBySession(session.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs", "details": err.Error()})
 		return
+	}
+	if len(existingRuns) > 0 {
+		// 既存のテンプレートランと関連データ（試合、グループなど）を削除
+		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(session.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run", "details": err.Error()})
+			return
+		}
 	}
 
 	// 全クラスを取得
@@ -294,13 +418,25 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		return
 	}
 
-	run, err := h.noonRepo.CreateTemplateRun(&models.NoonGameTemplateRun{
-		SessionID:   session.ID,
-		TemplateKey: noonTemplateCourseRelay,
-		Name:        fmt.Sprintf("コース対抗リレー (event_id=%d)", eventID),
-		CreatedBy:   user.ID,
-	})
+	if user.ID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user ID is required"})
+		return
+	}
+	if len(user.ID) != 36 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("user ID must be a valid UUID (36 characters), got %d characters: %q", len(user.ID), user.ID)})
+		return
+	}
+	pointsByRank := map[int]int{1: 40, 2: 30, 3: 20, 4: 10} // デフォルト値
+	var pointsByRankInterface interface{}
+	if req.Session != nil && req.Session.PointsByRank != nil {
+		pointsByRankInterface = req.Session.PointsByRank
+	} else {
+		pointsByRankInterface = pointsByRank
+	}
+
+	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(session.ID, noonTemplateCourseRelay, fmt.Sprintf("コース対抗リレー (event_id=%d)", eventID), user.ID, pointsByRankInterface)
 	if err != nil {
+		log.Printf("ERROR: CreateCourseRelayRun failed to create template run: session_id=%d, user_id=%q, error=%v", session.ID, user.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run", "details": err.Error()})
 		return
 	}
@@ -319,7 +455,6 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 }
 
 // CreateTugOfWarRun は綱引き(テンプレート)の run を作成し、4チームの試合を生成します。
-// 前提: 既に event に対する noon_game_session が存在していること（root が昼競技管理で作成済み）。
 func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Param("event_id"))
 	if err != nil {
@@ -338,14 +473,72 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		return
 	}
 
+	var req createTemplateRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// リクエストボディが空でもエラーにしない（後方互換性のため）
+		req = createTemplateRunRequest{}
+	}
+
 	session, err := h.noonRepo.GetSessionByEvent(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
 		return
 	}
 	if session == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "昼競技セッションが未作成です。rootで先にセッションを作成してください。"})
+		// セッションが存在しない場合はリクエストから設定を取得、またはデフォルト値を使用
+		sessionName := fmt.Sprintf("綱引き_%d", eventID)
+		if req.Session != nil && req.Session.Name != "" {
+			sessionName = req.Session.Name
+		}
+		mode := "group"
+		if req.Session != nil && req.Session.Mode != "" {
+			mode = strings.ToLower(strings.TrimSpace(req.Session.Mode))
+		}
+		session = &models.NoonGameSession{
+			EventID:             eventID,
+			Name:                sessionName,
+			Description:         nil,
+			Mode:                mode,
+			WinPoints:           0,
+			LossPoints:          0,
+			DrawPoints:          0,
+			ParticipationPoints: 0,
+			AllowManualPoints:   false,
+		}
+		if req.Session != nil {
+			if req.Session.Description != nil {
+				session.Description = req.Session.Description
+			}
+			session.WinPoints = req.Session.WinPoints
+			session.LossPoints = req.Session.LossPoints
+			session.DrawPoints = req.Session.DrawPoints
+			session.ParticipationPoints = req.Session.ParticipationPoints
+			if req.Session.AllowManualPoints != nil {
+				session.AllowManualPoints = *req.Session.AllowManualPoints
+			}
+		}
+		session, err = h.noonRepo.UpsertSession(session)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session", "details": err.Error()})
+			return
+		}
+	} else {
+		// 既にセッションが存在する場合は、そのセッションを使用（1つのイベントにつき1つのセッションのみ）
+		// セッション設定の更新は行わない（テンプレート作成時は既存セッションを使用）
+	}
+
+	// 既にテンプレートランが存在する場合は、既存のテンプレートと関連データを削除してから新しいテンプレートを作成
+	existingRuns, err := h.noonRepo.ListTemplateRunsBySession(session.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs", "details": err.Error()})
 		return
+	}
+	if len(existingRuns) > 0 {
+		// 既存のテンプレートランと関連データ（試合、グループなど）を削除
+		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(session.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run", "details": err.Error()})
+			return
+		}
 	}
 
 	// 全クラスを取得
@@ -431,13 +624,25 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		return
 	}
 
-	run, err := h.noonRepo.CreateTemplateRun(&models.NoonGameTemplateRun{
-		SessionID:   session.ID,
-		TemplateKey: noonTemplateTugOfWar,
-		Name:        fmt.Sprintf("綱引き (event_id=%d)", eventID),
-		CreatedBy:   user.ID,
-	})
+	if user.ID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user ID is required"})
+		return
+	}
+	if len(user.ID) != 36 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("user ID must be a valid UUID (36 characters), got %d characters: %q", len(user.ID), user.ID)})
+		return
+	}
+	pointsByRank := map[int]int{1: 40, 2: 30, 3: 20, 4: 10} // デフォルト値
+	var pointsByRankInterface interface{}
+	if req.Session != nil && req.Session.PointsByRank != nil {
+		pointsByRankInterface = req.Session.PointsByRank
+	} else {
+		pointsByRankInterface = pointsByRank
+	}
+
+	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(session.ID, noonTemplateTugOfWar, fmt.Sprintf("綱引き (event_id=%d)", eventID), user.ID, pointsByRankInterface)
 	if err != nil {
+		log.Printf("ERROR: CreateTugOfWarRun failed to create template run: session_id=%d, user_id=%q, error=%v", session.ID, user.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run", "details": err.Error()})
 		return
 	}
@@ -551,6 +756,20 @@ type createCourseRelayRunResponse struct {
 	Matches map[string]*models.NoonGameMatchWithResult `json:"matches"`
 }
 
+type createTemplateRunRequest struct {
+	Session *struct {
+		Name                string                 `json:"name"`
+		Description         *string                `json:"description"`
+		Mode                string                 `json:"mode"`
+		WinPoints           int                    `json:"win_points"`
+		LossPoints          int                    `json:"loss_points"`
+		DrawPoints          int                    `json:"draw_points"`
+		ParticipationPoints int                    `json:"participation_points"`
+		AllowManualPoints   *bool                  `json:"allow_manual_points"`
+		PointsByRank        map[string]interface{} `json:"points_by_rank,omitempty"` // 学年対抗リレー、コース対抗リレー、綱引き用
+	} `json:"session"`
+}
+
 type yearRelayRankInput struct {
 	EntryID int  `json:"entry_id" binding:"required"`
 	Rank    int  `json:"rank" binding:"required"`
@@ -571,9 +790,8 @@ type courseRelayRankInput struct {
 }
 
 type courseRelayResultRequest struct {
-	Rankings     []courseRelayRankInput `json:"rankings" binding:"required"`
-	Note         *string                `json:"note"`
-	PointsByRank *map[int]int           `json:"points_by_rank"` // オプション: 点数設定を変更可能
+	Rankings []courseRelayRankInput `json:"rankings" binding:"required"`
+	Note     *string                `json:"note"`
 }
 
 type tugOfWarRankInput struct {
@@ -583,9 +801,8 @@ type tugOfWarRankInput struct {
 }
 
 type tugOfWarResultRequest struct {
-	Rankings     []tugOfWarRankInput `json:"rankings" binding:"required"`
-	Note         *string             `json:"note"`
-	PointsByRank *map[int]int        `json:"points_by_rank"` // オプション: 点数設定を変更可能
+	Rankings []tugOfWarRankInput `json:"rankings" binding:"required"`
+	Note     *string             `json:"note"`
 }
 
 func (h *NoonGameHandler) GetSession(c *gin.Context) {
@@ -626,6 +843,7 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 			"matches":        []interface{}{},
 			"classes":        classes,
 			"points_summary": []interface{}{},
+			"template_runs":  []interface{}{},
 		})
 		return
 	}
@@ -691,6 +909,7 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 
 	payload, err := h.buildSessionPayload(updated)
 	if err != nil {
+		log.Printf("ERROR: UpsertSession failed to build session payload: session_id=%d, error=%v", updated.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload", "details": err.Error()})
 		return
 	}
@@ -1302,7 +1521,39 @@ func (h *NoonGameHandler) RecordYearRelayBlockResult(c *gin.Context) {
 		return
 	}
 
+	// テンプレートランから点数設定を取得
+	run, err := h.noonRepo.GetTemplateRunByID(runID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		return
+	}
+	if run == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template run not found"})
+		return
+	}
+
+	// デフォルトの点数設定（1位30点、2位25点、3位20点、4位15点、5位10点、6位5点）
 	pointsByRank := map[int]int{1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5}
+	// テンプレートランに保存された点数設定を使用
+	if run.PointsByRank != nil {
+		if yearRelayPoints, ok := run.PointsByRank.(map[string]interface{}); ok {
+			blockKey := "block_a"
+			if block == yearRelayMatchB {
+				blockKey = "block_b"
+			}
+			if blockPoints, ok := yearRelayPoints[blockKey].(map[string]interface{}); ok {
+				pointsByRank = make(map[int]int)
+				for k, v := range blockPoints {
+					if rank, err := strconv.Atoi(k); err == nil {
+						if points, ok := v.(float64); ok {
+							pointsByRank[rank] = int(points)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	h.applyYearRelayRankingsToMatch(c, runID, block, req, pointsByRank)
 }
 
@@ -1321,13 +1572,40 @@ func (h *NoonGameHandler) RecordYearRelayOverallBonus(c *gin.Context) {
 		return
 	}
 
-	// 4位以下はボーナス無し
+	// テンプレートランから点数設定を取得
+	run, err := h.noonRepo.GetTemplateRunByID(runID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		return
+	}
+	if run == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template run not found"})
+		return
+	}
+
+	// デフォルトの点数設定（1位30点、2位20点、3位10点、4位以下0点）
 	pointsByRank := map[int]int{1: 30, 2: 20, 3: 10, 4: 0, 5: 0, 6: 0}
+	// テンプレートランに保存された点数設定を使用
+	if run.PointsByRank != nil {
+		if yearRelayPoints, ok := run.PointsByRank.(map[string]interface{}); ok {
+			if overallPoints, ok := yearRelayPoints["overall"].(map[string]interface{}); ok {
+				pointsByRank = make(map[int]int)
+				for k, v := range overallPoints {
+					if rank, err := strconv.Atoi(k); err == nil {
+						if points, ok := v.(float64); ok {
+							pointsByRank[rank] = int(points)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	h.applyYearRelayRankingsToMatch(c, runID, yearRelayMatchBonus, req, pointsByRank)
 }
 
 // RecordCourseRelayResult はコース対抗リレーの順位を登録し、テンプレ点を自動付与します。
-// 点数はオプションで変更可能。同順位がある場合は、該当順位の points を必須入力とします。
+// 点数はテンプレートランに保存された設定を使用します。同順位がある場合は、該当順位の points を必須入力とします。
 func (h *NoonGameHandler) RecordCourseRelayResult(c *gin.Context) {
 	runID, err := strconv.Atoi(c.Param("run_id"))
 	if err != nil {
@@ -1341,11 +1619,32 @@ func (h *NoonGameHandler) RecordCourseRelayResult(c *gin.Context) {
 		return
 	}
 
+	// テンプレートランから点数設定を取得
+	run, err := h.noonRepo.GetTemplateRunByID(runID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		return
+	}
+	if run == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template run not found"})
+		return
+	}
+
 	// デフォルトの点数設定（1位40点、2位30点、3位20点、4位10点）
 	pointsByRank := map[int]int{1: 40, 2: 30, 3: 20, 4: 10}
-	// オプションで点数設定が指定されている場合は上書き
-	if req.PointsByRank != nil {
-		pointsByRank = *req.PointsByRank
+	// テンプレートランに保存された点数設定を使用
+	if run.PointsByRank != nil {
+		if pointsMap, ok := run.PointsByRank.(map[string]interface{}); ok {
+			// コース対抗リレーと綱引きの形式: {"1": 40, "2": 30, ...}
+			pointsByRank = make(map[int]int)
+			for k, v := range pointsMap {
+				if rank, err := strconv.Atoi(k); err == nil {
+					if points, ok := v.(float64); ok {
+						pointsByRank[rank] = int(points)
+					}
+				}
+			}
+		}
 	}
 
 	// yearRelayBlockResultRequestに変換
@@ -1366,7 +1665,7 @@ func (h *NoonGameHandler) RecordCourseRelayResult(c *gin.Context) {
 }
 
 // RecordTugOfWarResult は綱引きの順位を登録し、テンプレ点を自動付与します。
-// 点数はオプションで変更可能。同順位がある場合は、該当順位の points を必須入力とします。
+// 点数はテンプレートランに保存された設定を使用します。同順位がある場合は、該当順位の points を必須入力とします。
 func (h *NoonGameHandler) RecordTugOfWarResult(c *gin.Context) {
 	runID, err := strconv.Atoi(c.Param("run_id"))
 	if err != nil {
@@ -1380,11 +1679,32 @@ func (h *NoonGameHandler) RecordTugOfWarResult(c *gin.Context) {
 		return
 	}
 
+	// テンプレートランから点数設定を取得
+	run, err := h.noonRepo.GetTemplateRunByID(runID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		return
+	}
+	if run == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template run not found"})
+		return
+	}
+
 	// デフォルトの点数設定（1位40点、2位30点、3位20点、4位10点）
 	pointsByRank := map[int]int{1: 40, 2: 30, 3: 20, 4: 10}
-	// オプションで点数設定が指定されている場合は上書き
-	if req.PointsByRank != nil {
-		pointsByRank = *req.PointsByRank
+	// テンプレートランに保存された点数設定を使用
+	if run.PointsByRank != nil {
+		if pointsMap, ok := run.PointsByRank.(map[string]interface{}); ok {
+			// コース対抗リレーと綱引きの形式: {"1": 40, "2": 30, ...}
+			pointsByRank = make(map[int]int)
+			for k, v := range pointsMap {
+				if rank, err := strconv.Atoi(k); err == nil {
+					if points, ok := v.(float64); ok {
+						pointsByRank[rank] = int(points)
+					}
+				}
+			}
+		}
 	}
 
 	// yearRelayBlockResultRequestに変換
@@ -2290,6 +2610,12 @@ func (h *NoonGameHandler) buildSessionPayload(session *models.NoonGameSession) (
 		})
 	}
 
+	templateRuns, err := h.noonRepo.ListTemplateRunsBySession(session.ID)
+	if err != nil {
+		log.Printf("ERROR: buildSessionPayload failed to fetch template runs: session_id=%d, error=%v", session.ID, err)
+		return nil, fmt.Errorf("failed to fetch template runs: %w", err)
+	}
+
 	session.Groups = groups
 	session.Matches = matches
 	session.PointsSummary = summary
@@ -2300,6 +2626,7 @@ func (h *NoonGameHandler) buildSessionPayload(session *models.NoonGameSession) (
 		"matches":        matches,
 		"classes":        classes,
 		"points_summary": summary,
+		"template_runs":  templateRuns,
 	}, nil
 }
 
@@ -2523,4 +2850,38 @@ func validateSide(side struct {
 		return fmt.Errorf("type must be 'class' or 'group'")
 	}
 	return nil
+}
+
+// GetTemplateRunByMatchID は試合IDからテンプレートラン情報を取得します
+func (h *NoonGameHandler) GetTemplateRunByMatchID(c *gin.Context) {
+	matchID, err := strconv.Atoi(c.Param("match_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match_id"})
+		return
+	}
+
+	link, err := h.noonRepo.GetTemplateRunMatchByMatchID(matchID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run match", "details": err.Error()})
+		return
+	}
+	if link == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template run match not found"})
+		return
+	}
+
+	run, err := h.noonRepo.GetTemplateRunByID(link.RunID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		return
+	}
+	if run == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template run not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"run":       run,
+		"match_key": link.MatchKey,
+	})
 }
