@@ -2024,7 +2024,273 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		return
 	}
 
+	// AブロックまたはBブロックの結果が登録された場合、両方のブロックの結果が揃っていれば総合ボーナスを自動計算
+	if matchKey == yearRelayMatchA || matchKey == yearRelayMatchB {
+		if err := h.calculateAndRecordYearRelayOverallBonus(runID, user); err != nil {
+			// エラーが発生しても、ブロック結果の登録は成功しているので、エラーログを出力するだけ
+			log.Printf("WARNING: failed to calculate overall bonus: run_id=%d, error=%v", runID, err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"match": full})
+}
+
+// calculateAndRecordYearRelayOverallBonus は学年対抗リレーの総合ボーナスを自動計算して登録します。
+// AブロックとBブロックの両方の結果が揃っている場合のみ実行されます。
+func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, user *models.User) error {
+	// テンプレートランから点数設定を取得
+	run, err := h.noonRepo.GetTemplateRunByID(runID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch template run: %w", err)
+	}
+	if run == nil || run.TemplateKey != noonTemplateYearRelay {
+		return fmt.Errorf("template run not found or invalid")
+	}
+
+	// AブロックとBブロックの試合を取得
+	linkA, err := h.noonRepo.GetTemplateRunMatchByKey(runID, yearRelayMatchA)
+	if err != nil {
+		return fmt.Errorf("failed to fetch A block match link: %w", err)
+	}
+	if linkA == nil {
+		return fmt.Errorf("A block match link not found")
+	}
+
+	linkB, err := h.noonRepo.GetTemplateRunMatchByKey(runID, yearRelayMatchB)
+	if err != nil {
+		return fmt.Errorf("failed to fetch B block match link: %w", err)
+	}
+	if linkB == nil {
+		return fmt.Errorf("B block match link not found")
+	}
+
+	matchA, err := h.noonRepo.GetMatchByID(linkA.MatchID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch A block match: %w", err)
+	}
+	if matchA == nil {
+		return fmt.Errorf("A block match not found")
+	}
+
+	matchB, err := h.noonRepo.GetMatchByID(linkB.MatchID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch B block match: %w", err)
+	}
+	if matchB == nil {
+		return fmt.Errorf("B block match not found")
+	}
+
+	// AブロックとBブロックの両方に結果が登録されているか確認
+	if matchA.Result == nil || matchB.Result == nil {
+		return nil // まだ両方の結果が揃っていない場合は何もしない
+	}
+
+	// 総合ボーナスの試合を取得
+	linkBonus, err := h.noonRepo.GetTemplateRunMatchByKey(runID, yearRelayMatchBonus)
+	if err != nil {
+		return fmt.Errorf("failed to fetch bonus match link: %w", err)
+	}
+	if linkBonus == nil {
+		return fmt.Errorf("bonus match link not found")
+	}
+
+	matchBonus, err := h.noonRepo.GetMatchByID(linkBonus.MatchID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch bonus match: %w", err)
+	}
+	if matchBonus == nil {
+		return fmt.Errorf("bonus match not found")
+	}
+
+	// 既に総合ボーナスが登録されている場合はスキップ（再計算を防ぐ）
+	if matchBonus.Result != nil {
+		return nil
+	}
+
+	session, err := h.noonRepo.GetSessionByID(matchA.SessionID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch session: %w", err)
+	}
+	if session == nil {
+		return fmt.Errorf("session not found")
+	}
+
+	// 各チームのAブロックとBブロックの合計点数を計算
+	// entry_idをキーとして、AブロックとBブロックの点数を集計
+	entryTotalPoints := make(map[int]int)  // entry_id -> 合計点数
+	entryToClassIDs := make(map[int][]int) // entry_id -> classIDs
+
+	// Aブロックの点数を集計
+	if matchA.Result != nil && matchA.Result.Details != nil {
+		for _, detail := range matchA.Result.Details {
+			if detail.Points > 0 {
+				entryTotalPoints[detail.EntryID] += detail.Points
+				// entry_idからclassIDsを取得
+				for _, entry := range matchA.Entries {
+					if entry != nil && entry.ID == detail.EntryID {
+						classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
+						if err == nil && len(classIDs) > 0 {
+							entryToClassIDs[detail.EntryID] = classIDs
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Bブロックの点数を集計
+	if matchB.Result != nil && matchB.Result.Details != nil {
+		for _, detail := range matchB.Result.Details {
+			if detail.Points > 0 {
+				entryTotalPoints[detail.EntryID] += detail.Points
+				// entry_idからclassIDsを取得（まだ取得していない場合）
+				if _, ok := entryToClassIDs[detail.EntryID]; !ok {
+					for _, entry := range matchB.Entries {
+						if entry != nil && entry.ID == detail.EntryID {
+							classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
+							if err == nil && len(classIDs) > 0 {
+								entryToClassIDs[detail.EntryID] = classIDs
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 合計点数でソートして順位を決定
+	type entryScore struct {
+		EntryID int
+		Points  int
+	}
+	scores := make([]entryScore, 0, len(entryTotalPoints))
+	for entryID, points := range entryTotalPoints {
+		scores = append(scores, entryScore{EntryID: entryID, Points: points})
+	}
+	// 点数が高い順にソート
+	for i := 0; i < len(scores)-1; i++ {
+		for j := i + 1; j < len(scores); j++ {
+			if scores[i].Points < scores[j].Points {
+				scores[i], scores[j] = scores[j], scores[i]
+			}
+		}
+	}
+
+	// 順位を決定（同点の場合は同じ順位）
+	rankings := make([]yearRelayRankInput, 0, len(scores))
+	currentRank := 1
+	for i, score := range scores {
+		if i > 0 && score.Points < scores[i-1].Points {
+			currentRank = i + 1
+		}
+		rankings = append(rankings, yearRelayRankInput{
+			EntryID: score.EntryID,
+			Rank:    currentRank,
+			Points:  nil, // 総合ボーナスは自動計算なのでpointsは不要
+		})
+	}
+
+	// テンプレートランから総合ボーナスの点数設定を取得
+	pointsByRank := map[int]int{1: 30, 2: 20, 3: 10, 4: 0, 5: 0, 6: 0}
+	if run.PointsByRank != nil {
+		if yearRelayPoints, ok := run.PointsByRank.(map[string]interface{}); ok {
+			if overallPoints, ok := yearRelayPoints["overall"].(map[string]interface{}); ok {
+				pointsByRank = make(map[int]int)
+				for k, v := range overallPoints {
+					if rank, err := strconv.Atoi(k); err == nil {
+						if points, ok := v.(float64); ok {
+							pointsByRank[rank] = int(points)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 総合ボーナスの点数を付与
+	pointsEntries := make([]*models.NoonGamePoint, 0)
+	resultDetails := make([]*models.NoonGameResultDetail, 0)
+
+	matchTitle := fmt.Sprintf("試合 #%d", matchBonus.ID)
+	if matchBonus.Title != nil && strings.TrimSpace(*matchBonus.Title) != "" {
+		matchTitle = strings.TrimSpace(*matchBonus.Title)
+	}
+
+	for _, ranking := range rankings {
+		classIDs := entryToClassIDs[ranking.EntryID]
+		if len(classIDs) == 0 {
+			continue
+		}
+
+		points := 0
+		if p, ok := pointsByRank[ranking.Rank]; ok {
+			points = p
+		}
+
+		if points > 0 {
+			reason := fmt.Sprintf("昼競技テンプレ(%s) (%s)", run.Name, matchTitle)
+			for _, classID := range classIDs {
+				reasonCopy := reason
+				mid := matchBonus.ID
+				pointsEntries = append(pointsEntries, &models.NoonGamePoint{
+					SessionID: session.ID,
+					MatchID:   &mid,
+					ClassID:   classID,
+					Points:    points,
+					Reason:    &reasonCopy,
+					Source:    "result",
+					CreatedBy: user.ID,
+				})
+			}
+		}
+
+		rankCopy := ranking.Rank
+		resultDetails = append(resultDetails, &models.NoonGameResultDetail{
+			EntryID: ranking.EntryID,
+			Rank:    &rankCopy,
+			Points:  points,
+		})
+	}
+
+	// 既存ポイントを消す
+	if err := h.noonRepo.ClearPointsForMatch(matchBonus.ID); err != nil {
+		return fmt.Errorf("failed to clear existing points: %w", err)
+	}
+
+	// 点数を登録
+	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
+		return fmt.Errorf("failed to store points: %w", err)
+	}
+
+	// 試合結果を登録
+	if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
+		MatchID:    matchBonus.ID,
+		Winner:     "draw", // 総合ボーナスは順位ベースなのでwinnerはdraw
+		RecordedBy: user.ID,
+		Note:       nil,
+		Details:    resultDetails,
+	}); err != nil {
+		return fmt.Errorf("failed to store match result: %w", err)
+	}
+
+	// 試合ステータスを更新
+	matchBonus.Status = "completed"
+	if _, err := h.noonRepo.SaveMatch(matchBonus.NoonGameMatch); err != nil {
+		return fmt.Errorf("failed to update match status: %w", err)
+	}
+
+	// クラス得点へ反映
+	summary, err := h.noonRepo.SumPointsByClass(session.ID)
+	if err != nil {
+		return fmt.Errorf("failed to aggregate points: %w", err)
+	}
+	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
+		return fmt.Errorf("failed to update class scores: %w", err)
+	}
+
+	return nil
 }
 
 func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(

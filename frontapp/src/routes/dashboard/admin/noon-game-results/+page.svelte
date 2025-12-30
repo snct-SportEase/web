@@ -249,7 +249,10 @@
       if (!template) continue;
 
       if (template.type === 'year-relay') {
-        yearRelayMatches.push({ match, template });
+        // 総合ボーナスは自動計算されるため、入力UIから除外
+        if (template.block !== 'BONUS') {
+          yearRelayMatches.push({ match, template });
+        }
       } else if (template.type === 'course-relay') {
         courseRelayMatches.push({ match, template });
       } else if (template.type === 'tug-of-war') {
@@ -389,11 +392,8 @@
       };
 
       if (template.type === 'year-relay') {
-        if (template.block === 'BONUS') {
-          endpoint = `/api/admin/noon-game/template-runs/${runId}/year-relay/overall/result`;
-        } else {
-          endpoint = `/api/admin/noon-game/template-runs/${runId}/year-relay/blocks/${template.block}/result`;
-        }
+        // 総合ボーナスは自動計算されるため、ここには来ない
+        endpoint = `/api/admin/noon-game/template-runs/${runId}/year-relay/blocks/${template.block}/result`;
       } else if (template.type === 'course-relay') {
         endpoint = `/api/admin/noon-game/template-runs/${runId}/course-relay/result`;
       } else if (template.type === 'tug-of-war') {
