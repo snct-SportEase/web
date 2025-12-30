@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import { get } from 'svelte/store';
+  import { dndzone } from 'svelte-dnd-action';
 
   let session = null;
   let matches = [];
@@ -298,7 +299,7 @@
 
     templateRuns = Array.from(runs.values());
 
-    // フォームを初期化
+    // フォームを初期化（既存のフォームがある場合は順序を保持）
     const forms = {};
     for (const run of templateRuns) {
       for (const { match, template } of run.matches) {
@@ -310,28 +311,87 @@
             detailMap.set(detail.entry_id, detail);
           }
         }
-        const participants = hasEntries
-          ? match.entries.map((entry, index) => {
-              const detail = detailMap.get(entry.id);
-              const rankValue =
-                detail && detail.rank !== undefined && detail.rank !== null ? String(detail.rank) : '';
+        
+        // 既存のフォームがある場合は順序を保持
+        const existingForm = templateRunForms[formKey];
+        let participants = [];
+        
+        if (hasEntries) {
+          if (existingForm && existingForm.participants && existingForm.participants.length > 0) {
+            // 既存のフォームの順序を完全に保持（ドラッグ&ドロップで設定した順序を優先）
+            const existingEntryIds = new Set(existingForm.participants.map(p => p.entry_id));
+            const missingEntries = match.entries.filter(entry => !existingEntryIds.has(entry.id));
+            
+            // 既存の順序で参加者を再構築（順位はリストの位置から自動計算）
+            participants = existingForm.participants.map((existingParticipant, index) => {
+              const entry = match.entries.find(e => e.id === existingParticipant.entry_id);
+              if (!entry) return null;
+              
+              // リストの位置（インデックス+1）を順位として使用（ドラッグ&ドロップで設定した順序を保持）
+              const rankValue = String(index + 1);
+              
               return {
+                id: entry.id,
                 entry_id: entry.id,
-                name:
-                  entry.resolved_name ||
-                  entry.display_name ||
-                  `参加者 ${index + 1}`,
+                name: entry.resolved_name || entry.display_name || existingParticipant.name,
                 rank: rankValue,
-                points: null // 同順位の場合のみ
+                points: existingParticipant.points !== null && existingParticipant.points !== undefined 
+                  ? existingParticipant.points 
+                  : null
               };
-            })
-          : [];
+            }).filter(p => p !== null);
+            
+            // 新しいエントリを最後に追加
+            for (const entry of missingEntries) {
+              const detail = detailMap.get(entry.id);
+              const rankValue = detail && detail.rank !== undefined && detail.rank !== null 
+                ? String(detail.rank) 
+                : '';
+              participants.push({
+                id: entry.id,
+                entry_id: entry.id,
+                name: entry.resolved_name || entry.display_name || `参加者 ${participants.length + 1}`,
+                rank: rankValue,
+                points: detail ? detail.points : null
+              });
+            }
+          } else {
+            // 既存のフォームがない場合は、結果の順位でソート
+            const participantsWithRank = match.entries.map((entry, index) => {
+              const detail = detailMap.get(entry.id);
+              const rankValue = detail && detail.rank !== undefined && detail.rank !== null 
+                ? String(detail.rank) 
+                : '';
+              return {
+                id: entry.id,
+                entry_id: entry.id,
+                name: entry.resolved_name || entry.display_name || `参加者 ${index + 1}`,
+                rank: rankValue,
+                points: detail ? detail.points : null,
+                _rank: detail && detail.rank !== undefined && detail.rank !== null ? detail.rank : 999
+              };
+            });
+            
+            // 順位でソート（順位がない場合は最後に）
+            participantsWithRank.sort((a, b) => {
+              if (a._rank === 999 && b._rank === 999) return 0;
+              if (a._rank === 999) return 1;
+              if (b._rank === 999) return -1;
+              return a._rank - b._rank;
+            });
+            
+            participants = participantsWithRank.map(p => {
+              const { _rank, ...rest } = p;
+              return rest;
+            });
+          }
+        }
 
         forms[formKey] = {
           matchId: match.id,
           template: template,
           participants,
-          note: match.result?.note ?? ''
+          note: match.result?.note ?? (existingForm?.note || '')
         };
       }
     }
@@ -357,17 +417,17 @@
     errorMessage = '';
 
     try {
+      // ドラッグ&ドロップで設定した順序（リストの位置）で順位を決定
       const rankings = form.participants
-        .map((participant) => {
-          const rankValue = participant.rank === '' ? null : Number(participant.rank);
-          if (rankValue === null) return null;
+        .map((participant, index) => {
+          // リストの位置（インデックス+1）を順位として使用
+          const rankValue = index + 1;
           return {
             entry_id: participant.entry_id,
             rank: rankValue,
             points: participant.points !== null ? participant.points : null
           };
-        })
-        .filter((row) => row !== null);
+        });
 
       if (rankings.length === 0) {
         throw new Error('順位を入力してください。');
@@ -461,7 +521,85 @@
     };
   }
 
+  function handleDnd(e, formKey) {
+    const form = templateRunForms[formKey];
+    if (!form || !Array.isArray(form.participants)) return;
+    
+    const newParticipants = e.detail.items;
+    // 順位をリストの位置（インデックス+1）で自動設定
+    const participantsWithRank = newParticipants.map((participant, index) => {
+      const rank = index + 1;
+      return {
+        ...participant,
+        rank: String(rank)
+      };
+    });
+    
+    // 同順位チェック（同じ順位が複数ある場合は点数入力が必要）
+    const rankCounts = {};
+    participantsWithRank.forEach(p => {
+      const rank = Number(p.rank);
+      rankCounts[rank] = (rankCounts[rank] || 0) + 1;
+    });
+    
+    // 同順位がある場合は点数をクリア（再入力が必要）
+    const finalParticipants = participantsWithRank.map(p => {
+      const rank = Number(p.rank);
+      if (rankCounts[rank] > 1) {
+        // 同順位がある場合は点数をnullにする（既に点数が入力されている場合は保持）
+        return { ...p, points: p.points || null };
+      }
+      return p;
+    });
+    
+    templateRunForms = {
+      ...templateRunForms,
+      [formKey]: {
+        ...form,
+        participants: finalParticipants
+      }
+    };
+  }
+
+  function updateTemplateParticipantPoints(formKey, index, value) {
+    const form = templateRunForms[formKey];
+    if (!form || !Array.isArray(form.participants)) return;
+    const participants = [...form.participants];
+    participants[index] = {
+      ...participants[index],
+      points: value === '' ? null : Number(value)
+    };
+    templateRunForms = {
+      ...templateRunForms,
+      [formKey]: {
+        ...form,
+        participants
+      }
+    };
+  }
+
 </script>
+
+<style>
+  :global(.dnd-zone) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  :global(.dnd-zone li) {
+    user-select: none;
+  }
+  
+  :global(.dnd-zone li.dnd-dragging) {
+    opacity: 0.5;
+  }
+  
+  :global(.dnd-zone li.dnd-drag-over) {
+    border-color: #6366f1;
+    background-color: #eef2ff;
+  }
+</style>
 
 <div class="space-y-8 p-4 md:p-8">
   <h1 class="text-3xl font-bold text-gray-800 border-b pb-2">昼競技結果入力</h1>
@@ -503,35 +641,51 @@
                   <div class="border rounded p-4 bg-white space-y-3">
                     <h4 class="font-semibold text-gray-700">{match.title}</h4>
                     <div class="space-y-3">
-                      <p class="text-sm font-semibold text-gray-700">順位入力</p>
+                      <p class="text-sm font-semibold text-gray-700">順位入力（ドラッグ&ドロップで並び替え）</p>
                       <div class="space-y-2">
-                        {#each form.participants as participant, index}
-                          <div class="border rounded px-3 py-2 space-y-2 bg-gray-50">
-                            <p class="text-sm font-semibold text-gray-800">{participant.name}</p>
-                            <div class="grid grid-cols-2 gap-2">
-                              <div class="space-y-1">
-                                <label class="text-xs font-semibold text-gray-600">順位</label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  class="border rounded px-2 py-1 text-sm w-full"
-                                  value={participant.rank}
-                                  on:input={(e) => updateTemplateParticipantField(formKey, index, 'rank', e.target.value)}
-                                />
+                        <ul
+                          use:dndzone={{
+                            items: form.participants,
+                            flipDurationMs: 200
+                          }}
+                          on:consider={(e) => handleDnd(e, formKey)}
+                          on:finalize={(e) => handleDnd(e, formKey)}
+                          class="space-y-2"
+                        >
+                          {#each form.participants as participant, index (participant.id || participant.entry_id)}
+                            {@const currentRank = index + 1}
+                            {@const rankCount = form.participants.filter((p, idx) => {
+                              const pRank = idx + 1;
+                              return pRank === currentRank;
+                            }).length}
+                            {@const needsPoints = rankCount > 1}
+                            <li class="border rounded px-3 py-2 bg-gray-50 cursor-move hover:bg-gray-100 transition-colors">
+                              <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center space-x-3">
+                                  <div class="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-semibold text-sm">
+                                    {currentRank}
+                                  </div>
+                                  <p class="text-sm font-semibold text-gray-800">{participant.name}</p>
+                                </div>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                                </svg>
                               </div>
-                              <div class="space-y-1">
-                                <label class="text-xs font-semibold text-gray-600">点数（同順位の場合のみ必須）</label>
-                                <input
-                                  type="number"
-                                  class="border rounded px-2 py-1 text-sm w-full"
-                                  value={participant.points ?? ''}
-                                  on:input={(e) => updateTemplateParticipantField(formKey, index, 'points', e.target.value)}
-                                  placeholder="同順位時のみ"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        {/each}
+                              {#if needsPoints}
+                                <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                                  <label class="text-xs font-semibold text-yellow-800">点数（同順位のため必須）</label>
+                                  <input
+                                    type="number"
+                                    class="border border-yellow-300 rounded px-2 py-1 text-sm w-full mt-1"
+                                    value={participant.points ?? ''}
+                                    on:input={(e) => updateTemplateParticipantPoints(formKey, index, e.target.value)}
+                                    placeholder="点数を入力"
+                                  />
+                                </div>
+                              {/if}
+                            </li>
+                          {/each}
+                        </ul>
                       </div>
                       <div class="space-y-2">
                         <label class="text-sm font-semibold text-gray-700">備考</label>
