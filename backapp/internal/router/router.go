@@ -153,6 +153,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				adminEvent.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				adminEvent.GET("/:event_id/noon-game/session", noonHandler.GetSession)
+				// Templates (noon-game)
+				adminEvent.POST("/:event_id/noon-game/templates/year-relay/run", noonHandler.CreateYearRelayRun)
 			}
 
 			admin.GET("/events", eventHandler.GetAllEvents)
@@ -165,7 +167,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			}
 
 			// Assign a sport to a specific event
-			admin.POST("/events/:id/sports", sportHandler.AssignSportToEventHandler)
+			admin.POST("/events/:event_id/sports", sportHandler.AssignSportToEventHandler)
 			// Delete a sport from a specific event
 			admin.DELETE("/events/:event_id/sports/:sport_id", sportHandler.DeleteSportFromEventHandler)
 
@@ -179,6 +181,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
 			admin.PUT("/matches/:match_id/result", tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/noon-game/matches/:match_id/result", noonHandler.RecordMatchResult)
+			admin.PUT("/noon-game/template-runs/:run_id/year-relay/blocks/:block/result", noonHandler.RecordYearRelayBlockResult)
+			admin.PUT("/noon-game/template-runs/:run_id/year-relay/overall/result", noonHandler.RecordYearRelayOverallBonus)
 
 			adminUsers := admin.Group("/users")
 			{

@@ -33,6 +33,13 @@ type NoonGameRepository interface {
 	SumPointsByClass(sessionID int) (map[int]int, error)
 
 	GetGroupMembers(groupID int) ([]*models.NoonGameGroupMember, error)
+
+	// --- Template runs ---
+	CreateTemplateRun(run *models.NoonGameTemplateRun) (*models.NoonGameTemplateRun, error)
+	GetTemplateRunByID(runID int) (*models.NoonGameTemplateRun, error)
+	ListTemplateRunMatches(runID int) ([]*models.NoonGameTemplateRunMatch, error)
+	LinkTemplateRunMatch(runID int, matchID int, matchKey string) (*models.NoonGameTemplateRunMatch, error)
+	GetTemplateRunMatchByKey(runID int, matchKey string) (*models.NoonGameTemplateRunMatch, error)
 }
 
 type noonGameRepository struct {
@@ -41,6 +48,141 @@ type noonGameRepository struct {
 
 func NewNoonGameRepository(db *sql.DB) NoonGameRepository {
 	return &noonGameRepository{db: db}
+}
+
+func (r *noonGameRepository) CreateTemplateRun(run *models.NoonGameTemplateRun) (*models.NoonGameTemplateRun, error) {
+	if run == nil {
+		return nil, fmt.Errorf("run is nil")
+	}
+	if run.SessionID == 0 {
+		return nil, fmt.Errorf("session_id is required")
+	}
+	if strings.TrimSpace(run.TemplateKey) == "" {
+		return nil, fmt.Errorf("template_key is required")
+	}
+	if strings.TrimSpace(run.Name) == "" {
+		return nil, fmt.Errorf("name is required")
+	}
+	if strings.TrimSpace(run.CreatedBy) == "" {
+		return nil, fmt.Errorf("created_by is required")
+	}
+
+	res, err := r.db.Exec(`
+		INSERT INTO noon_game_template_runs (session_id, template_key, name, created_by)
+		VALUES (?, ?, ?, ?)
+	`, run.SessionID, strings.TrimSpace(run.TemplateKey), strings.TrimSpace(run.Name), strings.TrimSpace(run.CreatedBy))
+	if err != nil {
+		return nil, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	return r.GetTemplateRunByID(int(id))
+}
+
+func (r *noonGameRepository) GetTemplateRunByID(runID int) (*models.NoonGameTemplateRun, error) {
+	row := r.db.QueryRow(`
+		SELECT id, session_id, template_key, name, created_by, created_at, updated_at
+		FROM noon_game_template_runs
+		WHERE id = ?
+	`, runID)
+
+	run := &models.NoonGameTemplateRun{}
+	if err := row.Scan(
+		&run.ID,
+		&run.SessionID,
+		&run.TemplateKey,
+		&run.Name,
+		&run.CreatedBy,
+		&run.CreatedAt,
+		&run.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return run, nil
+}
+
+func (r *noonGameRepository) LinkTemplateRunMatch(runID int, matchID int, matchKey string) (*models.NoonGameTemplateRunMatch, error) {
+	if runID == 0 || matchID == 0 {
+		return nil, fmt.Errorf("run_id and match_id are required")
+	}
+	key := strings.TrimSpace(matchKey)
+	if key == "" {
+		return nil, fmt.Errorf("match_key is required")
+	}
+
+	res, err := r.db.Exec(`
+		INSERT INTO noon_game_template_run_matches (run_id, match_id, match_key)
+		VALUES (?, ?, ?)
+	`, runID, matchID, key)
+	if err != nil {
+		return nil, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	row := r.db.QueryRow(`
+		SELECT id, run_id, match_id, match_key
+		FROM noon_game_template_run_matches
+		WHERE id = ?
+	`, int(id))
+	out := &models.NoonGameTemplateRunMatch{}
+	if err := row.Scan(&out.ID, &out.RunID, &out.MatchID, &out.MatchKey); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *noonGameRepository) ListTemplateRunMatches(runID int) ([]*models.NoonGameTemplateRunMatch, error) {
+	rows, err := r.db.Query(`
+		SELECT id, run_id, match_id, match_key
+		FROM noon_game_template_run_matches
+		WHERE run_id = ?
+		ORDER BY id
+	`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*models.NoonGameTemplateRunMatch
+	for rows.Next() {
+		item := &models.NoonGameTemplateRunMatch{}
+		if err := rows.Scan(&item.ID, &item.RunID, &item.MatchID, &item.MatchKey); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *noonGameRepository) GetTemplateRunMatchByKey(runID int, matchKey string) (*models.NoonGameTemplateRunMatch, error) {
+	key := strings.TrimSpace(matchKey)
+	if key == "" {
+		return nil, fmt.Errorf("match_key is required")
+	}
+
+	row := r.db.QueryRow(`
+		SELECT id, run_id, match_id, match_key
+		FROM noon_game_template_run_matches
+		WHERE run_id = ? AND match_key = ?
+	`, runID, key)
+	item := &models.NoonGameTemplateRunMatch{}
+	if err := row.Scan(&item.ID, &item.RunID, &item.MatchID, &item.MatchKey); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return item, nil
 }
 
 func (r *noonGameRepository) GetSessionByID(sessionID int) (*models.NoonGameSession, error) {

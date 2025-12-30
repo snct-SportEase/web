@@ -28,6 +28,159 @@ func NewNoonGameHandler(noonRepo repository.NoonGameRepository, classRepo reposi
 	}
 }
 
+// CreateYearRelayRun は学年対抗リレー(テンプレート)の run を作成し、A/B/総合ボーナス用の試合を生成します。
+// 前提: 既に event に対する noon_game_session が存在していること（root が昼競技管理で作成済み）。
+func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id"})
+		return
+	}
+
+	userVal, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+	user, ok := userVal.(*models.User)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
+		return
+	}
+
+	session, err := h.noonRepo.GetSessionByEvent(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		return
+	}
+	if session == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "昼競技セッションが未作成です。rootで先にセッションを作成してください。"})
+		return
+	}
+
+	// 6チーム固定（専教含む）
+	teamDefs := []struct {
+		Display    string
+		ClassNames []string
+	}{
+		{Display: "1年生", ClassNames: []string{"1-1", "1-2", "1-3"}},
+		{Display: "2年生", ClassNames: []string{"IS2", "IT2", "IE2"}},
+		{Display: "3年生", ClassNames: []string{"IS3", "IT3", "IE3"}},
+		{Display: "4年生", ClassNames: []string{"IS4", "IT4", "IE4"}},
+		{Display: "5年生", ClassNames: []string{"IS5", "IT5", "IE5"}},
+		{Display: "専教", ClassNames: []string{"専教"}},
+	}
+
+	classes, err := h.classRepo.GetAllClasses(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		return
+	}
+	classIDByName := make(map[string]int, len(classes))
+	for _, cls := range classes {
+		classIDByName[cls.Name] = cls.ID
+	}
+
+	groupIDs := make([]int, 0, len(teamDefs))
+	entryDisplays := make([]string, 0, len(teamDefs))
+	for _, def := range teamDefs {
+		memberIDs := make([]int, 0, len(def.ClassNames))
+		for _, name := range def.ClassNames {
+			id, ok := classIDByName[name]
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("必要なクラスが見つかりません: %s", name)})
+				return
+			}
+			memberIDs = append(memberIDs, id)
+		}
+		grp, err := h.noonRepo.SaveGroup(&models.NoonGameGroup{
+			SessionID:   session.ID,
+			Name:        def.Display,
+			Description: nil,
+		}, memberIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create year relay group", "details": err.Error()})
+			return
+		}
+		groupIDs = append(groupIDs, grp.ID)
+		entryDisplays = append(entryDisplays, def.Display)
+	}
+
+	createMatchWithEntries := func(title string) (*models.NoonGameMatchWithResult, error) {
+		m := &models.NoonGameMatch{
+			SessionID: session.ID,
+			Title:     &title,
+			Status:    "scheduled",
+			AllowDraw: false,
+			Entries:   []*models.NoonGameMatchEntry{},
+		}
+		for i, groupID := range groupIDs {
+			display := entryDisplays[i]
+			displayCopy := display
+			gid := groupID
+			m.Entries = append(m.Entries, &models.NoonGameMatchEntry{
+				SideType:    "group",
+				GroupID:     &gid,
+				DisplayName: &displayCopy,
+			})
+		}
+		saved, err := h.noonRepo.SaveMatch(m)
+		if err != nil {
+			return nil, err
+		}
+		return h.noonRepo.GetMatchByID(saved.ID)
+	}
+
+	matchA, err := createMatchWithEntries("学年対抗リレー Aブロック")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create A block match", "details": err.Error()})
+		return
+	}
+	matchB, err := createMatchWithEntries("学年対抗リレー Bブロック")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create B block match", "details": err.Error()})
+		return
+	}
+	matchBonus, err := createMatchWithEntries("学年対抗リレー 総合ボーナス")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create bonus match", "details": err.Error()})
+		return
+	}
+
+	run, err := h.noonRepo.CreateTemplateRun(&models.NoonGameTemplateRun{
+		SessionID:   session.ID,
+		TemplateKey: noonTemplateYearRelay,
+		Name:        fmt.Sprintf("学年対抗リレー (event_id=%d)", eventID),
+		CreatedBy:   user.ID,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run", "details": err.Error()})
+		return
+	}
+
+	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchA.ID, yearRelayMatchA); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match A", "details": err.Error()})
+		return
+	}
+	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchB.ID, yearRelayMatchB); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match B", "details": err.Error()})
+		return
+	}
+	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchBonus.ID, yearRelayMatchBonus); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match bonus", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, createYearRelayRunResponse{
+		Run: run,
+		Matches: map[string]*models.NoonGameMatchWithResult{
+			yearRelayMatchA:     matchA,
+			yearRelayMatchB:     matchB,
+			yearRelayMatchBonus: matchBonus,
+		},
+	})
+}
+
 type upsertNoonSessionRequest struct {
 	Name                string  `json:"name" binding:"required"`
 	Description         *string `json:"description"`
@@ -88,6 +241,32 @@ type manualPointRequest struct {
 	Points  int     `json:"points" binding:"required"`
 	Reason  *string `json:"reason"`
 }
+
+// --- Templates: 学年対抗リレー ---
+const (
+	noonTemplateYearRelay = "year_relay"
+	yearRelayMatchA       = "A"
+	yearRelayMatchB       = "B"
+	yearRelayMatchBonus   = "BONUS"
+)
+
+type createYearRelayRunResponse struct {
+	Run     *models.NoonGameTemplateRun                `json:"run"`
+	Matches map[string]*models.NoonGameMatchWithResult `json:"matches"`
+}
+
+type yearRelayRankInput struct {
+	EntryID int  `json:"entry_id" binding:"required"`
+	Rank    int  `json:"rank" binding:"required"`
+	Points  *int `json:"points"` // 同順位(同点)の場合のみ必須
+}
+
+type yearRelayBlockResultRequest struct {
+	Rankings []yearRelayRankInput `json:"rankings" binding:"required"`
+	Note     *string              `json:"note"`
+}
+
+type yearRelayOverallResultRequest = yearRelayBlockResultRequest
 
 func (h *NoonGameHandler) GetSession(c *gin.Context) {
 	eventIDStr := c.Param("event_id")
@@ -783,6 +962,50 @@ func (h *NoonGameHandler) AddManualPoint(c *gin.Context) {
 	c.JSON(http.StatusOK, payload)
 }
 
+// RecordYearRelayBlockResult は学年対抗リレーのA/Bブロック順位を登録し、テンプレ点を自動付与します。
+// 同順位がある場合は、該当順位の points を必須入力とします。
+func (h *NoonGameHandler) RecordYearRelayBlockResult(c *gin.Context) {
+	runID, err := strconv.Atoi(c.Param("run_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid run_id"})
+		return
+	}
+	block := strings.ToUpper(strings.TrimSpace(c.Param("block")))
+	if block != yearRelayMatchA && block != yearRelayMatchB {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "block must be A or B"})
+		return
+	}
+
+	var req yearRelayBlockResultRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	pointsByRank := map[int]int{1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5}
+	h.applyYearRelayRankingsToMatch(c, runID, block, req, pointsByRank)
+}
+
+// RecordYearRelayOverallBonus は学年対抗リレーの総合ボーナスを登録します。
+// 原則は 1位30/2位20/3位10 を自動付与しますが、同順位がある場合は points 必須入力です。
+func (h *NoonGameHandler) RecordYearRelayOverallBonus(c *gin.Context) {
+	runID, err := strconv.Atoi(c.Param("run_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid run_id"})
+		return
+	}
+
+	var req yearRelayOverallResultRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// 4位以下はボーナス無し
+	pointsByRank := map[int]int{1: 30, 2: 20, 3: 10, 4: 0, 5: 0, 6: 0}
+	h.applyYearRelayRankingsToMatch(c, runID, yearRelayMatchBonus, req, pointsByRank)
+}
+
 func (h *NoonGameHandler) calculatePointsEntries(session *models.NoonGameSession, match *models.NoonGameMatchWithResult, winner string, homeClassIDs, awayClassIDs []int, user *models.User) []*models.NoonGamePoint {
 	var entries []*models.NoonGamePoint
 	matchID := match.ID
@@ -829,6 +1052,261 @@ func (h *NoonGameHandler) calculatePointsEntries(session *models.NoonGameSession
 	}
 
 	return entries
+}
+
+func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
+	c *gin.Context,
+	runID int,
+	matchKey string,
+	req yearRelayBlockResultRequest,
+	pointsByRank map[int]int,
+) {
+	userVal, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+	user, ok := userVal.(*models.User)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
+		return
+	}
+
+	run, err := h.noonRepo.GetTemplateRunByID(runID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run", "details": err.Error()})
+		return
+	}
+	if run == nil || run.TemplateKey != noonTemplateYearRelay {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template run not found"})
+		return
+	}
+
+	link, err := h.noonRepo.GetTemplateRunMatchByKey(runID, matchKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match", "details": err.Error()})
+		return
+	}
+	if link == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run match not found"})
+		return
+	}
+
+	match, err := h.noonRepo.GetMatchByID(link.MatchID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		return
+	}
+	if match == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "match not found"})
+		return
+	}
+
+	session, err := h.noonRepo.GetSessionByID(match.SessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		return
+	}
+	if session == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "session not found for match"})
+		return
+	}
+
+	// 入力の検証
+	if len(req.Rankings) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "rankings is required"})
+		return
+	}
+
+	entryLookup := make(map[int]*models.NoonGameMatchEntry)
+	for _, e := range match.Entries {
+		if e != nil {
+			entryLookup[e.ID] = e
+		}
+	}
+	if len(entryLookup) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "match entries are not configured"})
+		return
+	}
+	if len(req.Rankings) != len(entryLookup) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "rankings must include all teams"})
+		return
+	}
+
+	seenEntry := make(map[int]bool)
+	rankToCount := make(map[int]int)
+	for _, r := range req.Rankings {
+		if _, ok := entryLookup[r.EntryID]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "rankings contains unknown entry_id"})
+			return
+		}
+		if r.Rank <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "rank must be positive"})
+			return
+		}
+		if seenEntry[r.EntryID] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "duplicate entry_id in rankings"})
+			return
+		}
+		seenEntry[r.EntryID] = true
+		rankToCount[r.Rank]++
+	}
+	for id := range entryLookup {
+		if !seenEntry[id] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "rankings must include all entries"})
+			return
+		}
+	}
+
+	// 同順位がある rank は points が必須
+	for _, r := range req.Rankings {
+		if rankToCount[r.Rank] > 1 {
+			if r.Points == nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位があるため points の指定が必須です"})
+				return
+			}
+		} else {
+			// 同順位でない場合は points を受け取らない（テンプレ自動計算）
+			if r.Points != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位でない順位には points を指定できません"})
+				return
+			}
+		}
+	}
+
+	// 既存ポイントを消す
+	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points", "details": err.Error()})
+		return
+	}
+
+	pointsEntries := make([]*models.NoonGamePoint, 0)
+	resultDetails := make([]*models.NoonGameResultDetail, 0)
+
+	matchTitle := fmt.Sprintf("試合 #%d", match.ID)
+	if match.Title != nil && strings.TrimSpace(*match.Title) != "" {
+		matchTitle = strings.TrimSpace(*match.Title)
+	}
+
+	// 最良rank(=1)を winner 扱い（複数なら draw）
+	bestRank := math.MaxInt
+	bestCount := 0
+	bestEntryID := 0
+
+	for _, r := range req.Rankings {
+		entry := entryLookup[r.EntryID]
+		classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if len(classIDs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "対象クラスが解決できません"})
+			return
+		}
+
+		points := 0
+		if rankToCount[r.Rank] > 1 {
+			points = *r.Points
+		} else {
+			p, ok := pointsByRank[r.Rank]
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "rank is out of range"})
+				return
+			}
+			points = p
+		}
+
+		reason := fmt.Sprintf("昼競技テンプレ(%s) (%s)", run.Name, matchTitle)
+		for _, classID := range classIDs {
+			reasonCopy := reason
+			mid := match.ID
+			pointsEntries = append(pointsEntries, &models.NoonGamePoint{
+				SessionID: session.ID,
+				MatchID:   &mid,
+				ClassID:   classID,
+				Points:    points,
+				Reason:    &reasonCopy,
+				Source:    "result",
+				CreatedBy: user.ID,
+			})
+		}
+
+		rankCopy := r.Rank
+		resultDetails = append(resultDetails, &models.NoonGameResultDetail{
+			EntryID: r.EntryID,
+			Rank:    &rankCopy,
+			Points:  points,
+		})
+
+		if r.Rank < bestRank {
+			bestRank = r.Rank
+			bestCount = 1
+			bestEntryID = r.EntryID
+		} else if r.Rank == bestRank {
+			bestCount++
+		}
+	}
+
+	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points", "details": err.Error()})
+		return
+	}
+
+	winner := "draw"
+	if bestCount == 1 && bestEntryID != 0 && len(match.Entries) >= 2 {
+		// entry_index 0/1 を home/away に割り当てている前提
+		// それ以外(3人以上)では winner は draw のまま
+		if match.Entries[0] != nil && match.Entries[0].ID == bestEntryID {
+			winner = "home"
+		} else if match.Entries[1] != nil && match.Entries[1].ID == bestEntryID {
+			winner = "away"
+		}
+	}
+
+	if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
+		MatchID:    match.ID,
+		Winner:     winner,
+		RecordedBy: user.ID,
+		Note:       req.Note,
+		Details:    resultDetails,
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result", "details": err.Error()})
+		return
+	}
+
+	match.Status = "completed"
+	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status", "details": err.Error()})
+		return
+	}
+
+	// クラス得点へ反映
+	summary, err := h.noonRepo.SumPointsByClass(session.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points", "details": err.Error()})
+		return
+	}
+	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores", "details": err.Error()})
+		return
+	}
+
+	full, err := h.noonRepo.GetMatchByID(match.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		return
+	}
+	if full == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "match not found after update"})
+		return
+	}
+	if err := h.decorateMatches([]*models.NoonGameMatchWithResult{full}, nil, nil); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"match": full})
 }
 
 func (h *NoonGameHandler) resolveClassIDs(sideType string, classID, groupID *int) ([]int, error) {

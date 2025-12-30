@@ -122,3 +122,22 @@ type NoonGameResultDetail struct {
 	Note              *string `json:"note,omitempty"`
 	EntryResolvedName string  `json:"entry_resolved_name"`
 }
+
+// NoonGameTemplateRun は昼競技テンプレートの「実行単位(run)」を表します。
+// 例: 学年対抗リレー(2025) という run の中に Aブロック/Bブロック/総合ボーナス の試合が紐づく。
+type NoonGameTemplateRun struct {
+	ID          int       `json:"id"`
+	SessionID   int       `json:"session_id"`
+	TemplateKey string    `json:"template_key"`
+	Name        string    `json:"name"`
+	CreatedBy   string    `json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type NoonGameTemplateRunMatch struct {
+	ID       int    `json:"id"`
+	RunID    int    `json:"run_id"`
+	MatchID  int    `json:"match_id"`
+	MatchKey string `json:"match_key"`
+}
