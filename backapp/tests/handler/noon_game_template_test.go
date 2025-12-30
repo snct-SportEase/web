@@ -631,3 +631,440 @@ func TestNoonGameHandler_RecordYearRelayOverallBonus(t *testing.T) {
 		}
 	})
 }
+
+func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - Create course relay run with 4 teams and 1 match", func(t *testing.T) {
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		eventID := 1
+		sessionID := 10
+		userID := "test-user-id"
+
+		// セッション
+		session := &models.NoonGameSession{
+			ID:      sessionID,
+			EventID: eventID,
+			Name:    "テスト昼競技",
+		}
+		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+
+		// クラス一覧（4チーム分）
+		classes := []*models.Class{
+			{ID: 1, Name: "1-1", EventID: &eventID},
+			{ID: 2, Name: "1-2", EventID: &eventID},
+			{ID: 3, Name: "1-3", EventID: &eventID},
+			{ID: 4, Name: "IS2", EventID: &eventID},
+			{ID: 5, Name: "IT2", EventID: &eventID},
+			{ID: 6, Name: "IE2", EventID: &eventID},
+			{ID: 7, Name: "IS3", EventID: &eventID},
+			{ID: 8, Name: "IT3", EventID: &eventID},
+			{ID: 9, Name: "IE3", EventID: &eventID},
+			{ID: 10, Name: "IS4", EventID: &eventID},
+			{ID: 11, Name: "IT4", EventID: &eventID},
+			{ID: 12, Name: "IE4", EventID: &eventID},
+			{ID: 13, Name: "IS5", EventID: &eventID},
+			{ID: 14, Name: "IT5", EventID: &eventID},
+			{ID: 15, Name: "IE5", EventID: &eventID},
+			{ID: 16, Name: "専教", EventID: &eventID},
+		}
+		mockClassRepo.On("GetAllClasses", eventID).Return(classes, nil).Once()
+
+		// グループ作成（4回）
+		groupIDs := []int{201, 202, 203, 204}
+		groupNames := []string{"1-1 & IEコース", "1-2 & ISコース", "1-3 & ITコース", "専攻科・教員"}
+		for i, groupID := range groupIDs {
+			group := &models.NoonGameGroupWithMembers{
+				NoonGameGroup: &models.NoonGameGroup{
+					ID:        groupID,
+					SessionID: sessionID,
+					Name:      groupNames[i],
+				},
+				Members: []*models.NoonGameGroupMember{},
+			}
+			mockNoonRepo.On("SaveGroup", mock.AnythingOfType("*models.NoonGameGroup"), mock.AnythingOfType("[]int")).Return(group, nil).Once()
+		}
+
+		// 試合作成（1つ）
+		matchID := 301
+		match := &models.NoonGameMatch{
+			ID:        matchID,
+			SessionID: sessionID,
+			Status:    "scheduled",
+		}
+		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(match, nil).Once()
+
+		matchWithResult := &models.NoonGameMatchWithResult{
+			NoonGameMatch: match,
+			Entries:       []*models.NoonGameMatchEntry{},
+		}
+		mockNoonRepo.On("GetMatchByID", matchID).Return(matchWithResult, nil).Once()
+
+		// Template run作成
+		run := &models.NoonGameTemplateRun{
+			ID:          401,
+			SessionID:   sessionID,
+			TemplateKey: "course_relay",
+			Name:        "コース対抗リレー (event_id=1)",
+			CreatedBy:   userID,
+			CreatedAt:   time.Now(),
+		}
+		mockNoonRepo.On("CreateTemplateRun", mock.AnythingOfType("*models.NoonGameTemplateRun")).Return(run, nil).Once()
+
+		// 試合リンク（1回）
+		link := &models.NoonGameTemplateRunMatch{
+			ID:       501,
+			RunID:    401,
+			MatchID:  matchID,
+			MatchKey: "MAIN",
+		}
+		mockNoonRepo.On("LinkTemplateRunMatch", 401, matchID, "MAIN").Return(link, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "event_id", Value: "1"}}
+		c.Set("user", &models.User{ID: userID})
+
+		h.CreateCourseRelayRun(c)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		mockNoonRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("Error - Session not found", func(t *testing.T) {
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		eventID := 1
+		mockNoonRepo.On("GetSessionByEvent", eventID).Return(nil, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "event_id", Value: "1"}}
+		c.Set("user", &models.User{ID: "test-user"})
+
+		h.CreateCourseRelayRun(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockNoonRepo.AssertExpectations(t)
+	})
+
+	t.Run("Error - No classes found", func(t *testing.T) {
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		eventID := 1
+		sessionID := 10
+		session := &models.NoonGameSession{
+			ID:      sessionID,
+			EventID: eventID,
+			Name:    "テスト昼競技",
+		}
+		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockClassRepo.On("GetAllClasses", eventID).Return([]*models.Class{}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "event_id", Value: "1"}}
+		c.Set("user", &models.User{ID: "test-user"})
+
+		h.CreateCourseRelayRun(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockNoonRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+}
+
+func TestNoonGameHandler_RecordCourseRelayResult(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - Record result with default points", func(t *testing.T) {
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		runID := 401
+		sessionID := 10
+		eventID := 1
+		matchID := 301
+		userID := "test-user-id"
+
+		// Run取得
+		run := &models.NoonGameTemplateRun{
+			ID:          runID,
+			SessionID:   sessionID,
+			TemplateKey: "course_relay",
+			Name:        "コース対抗リレー (event_id=1)",
+		}
+		mockNoonRepo.On("GetTemplateRunByID", runID).Return(run, nil).Once()
+
+		// Match取得
+		runMatch := &models.NoonGameTemplateRunMatch{
+			ID:       501,
+			RunID:    runID,
+			MatchID:  matchID,
+			MatchKey: "MAIN",
+		}
+		mockNoonRepo.On("GetTemplateRunMatchByKey", runID, "MAIN").Return(runMatch, nil).Once()
+
+		// 試合とエントリー取得
+		entries := []*models.NoonGameMatchEntry{
+			{ID: 1, MatchID: matchID, SideType: "group", GroupID: intPtr(201), DisplayName: stringPtr("1-1 & IEコース")},
+			{ID: 2, MatchID: matchID, SideType: "group", GroupID: intPtr(202), DisplayName: stringPtr("1-2 & ISコース")},
+			{ID: 3, MatchID: matchID, SideType: "group", GroupID: intPtr(203), DisplayName: stringPtr("1-3 & ITコース")},
+			{ID: 4, MatchID: matchID, SideType: "group", GroupID: intPtr(204), DisplayName: stringPtr("専攻科・教員")},
+		}
+		match := &models.NoonGameMatchWithResult{
+			NoonGameMatch: &models.NoonGameMatch{
+				ID:        matchID,
+				SessionID: sessionID,
+				Status:    "scheduled",
+			},
+			Entries: entries,
+		}
+		// 最初の GetMatchByID（applyCourseRelayRankingsToMatch内で呼ばれる）
+		mockNoonRepo.On("GetMatchByID", matchID).Return(match, nil).Once()
+
+		// セッション取得（applyCourseRelayRankingsToMatch内で呼ばれる）
+		session := &models.NoonGameSession{ID: sessionID, EventID: eventID}
+		mockNoonRepo.On("GetSessionByID", sessionID).Return(session, nil).Once()
+
+		// グループメンバー取得（4回）- resolveClassIDs内で呼ばれる
+		groupMembers := map[int][]*models.NoonGameGroupMember{
+			201: {{ClassID: 1}, {ClassID: 6}, {ClassID: 9}, {ClassID: 12}, {ClassID: 15}}, // 1-1 & IEコース
+			202: {{ClassID: 2}, {ClassID: 4}, {ClassID: 7}, {ClassID: 10}, {ClassID: 13}}, // 1-2 & ISコース
+			203: {{ClassID: 3}, {ClassID: 5}, {ClassID: 8}, {ClassID: 11}, {ClassID: 14}}, // 1-3 & ITコース
+			204: {{ClassID: 16}},                                                          // 専攻科・教員
+		}
+		for groupID, members := range groupMembers {
+			mockNoonRepo.On("GetGroupMembers", groupID).Return(members, nil).Once()
+		}
+
+		// ポイントクリア
+		mockNoonRepo.On("ClearPointsForMatch", matchID).Return(nil).Once()
+
+		// ポイント挿入（40+30+20+10 = 100点が各クラスに配分）
+		mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
+
+		// 結果保存
+		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 601}, nil).Once()
+
+		// 試合ステータス更新
+		updatedMatch := &models.NoonGameMatch{ID: matchID, Status: "completed"}
+		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatch, nil).Once()
+
+		// ポイント集計
+		summary := map[int]int{1: 40, 2: 30, 3: 20, 4: 30, 5: 20, 6: 40, 7: 30, 8: 20, 9: 40, 10: 30, 11: 20, 12: 40, 13: 30, 14: 20, 15: 40, 16: 10}
+		mockNoonRepo.On("SumPointsByClass", sessionID).Return(summary, nil).Once()
+
+		// クラススコア更新
+		mockClassRepo.On("SetNoonGamePoints", eventID, summary).Return(nil).Once()
+
+		// 更新後の試合取得（decorateMatches の前）
+		mockNoonRepo.On("GetMatchByID", matchID).Return(match, nil).Once()
+
+		// decorateMatches 内で GetGroupWithMembers が呼ばれる（4回）
+		for groupID := range groupMembers {
+			groupWithMembers := &models.NoonGameGroupWithMembers{
+				NoonGameGroup: &models.NoonGameGroup{ID: groupID, SessionID: sessionID},
+				Members:       groupMembers[groupID],
+			}
+			mockNoonRepo.On("GetGroupWithMembers", sessionID, groupID).Return(groupWithMembers, nil).Once()
+		}
+
+		// 同順位でない場合は points を指定しない（自動計算）
+		reqBody := map[string]interface{}{
+			"rankings": []map[string]interface{}{
+				{"entry_id": 1, "rank": 1}, // 1-1 & IEコース: 1位（自動40点）
+				{"entry_id": 2, "rank": 2}, // 1-2 & ISコース: 2位（自動30点）
+				{"entry_id": 3, "rank": 3}, // 1-3 & ITコース: 3位（自動20点）
+				{"entry_id": 4, "rank": 4}, // 専攻科・教員: 4位（自動10点）
+			},
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "run_id", Value: "401"}}
+		c.Set("user", &models.User{ID: userID})
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/noon-game/template-runs/401/course-relay/result", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.RecordCourseRelayResult(c)
+
+		if w.Code != http.StatusOK {
+			t.Logf("Response body: %s", w.Body.String())
+		}
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockNoonRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - Record result with custom points", func(t *testing.T) {
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		runID := 401
+		sessionID := 10
+		eventID := 1
+		matchID := 301
+		userID := "test-user-id"
+
+		run := &models.NoonGameTemplateRun{ID: runID, SessionID: sessionID, TemplateKey: "course_relay", Name: "コース対抗リレー (event_id=1)"}
+		mockNoonRepo.On("GetTemplateRunByID", runID).Return(run, nil).Once()
+
+		runMatch := &models.NoonGameTemplateRunMatch{ID: 501, RunID: runID, MatchID: matchID, MatchKey: "MAIN"}
+		mockNoonRepo.On("GetTemplateRunMatchByKey", runID, "MAIN").Return(runMatch, nil).Once()
+
+		entries := []*models.NoonGameMatchEntry{
+			{ID: 1, MatchID: matchID, SideType: "group", GroupID: intPtr(201), DisplayName: stringPtr("1-1 & IEコース")},
+			{ID: 2, MatchID: matchID, SideType: "group", GroupID: intPtr(202), DisplayName: stringPtr("1-2 & ISコース")},
+			{ID: 3, MatchID: matchID, SideType: "group", GroupID: intPtr(203), DisplayName: stringPtr("1-3 & ITコース")},
+			{ID: 4, MatchID: matchID, SideType: "group", GroupID: intPtr(204), DisplayName: stringPtr("専攻科・教員")},
+		}
+		match := &models.NoonGameMatchWithResult{
+			NoonGameMatch: &models.NoonGameMatch{ID: matchID, SessionID: sessionID, Status: "scheduled"},
+			Entries:       entries,
+		}
+		mockNoonRepo.On("GetMatchByID", matchID).Return(match, nil).Once()
+
+		session := &models.NoonGameSession{ID: sessionID, EventID: eventID}
+		mockNoonRepo.On("GetSessionByID", sessionID).Return(session, nil).Once()
+
+		groupMembers := map[int][]*models.NoonGameGroupMember{
+			201: {{ClassID: 1}, {ClassID: 6}, {ClassID: 9}, {ClassID: 12}, {ClassID: 15}},
+			202: {{ClassID: 2}, {ClassID: 4}, {ClassID: 7}, {ClassID: 10}, {ClassID: 13}},
+			203: {{ClassID: 3}, {ClassID: 5}, {ClassID: 8}, {ClassID: 11}, {ClassID: 14}},
+			204: {{ClassID: 16}},
+		}
+		for groupID, members := range groupMembers {
+			mockNoonRepo.On("GetGroupMembers", groupID).Return(members, nil).Once()
+		}
+
+		mockNoonRepo.On("ClearPointsForMatch", matchID).Return(nil).Once()
+		mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
+		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 601}, nil).Once()
+
+		updatedMatch := &models.NoonGameMatch{ID: matchID, Status: "completed"}
+		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatch, nil).Once()
+
+		// カスタム点数設定（1位50点、2位35点、3位25点、4位15点）
+		summary := map[int]int{1: 50, 2: 35, 3: 25, 4: 35, 5: 25, 6: 50, 7: 35, 8: 25, 9: 50, 10: 35, 11: 25, 12: 50, 13: 35, 14: 25, 15: 50, 16: 15}
+		mockNoonRepo.On("SumPointsByClass", sessionID).Return(summary, nil).Once()
+		mockClassRepo.On("SetNoonGamePoints", eventID, summary).Return(nil).Once()
+
+		mockNoonRepo.On("GetMatchByID", matchID).Return(match, nil).Once()
+
+		for groupID := range groupMembers {
+			groupWithMembers := &models.NoonGameGroupWithMembers{
+				NoonGameGroup: &models.NoonGameGroup{ID: groupID, SessionID: sessionID},
+				Members:       groupMembers[groupID],
+			}
+			mockNoonRepo.On("GetGroupWithMembers", sessionID, groupID).Return(groupWithMembers, nil).Once()
+		}
+
+		// カスタム点数設定を指定
+		reqBody := map[string]interface{}{
+			"rankings": []map[string]interface{}{
+				{"entry_id": 1, "rank": 1}, // 1位（カスタム50点）
+				{"entry_id": 2, "rank": 2}, // 2位（カスタム35点）
+				{"entry_id": 3, "rank": 3}, // 3位（カスタム25点）
+				{"entry_id": 4, "rank": 4}, // 4位（カスタム15点）
+			},
+			"points_by_rank": map[int]int{1: 50, 2: 35, 3: 25, 4: 15},
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "run_id", Value: "401"}}
+		c.Set("user", &models.User{ID: userID})
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/noon-game/template-runs/401/course-relay/result", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.RecordCourseRelayResult(c)
+
+		if w.Code != http.StatusOK {
+			t.Logf("Response body: %s", w.Body.String())
+		}
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockNoonRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("Error - Tie ranking without points", func(t *testing.T) {
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		runID := 401
+		matchID := 301
+
+		run := &models.NoonGameTemplateRun{ID: runID, SessionID: 10, TemplateKey: "course_relay"}
+		mockNoonRepo.On("GetTemplateRunByID", runID).Return(run, nil).Once()
+
+		runMatch := &models.NoonGameTemplateRunMatch{ID: 501, RunID: runID, MatchID: matchID, MatchKey: "MAIN"}
+		mockNoonRepo.On("GetTemplateRunMatchByKey", runID, "MAIN").Return(runMatch, nil).Once()
+
+		entries := []*models.NoonGameMatchEntry{
+			{ID: 1, MatchID: matchID, SideType: "group", GroupID: intPtr(201)},
+			{ID: 2, MatchID: matchID, SideType: "group", GroupID: intPtr(202)},
+		}
+		sessionID := 10
+		match := &models.NoonGameMatchWithResult{
+			NoonGameMatch: &models.NoonGameMatch{ID: matchID, SessionID: sessionID},
+			Entries:       entries,
+		}
+		mockNoonRepo.On("GetMatchByID", matchID).Return(match, nil).Once()
+
+		session := &models.NoonGameSession{ID: sessionID, EventID: 1}
+		mockNoonRepo.On("GetSessionByID", sessionID).Return(session, nil).Once()
+
+		// 同順位（1位が2つ）で points が未指定
+		reqBody := map[string]interface{}{
+			"rankings": []map[string]interface{}{
+				{"entry_id": 1, "rank": 1}, // points なし
+				{"entry_id": 2, "rank": 1}, // points なし
+			},
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "run_id", Value: "401"}}
+		c.Set("user", &models.User{ID: "test-user"})
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/noon-game/template-runs/401/course-relay/result", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.RecordCourseRelayResult(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Contains(t, resp["error"].(string), "同順位")
+		mockNoonRepo.AssertExpectations(t)
+	})
+}
