@@ -124,6 +124,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			studentEvents := student.Group("/events")
 			{
 				studentEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
+				studentEvents.GET("/:event_id/noon-game/session", noonHandler.GetSession)
 			}
 
 			studentNotificationRequests := student.Group("/notification-requests")
