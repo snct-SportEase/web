@@ -125,11 +125,20 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	if req.Session != nil && len(req.Session.Groups) > 0 {
 		// 手動設定を使用
 		for _, g := range req.Session.Groups {
+			// バリデーション: グループ名とクラス名が空でないことを確認
+			if strings.TrimSpace(g.GroupName) == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "グループ名が空です"})
+				return
+			}
+			if len(g.ClassNames) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("グループ「%s」にクラスが設定されていません", g.GroupName)})
+				return
+			}
 			teamDefs = append(teamDefs, struct {
 				Display    string
 				ClassNames []string
 			}{
-				Display:    g.GroupName,
+				Display:    strings.TrimSpace(g.GroupName),
 				ClassNames: g.ClassNames,
 			})
 		}
@@ -152,7 +161,15 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 			}
 		} else {
 			// デフォルト設定をソートして使用
+			if len(defaultGroups) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "デフォルトグループ設定が見つかりません。グループを手動で設定してください。"})
+				return
+			}
 			for _, g := range defaultGroups {
+				if len(g.ClassNames) == 0 {
+					log.Printf("WARNING: default group %q has no class names, skipping", g.GroupName)
+					continue
+				}
 				teamDefs = append(teamDefs, struct {
 					Display    string
 					ClassNames []string
@@ -161,7 +178,17 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 					ClassNames: g.ClassNames,
 				})
 			}
+			if len(teamDefs) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "有効なデフォルトグループ設定が見つかりません。グループを手動で設定してください。"})
+				return
+			}
 		}
+	}
+
+	// グループ設定が空の場合はエラー
+	if len(teamDefs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "グループ設定が空です。少なくとも1つのグループを設定してください。"})
+		return
 	}
 
 	classes, err := h.classRepo.GetAllClasses(eventID)
@@ -400,11 +427,20 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 	if req.Session != nil && len(req.Session.Groups) > 0 {
 		// 手動設定を使用
 		for _, g := range req.Session.Groups {
+			// バリデーション: グループ名とクラス名が空でないことを確認
+			if strings.TrimSpace(g.GroupName) == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "グループ名が空です"})
+				return
+			}
+			if len(g.ClassNames) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("グループ「%s」にクラスが設定されていません", g.GroupName)})
+				return
+			}
 			teamDefs = append(teamDefs, struct {
 				Display    string
 				ClassNames []string
 			}{
-				Display:    g.GroupName,
+				Display:    strings.TrimSpace(g.GroupName),
 				ClassNames: g.ClassNames,
 			})
 		}
@@ -425,7 +461,15 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 			}
 		} else {
 			// デフォルト設定をソートして使用
+			if len(defaultGroups) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "デフォルトグループ設定が見つかりません。グループを手動で設定してください。"})
+				return
+			}
 			for _, g := range defaultGroups {
+				if len(g.ClassNames) == 0 {
+					log.Printf("WARNING: default group %q has no class names, skipping", g.GroupName)
+					continue
+				}
 				teamDefs = append(teamDefs, struct {
 					Display    string
 					ClassNames []string
@@ -434,7 +478,17 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 					ClassNames: g.ClassNames,
 				})
 			}
+			if len(teamDefs) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "有効なデフォルトグループ設定が見つかりません。グループを手動で設定してください。"})
+				return
+			}
 		}
+	}
+
+	// グループ設定が空の場合はエラー
+	if len(teamDefs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "グループ設定が空です。少なくとも1つのグループを設定してください。"})
+		return
 	}
 
 	groupIDs := make([]int, 0, len(teamDefs))
@@ -680,6 +734,12 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 				})
 			}
 		}
+	}
+
+	// グループ設定が空の場合はエラー
+	if len(teamDefs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "グループ設定が空です。少なくとも1つのグループを設定してください。"})
+		return
 	}
 
 	groupIDs := make([]int, 0, len(teamDefs))
@@ -1145,13 +1205,41 @@ func (h *NoonGameHandler) SaveTemplateDefaultGroups(c *gin.Context) {
 		return
 	}
 
+	// バリデーション
+	if len(req.Groups) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "グループが1つ以上必要です"})
+		return
+	}
+
 	groups := make([]*models.NoonGameTemplateDefaultGroup, len(req.Groups))
 	for i, g := range req.Groups {
+		// グループ名のバリデーション
+		if strings.TrimSpace(g.GroupName) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("グループ%dの名前が空です", i+1)})
+			return
+		}
+		// クラス名のバリデーション
+		if len(g.ClassNames) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("グループ「%s」にクラスが設定されていません", g.GroupName)})
+			return
+		}
+		// 空のクラス名をフィルタリング
+		validClassNames := make([]string, 0, len(g.ClassNames))
+		for _, className := range g.ClassNames {
+			if strings.TrimSpace(className) != "" {
+				validClassNames = append(validClassNames, strings.TrimSpace(className))
+			}
+		}
+		if len(validClassNames) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("グループ「%s」に有効なクラス名がありません", g.GroupName)})
+			return
+		}
+
 		groups[i] = &models.NoonGameTemplateDefaultGroup{
 			TemplateKey: templateKey,
 			GroupIndex:  g.GroupIndex,
-			GroupName:   g.GroupName,
-			ClassNames:  g.ClassNames,
+			GroupName:   strings.TrimSpace(g.GroupName),
+			ClassNames:  validClassNames,
 		}
 	}
 
