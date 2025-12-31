@@ -142,3 +142,14 @@ type NoonGameTemplateRunMatch struct {
 	MatchID  int    `json:"match_id"`
 	MatchKey string `json:"match_key"`
 }
+
+// NoonGameTemplateDefaultGroup はテンプレートのデフォルトグループ設定を表します。
+type NoonGameTemplateDefaultGroup struct {
+	ID          int       `json:"id"`
+	TemplateKey string    `json:"template_key"`
+	GroupIndex  int       `json:"group_index"`
+	GroupName   string    `json:"group_name"`
+	ClassNames  []string  `json:"class_names"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}

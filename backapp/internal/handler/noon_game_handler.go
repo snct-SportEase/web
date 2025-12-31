@@ -116,17 +116,52 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		}
 	}
 
-	// 6チーム固定（専教含む）
-	teamDefs := []struct {
+	// グループ設定を取得（手動設定があればそれを使用、なければデフォルト設定を使用）
+	var teamDefs []struct {
 		Display    string
 		ClassNames []string
-	}{
-		{Display: "1年生", ClassNames: []string{"1-1", "1-2", "1-3"}},
-		{Display: "2年生", ClassNames: []string{"IS2", "IT2", "IE2"}},
-		{Display: "3年生", ClassNames: []string{"IS3", "IT3", "IE3"}},
-		{Display: "4年生", ClassNames: []string{"IS4", "IT4", "IE4"}},
-		{Display: "5年生", ClassNames: []string{"IS5", "IT5", "IE5"}},
-		{Display: "専教", ClassNames: []string{"専教"}},
+	}
+
+	if req.Session != nil && len(req.Session.Groups) > 0 {
+		// 手動設定を使用
+		for _, g := range req.Session.Groups {
+			teamDefs = append(teamDefs, struct {
+				Display    string
+				ClassNames []string
+			}{
+				Display:    g.GroupName,
+				ClassNames: g.ClassNames,
+			})
+		}
+	} else {
+		// デフォルト設定を使用
+		defaultGroups, err := h.noonRepo.GetTemplateDefaultGroups(noonTemplateYearRelay)
+		if err != nil {
+			log.Printf("WARNING: failed to fetch default groups, using hardcoded defaults: %v", err)
+			// フォールバック: ハードコードされたデフォルト値
+			teamDefs = []struct {
+				Display    string
+				ClassNames []string
+			}{
+				{Display: "1年生", ClassNames: []string{"1-1", "1-2", "1-3"}},
+				{Display: "2年生", ClassNames: []string{"IS2", "IT2", "IE2"}},
+				{Display: "3年生", ClassNames: []string{"IS3", "IT3", "IE3"}},
+				{Display: "4年生", ClassNames: []string{"IS4", "IT4", "IE4"}},
+				{Display: "5年生", ClassNames: []string{"IS5", "IT5", "IE5"}},
+				{Display: "専教", ClassNames: []string{"専教"}},
+			}
+		} else {
+			// デフォルト設定をソートして使用
+			for _, g := range defaultGroups {
+				teamDefs = append(teamDefs, struct {
+					Display    string
+					ClassNames []string
+				}{
+					Display:    g.GroupName,
+					ClassNames: g.ClassNames,
+				})
+			}
+		}
 	}
 
 	classes, err := h.classRepo.GetAllClasses(eventID)
@@ -356,15 +391,50 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		classIDByName[cls.Name] = cls.ID
 	}
 
-	// チーム定義（デフォルト）
-	teamDefs := []struct {
+	// グループ設定を取得（手動設定があればそれを使用、なければデフォルト設定を使用）
+	var teamDefs []struct {
 		Display    string
 		ClassNames []string
-	}{
-		{Display: "1-1 & IEコース", ClassNames: []string{"1-1", "IE2", "IE3", "IE4", "IE5"}},
-		{Display: "1-2 & ISコース", ClassNames: []string{"1-2", "IS2", "IS3", "IS4", "IS5"}},
-		{Display: "1-3 & ITコース", ClassNames: []string{"1-3", "IT2", "IT3", "IT4", "IT5"}},
-		{Display: "専攻科・教員", ClassNames: []string{"専教"}},
+	}
+
+	if req.Session != nil && len(req.Session.Groups) > 0 {
+		// 手動設定を使用
+		for _, g := range req.Session.Groups {
+			teamDefs = append(teamDefs, struct {
+				Display    string
+				ClassNames []string
+			}{
+				Display:    g.GroupName,
+				ClassNames: g.ClassNames,
+			})
+		}
+	} else {
+		// デフォルト設定を使用
+		defaultGroups, err := h.noonRepo.GetTemplateDefaultGroups(noonTemplateCourseRelay)
+		if err != nil {
+			log.Printf("WARNING: failed to fetch default groups, using hardcoded defaults: %v", err)
+			// フォールバック: ハードコードされたデフォルト値
+			teamDefs = []struct {
+				Display    string
+				ClassNames []string
+			}{
+				{Display: "1-1 & IEコース", ClassNames: []string{"1-1", "IE2", "IE3", "IE4", "IE5"}},
+				{Display: "1-2 & ISコース", ClassNames: []string{"1-2", "IS2", "IS3", "IS4", "IS5"}},
+				{Display: "1-3 & ITコース", ClassNames: []string{"1-3", "IT2", "IT3", "IT4", "IT5"}},
+				{Display: "専攻科・教員", ClassNames: []string{"専教"}},
+			}
+		} else {
+			// デフォルト設定をソートして使用
+			for _, g := range defaultGroups {
+				teamDefs = append(teamDefs, struct {
+					Display    string
+					ClassNames []string
+				}{
+					Display:    g.GroupName,
+					ClassNames: g.ClassNames,
+				})
+			}
+		}
 	}
 
 	groupIDs := make([]int, 0, len(teamDefs))
@@ -566,15 +636,50 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		classIDByName[cls.Name] = cls.ID
 	}
 
-	// チーム定義（デフォルト）
-	teamDefs := []struct {
+	// グループ設定を取得（手動設定があればそれを使用、なければデフォルト設定を使用）
+	var teamDefs []struct {
 		Display    string
 		ClassNames []string
-	}{
-		{Display: "1-1 & ISコース", ClassNames: []string{"1-1", "IS2", "IS3", "IS4", "IS5"}},
-		{Display: "1-2 & ITコース", ClassNames: []string{"1-2", "IT2", "IT3", "IT4", "IT5"}},
-		{Display: "1-3 & IEコース", ClassNames: []string{"1-3", "IE2", "IE3", "IE4", "IE5"}},
-		{Display: "専攻科・教員", ClassNames: []string{"専教"}},
+	}
+
+	if req.Session != nil && len(req.Session.Groups) > 0 {
+		// 手動設定を使用
+		for _, g := range req.Session.Groups {
+			teamDefs = append(teamDefs, struct {
+				Display    string
+				ClassNames []string
+			}{
+				Display:    g.GroupName,
+				ClassNames: g.ClassNames,
+			})
+		}
+	} else {
+		// デフォルト設定を使用
+		defaultGroups, err := h.noonRepo.GetTemplateDefaultGroups(noonTemplateTugOfWar)
+		if err != nil {
+			log.Printf("WARNING: failed to fetch default groups, using hardcoded defaults: %v", err)
+			// フォールバック: ハードコードされたデフォルト値
+			teamDefs = []struct {
+				Display    string
+				ClassNames []string
+			}{
+				{Display: "1-1 & ISコース", ClassNames: []string{"1-1", "IS2", "IS3", "IS4", "IS5"}},
+				{Display: "1-2 & ITコース", ClassNames: []string{"1-2", "IT2", "IT3", "IT4", "IT5"}},
+				{Display: "1-3 & IEコース", ClassNames: []string{"1-3", "IE2", "IE3", "IE4", "IE5"}},
+				{Display: "専攻科・教員", ClassNames: []string{"専教"}},
+			}
+		} else {
+			// デフォルト設定をソートして使用
+			for _, g := range defaultGroups {
+				teamDefs = append(teamDefs, struct {
+					Display    string
+					ClassNames []string
+				}{
+					Display:    g.GroupName,
+					ClassNames: g.ClassNames,
+				})
+			}
+		}
 	}
 
 	groupIDs := make([]int, 0, len(teamDefs))
@@ -775,7 +880,13 @@ type createTemplateRunRequest struct {
 		ParticipationPoints int                    `json:"participation_points"`
 		AllowManualPoints   *bool                  `json:"allow_manual_points"`
 		PointsByRank        map[string]interface{} `json:"points_by_rank,omitempty"` // 学年対抗リレー、コース対抗リレー、綱引き用
+		Groups              []templateGroupConfig  `json:"groups,omitempty"`         // 手動グループ設定（オプション）
 	} `json:"session"`
+}
+
+type templateGroupConfig struct {
+	GroupName  string   `json:"group_name" binding:"required"`
+	ClassNames []string `json:"class_names" binding:"required"`
 }
 
 type yearRelayRankInput struct {
@@ -995,6 +1106,61 @@ func (h *NoonGameHandler) DeleteGroup(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "group deleted"})
+}
+
+// GetTemplateDefaultGroups は指定されたテンプレートキーのデフォルトグループ設定を取得します。
+func (h *NoonGameHandler) GetTemplateDefaultGroups(c *gin.Context) {
+	templateKey := c.Param("template_key")
+	if templateKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "template_key is required"})
+		return
+	}
+
+	groups, err := h.noonRepo.GetTemplateDefaultGroups(templateKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch default groups", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"groups": groups})
+}
+
+// SaveTemplateDefaultGroups は指定されたテンプレートキーのデフォルトグループ設定を保存します。
+func (h *NoonGameHandler) SaveTemplateDefaultGroups(c *gin.Context) {
+	templateKey := c.Param("template_key")
+	if templateKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "template_key is required"})
+		return
+	}
+
+	var req struct {
+		Groups []struct {
+			GroupIndex int      `json:"group_index" binding:"required"`
+			GroupName  string   `json:"group_name" binding:"required"`
+			ClassNames []string `json:"class_names" binding:"required"`
+		} `json:"groups" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	groups := make([]*models.NoonGameTemplateDefaultGroup, len(req.Groups))
+	for i, g := range req.Groups {
+		groups[i] = &models.NoonGameTemplateDefaultGroup{
+			TemplateKey: templateKey,
+			GroupIndex:  g.GroupIndex,
+			GroupName:   g.GroupName,
+			ClassNames:  g.ClassNames,
+		}
+	}
+
+	if err := h.noonRepo.SaveTemplateDefaultGroups(templateKey, groups); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save default groups", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "default groups saved"})
 }
 
 func (h *NoonGameHandler) SaveMatch(c *gin.Context) {

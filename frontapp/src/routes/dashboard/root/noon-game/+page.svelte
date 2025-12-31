@@ -35,7 +35,8 @@
       block_a: {1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5},
       block_b: {1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5},
       overall: {1: 30, 2: 20, 3: 10, 4: 0, 5: 0, 6: 0}
-    }
+    },
+    groups: [] // グループ設定 [{group_name: string, class_names: string[]}]
   };
 
   let sessionForm = {
@@ -708,34 +709,110 @@
       }
     }
 
-    // 既存のセッションがあれば、その設定を使用
-    if (session) {
-      templateConfigForm = {
-        name: session.name || `${templateNames[templateType]}_${current.id}`,
-        description: session.description || '',
-        mode: session.mode || 'group',
-        win_points: session.win_points || 0,
-        loss_points: session.loss_points || 0,
-        draw_points: session.draw_points || 0,
-        participation_points: session.participation_points || 0,
-        allow_manual_points: session.allow_manual_points || false,
-        points_by_rank: pointsByRank,
-        year_relay_points: yearRelayPoints
-      };
-    } else {
-      // セッションがない場合はデフォルト値を設定
-      templateConfigForm = {
-        name: `${templateNames[templateType]}_${current.id}`,
-        description: '',
-        mode: 'group',
-        win_points: 0,
-        loss_points: 0,
-        draw_points: 0,
-        participation_points: 0,
-        allow_manual_points: false,
-        points_by_rank: pointsByRank,
-        year_relay_points: yearRelayPoints
-      };
+    // デフォルトグループ設定を読み込む
+    loadDefaultGroups(templateKeyMap[templateType]).then(defaultGroups => {
+      // 既存のセッションがあれば、その設定を使用
+      if (session) {
+        templateConfigForm = {
+          name: session.name || `${templateNames[templateType]}_${current.id}`,
+          description: session.description || '',
+          mode: session.mode || 'group',
+          win_points: session.win_points || 0,
+          loss_points: session.loss_points || 0,
+          draw_points: session.draw_points || 0,
+          participation_points: session.participation_points || 0,
+          allow_manual_points: session.allow_manual_points || false,
+          points_by_rank: pointsByRank,
+          year_relay_points: yearRelayPoints,
+          groups: defaultGroups || []
+        };
+      } else {
+        // セッションがない場合はデフォルト値を設定
+        templateConfigForm = {
+          name: `${templateNames[templateType]}_${current.id}`,
+          description: '',
+          mode: 'group',
+          win_points: 0,
+          loss_points: 0,
+          draw_points: 0,
+          participation_points: 0,
+          allow_manual_points: false,
+          points_by_rank: pointsByRank,
+          year_relay_points: yearRelayPoints,
+          groups: defaultGroups || []
+        };
+      }
+    }).catch(err => {
+      console.error('Failed to load default groups:', err);
+      // エラー時は空のグループ設定を使用
+      if (session) {
+        templateConfigForm = {
+          name: session.name || `${templateNames[templateType]}_${current.id}`,
+          description: session.description || '',
+          mode: session.mode || 'group',
+          win_points: session.win_points || 0,
+          loss_points: session.loss_points || 0,
+          draw_points: session.draw_points || 0,
+          participation_points: session.participation_points || 0,
+          allow_manual_points: session.allow_manual_points || false,
+          points_by_rank: pointsByRank,
+          year_relay_points: yearRelayPoints,
+          groups: []
+        };
+      } else {
+        templateConfigForm = {
+          name: `${templateNames[templateType]}_${current.id}`,
+          description: '',
+          mode: 'group',
+          win_points: 0,
+          loss_points: 0,
+          draw_points: 0,
+          participation_points: 0,
+          allow_manual_points: false,
+          points_by_rank: pointsByRank,
+          year_relay_points: yearRelayPoints,
+          groups: []
+        };
+      }
+    });
+  }
+
+  async function loadDefaultGroups(templateKey) {
+    try {
+      const res = await fetch(`/api/root/noon-game/templates/${templateKey}/default-groups`);
+      if (!res.ok) {
+        throw new Error('Failed to load default groups');
+      }
+      const data = await res.json();
+      return (data.groups || []).map(g => ({
+        group_name: g.group_name,
+        class_names: g.class_names || []
+      }));
+    } catch (err) {
+      console.error('Error loading default groups:', err);
+      return [];
+    }
+  }
+
+  async function saveDefaultGroups(templateKey) {
+    try {
+      const groups = templateConfigForm.groups.map((g, index) => ({
+        group_index: index + 1,
+        group_name: g.group_name,
+        class_names: g.class_names || []
+      }));
+      const res = await fetch(`/api/root/noon-game/templates/${templateKey}/default-groups`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups })
+      });
+      if (!res.ok) {
+        throw new Error('Failed to save default groups');
+      }
+      alert('デフォルト設定を保存しました。');
+    } catch (err) {
+      console.error('Error saving default groups:', err);
+      alert('デフォルト設定の保存に失敗しました。');
     }
   }
 
@@ -810,6 +887,11 @@
             payload.session.points_by_rank[Number(rank)] = pointsNum;
           }
         }
+      }
+
+      // グループ設定を追加（手動設定がある場合のみ）
+      if (templateConfigForm.groups && templateConfigForm.groups.length > 0) {
+        payload.session.groups = templateConfigForm.groups;
       }
 
       const endpoint = (selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war')
@@ -1045,6 +1127,81 @@
                   </div>
                 </div>
               {/if}
+
+              <!-- グループ設定 -->
+              <div class="border rounded-lg p-4 space-y-4 bg-green-50">
+                <div class="flex justify-between items-center">
+                  <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">グループ設定</h3>
+                  <button
+                    class="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    on:click={() => {
+                      const templateKeyMap = {
+                        'year-relay': 'year_relay',
+                        'course-relay': 'course_relay',
+                        'tug-of-war': 'tug_of_war'
+                      };
+                      saveDefaultGroups(templateKeyMap[selectedTemplateType]);
+                    }}>
+                    デフォルト設定を保存
+                  </button>
+                </div>
+                <p class="text-sm text-gray-600">各グループの名前と所属クラスを設定します。デフォルト設定として保存することもできます。</p>
+                
+                <div class="space-y-3">
+                  {#each templateConfigForm.groups as group, index}
+                    <div class="border rounded p-3 bg-white">
+                      <div class="flex items-center space-x-2 mb-2">
+                        <label class="flex-1 flex flex-col text-sm font-medium text-gray-700">
+                          グループ名
+                          <input
+                            type="text"
+                            class="mt-1 border rounded px-2 py-1 text-sm"
+                            value={group.group_name}
+                            on:input={(e) => {
+                              templateConfigForm.groups[index].group_name = e.target.value;
+                              templateConfigForm.groups = [...templateConfigForm.groups];
+                            }}
+                            placeholder="例: 1年生" />
+                        </label>
+                        <button
+                          class="text-red-500 hover:text-red-700 px-2 py-1 text-sm"
+                          on:click={() => {
+                            templateConfigForm.groups = templateConfigForm.groups.filter((_, i) => i !== index);
+                          }}>
+                          削除
+                        </button>
+                      </div>
+                      <div class="flex flex-col space-y-2">
+                        <label class="text-sm font-medium text-gray-700">クラス名（カンマ区切り）</label>
+                        <input
+                          type="text"
+                          class="border rounded px-2 py-1 text-sm"
+                          value={group.class_names ? group.class_names.join(', ') : ''}
+                          on:input={(e) => {
+                            const classNames = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                            templateConfigForm.groups[index].class_names = classNames;
+                            templateConfigForm.groups = [...templateConfigForm.groups];
+                          }}
+                          placeholder="例: 1-1, 1-2, 1-3" />
+                        {#if group.class_names && group.class_names.length > 0}
+                          <div class="flex flex-wrap gap-1">
+                            {#each group.class_names as className}
+                              <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">{className}</span>
+                            {/each}
+                          </div>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                  <button
+                    class="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded text-gray-600 hover:border-gray-400 hover:text-gray-800"
+                    on:click={() => {
+                      templateConfigForm.groups = [...templateConfigForm.groups, { group_name: '', class_names: [] }];
+                    }}>
+                    + グループを追加
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="flex justify-end space-x-3">

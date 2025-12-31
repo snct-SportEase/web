@@ -46,6 +46,10 @@ type NoonGameRepository interface {
 	GetTemplateRunMatchByKey(runID int, matchKey string) (*models.NoonGameTemplateRunMatch, error)
 	GetTemplateRunMatchByMatchID(matchID int) (*models.NoonGameTemplateRunMatch, error)
 	DeleteTemplateRunAndRelatedData(sessionID int) error
+
+	// --- Template default groups ---
+	GetTemplateDefaultGroups(templateKey string) ([]*models.NoonGameTemplateDefaultGroup, error)
+	SaveTemplateDefaultGroups(templateKey string, groups []*models.NoonGameTemplateDefaultGroup) error
 }
 
 type noonGameRepository struct {
@@ -1882,4 +1886,89 @@ func nullableInt(ptr *int) interface{} {
 		return nil
 	}
 	return *ptr
+}
+
+// GetTemplateDefaultGroups は指定されたテンプレートキーのデフォルトグループ設定を取得します。
+func (r *noonGameRepository) GetTemplateDefaultGroups(templateKey string) ([]*models.NoonGameTemplateDefaultGroup, error) {
+	rows, err := r.db.Query(`
+		SELECT id, template_key, group_index, group_name, class_names, created_at, updated_at
+		FROM noon_game_template_default_groups
+		WHERE template_key = ?
+		ORDER BY group_index
+	`, templateKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var groups []*models.NoonGameTemplateDefaultGroup
+	for rows.Next() {
+		group := &models.NoonGameTemplateDefaultGroup{}
+		var classNamesJSON string
+		if err := rows.Scan(
+			&group.ID,
+			&group.TemplateKey,
+			&group.GroupIndex,
+			&group.GroupName,
+			&classNamesJSON,
+			&group.CreatedAt,
+			&group.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		// JSONをパース
+		if err := json.Unmarshal([]byte(classNamesJSON), &group.ClassNames); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal class_names: %w", err)
+		}
+
+		groups = append(groups, group)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return groups, nil
+}
+
+// SaveTemplateDefaultGroups は指定されたテンプレートキーのデフォルトグループ設定を保存します。
+func (r *noonGameRepository) SaveTemplateDefaultGroups(templateKey string, groups []*models.NoonGameTemplateDefaultGroup) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 既存の設定を削除
+	if _, err := tx.Exec(`DELETE FROM noon_game_template_default_groups WHERE template_key = ?`, templateKey); err != nil {
+		return fmt.Errorf("failed to delete existing default groups: %w", err)
+	}
+
+	// 新しい設定を挿入
+	stmt, err := tx.Prepare(`
+		INSERT INTO noon_game_template_default_groups (template_key, group_index, group_name, class_names)
+		VALUES (?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, group := range groups {
+		classNamesJSON, err := json.Marshal(group.ClassNames)
+		if err != nil {
+			return fmt.Errorf("failed to marshal class_names: %w", err)
+		}
+
+		if _, err := stmt.Exec(templateKey, group.GroupIndex, group.GroupName, string(classNamesJSON)); err != nil {
+			return fmt.Errorf("failed to insert default group: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }

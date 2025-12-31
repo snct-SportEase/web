@@ -286,6 +286,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootNoon.PUT("/sessions/:session_id/matches/:match_id", noonHandler.SaveMatch)
 				rootNoon.DELETE("/sessions/:session_id/matches/:match_id", noonHandler.DeleteMatch)
 				rootNoon.POST("/sessions/:session_id/manual-points", noonHandler.AddManualPoint)
+				rootNoon.GET("/templates/:template_key/default-groups", noonHandler.GetTemplateDefaultGroups)
+				rootNoon.PUT("/templates/:template_key/default-groups", noonHandler.SaveTemplateDefaultGroups)
 			}
 
 			rootNotifications := root.Group("/notifications")
