@@ -2169,6 +2169,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 
 	// AブロックとBブロックの両方に結果が登録されているか確認
 	if matchA.Result == nil || matchB.Result == nil {
+		log.Printf("INFO: skip overall bonus (results not ready) run_id=%d matchA_result_nil=%t matchB_result_nil=%t", runID, matchA.Result == nil, matchB.Result == nil)
 		return nil // まだ両方の結果が揃っていない場合は何もしない
 	}
 
@@ -2189,32 +2190,95 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 		return fmt.Errorf("bonus match not found")
 	}
 
-	// 既に総合ボーナスが登録されている場合はスキップ（再計算を防ぐ）
-	if matchBonus.Result != nil {
-		return nil
-	}
+	// 既存の総合ボーナスがあっても毎回再計算して上書きする
+	// （空結果が残っていても必ず計算し直す）
 
 	// session は既に取得済みなので、sessionObj を使用
 
 	// 各チームのAブロックとBブロックの合計点数を計算
-	// entry_idをキーとして、AブロックとBブロックの点数を集計
-	entryTotalPoints := make(map[int]int)  // entry_id -> 合計点数
-	entryToClassIDs := make(map[int][]int) // entry_id -> classIDs
+	// groupIDをキーとして、AブロックとBブロックの点数を集計（同じ学年のエントリーをマッチング）
+	groupTotalPoints := make(map[int]int)  // groupID -> 合計点数
+	groupToClassIDs := make(map[int][]int) // groupID -> classIDs
+	groupToEntryID := make(map[int]int)    // groupID -> 総合ボーナス試合のentryID
+
+	log.Printf("INFO: start overall bonus calc run_id=%d match_bonus_id=%d entries=%d a_details=%d b_details=%d", runID, matchBonus.ID, len(matchBonus.Entries), len(matchA.Result.Details), len(matchB.Result.Details))
+
+	// 総合ボーナス試合のエントリーをマッピング（groupID -> entryID）
+	for _, entry := range matchBonus.Entries {
+		if entry != nil && entry.SideType == "group" && entry.GroupID != nil {
+			groupToEntryID[*entry.GroupID] = entry.ID
+			// classIDsも取得
+			classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
+			if err == nil && len(classIDs) > 0 {
+				groupToClassIDs[*entry.GroupID] = classIDs
+			}
+		}
+	}
 
 	// Aブロックの点数を集計
 	if matchA.Result != nil && matchA.Result.Details != nil {
 		for _, detail := range matchA.Result.Details {
 			if detail.Points > 0 {
-				entryTotalPoints[detail.EntryID] += detail.Points
-				// entry_idからclassIDsを取得
+				found := false
+				var resolvedName string
+				if detail.EntryResolvedName != "" {
+					resolvedName = strings.TrimSpace(detail.EntryResolvedName)
+				}
+				// エントリーからgroupIDを取得（マッチ内）
 				for _, entry := range matchA.Entries {
-					if entry != nil && entry.ID == detail.EntryID {
-						classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
-						if err == nil && len(classIDs) > 0 {
-							entryToClassIDs[detail.EntryID] = classIDs
+					if entry != nil && entry.ID == detail.EntryID && entry.SideType == "group" && entry.GroupID != nil {
+						groupID := *entry.GroupID
+						groupTotalPoints[groupID] += detail.Points
+						if _, ok := groupToClassIDs[groupID]; !ok {
+							classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
+							if err == nil && len(classIDs) > 0 {
+								groupToClassIDs[groupID] = classIDs
+							}
 						}
+						found = true
 						break
 					}
+				}
+				// マッチ内に該当エントリーが無い場合、DBまたは名前マッチで補完
+				if !found {
+					if entry, err := h.noonRepo.GetEntryByID(detail.EntryID); err == nil && entry != nil && entry.SideType == "group" && entry.GroupID != nil {
+						groupID := *entry.GroupID
+						groupTotalPoints[groupID] += detail.Points
+						if _, ok := groupToClassIDs[groupID]; !ok {
+							classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
+							if err == nil && len(classIDs) > 0 {
+								groupToClassIDs[groupID] = classIDs
+							}
+						}
+						if _, ok := groupToEntryID[groupID]; !ok {
+							// BONUSエントリーが不一致の場合もあるので、fallbackとしてセット
+							groupToEntryID[groupID] = detail.EntryID
+						}
+						log.Printf("INFO: bonus calc A-block fallback entry lookup by id detail_entry_id=%d group_id=%d", detail.EntryID, groupID)
+						found = true
+					}
+				}
+				if !found {
+					// 名前でBONUSエントリーとマッチさせて groupID を推定
+					groupID := resolveGroupIDByName(resolvedName, matchBonus.Entries, groupMap)
+					if groupID != nil {
+						gid := *groupID
+						groupTotalPoints[gid] += detail.Points
+						if _, ok := groupToClassIDs[gid]; !ok {
+							classIDs, err := h.resolveClassIDs("group", nil, groupID)
+							if err == nil && len(classIDs) > 0 {
+								groupToClassIDs[gid] = classIDs
+							}
+						}
+						if _, ok := groupToEntryID[gid]; !ok {
+							groupToEntryID[gid] = detail.EntryID
+						}
+						log.Printf("INFO: bonus calc A-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, resolvedName, gid)
+						found = true
+					}
+				}
+				if !found {
+					log.Printf("WARNING: bonus calc A-block entry not found detail_entry_id=%d name=%q", detail.EntryID, resolvedName)
 				}
 			}
 		}
@@ -2224,31 +2288,87 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 	if matchB.Result != nil && matchB.Result.Details != nil {
 		for _, detail := range matchB.Result.Details {
 			if detail.Points > 0 {
-				entryTotalPoints[detail.EntryID] += detail.Points
-				// entry_idからclassIDsを取得（まだ取得していない場合）
-				if _, ok := entryToClassIDs[detail.EntryID]; !ok {
-					for _, entry := range matchB.Entries {
-						if entry != nil && entry.ID == detail.EntryID {
+				found := false
+				var resolvedName string
+				if detail.EntryResolvedName != "" {
+					resolvedName = strings.TrimSpace(detail.EntryResolvedName)
+				}
+				// エントリーからgroupIDを取得（マッチ内）
+				for _, entry := range matchB.Entries {
+					if entry != nil && entry.ID == detail.EntryID && entry.SideType == "group" && entry.GroupID != nil {
+						groupID := *entry.GroupID
+						groupTotalPoints[groupID] += detail.Points
+						if _, ok := groupToClassIDs[groupID]; !ok {
 							classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
 							if err == nil && len(classIDs) > 0 {
-								entryToClassIDs[detail.EntryID] = classIDs
+								groupToClassIDs[groupID] = classIDs
 							}
-							break
 						}
+						found = true
+						break
 					}
+				}
+				// マッチ内に該当エントリーが無い場合、DBまたは名前マッチで補完
+				if !found {
+					if entry, err := h.noonRepo.GetEntryByID(detail.EntryID); err == nil && entry != nil && entry.SideType == "group" && entry.GroupID != nil {
+						groupID := *entry.GroupID
+						groupTotalPoints[groupID] += detail.Points
+						if _, ok := groupToClassIDs[groupID]; !ok {
+							classIDs, err := h.resolveClassIDs(entry.SideType, entry.ClassID, entry.GroupID)
+							if err == nil && len(classIDs) > 0 {
+								groupToClassIDs[groupID] = classIDs
+							}
+						}
+						if _, ok := groupToEntryID[groupID]; !ok {
+							groupToEntryID[groupID] = detail.EntryID
+						}
+						log.Printf("INFO: bonus calc B-block fallback entry lookup by id detail_entry_id=%d group_id=%d", detail.EntryID, groupID)
+						found = true
+					}
+				}
+				if !found {
+					groupID := resolveGroupIDByName(resolvedName, matchBonus.Entries, groupMap)
+					if groupID != nil {
+						gid := *groupID
+						groupTotalPoints[gid] += detail.Points
+						if _, ok := groupToClassIDs[gid]; !ok {
+							classIDs, err := h.resolveClassIDs("group", nil, groupID)
+							if err == nil && len(classIDs) > 0 {
+								groupToClassIDs[gid] = classIDs
+							}
+						}
+						if _, ok := groupToEntryID[gid]; !ok {
+							groupToEntryID[gid] = detail.EntryID
+						}
+						log.Printf("INFO: bonus calc B-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, resolvedName, gid)
+						found = true
+					}
+				}
+				if !found {
+					log.Printf("WARNING: bonus calc B-block entry not found detail_entry_id=%d name=%q", detail.EntryID, resolvedName)
 				}
 			}
 		}
 	}
 
 	// 合計点数でソートして順位を決定
-	type entryScore struct {
+	type groupScore struct {
+		GroupID int
 		EntryID int
 		Points  int
 	}
-	scores := make([]entryScore, 0, len(entryTotalPoints))
-	for entryID, points := range entryTotalPoints {
-		scores = append(scores, entryScore{EntryID: entryID, Points: points})
+	scores := make([]groupScore, 0, len(groupTotalPoints))
+	for groupID, points := range groupTotalPoints {
+		entryID, ok := groupToEntryID[groupID]
+		if !ok {
+			// 総合ボーナス試合にエントリーがない場合はスキップ
+			continue
+		}
+		scores = append(scores, groupScore{
+			GroupID: groupID,
+			EntryID: entryID,
+			Points:  points,
+		})
 	}
 	// 点数が高い順にソート
 	for i := 0; i < len(scores)-1; i++ {
@@ -2300,7 +2420,19 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 	}
 
 	for _, ranking := range rankings {
-		classIDs := entryToClassIDs[ranking.EntryID]
+		// ranking.EntryIDからgroupIDを逆引き
+		var groupID *int
+		for _, entry := range matchBonus.Entries {
+			if entry != nil && entry.ID == ranking.EntryID && entry.SideType == "group" && entry.GroupID != nil {
+				groupID = entry.GroupID
+				break
+			}
+		}
+		if groupID == nil {
+			continue
+		}
+
+		classIDs := groupToClassIDs[*groupID]
 		if len(classIDs) == 0 {
 			continue
 		}
@@ -2327,29 +2459,15 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 			}
 		}
 
-		// エントリー名を解決
+		// エントリー名を解決（総合ボーナス試合のエントリーを使用）
 		entryName := ""
-		if classIDs, ok := entryToClassIDs[ranking.EntryID]; ok && len(classIDs) > 0 {
-			// entryToClassIDsからエントリー情報を取得
-			for _, entry := range matchA.Entries {
-				if entry != nil && entry.ID == ranking.EntryID {
-					name, _, err := h.resolveEntryDisplay(sessionObj.ID, entry, classMap, groupMap)
-					if err == nil && name != "" {
-						entryName = name
-					}
-					break
+		for _, entry := range matchBonus.Entries {
+			if entry != nil && entry.ID == ranking.EntryID {
+				name, _, err := h.resolveEntryDisplay(sessionObj.ID, entry, classMap, groupMap)
+				if err == nil && name != "" {
+					entryName = name
 				}
-			}
-			if entryName == "" {
-				for _, entry := range matchB.Entries {
-					if entry != nil && entry.ID == ranking.EntryID {
-						name, _, err := h.resolveEntryDisplay(sessionObj.ID, entry, classMap, groupMap)
-						if err == nil && name != "" {
-							entryName = name
-						}
-						break
-					}
-				}
+				break
 			}
 		}
 
@@ -2362,9 +2480,20 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 		})
 	}
 
-	// 既存ポイントを消す
+	// 既存ポイント・既存結果を消す（空結果が残っているケースに対応）
 	if err := h.noonRepo.ClearPointsForMatch(matchBonus.ID); err != nil {
 		return fmt.Errorf("failed to clear existing points: %w", err)
+	}
+	if matchBonus.Result != nil {
+		if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
+			MatchID:    matchBonus.ID,
+			Winner:     "draw",
+			RecordedBy: user.ID,
+			Note:       nil,
+			Details:    []*models.NoonGameResultDetail{}, // 既存 detail を一旦クリア
+		}); err != nil {
+			return fmt.Errorf("failed to clear existing bonus result: %w", err)
+		}
 	}
 
 	// 点数を登録
@@ -2398,6 +2527,38 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 		return fmt.Errorf("failed to update class scores: %w", err)
 	}
 
+	log.Printf("INFO: overall bonus saved run_id=%d match_bonus_id=%d details=%d points_entries=%d", runID, matchBonus.ID, len(resultDetails), len(pointsEntries))
+
+	return nil
+}
+
+// resolveGroupIDByName は、detail.EntryResolvedName などから groupID を推定するためのフォールバック。
+// ・ボーナス試合のエントリー表示名/ResolvedName と突き合わせ
+// ・groupMap に名称があれば名称一致で解決
+func resolveGroupIDByName(name string, entries []*models.NoonGameMatchEntry, groupMap map[int]*models.NoonGameGroupWithMembers) *int {
+	if strings.TrimSpace(name) == "" {
+		return nil
+	}
+	n := strings.TrimSpace(name)
+	// bonus match entries 優先
+	for _, e := range entries {
+		if e != nil && e.SideType == "group" && e.GroupID != nil {
+			display := ""
+			if e.DisplayName != nil {
+				display = strings.TrimSpace(*e.DisplayName)
+			}
+			if strings.EqualFold(display, n) {
+				return e.GroupID
+			}
+		}
+	}
+	// groupMap の名称マッチ
+	for gid, g := range groupMap {
+		if g != nil && strings.EqualFold(strings.TrimSpace(g.Name), n) {
+			id := gid
+			return &id
+		}
+	}
 	return nil
 }
 
