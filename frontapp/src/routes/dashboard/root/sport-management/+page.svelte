@@ -25,9 +25,18 @@
     let editingMaxCapacity = null;
     let isAssigning = false; // 割り当て処理中のフラグ
 
-    const allLocations = ['gym1', 'gym2', 'ground', 'noon_game', 'other'];
+    // 昼競技(noon_game)は /dashboard/root/noon-game で管理するため、通常競技の割り当て対象から除外する
+    const allLocations = ['gym1', 'gym2', 'ground', 'other'];
 
-    $: usedLocations = eventSports ? eventSports.map(es => es.location).filter(loc => loc !== 'other') : [];
+    // noon_game はこの画面の対象外なので、使用中ロケーションの計算からも除外する
+    $: usedLocations = eventSports
+        ? eventSports
+              .map(es => es.location)
+              .filter(loc => loc !== 'other' && loc !== 'noon_game')
+        : [];
+
+    // この画面で扱うのは「通常競技」のみ（noon_game は別画面で管理）
+    $: visibleEventSports = eventSports ? eventSports.filter(es => es.location !== 'noon_game') : [];
 
     let unsubscribe = null;
 
@@ -397,7 +406,7 @@
 
                     <!-- Right side: Assigned Sports List -->
                     <div>
-                        <h3 class="font-medium text-lg mb-4 text-gray-700">割り当て済み競技一覧 ({eventSports.length}件)</h3>
+                        <h3 class="font-medium text-lg mb-4 text-gray-700">割り当て済み競技一覧 ({visibleEventSports.length}件)</h3>
                         <div class="max-h-96 overflow-y-auto border rounded-lg shadow-inner">
                             <table class="w-full text-sm">
                                 <thead class="sticky top-0 bg-gray-200">
@@ -410,7 +419,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {#each eventSports as es (es.sport_id)}
+                                    {#each visibleEventSports as es (es.sport_id)}
                                         <tr class="border-t hover:bg-gray-50">
                                             <td class="px-4 py-3 font-medium text-gray-900">{getSportName(es.sport_id)}</td>
                                             <td class="px-4 py-3 text-gray-600">{es.location}</td>

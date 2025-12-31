@@ -3,6 +3,7 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -33,6 +34,22 @@ type NoonGameRepository interface {
 	SumPointsByClass(sessionID int) (map[int]int, error)
 
 	GetGroupMembers(groupID int) ([]*models.NoonGameGroupMember, error)
+	GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error)
+
+	// --- Template runs ---
+	CreateTemplateRun(run *models.NoonGameTemplateRun) (*models.NoonGameTemplateRun, error)
+	CreateTemplateRunWithPointsByRankJSON(sessionID int, templateKey, name, createdBy string, pointsByRankJSON interface{}) (*models.NoonGameTemplateRun, error)
+	GetTemplateRunByID(runID int) (*models.NoonGameTemplateRun, error)
+	ListTemplateRunsBySession(sessionID int) ([]*models.NoonGameTemplateRun, error)
+	ListTemplateRunMatches(runID int) ([]*models.NoonGameTemplateRunMatch, error)
+	LinkTemplateRunMatch(runID int, matchID int, matchKey string) (*models.NoonGameTemplateRunMatch, error)
+	GetTemplateRunMatchByKey(runID int, matchKey string) (*models.NoonGameTemplateRunMatch, error)
+	GetTemplateRunMatchByMatchID(matchID int) (*models.NoonGameTemplateRunMatch, error)
+	DeleteTemplateRunAndRelatedData(sessionID int) error
+
+	// --- Template default groups ---
+	GetTemplateDefaultGroups(templateKey string) ([]*models.NoonGameTemplateDefaultGroup, error)
+	SaveTemplateDefaultGroups(templateKey string, groups []*models.NoonGameTemplateDefaultGroup) error
 }
 
 type noonGameRepository struct {
@@ -41,6 +58,351 @@ type noonGameRepository struct {
 
 func NewNoonGameRepository(db *sql.DB) NoonGameRepository {
 	return &noonGameRepository{db: db}
+}
+
+func (r *noonGameRepository) CreateTemplateRun(run *models.NoonGameTemplateRun) (*models.NoonGameTemplateRun, error) {
+	if run == nil {
+		return nil, fmt.Errorf("run is nil")
+	}
+	if run.SessionID == 0 {
+		return nil, fmt.Errorf("session_id is required")
+	}
+	if strings.TrimSpace(run.TemplateKey) == "" {
+		return nil, fmt.Errorf("template_key is required")
+	}
+	if strings.TrimSpace(run.Name) == "" {
+		return nil, fmt.Errorf("name is required")
+	}
+	createdBy := strings.TrimSpace(run.CreatedBy)
+	if createdBy == "" {
+		return nil, fmt.Errorf("created_by is required")
+	}
+	if len(createdBy) != 36 {
+		return nil, fmt.Errorf("created_by must be a valid UUID (36 characters), got %d characters", len(createdBy))
+	}
+
+	var pointsByRankJSON interface{}
+	if run.PointsByRank != nil {
+		jsonBytes, err := json.Marshal(run.PointsByRank)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal points_by_rank: %w", err)
+		}
+		pointsByRankJSON = string(jsonBytes)
+	}
+
+	res, err := r.db.Exec(`
+		INSERT INTO noon_game_template_runs (session_id, template_key, name, created_by, points_by_rank)
+		VALUES (?, ?, ?, ?, ?)
+	`, run.SessionID, strings.TrimSpace(run.TemplateKey), strings.TrimSpace(run.Name), createdBy, pointsByRankJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert template run (session_id=%d, template_key=%q, name=%q, created_by=%q): %w", run.SessionID, run.TemplateKey, run.Name, createdBy, err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last insert id: %w", err)
+	}
+	return r.GetTemplateRunByID(int(id))
+}
+
+func (r *noonGameRepository) CreateTemplateRunWithPointsByRankJSON(sessionID int, templateKey, name, createdBy string, pointsByRankJSON interface{}) (*models.NoonGameTemplateRun, error) {
+	if sessionID == 0 {
+		return nil, fmt.Errorf("session_id is required")
+	}
+	if strings.TrimSpace(templateKey) == "" {
+		return nil, fmt.Errorf("template_key is required")
+	}
+	if strings.TrimSpace(name) == "" {
+		return nil, fmt.Errorf("name is required")
+	}
+	createdByTrimmed := strings.TrimSpace(createdBy)
+	if createdByTrimmed == "" {
+		return nil, fmt.Errorf("created_by is required")
+	}
+	if len(createdByTrimmed) != 36 {
+		return nil, fmt.Errorf("created_by must be a valid UUID (36 characters), got %d characters", len(createdByTrimmed))
+	}
+
+	var pointsByRankJSONVal interface{}
+	if pointsByRankJSON != nil {
+		// JSONとしてマーシャルしてから保存
+		jsonBytes, err := json.Marshal(pointsByRankJSON)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal points_by_rank: %w", err)
+		}
+		var unmarshaled interface{}
+		if err := json.Unmarshal(jsonBytes, &unmarshaled); err != nil {
+			return nil, fmt.Errorf("failed to validate points_by_rank JSON: %w", err)
+		}
+		pointsByRankJSONVal = string(jsonBytes)
+	}
+
+	res, err := r.db.Exec(`
+		INSERT INTO noon_game_template_runs (session_id, template_key, name, created_by, points_by_rank)
+		VALUES (?, ?, ?, ?, ?)
+	`, sessionID, strings.TrimSpace(templateKey), strings.TrimSpace(name), createdByTrimmed, pointsByRankJSONVal)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert template run (session_id=%d, template_key=%q, name=%q, created_by=%q): %w", sessionID, templateKey, name, createdByTrimmed, err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last insert id: %w", err)
+	}
+	return r.GetTemplateRunByID(int(id))
+}
+
+func (r *noonGameRepository) GetTemplateRunByID(runID int) (*models.NoonGameTemplateRun, error) {
+	row := r.db.QueryRow(`
+		SELECT id, session_id, template_key, name, created_by, created_at, updated_at, points_by_rank
+		FROM noon_game_template_runs
+		WHERE id = ?
+	`, runID)
+
+	run := &models.NoonGameTemplateRun{}
+	var pointsByRankJSON sql.NullString
+	if err := row.Scan(
+		&run.ID,
+		&run.SessionID,
+		&run.TemplateKey,
+		&run.Name,
+		&run.CreatedBy,
+		&run.CreatedAt,
+		&run.UpdatedAt,
+		&pointsByRankJSON,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if pointsByRankJSON.Valid && pointsByRankJSON.String != "" {
+		var pointsByRank interface{}
+		if err := json.Unmarshal([]byte(pointsByRankJSON.String), &pointsByRank); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal points_by_rank: %w", err)
+		}
+		run.PointsByRank = pointsByRank
+	}
+
+	return run, nil
+}
+
+func (r *noonGameRepository) ListTemplateRunsBySession(sessionID int) ([]*models.NoonGameTemplateRun, error) {
+	rows, err := r.db.Query(`
+		SELECT id, session_id, template_key, name, created_by, created_at, updated_at, points_by_rank
+		FROM noon_game_template_runs
+		WHERE session_id = ?
+		ORDER BY created_at
+	`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*models.NoonGameTemplateRun
+	for rows.Next() {
+		run := &models.NoonGameTemplateRun{}
+		var pointsByRankJSON sql.NullString
+		if err := rows.Scan(
+			&run.ID,
+			&run.SessionID,
+			&run.TemplateKey,
+			&run.Name,
+			&run.CreatedBy,
+			&run.CreatedAt,
+			&run.UpdatedAt,
+			&pointsByRankJSON,
+		); err != nil {
+			return nil, err
+		}
+
+		if pointsByRankJSON.Valid && pointsByRankJSON.String != "" {
+			var pointsByRank interface{}
+			if err := json.Unmarshal([]byte(pointsByRankJSON.String), &pointsByRank); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal points_by_rank: %w", err)
+			}
+			run.PointsByRank = pointsByRank
+		}
+
+		out = append(out, run)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *noonGameRepository) LinkTemplateRunMatch(runID int, matchID int, matchKey string) (*models.NoonGameTemplateRunMatch, error) {
+	if runID == 0 || matchID == 0 {
+		return nil, fmt.Errorf("run_id and match_id are required")
+	}
+	key := strings.TrimSpace(matchKey)
+	if key == "" {
+		return nil, fmt.Errorf("match_key is required")
+	}
+
+	res, err := r.db.Exec(`
+		INSERT INTO noon_game_template_run_matches (run_id, match_id, match_key)
+		VALUES (?, ?, ?)
+	`, runID, matchID, key)
+	if err != nil {
+		return nil, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	row := r.db.QueryRow(`
+		SELECT id, run_id, match_id, match_key
+		FROM noon_game_template_run_matches
+		WHERE id = ?
+	`, int(id))
+	out := &models.NoonGameTemplateRunMatch{}
+	if err := row.Scan(&out.ID, &out.RunID, &out.MatchID, &out.MatchKey); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *noonGameRepository) ListTemplateRunMatches(runID int) ([]*models.NoonGameTemplateRunMatch, error) {
+	rows, err := r.db.Query(`
+		SELECT id, run_id, match_id, match_key
+		FROM noon_game_template_run_matches
+		WHERE run_id = ?
+		ORDER BY id
+	`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*models.NoonGameTemplateRunMatch
+	for rows.Next() {
+		item := &models.NoonGameTemplateRunMatch{}
+		if err := rows.Scan(&item.ID, &item.RunID, &item.MatchID, &item.MatchKey); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *noonGameRepository) GetTemplateRunMatchByKey(runID int, matchKey string) (*models.NoonGameTemplateRunMatch, error) {
+	key := strings.TrimSpace(matchKey)
+	if key == "" {
+		return nil, fmt.Errorf("match_key is required")
+	}
+
+	row := r.db.QueryRow(`
+		SELECT id, run_id, match_id, match_key
+		FROM noon_game_template_run_matches
+		WHERE run_id = ? AND match_key = ?
+	`, runID, key)
+	item := &models.NoonGameTemplateRunMatch{}
+	if err := row.Scan(&item.ID, &item.RunID, &item.MatchID, &item.MatchKey); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return item, nil
+}
+
+func (r *noonGameRepository) GetTemplateRunMatchByMatchID(matchID int) (*models.NoonGameTemplateRunMatch, error) {
+	row := r.db.QueryRow(`
+		SELECT id, run_id, match_id, match_key
+		FROM noon_game_template_run_matches
+		WHERE match_id = ?
+	`, matchID)
+	item := &models.NoonGameTemplateRunMatch{}
+	if err := row.Scan(&item.ID, &item.RunID, &item.MatchID, &item.MatchKey); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return item, nil
+}
+
+func (r *noonGameRepository) DeleteTemplateRunAndRelatedData(sessionID int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// セッションに関連するすべてのテンプレートランを取得
+	runs, err := r.ListTemplateRunsBySession(sessionID)
+	if err != nil {
+		return err
+	}
+
+	for _, run := range runs {
+		// テンプレートランに関連する試合を取得
+		runMatches, err := r.ListTemplateRunMatches(run.ID)
+		if err != nil {
+			return err
+		}
+
+		// 試合を削除（関連データも含む）- トランザクション内で直接削除
+		for _, runMatch := range runMatches {
+			matchID := runMatch.MatchID
+			// 試合に関連するポイントを削除
+			if _, err := tx.Exec(`DELETE FROM noon_game_points WHERE match_id = ?`, matchID); err != nil {
+				return err
+			}
+			// 試合結果の詳細を削除
+			if _, err := tx.Exec(`
+				DELETE FROM noon_game_result_details
+				WHERE result_id IN (SELECT id FROM noon_game_results WHERE match_id = ?)
+			`, matchID); err != nil {
+				return err
+			}
+			// 試合結果を削除
+			if _, err := tx.Exec(`DELETE FROM noon_game_results WHERE match_id = ?`, matchID); err != nil {
+				return err
+			}
+			// 試合エントリーを削除
+			if _, err := tx.Exec(`DELETE FROM noon_game_match_entries WHERE match_id = ?`, matchID); err != nil {
+				return err
+			}
+			// 試合を削除
+			if _, err := tx.Exec(`DELETE FROM noon_game_matches WHERE id = ? AND session_id = ?`, matchID, sessionID); err != nil {
+				return err
+			}
+		}
+
+		// テンプレートラン試合のリンクを削除
+		if _, err := tx.Exec(`DELETE FROM noon_game_template_run_matches WHERE run_id = ?`, run.ID); err != nil {
+			return err
+		}
+
+		// テンプレートランを削除
+		if _, err := tx.Exec(`DELETE FROM noon_game_template_runs WHERE id = ?`, run.ID); err != nil {
+			return err
+		}
+	}
+
+	// テンプレートで作成されたグループを削除
+	// テンプレート作成時に作成されたグループを削除する
+	groups, err := r.GetGroupsWithMembers(sessionID)
+	if err != nil {
+		return err
+	}
+	for _, group := range groups {
+		// グループメンバーを削除
+		if _, err := tx.Exec(`DELETE FROM noon_game_group_members WHERE group_id = ?`, group.ID); err != nil {
+			return err
+		}
+		// グループを削除
+		if _, err := tx.Exec(`DELETE FROM noon_game_groups WHERE id = ? AND session_id = ?`, group.ID, sessionID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (r *noonGameRepository) GetSessionByID(sessionID int) (*models.NoonGameSession, error) {
@@ -1187,6 +1549,51 @@ func (r *noonGameRepository) fetchMatchEntries(matchIDs []int) (map[int][]*model
 	return result, nil
 }
 
+func (r *noonGameRepository) GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error) {
+	row := r.db.QueryRow(`
+		SELECT id, match_id, entry_index, side_type, class_id, group_id, display_name
+		FROM noon_game_match_entries
+		WHERE id = ?
+	`, entryID)
+
+	entry := &models.NoonGameMatchEntry{}
+	var (
+		classID     sql.NullInt64
+		groupID     sql.NullInt64
+		displayName sql.NullString
+	)
+
+	if err := row.Scan(
+		&entry.ID,
+		&entry.MatchID,
+		&entry.EntryIndex,
+		&entry.SideType,
+		&classID,
+		&groupID,
+		&displayName,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if classID.Valid {
+		val := int(classID.Int64)
+		entry.ClassID = &val
+	}
+	if groupID.Valid {
+		val := int(groupID.Int64)
+		entry.GroupID = &val
+	}
+	if displayName.Valid {
+		str := displayName.String
+		entry.DisplayName = &str
+	}
+
+	return entry, nil
+}
+
 func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*models.NoonGameResultDetail, error) {
 	result := make(map[int][]*models.NoonGameResultDetail)
 	if len(matchIDs) == 0 {
@@ -1195,9 +1602,12 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 
 	placeholder, args := buildInClause(matchIDs)
 	query := fmt.Sprintf(`
-		SELECT rd.id, r.match_id, rd.entry_id, rd.placement_rank, rd.points, rd.note
+		SELECT 
+			rd.id, r.match_id, rd.entry_id, rd.placement_rank, rd.points, rd.note, rd.entry_resolved_name,
+			e.entry_index, e.side_type, e.class_id, e.group_id, e.display_name
 		FROM noon_game_result_details rd
 		JOIN noon_game_results r ON rd.result_id = r.id
+		LEFT JOIN noon_game_match_entries e ON rd.entry_id = e.id
 		WHERE r.match_id IN (%s)
 		ORDER BY r.match_id, rd.placement_rank, rd.id
 	`, placeholder)
@@ -1211,9 +1621,15 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 	for rows.Next() {
 		detail := &models.NoonGameResultDetail{}
 		var (
-			matchID sql.NullInt64
-			rank    sql.NullInt64
-			note    sql.NullString
+			matchID           sql.NullInt64
+			rank              sql.NullInt64
+			note              sql.NullString
+			entryResolvedName sql.NullString
+			entryIndex        sql.NullInt64
+			sideType          sql.NullString
+			entryClassID      sql.NullInt64
+			entryGroupID      sql.NullInt64
+			displayName       sql.NullString
 		)
 		if err := rows.Scan(
 			&detail.ID,
@@ -1222,6 +1638,12 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 			&rank,
 			&detail.Points,
 			&note,
+			&entryResolvedName,
+			&entryIndex,
+			&sideType,
+			&entryClassID,
+			&entryGroupID,
+			&displayName,
 		); err != nil {
 			return nil, err
 		}
@@ -1237,6 +1659,10 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 		if note.Valid {
 			str := note.String
 			detail.Note = &str
+		}
+		// データベースに保存されている entry_resolved_name を優先的に使用
+		if entryResolvedName.Valid {
+			detail.EntryResolvedName = entryResolvedName.String
 		}
 
 		result[int(matchID.Int64)] = append(result[int(matchID.Int64)], detail)
@@ -1331,8 +1757,8 @@ func (r *noonGameRepository) replaceResultDetailsTx(tx *sql.Tx, resultID int, de
 	}
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO noon_game_result_details (result_id, entry_id, placement_rank, points, note)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO noon_game_result_details (result_id, entry_id, placement_rank, points, note, entry_resolved_name)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -1343,12 +1769,17 @@ func (r *noonGameRepository) replaceResultDetailsTx(tx *sql.Tx, resultID int, de
 		if detail == nil {
 			continue
 		}
+		entryResolvedName := ""
+		if detail.EntryResolvedName != "" {
+			entryResolvedName = detail.EntryResolvedName
+		}
 		if _, err := stmt.Exec(
 			resultID,
 			detail.EntryID,
 			nullableInt(detail.Rank),
 			detail.Points,
 			nullableString(detail.Note),
+			nullableString(&entryResolvedName),
 		); err != nil {
 			return err
 		}
@@ -1455,4 +1886,89 @@ func nullableInt(ptr *int) interface{} {
 		return nil
 	}
 	return *ptr
+}
+
+// GetTemplateDefaultGroups は指定されたテンプレートキーのデフォルトグループ設定を取得します。
+func (r *noonGameRepository) GetTemplateDefaultGroups(templateKey string) ([]*models.NoonGameTemplateDefaultGroup, error) {
+	rows, err := r.db.Query(`
+		SELECT id, template_key, group_index, group_name, class_names, created_at, updated_at
+		FROM noon_game_template_default_groups
+		WHERE template_key = ?
+		ORDER BY group_index
+	`, templateKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var groups []*models.NoonGameTemplateDefaultGroup
+	for rows.Next() {
+		group := &models.NoonGameTemplateDefaultGroup{}
+		var classNamesJSON string
+		if err := rows.Scan(
+			&group.ID,
+			&group.TemplateKey,
+			&group.GroupIndex,
+			&group.GroupName,
+			&classNamesJSON,
+			&group.CreatedAt,
+			&group.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		// JSONをパース
+		if err := json.Unmarshal([]byte(classNamesJSON), &group.ClassNames); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal class_names: %w", err)
+		}
+
+		groups = append(groups, group)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return groups, nil
+}
+
+// SaveTemplateDefaultGroups は指定されたテンプレートキーのデフォルトグループ設定を保存します。
+func (r *noonGameRepository) SaveTemplateDefaultGroups(templateKey string, groups []*models.NoonGameTemplateDefaultGroup) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 既存の設定を削除
+	if _, err := tx.Exec(`DELETE FROM noon_game_template_default_groups WHERE template_key = ?`, templateKey); err != nil {
+		return fmt.Errorf("failed to delete existing default groups: %w", err)
+	}
+
+	// 新しい設定を挿入
+	stmt, err := tx.Prepare(`
+		INSERT INTO noon_game_template_default_groups (template_key, group_index, group_name, class_names)
+		VALUES (?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, group := range groups {
+		classNamesJSON, err := json.Marshal(group.ClassNames)
+		if err != nil {
+			return fmt.Errorf("failed to marshal class_names: %w", err)
+		}
+
+		if _, err := stmt.Exec(templateKey, group.GroupIndex, group.GroupName, string(classNamesJSON)); err != nil {
+			return fmt.Errorf("failed to insert default group: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }

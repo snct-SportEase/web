@@ -75,6 +75,10 @@ func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context)
 	generatedTournaments := make([]models.GeneratedTournament, 0)
 
 	for _, eventSport := range sports {
+		// 昼競技(noon_game)は /noon-game で別管理するため、トーナメント生成対象から除外
+		if eventSport.Location == "noon_game" {
+			continue
+		}
 		roundBusyClasses := make(map[int]map[int]bool)
 		sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
 		if err != nil {
@@ -163,6 +167,27 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 		return
 	}
 
+	// 昼競技(noon_game)のトーナメントは作成させない（フロント改変や直叩き対策）
+	eventSports, err := h.sportRepo.GetSportsByEventID(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event", "details": err.Error()})
+		return
+	}
+	locationBySportID := make(map[int]string, len(eventSports))
+	for _, es := range eventSports {
+		locationBySportID[es.SportID] = es.Location
+	}
+	for _, t := range tournamentsToCreate {
+		if t.EventID != 0 && t.EventID != eventID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "EventID mismatch"})
+			return
+		}
+		if locationBySportID[t.SportID] == "noon_game" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "昼競技(noon_game)はトーナメント生成の対象外です"})
+			return
+		}
+	}
+
 	// First, delete existing tournaments for this event
 	if err := h.tournRepo.DeleteTournamentsByEventID(eventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete existing tournaments", "details": err.Error()})
@@ -213,6 +238,10 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 	}
 
 	for _, eventSport := range sports {
+		// 昼競技(noon_game)は /noon-game で別管理するため、トーナメント生成対象から除外
+		if eventSport.Location == "noon_game" {
+			continue
+		}
 		roundBusyClasses := make(map[int]map[int]bool)
 		sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
 		if err != nil {
