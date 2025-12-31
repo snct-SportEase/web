@@ -250,7 +250,11 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 
 // CreateCourseRelayRun はコース対抗リレー(テンプレート)の run を作成し、4チームの試合を生成します。
 func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id"})
 		return
@@ -456,7 +460,11 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 
 // CreateTugOfWarRun は綱引き(テンプレート)の run を作成し、4チームの試合を生成します。
 func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("event_id"))
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id"})
 		return
@@ -1298,9 +1306,30 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 				})
 			}
 
+			// エントリー名を解決
+			entryName := ""
+			if entry, ok := entryLookup[ranking.EntryID]; ok && entry != nil {
+				// classMap と groupMap を取得
+				classes, _ := h.classRepo.GetAllClasses(match.SessionID)
+				classMap := make(map[int]*models.Class)
+				for _, class := range classes {
+					classMap[class.ID] = class
+				}
+				groups, _ := h.noonRepo.GetGroupsWithMembers(match.SessionID)
+				groupMap := make(map[int]*models.NoonGameGroupWithMembers)
+				for _, group := range groups {
+					groupMap[group.ID] = group
+				}
+				name, _, err := h.resolveEntryDisplay(match.SessionID, entry, classMap, groupMap)
+				if err == nil && name != "" {
+					entryName = name
+				}
+			}
+
 			detail := &models.NoonGameResultDetail{
-				EntryID: ranking.EntryID,
-				Points:  ranking.Points,
+				EntryID:           ranking.EntryID,
+				Points:            ranking.Points,
+				EntryResolvedName: entryName,
 			}
 			if ranking.Rank != nil {
 				rankVal := *ranking.Rank
@@ -1851,6 +1880,26 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		return
 	}
 
+	// classMap と groupMap を取得
+	classes, err := h.classRepo.GetAllClasses(session.EventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		return
+	}
+	classMap := make(map[int]*models.Class)
+	for _, class := range classes {
+		classMap[class.ID] = class
+	}
+	groups, err := h.noonRepo.GetGroupsWithMembers(session.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups", "details": err.Error()})
+		return
+	}
+	groupMap := make(map[int]*models.NoonGameGroupWithMembers)
+	for _, group := range groups {
+		groupMap[group.ID] = group
+	}
+
 	seenEntry := make(map[int]bool)
 	rankToCount := make(map[int]int)
 	for _, r := range req.Rankings {
@@ -1950,11 +1999,21 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 			})
 		}
 
+		// エントリー名を解決
+		entryName := ""
+		if entry != nil {
+			name, _, err := h.resolveEntryDisplay(session.ID, entry, classMap, groupMap)
+			if err == nil && name != "" {
+				entryName = name
+			}
+		}
+
 		rankCopy := r.Rank
 		resultDetails = append(resultDetails, &models.NoonGameResultDetail{
-			EntryID: r.EntryID,
-			Rank:    &rankCopy,
-			Points:  points,
+			EntryID:           r.EntryID,
+			Rank:              &rankCopy,
+			Points:            points,
+			EntryResolvedName: entryName,
 		})
 
 		if r.Rank < bestRank {
@@ -2047,6 +2106,34 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 		return fmt.Errorf("template run not found or invalid")
 	}
 
+	// classMap と groupMap を取得
+	sessionObj, err := h.noonRepo.GetSessionByID(run.SessionID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch session: %w", err)
+	}
+	if sessionObj == nil {
+		return fmt.Errorf("session not found")
+	}
+	classes, err := h.classRepo.GetAllClasses(sessionObj.EventID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch classes: %w", err)
+	}
+	classMap := make(map[int]*models.Class)
+	for _, class := range classes {
+		classMap[class.ID] = class
+	}
+	groups, err := h.noonRepo.GetGroupsWithMembers(run.SessionID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch groups: %w", err)
+	}
+	groupMap := make(map[int]*models.NoonGameGroupWithMembers)
+	for _, group := range groups {
+		groupMap[group.ID] = group
+	}
+
+	// session 変数を sessionObj から取得
+	session := sessionObj
+
 	// AブロックとBブロックの試合を取得
 	linkA, err := h.noonRepo.GetTemplateRunMatchByKey(runID, yearRelayMatchA)
 	if err != nil {
@@ -2107,13 +2194,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 		return nil
 	}
 
-	session, err := h.noonRepo.GetSessionByID(matchA.SessionID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch session: %w", err)
-	}
-	if session == nil {
-		return fmt.Errorf("session not found")
-	}
+	// session は既に取得済みなので、sessionObj を使用
 
 	// 各チームのAブロックとBブロックの合計点数を計算
 	// entry_idをキーとして、AブロックとBブロックの点数を集計
@@ -2246,11 +2327,38 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 			}
 		}
 
+		// エントリー名を解決
+		entryName := ""
+		if classIDs, ok := entryToClassIDs[ranking.EntryID]; ok && len(classIDs) > 0 {
+			// entryToClassIDsからエントリー情報を取得
+			for _, entry := range matchA.Entries {
+				if entry != nil && entry.ID == ranking.EntryID {
+					name, _, err := h.resolveEntryDisplay(sessionObj.ID, entry, classMap, groupMap)
+					if err == nil && name != "" {
+						entryName = name
+					}
+					break
+				}
+			}
+			if entryName == "" {
+				for _, entry := range matchB.Entries {
+					if entry != nil && entry.ID == ranking.EntryID {
+						name, _, err := h.resolveEntryDisplay(sessionObj.ID, entry, classMap, groupMap)
+						if err == nil && name != "" {
+							entryName = name
+						}
+						break
+					}
+				}
+			}
+		}
+
 		rankCopy := ranking.Rank
 		resultDetails = append(resultDetails, &models.NoonGameResultDetail{
-			EntryID: ranking.EntryID,
-			Rank:    &rankCopy,
-			Points:  points,
+			EntryID:           ranking.EntryID,
+			Rank:              &rankCopy,
+			Points:            points,
+			EntryResolvedName: entryName,
 		})
 	}
 
@@ -2372,6 +2480,26 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		return
 	}
 
+	// classMap と groupMap を取得
+	classes, err := h.classRepo.GetAllClasses(session.EventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		return
+	}
+	classMap := make(map[int]*models.Class)
+	for _, class := range classes {
+		classMap[class.ID] = class
+	}
+	groups, err := h.noonRepo.GetGroupsWithMembers(session.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups", "details": err.Error()})
+		return
+	}
+	groupMap := make(map[int]*models.NoonGameGroupWithMembers)
+	for _, group := range groups {
+		groupMap[group.ID] = group
+	}
+
 	seenEntry := make(map[int]bool)
 	rankToCount := make(map[int]int)
 	for _, r := range req.Rankings {
@@ -2471,11 +2599,21 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 			})
 		}
 
+		// エントリー名を解決
+		entryName := ""
+		if entry != nil {
+			name, _, err := h.resolveEntryDisplay(session.ID, entry, classMap, groupMap)
+			if err == nil && name != "" {
+				entryName = name
+			}
+		}
+
 		rankCopy := r.Rank
 		resultDetails = append(resultDetails, &models.NoonGameResultDetail{
-			EntryID: r.EntryID,
-			Rank:    &rankCopy,
-			Points:  points,
+			EntryID:           r.EntryID,
+			Rank:              &rankCopy,
+			Points:            points,
+			EntryResolvedName: entryName,
 		})
 
 		if r.Rank < bestRank {
@@ -2627,6 +2765,26 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		return
 	}
 
+	// classMap と groupMap を取得
+	classes, err := h.classRepo.GetAllClasses(session.EventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		return
+	}
+	classMap := make(map[int]*models.Class)
+	for _, class := range classes {
+		classMap[class.ID] = class
+	}
+	groups, err := h.noonRepo.GetGroupsWithMembers(session.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups", "details": err.Error()})
+		return
+	}
+	groupMap := make(map[int]*models.NoonGameGroupWithMembers)
+	for _, group := range groups {
+		groupMap[group.ID] = group
+	}
+
 	seenEntry := make(map[int]bool)
 	rankToCount := make(map[int]int)
 	for _, r := range req.Rankings {
@@ -2726,11 +2884,21 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 			})
 		}
 
+		// エントリー名を解決
+		entryName := ""
+		if entry != nil {
+			name, _, err := h.resolveEntryDisplay(session.ID, entry, classMap, groupMap)
+			if err == nil && name != "" {
+				entryName = name
+			}
+		}
+
 		rankCopy := r.Rank
 		resultDetails = append(resultDetails, &models.NoonGameResultDetail{
-			EntryID: r.EntryID,
-			Rank:    &rankCopy,
-			Points:  points,
+			EntryID:           r.EntryID,
+			Rank:              &rankCopy,
+			Points:            points,
+			EntryResolvedName: entryName,
 		})
 
 		if r.Rank < bestRank {
@@ -2955,12 +3123,62 @@ func (h *NoonGameHandler) decorateMatches(matches []*models.NoonGameMatchWithRes
 					if detail == nil {
 						continue
 					}
+					// まず entryNameMap から取得を試みる
 					if name, ok := entryNameMap[detail.EntryID]; ok && name != "" {
 						detail.EntryResolvedName = name
 					}
+					// entryNameMap にない場合は entryLookup から取得
 					if detail.EntryResolvedName == "" {
 						if entry, ok := entryLookup[detail.EntryID]; ok && entry != nil {
 							detail.EntryResolvedName = entry.ResolvedName
+						}
+					}
+					// まだ設定されていない場合、match.Entries から直接探す
+					if detail.EntryResolvedName == "" && len(match.Entries) > 0 {
+						for _, entry := range match.Entries {
+							if entry != nil && entry.ID == detail.EntryID {
+								name, classIDs, err := h.resolveEntryDisplay(match.SessionID, entry, classMap, groupMap)
+								if err == nil && name != "" {
+									entry.ResolvedName = name
+									entry.ClassIDs = classIDs
+									detail.EntryResolvedName = name
+									// 次回のために entryNameMap にも追加
+									entryNameMap[entry.ID] = name
+									entryLookup[entry.ID] = entry
+								}
+								break
+							}
+						}
+					}
+					// まだ設定されていない場合、データベースから直接エントリー情報を取得
+					if detail.EntryResolvedName == "" {
+						entry, err := h.noonRepo.GetEntryByID(detail.EntryID)
+						if err == nil && entry != nil {
+							name, classIDs, err := h.resolveEntryDisplay(match.SessionID, entry, classMap, groupMap)
+							if err == nil && name != "" {
+								entry.ResolvedName = name
+								entry.ClassIDs = classIDs
+								detail.EntryResolvedName = name
+								// 次回のために entryNameMap にも追加
+								entryNameMap[entry.ID] = name
+								entryLookup[entry.ID] = entry
+							}
+						} else {
+							// エントリーが存在しない場合、現在のエントリーから順位と点数で照合を試みる
+							// これはエントリーが削除・再作成された場合のフォールバック
+							if len(match.Entries) > 0 && detail.Rank != nil {
+								// 順位に基づいてエントリーを推測（最後の手段）
+								rankIndex := *detail.Rank - 1
+								if rankIndex >= 0 && rankIndex < len(match.Entries) {
+									entryByRank := match.Entries[rankIndex]
+									if entryByRank != nil {
+										name, _, err := h.resolveEntryDisplay(match.SessionID, entryByRank, classMap, groupMap)
+										if err == nil && name != "" {
+											detail.EntryResolvedName = name
+										}
+									}
+								}
+							}
 						}
 					}
 

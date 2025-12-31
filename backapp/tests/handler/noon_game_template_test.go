@@ -152,6 +152,14 @@ func (m *MockNoonGameRepository) GetGroupMembers(groupID int) ([]*models.NoonGam
 	return args.Get(0).([]*models.NoonGameGroupMember), args.Error(1)
 }
 
+func (m *MockNoonGameRepository) GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error) {
+	args := m.Called(entryID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.NoonGameMatchEntry), args.Error(1)
+}
+
 func (m *MockNoonGameRepository) CreateTemplateRun(run *models.NoonGameTemplateRun) (*models.NoonGameTemplateRun, error) {
 	args := m.Called(run)
 	if args.Get(0) == nil {

@@ -34,6 +34,7 @@ type NoonGameRepository interface {
 	SumPointsByClass(sessionID int) (map[int]int, error)
 
 	GetGroupMembers(groupID int) ([]*models.NoonGameGroupMember, error)
+	GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error)
 
 	// --- Template runs ---
 	CreateTemplateRun(run *models.NoonGameTemplateRun) (*models.NoonGameTemplateRun, error)
@@ -1544,6 +1545,51 @@ func (r *noonGameRepository) fetchMatchEntries(matchIDs []int) (map[int][]*model
 	return result, nil
 }
 
+func (r *noonGameRepository) GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error) {
+	row := r.db.QueryRow(`
+		SELECT id, match_id, entry_index, side_type, class_id, group_id, display_name
+		FROM noon_game_match_entries
+		WHERE id = ?
+	`, entryID)
+
+	entry := &models.NoonGameMatchEntry{}
+	var (
+		classID     sql.NullInt64
+		groupID     sql.NullInt64
+		displayName sql.NullString
+	)
+
+	if err := row.Scan(
+		&entry.ID,
+		&entry.MatchID,
+		&entry.EntryIndex,
+		&entry.SideType,
+		&classID,
+		&groupID,
+		&displayName,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if classID.Valid {
+		val := int(classID.Int64)
+		entry.ClassID = &val
+	}
+	if groupID.Valid {
+		val := int(groupID.Int64)
+		entry.GroupID = &val
+	}
+	if displayName.Valid {
+		str := displayName.String
+		entry.DisplayName = &str
+	}
+
+	return entry, nil
+}
+
 func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*models.NoonGameResultDetail, error) {
 	result := make(map[int][]*models.NoonGameResultDetail)
 	if len(matchIDs) == 0 {
@@ -1552,9 +1598,12 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 
 	placeholder, args := buildInClause(matchIDs)
 	query := fmt.Sprintf(`
-		SELECT rd.id, r.match_id, rd.entry_id, rd.placement_rank, rd.points, rd.note
+		SELECT 
+			rd.id, r.match_id, rd.entry_id, rd.placement_rank, rd.points, rd.note, rd.entry_resolved_name,
+			e.entry_index, e.side_type, e.class_id, e.group_id, e.display_name
 		FROM noon_game_result_details rd
 		JOIN noon_game_results r ON rd.result_id = r.id
+		LEFT JOIN noon_game_match_entries e ON rd.entry_id = e.id
 		WHERE r.match_id IN (%s)
 		ORDER BY r.match_id, rd.placement_rank, rd.id
 	`, placeholder)
@@ -1568,9 +1617,15 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 	for rows.Next() {
 		detail := &models.NoonGameResultDetail{}
 		var (
-			matchID sql.NullInt64
-			rank    sql.NullInt64
-			note    sql.NullString
+			matchID           sql.NullInt64
+			rank              sql.NullInt64
+			note              sql.NullString
+			entryResolvedName sql.NullString
+			entryIndex        sql.NullInt64
+			sideType          sql.NullString
+			entryClassID      sql.NullInt64
+			entryGroupID      sql.NullInt64
+			displayName       sql.NullString
 		)
 		if err := rows.Scan(
 			&detail.ID,
@@ -1579,6 +1634,12 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 			&rank,
 			&detail.Points,
 			&note,
+			&entryResolvedName,
+			&entryIndex,
+			&sideType,
+			&entryClassID,
+			&entryGroupID,
+			&displayName,
 		); err != nil {
 			return nil, err
 		}
@@ -1594,6 +1655,10 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 		if note.Valid {
 			str := note.String
 			detail.Note = &str
+		}
+		// データベースに保存されている entry_resolved_name を優先的に使用
+		if entryResolvedName.Valid {
+			detail.EntryResolvedName = entryResolvedName.String
 		}
 
 		result[int(matchID.Int64)] = append(result[int(matchID.Int64)], detail)
@@ -1688,8 +1753,8 @@ func (r *noonGameRepository) replaceResultDetailsTx(tx *sql.Tx, resultID int, de
 	}
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO noon_game_result_details (result_id, entry_id, placement_rank, points, note)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO noon_game_result_details (result_id, entry_id, placement_rank, points, note, entry_resolved_name)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -1700,12 +1765,17 @@ func (r *noonGameRepository) replaceResultDetailsTx(tx *sql.Tx, resultID int, de
 		if detail == nil {
 			continue
 		}
+		entryResolvedName := ""
+		if detail.EntryResolvedName != "" {
+			entryResolvedName = detail.EntryResolvedName
+		}
 		if _, err := stmt.Exec(
 			resultID,
 			detail.EntryID,
 			nullableInt(detail.Rank),
 			detail.Points,
 			nullableString(detail.Note),
+			nullableString(&entryResolvedName),
 		); err != nil {
 			return err
 		}

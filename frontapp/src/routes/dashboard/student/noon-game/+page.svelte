@@ -30,6 +30,28 @@
       session = data.session;
       matches = data.matches || [];
       pointsSummary = data.points_summary || [];
+      
+      // デバッグ用: テンプレート結果のデータ構造を確認
+      const templateMatches = matches.filter(m => detectTemplateFromMatch(m));
+      if (templateMatches.length > 0) {
+        console.log('Template matches data:', templateMatches.map(m => ({
+          id: m.id,
+          title: m.title,
+          entries: m.entries?.map(e => ({
+            id: e.id,
+            resolved_name: e.resolved_name,
+            display_name: e.display_name
+          })),
+          result_details: m.result?.details?.map(d => ({
+            entry_id: d.entry_id,
+            entry_resolved_name: d.entry_resolved_name,
+            resolved_name: d.resolved_name,
+            display_name: d.display_name,
+            rank: d.rank,
+            points: d.points
+          }))
+        })));
+      }
     } catch (err) {
       console.error(err);
       errorMessage = err.message;
@@ -76,7 +98,43 @@
     return null;
   }
 
-  function formatResultDetails(details) {
+  function getEntryName(detail, entries) {
+    // バックエンドから設定された entry_resolved_name を最優先
+    if (detail.entry_resolved_name) {
+      return detail.entry_resolved_name;
+    }
+    // entries から対応するエントリーを探す（型の不一致を考慮）
+    if (detail.entry_id && entries && entries.length > 0) {
+      const entryId = detail.entry_id;
+      const entry = entries.find(e => {
+        // 数値と文字列の両方に対応
+        return e.id === entryId || 
+               e.id === Number(entryId) || 
+               String(e.id) === String(entryId);
+      });
+      if (entry) {
+        if (entry.resolved_name) {
+          return entry.resolved_name;
+        }
+        if (entry.display_name) {
+          return entry.display_name;
+        }
+      }
+      // デバッグ用: エントリーが見つからない場合
+      if (!entry) {
+        console.warn('Entry not found for detail:', {
+          detail_entry_id: detail.entry_id,
+          detail_entry_id_type: typeof detail.entry_id,
+          detail_rank: detail.rank,
+          available_entry_ids: entries.map(e => ({ id: e.id, id_type: typeof e.id, resolved_name: e.resolved_name, display_name: e.display_name }))
+        });
+      }
+    }
+    // フォールバック
+    return detail.resolved_name || detail.display_name || '-';
+  }
+
+  function formatResultDetails(details, entries) {
     if (!details || details.length === 0) return '未登録';
     const sorted = [...details].sort((a, b) => {
       const rankA = a.rank || 999;
@@ -86,7 +144,7 @@
     return sorted.map(d => {
       const rank = d.rank ? `${d.rank}位` : '-';
       const points = d.points !== null && d.points !== undefined ? ` (${d.points}点)` : '';
-      const name = d.resolved_name || d.display_name || '-';
+      const name = getEntryName(d, entries);
       return `${rank}: ${name}${points}`;
     }).join(', ');
   }
@@ -131,7 +189,7 @@
                                   {detail.rank ? `${detail.rank}位` : '-'}
                                 </span>
                                 <span class="text-sm text-gray-700">
-                                  {detail.resolved_name || detail.display_name || '-'}
+                                  {getEntryName(detail, match.entries)}
                                 </span>
                                 {#if detail.points !== null && detail.points !== undefined}
                                   <span class="text-sm font-semibold text-indigo-600">
@@ -199,7 +257,7 @@
                                 {detail.rank ? `${detail.rank}位` : '-'}
                               </span>
                               <span class="text-sm text-gray-700">
-                                {detail.resolved_name || detail.display_name || '-'}
+                                {getEntryName(detail, match.entries)}
                               </span>
                               {#if detail.points !== null && detail.points !== undefined}
                                 <span class="text-sm font-semibold text-indigo-600">
