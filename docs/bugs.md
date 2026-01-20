@@ -4,21 +4,7 @@
 
 ## 未解決のバグ
 
-### 1. テストコードのコンパイルエラー (Backend)
-**重要度**: 高
-**場所**: `backapp/tests/handler`
-**説明**: バックエンドのテストを実行した際、モックオブジェクトがインターフェースを満たしていないためコンパイルエラーが発生します。
-- `MockNoonGameRepository` が `repository.NoonGameRepository` インターフェースに追加されたメソッド（`GetTemplateDefaultGroups`, `SaveTemplateDefaultGroups`）を実装していません。
-- **再現方法**: `backapp` ディレクトリで `go test ./...` を実行。
-
-### 2. イベントIDのハードコード (Frontend)
-**重要度**: 中
-**場所**: `frontapp/src/routes/dashboard/admin/vorting-mvp/+page.svelte`
-**説明**: MVP投票画面において、イベントIDが `1` に固定（ハードコード）されています。
-- **影響**: IDが1以外のイベントでこの機能を使用すると正しく動作しない可能性があります。
-- **修正**: アクティブなイベントIDをAPIから動的に取得するように修正する必要があります。 (`TODO: Get the active event id` というコメントが残っています)
-
-### 3. 初期セットアップの状態
+### 1. 初期セットアップの状態
 **重要度**: 低 (環境構築)
 **場所**: プロジェクト全体
 **説明**: プロジェクトの初期状態として、いくつかのファイルやディレクトリが不足しています。
@@ -40,3 +26,11 @@
 3.  **uploadsディレクトリの欠落 (Backend)**
     - 静的ファイル配信用の `uploads` ディレクトリを作成しました。
     - **Note**: `backapp/.gitignore` に登録済みです。
+
+4.  **テストコードのコンパイルエラー (Backend)**
+    - **場所**: `backapp/tests/handler`
+    - **修正内容**: `MockNoonGameRepository` に不足していた `GetTemplateDefaultGroups` と `SaveTemplateDefaultGroups` メソッドを実装し、テストコード内のモック期待値を更新しました。
+
+5.  **イベントIDのハードコード (Frontend)**
+    - **場所**: `frontapp/src/routes/dashboard/admin/vorting-mvp/+page.svelte`
+    - **修正内容**: MVP投票画面でイベントIDが `1` に固定されていた問題を修正し、`/api/events/active` から動的に取得するように変更しました。

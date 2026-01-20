@@ -4,14 +4,37 @@
   let eligibleClasses = [];
   let selectedClass = '';
   let reason = '';
-  let eventId = 1; // TODO: Get the active event id
+  let eventId = null;
+  let eventName = '';
 
   let hasVoted = false;
   let votedForClassId = null;
   let votedForClassName = '';
 
   onMount(async () => {
-    // Fetch eligible classes first to map class ID to name
+    // 1. Fetch active event first
+    try {
+      const eventRes = await fetch('/api/events/active');
+      if (!eventRes.ok) {
+        console.error('Failed to fetch active event');
+        alert('開催中のイベント情報の取得に失敗しました。');
+        return;
+      }
+      const eventData = await eventRes.json();
+      if (!eventData.event_id) {
+        console.error('No active event found');
+        alert('開催中のイベントがありません。');
+        return;
+      }
+      eventId = eventData.event_id;
+      eventName = eventData.event_name;
+    } catch (error) {
+      console.error('Error fetching active event:', error);
+      alert('イベント情報の取得中にエラーが発生しました。');
+      return;
+    }
+
+    // 2. Fetch eligible classes using the active event ID
     const classRes = await fetch(`/api/admin/mvp/eligible-classes?event_id=${eventId}`);
     if (classRes.ok) {
       eligibleClasses = await classRes.json();
@@ -20,7 +43,7 @@
       // Handle error appropriately
     }
 
-    // Check if user has already voted
+    // 3. Check if user has already voted for this event
     const voteRes = await fetch(`/api/admin/mvp/user-vote?event_id=${eventId}`);
     if (voteRes.ok) {
       const voteData = await voteRes.json();
