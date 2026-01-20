@@ -1,4 +1,5 @@
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+const BACKEND_URL = env.BACKEND_URL;
 
 const toNumber = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : 0);
 

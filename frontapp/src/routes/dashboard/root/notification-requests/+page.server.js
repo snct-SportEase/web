@@ -1,4 +1,5 @@
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+const BACKEND_URL = env.BACKEND_URL;
 
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ fetch, request, url }) {

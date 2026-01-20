@@ -1,4 +1,5 @@
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+const BACKEND_URL = env.BACKEND_URL;
 import { redirect } from '@sveltejs/kit';
 
 /** @type {import('@sveltejs/kit').Handle} */
@@ -10,7 +11,7 @@ export async function handle({ event, resolve }) {
       const url = `${BACKEND_URL}/api/auth/user`;
       const response = await fetch(url, {
         headers: {
-          'cookie': `session_token=${sessionToken}`, 
+          'cookie': `session_token=${sessionToken}`,
         },
       });
 
