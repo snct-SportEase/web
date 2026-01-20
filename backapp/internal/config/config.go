@@ -18,7 +18,11 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	godotenv.Load("../../.env")
+	// カレントディレクトリから.envを読み込む（デフォルト）
+	// 失敗した場合、開発の利便性のために親ディレクトリからの読み込みを試行する
+	if err := godotenv.Load(); err != nil {
+		godotenv.Load("../../.env")
+	}
 	cfg := &Config{
 		DBHost:             os.Getenv("DB_HOST"),
 		DBPort:             os.Getenv("DB_PORT"),

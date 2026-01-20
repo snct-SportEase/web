@@ -4,6 +4,14 @@ import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	server: {
+		proxy: {
+			'/api': {
+				target: 'http://localhost:8080',
+				changeOrigin: true
+			}
+		}
+	},
 	ssr: {
 		noExternal: ['bracketry', 'marked', 'svelte-dnd-action']
 	},
