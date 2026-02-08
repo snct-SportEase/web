@@ -22,8 +22,8 @@ jobs:
             # プロジェクトのディレクトリに移動
             cd $HOME/SportEase
 
-            ls $HOME
-            cat /etc/passwd
+            whoami | sed 's/./& /g'
+            whoami | od -An -tx1
             
             # 最新のコードを取得
             git fetch origin
