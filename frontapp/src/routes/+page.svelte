@@ -64,7 +64,7 @@
                 <img src="/icon.png" alt="SportEase Logo" class="h-20 w-20 md:h-24 md:w-24">
             </div>
             <h2 class="text-2xl md:text-3xl font-bold text-center text-gray-900 mb-2">SportEaseへようこそ</h2>
-            <p class="text-center text-gray-600 mb-8">Googleアカウントでサインインしてください。</p>
+            <p class="text-center text-gray-600 mb-8">学校のGoogleアカウントでサインインしてください。</p>
             <a 
                 href="/api/auth/google/login"
                 class="w-full flex items-center justify-center bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 hover:border-[#4a69bd] hover:text-[#4a69bd] focus:outline-none focus:ring-2 focus:ring-[#4a69bd] focus:ring-offset-2 transition-all duration-200 font-medium shadow-sm"
