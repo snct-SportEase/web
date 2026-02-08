@@ -56,7 +56,6 @@ services:
     container_name: sportease-backapp
     env_file:
       - .env
-      - backapp/.env
     volumes:
       - uploads-data:/app/uploads
     depends_on:
