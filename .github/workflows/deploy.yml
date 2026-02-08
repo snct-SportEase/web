@@ -21,9 +21,6 @@ jobs:
           script: |
             # プロジェクトのディレクトリに移動
             cd $HOME/SportEase
-
-            whoami | sed 's/./& /g'
-            whoami | od -An -tx1
             
             # 最新のコードを取得
             git fetch origin
