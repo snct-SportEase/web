@@ -62,6 +62,51 @@ self.addEventListener('fetch', (event) => {
 			}
 		}
 
+		// Identify critical API endpoints for Stale-While-Revalidate strategy
+		// These are data that users might want to see even if offline (schedule, tournaments, etc.)
+		const isCriticalApi = 
+			url.pathname.match(/^\/api\/student\/events\/[^/]+\/tournaments/) ||
+			url.pathname.match(/^\/api\/student\/events\/[^/]+\/noon-game\/session/) ||
+			url.pathname.match(/^\/api\/root\/events/) ||
+			url.pathname.match(/^\/api\/student\/class-info/);
+
+		if (isCriticalApi) {
+			// Stale-While-Revalidate strategy
+			// 1. Return from cache immediately if available
+			// 2. Fetch from network and update cache in background
+			const cachedResponse = await cache.match(event.request);
+			
+			const networkFetch = fetch(event.request).then(response => {
+				// Update cache if response is valid
+				if (response.ok && (url.protocol === 'http:' || url.protocol === 'https:')) {
+					cache.put(event.request, response.clone());
+				}
+				return response;
+			}).catch(err => {
+				console.log('Network fetch failed for critical API, using cache if available');
+				throw err;
+			});
+
+			// If we have a cached response, return it immediately, but still trigger the network fetch to update cache
+			if (cachedResponse) {
+				// We don't await the network fetch here, we just start it
+				// theoretically to update the cache for *next* time.
+				// However, standard SW Stale-While-Revalidate usually returns cache and updates in background.
+				// To make the UI update eventually, the app would need to handle updates, 
+				// but for offline availability, returning stale cache is the priority.
+				return cachedResponse;
+			}
+			
+			// If no cache, wait for network
+			try {
+				return await networkFetch;
+			} catch (err) {
+				// If both cache and network fail, we can't do much for API calls
+				// maybe return a fallback JSON if needed, but for now just throw
+				throw err;
+			}
+		}
+
 		// for everything else, try the network first, but
 		// fall back to the cache if we're offline
 		try {
