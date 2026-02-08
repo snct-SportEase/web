@@ -89,6 +89,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				google.GET("/login", authHandler.GoogleLogin)
 				google.GET("/callback", authHandler.GoogleCallback)
 			}
+			auth.GET("/dev-login", authHandler.DevLogin)
 			auth.GET("/user", middleware.AuthMiddleware(userRepo), authHandler.GetUser)
 			auth.POST("/logout", authHandler.Logout)
 		}

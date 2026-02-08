@@ -5,6 +5,7 @@ import (
 	"backapp/internal/models"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -229,6 +230,19 @@ func (m *MockNoonGameRepository) DeleteTemplateRunAndRelatedData(sessionID int) 
 	return args.Error(0)
 }
 
+func (m *MockNoonGameRepository) GetTemplateDefaultGroups(templateKey string) ([]*models.NoonGameTemplateDefaultGroup, error) {
+	args := m.Called(templateKey)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.NoonGameTemplateDefaultGroup), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) SaveTemplateDefaultGroups(templateKey string, groups []*models.NoonGameTemplateDefaultGroup) error {
+	args := m.Called(templateKey, groups)
+	return args.Error(0)
+}
+
 // --- Tests ---
 
 func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
@@ -255,6 +269,9 @@ func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
+
+		// デフォルトグループ取得（存在しないとしてフォールバックをテスト）
+		mockNoonRepo.On("GetTemplateDefaultGroups", "year_relay").Return(nil, errors.New("not found")).Once()
 
 		// クラス一覧（6チーム分）
 		classes := []*models.Class{
@@ -366,6 +383,9 @@ func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
+
+		// デフォルトグループ取得（存在しないとしてフォールバックをテスト）
+		mockNoonRepo.On("GetTemplateDefaultGroups", "year_relay").Return(nil, errors.New("not found")).Once()
 
 		// クラス一覧
 		classes := []*models.Class{
@@ -1498,6 +1518,9 @@ func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
 		}
 		mockClassRepo.On("GetAllClasses", eventID).Return(classes, nil).Once()
 
+		// デフォルトグループ取得（存在しないとしてフォールバックをテスト）
+		mockNoonRepo.On("GetTemplateDefaultGroups", "course_relay").Return(nil, errors.New("not found")).Once()
+
 		// グループ作成（4回）
 		groupIDs := []int{201, 202, 203, 204}
 		groupNames := []string{"1-1 & IEコース", "1-2 & ISコース", "1-3 & ITコース", "専攻科・教員"}
@@ -1929,6 +1952,9 @@ func TestNoonGameHandler_CreateTugOfWarRun(t *testing.T) {
 			{ID: 16, Name: "専教", EventID: &eventID},
 		}
 		mockClassRepo.On("GetAllClasses", eventID).Return(classes, nil).Once()
+
+		// デフォルトグループ取得（存在しないとしてフォールバックをテスト）
+		mockNoonRepo.On("GetTemplateDefaultGroups", "tug_of_war").Return(nil, errors.New("not found")).Once()
 
 		// グループ作成（4回）
 		groupIDs := []int{301, 302, 303, 304}

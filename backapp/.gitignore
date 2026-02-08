@@ -1,0 +1,19 @@
+# Go
+bin/
+vendor/
+*.exe
+*.test
+*.out
+cover.out
+
+# Env
+.env
+.env.*
+
+# Uploads
+uploads/
+
+# Infra / Docker (from root)
+letsencrypt/
+acm.json
+github_deploy_key

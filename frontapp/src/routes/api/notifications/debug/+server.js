@@ -1,4 +1,5 @@
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+const BACKEND_URL = env.BACKEND_URL;
 import { json } from '@sveltejs/kit';
 
 /** @type {import('./$types').RequestHandler} */

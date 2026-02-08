@@ -45,7 +45,7 @@ services:
       - spotease-net
     restart: always
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,6 +56,7 @@ services:
     container_name: sportease-backapp
     env_file:
       - .env
+      - backapp/.env
     volumes:
       - uploads-data:/app/uploads
     depends_on:
@@ -64,12 +65,12 @@ services:
     networks:
       - spotease-net
     labels:
-       - "traefik.enable=true"
-       - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
-       - "traefik.http.routers.backend-https.entrypoints=websecure"
-       - "traefik.http.routers.backend-https.tls.certresolver=myresolver"
-       - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
-       - "traefik.http.services.backend.loadbalancer.server.port=8080"
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
+      - "traefik.http.routers.backend-https.entrypoints=websecure"
+      - "traefik.http.routers.backend-https.tls.certresolver=myresolver"
+      - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
+      - "traefik.http.services.backend.loadbalancer.server.port=8080"
 
   sportease-frontapp:
     build:

@@ -168,6 +168,60 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }
 
+// DevLogin is a backdoor for local testing to bypass Google OAuth
+func (h *AuthHandler) DevLogin(c *gin.Context) {
+	email := c.Query("email")
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email is required"})
+		return
+	}
+
+	user, err := h.userRepo.GetUserByEmail(email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user by email"})
+		return
+	}
+
+	if user == nil {
+		// User does not exist, create a new one
+		newUser := &models.User{
+			ID:                uuid.New().String(),
+			Email:             email,
+			IsProfileComplete: false,
+		}
+		// Skip whitelist check for dev login for convenience, or keep it strict?
+		// Let's keep it strict to match production behavior closer, or maybe just allow it.
+		// For now, let's just try to create.
+		if err := h.userRepo.CreateUser(newUser); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user: " + err.Error()})
+			return
+		}
+		user = newUser
+	} else {
+		// User exists, try to sync role from whitelist if possible (optional)
+		whitelistRole, err := h.userRepo.GetRoleByEmail(user.Email)
+		if err == nil {
+			h.userRepo.AddUserRoleIfNotExists(user.ID, whitelistRole)
+		}
+	}
+
+	// Create session
+	sessionToken := uuid.New().String()
+	middleware.CreateSession(sessionToken, user.ID)
+
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "session_token",
+		Value:    sessionToken,
+		Expires:  time.Now().Add(24 * time.Hour),
+		Path:     "/",
+		HttpOnly: false,
+		Secure:   middleware.IsRequestSecure(c.Request),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
+}
+
 func (h *AuthHandler) GetUser(c *gin.Context) {
 	userCtx, exists := c.Get("user")
 	if !exists {

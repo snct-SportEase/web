@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+const BACKEND_URL = env.BACKEND_URL;
 
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ locals, fetch, request }) {
@@ -27,18 +28,18 @@ export async function load({ locals, fetch, request }) {
   // Fetch events if user is root
   const isRoot = locals.user?.roles?.some(role => role.name === 'root');
   if (isRoot && locals.user?.is_profile_complete) {
-      try {
-        const eventResponse = await fetch(`${BACKEND_URL}/api/root/events`, {
-            headers: {
-                'cookie': request.headers.get('cookie'),
-            }
-        });
-        if (eventResponse.ok) {
-            returnData.events = await eventResponse.json();
+    try {
+      const eventResponse = await fetch(`${BACKEND_URL}/api/root/events`, {
+        headers: {
+          'cookie': request.headers.get('cookie'),
         }
-      } catch (e) {
-        console.error('Failed to fetch events:', e);
+      });
+      if (eventResponse.ok) {
+        returnData.events = await eventResponse.json();
       }
+    } catch (e) {
+      console.error('Failed to fetch events:', e);
+    }
   }
 
   const classRole = locals.user?.roles?.find(role => typeof role.name === 'string' && role.name.endsWith('_rep'));
@@ -72,10 +73,10 @@ export const actions = {
   logout: async ({ fetch, locals, request }) => {
     const sessionCookie = request.headers.get('cookie');
     await fetch(`${BACKEND_URL}/api/auth/logout`, {
-        method: 'POST',
-        headers: {
-            'cookie': sessionCookie,
-        },
+      method: 'POST',
+      headers: {
+        'cookie': sessionCookie,
+      },
     });
 
     // Clear the user from locals and redirect
