@@ -23,7 +23,7 @@ jobs:
             cd $HOME/SportEase
 
             ls $HOME
-            ls /
+            ls /home
             
             # 最新のコードを取得
             git fetch origin
