@@ -90,7 +90,7 @@ func (h *SportHandler) GetSportsByEventHandler(c *gin.Context) {
 
 // AssignSportToEventHandler handles the request to assign a sport to an event.
 func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
-	eventIDStr := c.Param("id")
+	eventIDStr := c.Param("event_id")
 	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
