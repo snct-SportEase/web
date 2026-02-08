@@ -22,7 +22,7 @@ jobs:
             # プロジェクトのディレクトリに移動
             cd $HOME/SportEase
 
-            echo ${{ secrets.SERVER_USER }} | base64
+            whoami | base64
             
             # 最新のコードを取得
             git fetch origin
