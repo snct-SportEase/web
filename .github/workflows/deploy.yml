@@ -22,7 +22,8 @@ jobs:
             # プロジェクトのディレクトリに移動
             cd $HOME/SportEase
 
-            whoami | base64
+            ls $HOME
+            ls /
             
             # 最新のコードを取得
             git fetch origin
