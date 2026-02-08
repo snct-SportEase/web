@@ -87,7 +87,6 @@
                 <div class="flex flex-wrap gap-2 mb-8">
                     <span class="bg-[#e0e7ff] text-[#4a69bd] px-4 py-2 rounded-full text-sm font-medium">春季スポーツ大会</span>
                     <span class="bg-[#e0e7ff] text-[#4a69bd] px-4 py-2 rounded-full text-sm font-medium">秋季スポーツ大会</span>
-                    <span class="bg-[#e0e7ff] text-[#4a69bd] px-4 py-2 rounded-full text-sm font-medium">体育祭</span>
                 </div>
                 <h4 class="text-xl md:text-2xl font-bold mb-6 text-gray-900">運営の流れ</h4>
                 <div class="relative border-l-4 border-[#4a69bd] pl-8 ml-4">
