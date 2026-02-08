@@ -1,7 +1,10 @@
 <script>
-  import { onMount } from 'svelte';
+import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { fade, fly } from 'svelte/transition';
+  import { invalidateAll } from '$app/navigation';
+  import { page } from '$app/stores';
+  import { get } from 'svelte/store';
 
   let users = [];
   let classes = []; // クラス一覧
@@ -125,6 +128,13 @@
     }
   }
 
+  async function checkAndInvalidateIfSelf(targetUserId) {
+    const currentUser = get(page).data?.user;
+    if (currentUser && currentUser.id === targetUserId) {
+      await invalidateAll();
+    }
+  }
+
   async function handleDisplayNameUpdate() {
     if (!selectedUser || !browser) return;
 
@@ -142,6 +152,7 @@
 
       if (response.ok) {
         updateLocalUser({ ...selectedUser, display_name: newDisplayName });
+        await checkAndInvalidateIfSelf(selectedUser.id);
         alert('表示名を更新しました');
       } else {
         console.error('Failed to update display name:', response.statusText);
@@ -195,9 +206,8 @@
       }
 
       alert('クラス代表を変更しました');
-      // ユーザー情報を再取得して更新
-      // 簡易的にローカル更新したいが、ロールIDなどが不明なので再取得が無難
       await fetchUsers(searchQuery, searchType);
+      await checkAndInvalidateIfSelf(selectedUser.id);
       closeEditModal();
 
     } catch (error) {
@@ -230,9 +240,7 @@
         alert('ロールを追加しました');
         newRoleName = '';
         await fetchUsers(searchQuery, searchType);
-        // モーダルは閉じずに更新された情報を再反映させたいが、
-        // fetchUsersでusersが更新されるとselectedUserの参照が切れる可能性があるため
-        // ここでは簡易的に閉じるか、selectedUserを再検索して更新する
+        await checkAndInvalidateIfSelf(selectedUser.id);
         const updatedUser = users.find(u => u.id === selectedUser.id);
         if (updatedUser) selectedUser = updatedUser; 
       } else {
@@ -262,6 +270,7 @@
       if (response.ok) {
         alert('ロールを削除しました');
         await fetchUsers(searchQuery, searchType);
+        await checkAndInvalidateIfSelf(selectedUser.id);
         const updatedUser = users.find(u => u.id === selectedUser.id);
         if (updatedUser) selectedUser = updatedUser;
       } else {
