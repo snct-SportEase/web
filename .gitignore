@@ -1,4 +1,6 @@
 .env
 letsencrypt/
 
-latex/
+latex/*
+!latex/*.tex
+!latex/*.pdf
