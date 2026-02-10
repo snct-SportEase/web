@@ -4,3 +4,4 @@ letsencrypt/
 latex/*
 !latex/*.tex
 !latex/*.pdf
+!latex/*.png
