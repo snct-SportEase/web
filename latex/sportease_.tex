@@ -9,6 +9,7 @@
 \usepackage{tabularx}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usepackage{float}
 \usetikzlibrary{shapes.geometric, arrows, positioning, fit, backgrounds}
 
 \title{SportEase の情報の取り扱い}
@@ -19,25 +20,45 @@
 
 \maketitle
 
-\section{情報の取り扱い}
-このアプリは Google アカウントでユーザー認証を行っている 。
-高専のメールアドレスでのみログインできるように、ホワイトリストで制限している。
+\section{個人情報保護方針}
 
-利用する  Google アカウント情報はGoogle メールアドレスのみである 。
+本システムにおける個人情報の取り扱いは、以下の通り厳格に管理する。
+
+\subsection{Google認証で収集する個人情報}
+利用するGoogleアカウントから取得する個人情報はメールアドレスのみである。
+
+メールアドレスは本システム内でユーザーを一意に識別するIDとして使用する。
+
+\subsection{データの保存期間と表示}
 \begin{itemize}
-    \item  Google メールアドレス
+    \item \textbf{保存期間}: 過去のイベント結果（トーナメント表、順位、得点等）は、学校行事の記録として永続的に保存する。
+    \item \textbf{表示ポリシー}:
+    \begin{itemize}
+        \item 現在進行中のイベントについては、ユーザー名（表示名）を表示する。
+        \item 終了した過去のイベントについては、プライバシー保護のためユーザー名を非表示とし、クラス単位またはチーム単位の結果のみを表示する。
+        \item 卒業生の個人データ（メールアドレス等）はホワイトリストから削除されるため、システムへのログインは不可能となる。
+    \end{itemize}
 \end{itemize}
 
-使用用途は以下の通りである：
+\subsection{アクセス制御}
+データベースへのアクセスは以下の通り厳密に制限する。
+\begin{itemize}
+    \item \textbf{Root (システム管理者)}: 全データへのアクセス権限を持つ。
+    \item \textbf{Admin (行事委員)}: 運営に必要な最小限のデータ（試合結果、出欠状況）のみ参照・更新可能。
+    \item \textbf{Student (一般学生)}: 自身のプロフィールおよび公開された競技結果のみ閲覧可能。他者のメールアドレス等は閲覧不可。
+    \item \textbf{DB直接アクセス(システム外からのアクセス)}: 定められたシステム管理者（1〜2名）のみが、SSH接続を通してのみアクセス可能。
+\end{itemize}
 
-\begin{table}[h]
+\subsection{情報の使用用途}
+\begin{table}[H]
     \centering
     \caption{情報の使用用途}
     \begin{tabularx}{\textwidth}{|l|X|}
         \toprule
         情報 & 用途 \\
         \midrule
-        メールアドレス & ユーザー認証、アプリ内でユーザーを一意に識別するためのID \\
+        メールアドレス & ユーザー認証（OAuth2）、システムからの重要なお知らせ（Web Push通知） \\
+        クラス・学年 & トーナメントのチーム分け、クラス対抗戦の集計 \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -61,7 +82,7 @@
 本システムでは以下の3つのユーザーロールを定義し、権限管理を行っている。\\
 必要に応じてロールを増やすことはできるが、権限管理はこの3つのベースロールで行っている。
 
-\begin{table}[h]
+\begin{table}[H]
     \centering
     \caption{ユーザーロール一覧}
     \begin{tabularx}{\textwidth}{|l| X|}
@@ -183,19 +204,37 @@
     \item \textbf{ネットワーク}: インターネット接続必須（学内Wi-Fiまたはモバイルネットワーク）
 \end{itemize}
 
-\subsection{非機能要件}
+\subsection{セキュリティ対策}
+本システムでは、以下の多層的なセキュリティ対策を実装している。
+
+\subsubsection{アプリケーションセキュリティ}
 \begin{itemize}
-    \item \textbf{セキュリティ}:
-    \begin{itemize}
-        \item Google OAuth2 (OpenID Connect) による堅牢な認証
-        \item 指定ドメイン (@sendai-nct.jp / .ac.jp) およびホワイトリストによるアクセス制限
-        \item 常時SSL/TLS化 (HTTPS) による通信の暗号化
-    \end{itemize}
-    \item \textbf{パフォーマンス・可用性}:
-    \begin{itemize}
-        \item WebSocketを用いたリアルタイムな試合経過・結果の配信
-        \item コンテナ技術 (Docker) による環境の一貫性と高い移植性
-    \end{itemize}
+    \item \textbf{SQLインジェクション対策}: すべてのデータベース操作において、Go言語のプレースホルダ機能（Prepared Statements）またはORMを使用し、SQLインジェクションを無効化している。
+    \item \textbf{CSRF対策}: セッションベースの認証（HttpOnly, SameSite=Lax Cookie）およびCORSによるOrigin検証により、不正なクロスサイトリクエストを防止している。
+    \item \textbf{XSS対策}: SvelteKitのオートエスケープ機能により、ユーザー入力のスクリプト実行を防止している。Markdown表示箇所については、サニタイズ処理を行っている。
+    \item \textbf{API認可}: 全てのエンドポイントにおいてミドルウェア（Middleware）による認証・認可チェックを行い、権限のないリソースへのアクセスを遮断している。
+    \item \textbf{ファイルアップロード}: 画像およびPDFファイルのアップロード時は、拡張子だけでなくMIMEタイプの検証を行い、実行可能ファイルの混入を防ぐ。
+\end{itemize}
+
+\subsubsection{インフラストラクチャ・通信}
+\begin{itemize}
+    \item \textbf{通信の暗号化}: Let's Encryptを用いたSSL/TLS証明書の自動更新により、全通信をHTTPS化している。
+    \item \textbf{ポート制限}: 外部（インターネット）にはHTTP(80)とHTTPS(443)のみを公開し、DBポート(3306)やSSHポートは外部から遮断している。
+    \item \textbf{コンテナ隔離}: Dockerによりアプリケーションとホスト環境を分離し、コンテナ侵害時の影響を最小限に抑えている。
+\end{itemize}
+
+\subsection{運用管理規定}
+
+\subsubsection{管理体制}
+\begin{itemize}
+    \item \textbf{運用責任者}: 行事委員会
+    \item \textbf{システム管理者}: 佐藤佑作
+    \item \textbf{サーバー管理者}: 林航平、佐藤佑作
+\end{itemize}
+
+\subsubsection{引継ぎ}
+\begin{itemize}
+    \item \textbf{卒業時の処理}: システム管理者が卒業する際は、アクセス権限（サーバーログイン情報、DBパスワード）を変更し、新管理者へ安全に引き継ぐ。旧管理者のアカウントは即座に無効化する。
 \end{itemize}
 
 \section{内部設計}
@@ -211,7 +250,7 @@
 \end{itemize}
 
 \subsection{技術スタック}
-\begin{table}[h]
+\begin{table}[H]
     \centering
     \caption{採用技術一覧}
     \begin{tabularx}{\textwidth}{l l}
@@ -239,55 +278,493 @@
     \item \textbf{Notifications}: Web Push通知の購読情報および通知履歴。
 \end{itemize}
 
-\subsection{API設計}
-RESTful APIを採用し、リソースごとにエンドポイントを定義している。
-\begin{itemize}
-    \item \texttt{/api/auth}: 認証関連（Googleログイン、プロファイル取得）
-    \item \texttt{/api/events}: イベント情報の取得・更新
-    \item \texttt{/api/admin}: 管理機能全般（試合結果更新、マスタ管理）
-    \item \texttt{/api/student}: 学生向け読み取り専用API
-    \item \texttt{/api/ws}: WebSocketエンドポイント（トーナメント表のリアルタイム更新等）
-\end{itemize}
-
-\subsection{ディレクトリ構成}
-本システムの主要なソースコード構成は以下の通りである。
-
-\begin{itemize}
-    \item \texttt{frontapp/} (Frontend: SvelteKit)
-    \begin{itemize}
-        \item \texttt{src/routes/}: ページコンポーネントおよびSvelteKitのリ APIエンドポイント。
-        \item \texttt{src/lib/}: 再利用可能なUIコンポーネント、ユーティリティ関数、ストア（状態管理）。
-        \item \texttt{static/}: 静的ファイル（画像、フォント等）。
-    \end{itemize}
-    \item \texttt{backapp/} (Backend: Go)
-    \begin{itemize}
-        \item \texttt{cmd/}: アプリケーションのエントリーポイント (main.go)。
-        \item \texttt{internal/router/}: Ginフレームワークを用いたルーティング定義。
-        \item \texttt{internal/handler/}: HTTPリクエストを処理するビジネスロジック層。
-        \item \texttt{internal/repository/}: データベース操作を抽象化するデータアクセス層。
-        \item \texttt{internal/models/}: データベースのテーブル構造に対応するGo構造体定義。
-        \item \texttt{db/migrations/}: データベースのスキーマ定義およびマイグレーション用SQLファイル。
-    \end{itemize}
-\end{itemize}
-
 \subsection{データベース設計}
-主要なテーブルとその役割は以下の通りである。
+詳細なデータベース設計は以下の通りである。
 
-\begin{table}[h]
+\subsubsection{Core Tables}
+基本となるユーザー、イベント、競技、クラス等のテーブル群。
+
+\begin{table}[H]
     \centering
-    \caption{主要テーブル一覧}
-    \begin{tabularx}{\textwidth}{|l|X|}
+    \caption{users (ユーザー)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
         \toprule
-        テーブル名 & 概要 \\
+        Column & Type & Description \\
         \midrule
-        \texttt{users} & ユーザー情報（UUID, メールアドレス, 表示名, ロール等） \\ \midrule
-        \texttt{classes} & クラス情報（クラス名, 学生数, イベントID） \\ \midrule
-        \texttt{events} & イベント情報（大会名, 年度, 開催期間） \\ \midrule
-        \texttt{sports} & 競技種目マスター（サッカー, バスケ等） \\ \midrule
-        \texttt{teams} & クラス・競技ごとのチーム情報 \\ \midrule
-        \texttt{matches} & 試合情報（トーナメント位置, 対戦チーム, スコア, 勝者） \\ \midrule
-        \texttt{notifications} & Web Push通知の送信ログと内容 \\ \midrule
-        \texttt{noon\_game\_*} & 昼企画（リレー等）に関連する設定・結果データ群 \\
+        id & CHAR(36) & UUID (Primary Key) \\
+        email & VARCHAR(255) & メールアドレス (Unique) \\
+        display\_name & VARCHAR(255) & 表示名 \\
+        class\_id & INT & 所属クラスID (FK) \\
+        is\_profile\_complete & BOOLEAN & プロフィール登録完了フラグ \\
+        created\_at & TIMESTAMP & 作成日時 \\
+        updated\_at & TIMESTAMP & 更新日時 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{roles (ロールマスタ)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        name & VARCHAR(50) & ロール名 (root, admin, student) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{user\_roles (ユーザーロール割り当て)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        user\_id & CHAR(36) & ユーザーID (FK) \\
+        role\_id & INT & ロールID (FK) \\
+        event\_id & INT & イベントID (FK, NULLable) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{events (イベント・大会)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        name & VARCHAR(255) & イベント名 \\
+        year & INT & 年度 \\
+        season & ENUM & 時期 (spring, autumn) \\
+        start\_date & DATE & 開始日 \\
+        end\_date & DATE & 終了日 \\
+        active & BOOLEAN & 現在有効なイベントかどうか \\
+        competition\_guidelines & TEXT & 競技要項 (Markdown/Text) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{classes (クラス)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id & INT & イベントID (FK) \\
+        name & VARCHAR(255) & クラス名 \\
+        student\_count & INT & 学生数 \\
+        attend\_count & INT & 出席数 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{sports (競技マスタ)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        name & VARCHAR(255) & 競技名 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{event\_sports (イベント採用競技)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        event\_id & INT & イベントID (FK) \\
+        sport\_id & INT & 競技ID (FK) \\
+        description & TEXT & 説明 \\
+        rules & TEXT & ルール \\
+        location & ENUM & 場所 (gym1, gym2, ground, etc.) \\
+        staff\_count & INT & 運営スタッフ数 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{whitelisted\_emails (ログイン許可リスト)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        email & VARCHAR(255) & メールアドレス \\
+        role & ENUM & 初期ロール \\
+        event\_id & INT & イベントID (NULLable) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Competition Tables}
+トーナメント、試合、チーム、得点等の競技運営に関わるテーブル群。
+
+\begin{table}[H]
+    \centering
+    \caption{teams (チーム)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        name & VARCHAR(255) & チーム名 \\
+        class\_id & INT & クラスID (FK) \\
+        sport\_id & INT & 競技ID (FK) \\
+        event\_id & INT & イベントID (FK) \\
+        capacity & INT & チーム定員 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{team\_members (チームメンバー)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        team\_id & INT & チームID (FK) \\
+        user\_id & CHAR(36) & ユーザーID (FK) \\
+        is\_confirmed & BOOLEAN & 参加確定フラグ \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{tournaments (トーナメント)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        name & VARCHAR(255) & トーナメント名 \\
+        event\_id & INT & イベントID (FK) \\
+        sport\_id & INT & 競技ID (FK) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{matches (試合)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        tournament\_id & INT & トーナメントID (FK) \\
+        round & INT & ラウンド番号 \\
+        match\_number\_in\_round & INT & ラウンド内試合順 \\
+        team1\_id & INT & チーム1 ID (FK) \\
+        team2\_id & INT & チーム2 ID (FK) \\
+        team1\_score & INT & チーム1 スコア \\
+        team2\_score & INT & チーム2 スコア \\
+        winner\_team\_id & INT & 勝者チームID (FK) \\
+        next\_match\_id & INT & 次戦ID (FK) \\
+        status & VARCHAR(50) & 試合状態 (scheduled, in\_progress, completed) \\
+        start\_time & VARCHAR(255) & 開始予定時刻 \\
+        rainy\_mode\_start\_time & VARCHAR(255) & 雨天時開始時刻 \\
+        court\_number & VARCHAR(255) & コート番号 \\
+        is\_bronze\_match & BOOLEAN & 3位決定戦フラグ \\
+        loser\_bracket\_block & VARCHAR(50) & 敗者復活戦ブロック \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{class\_scores (クラス得点集計)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id & INT & イベントID (FK) \\
+        class\_id & INT & クラスID (FK) \\
+        initial\_points & INT & 初期点 \\
+        attendance\_points & INT & 出席点 \\
+        noon\_game\_points & INT & 昼企画点 \\
+        mvp\_points & INT & MVP点 \\
+        total\_points\_overall & INT & 総合得点 \\
+        rank\_overall & INT & 総合順位 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{score\_logs (得点履歴)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id & INT & イベントID (FK) \\
+        class\_id & INT & クラスID (FK) \\
+        points & INT & 加算/減算ポイント \\
+        reason & TEXT & 理由 \\
+        source\_match\_id & INT & 対象試合ID (FK) \\
+        created\_at & TIMESTAMP & 作成日時 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{mvp\_votes (MVP投票)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id & INT & イベントID (FK) \\
+        voter\_user\_id & CHAR(36) & 投票者ID (FK) \\
+        voted\_for\_class\_id & INT & 被投票クラスID (FK) \\
+        reason & TEXT & 理由 \\
+        points & INT & 投票ポイント \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{check\_ins (チェックイン・出席)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        user\_id & CHAR(36) & ユーザーID (FK) \\
+        event\_id & INT & イベントID (FK) \\
+        purpose & ENUM & 目的 (opening\_ceremony, etc.) \\
+        checked\_in\_at & TIMESTAMP & チェックイン日時 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Noon Game Tables}
+昼企画（リレー、綱引き等）に関わるテーブル群。
+
+\begin{table}[H]
+    \centering
+    \caption{noon\_game\_sessions (昼企画セッション)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id & INT & イベントID (FK) \\
+        name & VARCHAR(255) & 企画名 \\
+        mode & ENUM & 対戦モード (class, group, mixed) \\
+        win/loss/draw\_points & INT & 勝敗別ポイント設定 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{noon\_game\_groups (昼企画グループ)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        session\_id & INT & セッションID (FK) \\
+        name & VARCHAR(255) & グループ名 (例: 1年合同) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{noon\_game\_template\_runs (テンプレート実行)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        session\_id & INT & セッションID (FK) \\
+        template\_key & VARCHAR(50) & テンプレート識別子 (year\_relay等) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Notification Tables}
+通知機能に関わるテーブル群。
+
+\begin{table}[H]
+    \centering
+    \caption{notifications (通知)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        title & TEXT & タイトル \\
+        body & TEXT & 本文 \\
+        created\_by & CHAR(36) & 作成者 (FK) \\
+        event\_id & INT & イベントID (FK) \\
+        created\_at & TIMESTAMP & 送信日時 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{notification\_recipients (通知受信者)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        notification\_id & INT & 通知ID (FK) \\
+        user\_id/class\_id & CHAR/INT & 受信対象 (ユーザー個別/クラス全体) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{push\_subscriptions (WebPush購読)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        user\_id & CHAR(36) & ユーザーID (FK) \\
+        endpoint & VARCHAR(500) & Pushサービスのエンドポイント \\
+        keys (auth, p256dh) & VARCHAR & 暗号化キー \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{API設計}
+RESTful APIのエンドポイント一覧。
+
+\subsubsection{Authentication / User}
+\begin{table}[H]
+    \centering
+    \caption{Auth API}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Method & Path & Description \\
+        \midrule
+        GET & /api/auth/google/login & Google OAuthログイン開始 \\
+        GET & /api/auth/google/callback & Google OAuthコールバック \\
+        GET & /api/auth/dev-login & 開発用ログイン (Dev環境のみ) \\
+        GET & /api/auth/user & ログインユーザー情報取得 \\
+        POST & /api/auth/logout & ログアウト \\
+        PUT & /api/user/profile & プロフィール更新 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{General / Student}
+学生権限以上でアクセス可能なAPI。
+
+\begin{table}[H]
+    \centering
+    \caption{General API}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Method & Path & Description \\
+        \midrule
+        GET & /api/events/active & 現在アクティブなイベント取得 \\
+        GET & /api/events/:id/sports & イベント採用競技一覧取得 \\
+        GET & /api/classes & クラス一覧取得 \\
+        GET & /api/scores/class & クラス得点情報取得 \\
+        GET & /api/qrcode/teams & 自分の所属チームQRコード取得 \\
+        POST & /api/qrcode/generate & QRコード生成 \\
+        POST & /api/qrcode/verify & QRコード検証 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Student API (/api/student)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Method & Path & Description \\
+        \midrule
+        GET & .../class-progress & クラス進捗状況取得 \\
+        GET & .../events/:id/tournaments & トーナメント表取得 \\
+        GET & .../noon-game/session & 昼企画セッション情報取得 \\
+        GET & .../notification-requests & 通知リクエスト一覧 \\
+        POST & .../notification-requests & 通知リクエスト作成 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Admin}
+行事委員 (Admin) 以上でアクセス可能なAPI。
+
+\begin{table}[H]
+    \centering
+    \caption{Admin API (/api/admin)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Method & Path & Description \\
+        \midrule
+        GET & .../events & イベント一覧取得 \\
+        POST & .../events/:id/sports & 競技をイベントに追加 \\
+        DELETE & .../events/:id/sports/:id & イベントから競技を削除 \\
+        GET/PUT & .../events/.../details & 競技詳細設定 \\
+        PUT & .../result, /status & 試合結果・ステータス更新 \\
+        POST & .../attendance/register & 出席登録 \\
+        POST & .../images, /pdfs & 画像・PDFアップロード \\
+        GET & .../users & ユーザー一覧検索 \\
+        PUT/DEL & .../users/role & ユーザーロール変更・削除 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Class/Team Management API (/api/admin/class-team)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Method & Path & Description \\
+        \midrule
+        GET & .../managed-class & 担当クラス情報取得 \\
+        GET & .../classes/:id/members & クラスメンバー取得 \\
+        POST & .../assign-members & チームメンバー割り当て \\
+        DELETE & .../remove-member & チームメンバー解除 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Root}
+システム管理者 (Root) のみアクセス可能なAPI。
+
+\begin{table}[H]
+    \centering
+    \caption{Root API (/api/root)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Method & Path & Description \\
+        \midrule
+        GET/POST & .../whitelist & ホワイトリスト管理 \\
+        POST & .../whitelist/csv & ホワイトリストCSV一括登録 \\
+        POST & .../events & イベント新規作成 \\
+        PUT & .../events/active & アクティブイベント切り替え \\
+        POST & .../tournaments/generate-all & 全トーナメント一括生成 \\
+        PUT & .../classes/student-counts & クラス人数設定 \\
+        POST & .../sports & 競技マスタ作成 \\
+        POST & .../notifications & 全体通知作成 \\
+        POST & .../notification-requests/... & 通知リクエスト承認・否認 \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -312,7 +789,7 @@ RESTful APIを採用し、リソースごとにエンドポイントを定義し
 \end{enumerate}
 
 % 画像を挿入する場合は、画像ファイルをプロジェクト内に配置し、以下のコメントアウトを外してください。
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \resizebox{\textwidth}{!}{
     \begin{tikzpicture}[node distance=2.5cm, auto,
