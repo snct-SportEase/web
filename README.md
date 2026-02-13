@@ -1,5 +1,7 @@
 # SportEase
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/snct-SportEase/web)
+
 SportEaseは、学校行事のスポーツ大会運営をオンラインで一元管理するためのWebアプリケーションです。Google認証を利用した安全なログイン、役割に応じたダッシュボード、トーナメント進行管理、通知配信、出席確認など、運営と参加者双方の体験を支援します。
 
 ## 主な機能
