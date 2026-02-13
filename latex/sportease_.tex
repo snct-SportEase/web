@@ -97,6 +97,10 @@
     \end{tabularx}
 \end{table}
 
+Roleの制限について、上記のいずれかのロール+class\_repの権限を持つことができる。\\
+また、必要に応じて審判等の特定の集団用のロールを作成することも可能である。\\
+ベースロールに加えて作成してロールは主に通知機能のロールフィルタリングで用いることを想定している。
+
 \subsection{機能要件}
 各ロールにおける利用可能な機能の詳細は以下の通りである。
 
@@ -1032,7 +1036,7 @@ RESTful APIのエンドポイント一覧（主要なもの）。全112エンド
         };
 
         % Edges
-        \path [line] (user) -- node[right] {HTTPS/HTTP} (traefik);
+        \path [line] (user) -- node[right] {HTTPS} (traefik);
         \path [line] (traefik) -| node[pos=0.1, above left, font=\footnotesize] {Proxy} (frontend);
         \path [line] (traefik) -| node[pos=0.1, above right, font=\footnotesize] {Proxy} (backend);
         \path [dashedline] (frontend) -- node[above, font=\footnotesize] {API Call} (backend);
