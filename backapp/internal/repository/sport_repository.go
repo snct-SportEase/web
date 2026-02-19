@@ -139,7 +139,12 @@ func (r *sportRepository) DeleteSportFromEvent(eventID int, sportID int) error {
 
 // GetTeamsBySportID retrieves all teams for a given sport ID from the database.
 func (r *sportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, error) {
-	query := "SELECT id, name, class_id, sport_id, event_id, min_capacity, max_capacity FROM teams WHERE sport_id = ?"
+	query := `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, t.min_capacity, t.max_capacity 
+		FROM teams t 
+		JOIN classes c ON t.class_id = c.id 
+		WHERE t.sport_id = ?
+	`
 	rows, err := r.db.Query(query, sportID)
 	if err != nil {
 		return nil, err

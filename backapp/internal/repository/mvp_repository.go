@@ -67,148 +67,17 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 		return err
 	}
 
-	// Update class_scores
-	_, err = tx.Exec(`
-    	INSERT INTO class_scores (event_id, class_id, mvp_points)
-    	VALUES (?, ?, ?)
-    	ON DUPLICATE KEY UPDATE mvp_points = mvp_points + VALUES(mvp_points)
-	`, eventID, votedForClassID, mvpPoints)
-	if err != nil {
-		return err
-	}
-
-	// Ensure MVP points do not affect total points used for ranking
-	_, err = tx.Exec(`
-		UPDATE class_scores
-		SET
-			total_points_current_event = total_points_current_event - ?,
-			total_points_overall = total_points_overall - ?
-		WHERE event_id = ? AND class_id = ?
-	`, mvpPoints, mvpPoints, eventID, votedForClassID)
-	if err != nil {
-		return err
-	}
-
 	// Insert into score_logs
-	logReason := "MVP vote"
+	logReason := "mvp_points"
 	if reason != "" {
-		logReason = fmt.Sprintf("MVP vote: %s", reason)
+		logReason = fmt.Sprintf("mvp_points: %s", reason)
 	}
 	_, err = tx.Exec("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)", eventID, votedForClassID, mvpPoints, logReason)
 	if err != nil {
 		return err
 	}
 
-	// Get season to determine which rank to update
-	var season string
-	err = tx.QueryRow("SELECT season FROM events WHERE id = ?", eventID).Scan(&season)
-	if err != nil {
-		return err
-	}
-
-	if err := updateCurrentEventRanks(tx, eventID); err != nil {
-		return err
-	}
-
-	if season == "autumn" {
-		if err := updateOverallRanks(tx, eventID); err != nil {
-			return err
-		}
-	}
-
 	return tx.Commit()
-}
-
-func updateCurrentEventRanks(tx *sql.Tx, eventID int) error {
-	// Check if all classes have 0 points (competition not started)
-	var maxPoints int
-	err := tx.QueryRow(`
-		SELECT COALESCE(MAX(total_points_current_event), 0)
-		FROM class_scores
-		WHERE event_id = ?
-	`, eventID).Scan(&maxPoints)
-	if err != nil {
-		return fmt.Errorf("failed to check max points: %w", err)
-	}
-
-	if maxPoints == 0 {
-		// All classes have 0 points, set all ranks to 0
-		_, err = tx.Exec(`
-			UPDATE class_scores
-			SET rank_current_event = 0
-			WHERE event_id = ?
-		`, eventID)
-		if err != nil {
-			return fmt.Errorf("failed to reset current event ranks: %w", err)
-		}
-		return nil
-	}
-
-	// Normal ranking
-	const query = `
-		UPDATE class_scores cs
-		JOIN (
-			SELECT
-				class_id,
-				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
-			FROM class_scores
-			WHERE event_id = ?
-		) ranked_data ON cs.class_id = ranked_data.class_id
-		SET cs.rank_current_event = ranked_data.new_rank
-		WHERE cs.event_id = ?
-	`
-
-	if _, err := tx.Exec(query, eventID, eventID); err != nil {
-		return fmt.Errorf("failed to update ranks: %w", err)
-	}
-
-	return nil
-}
-
-func updateOverallRanks(tx *sql.Tx, eventID int) error {
-	// Check if all classes have 0 points (competition not started)
-	var maxPoints int
-	err := tx.QueryRow(`
-		SELECT COALESCE(MAX(total_points_overall), 0)
-		FROM class_scores
-		WHERE event_id = ?
-	`, eventID).Scan(&maxPoints)
-	if err != nil {
-		return fmt.Errorf("failed to check max points: %w", err)
-	}
-
-	if maxPoints == 0 {
-		// All classes have 0 points, set all ranks to 0
-		_, err = tx.Exec(`
-			UPDATE class_scores
-			SET rank_overall = 0
-			WHERE event_id = ?
-		`, eventID)
-		if err != nil {
-			return fmt.Errorf("failed to reset overall ranks: %w", err)
-		}
-		return nil
-	}
-
-	// Normal ranking
-	const query = `
-		UPDATE class_scores cs
-		JOIN (
-			SELECT
-				class_id,
-				RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
-			FROM class_scores
-			WHERE event_id = ?
-		) ranked_data ON cs.class_id = ranked_data.class_id
-		SET cs.rank_overall = ranked_data.new_rank
-		WHERE cs.event_id = ?
-	`
-
-	if _, err := tx.Exec(query, eventID, eventID); err != nil {
-		return fmt.Errorf("failed to update overall ranks: %w", err)
-	}
-
-	return nil
 }
 
 func (r *mvpRepository) GetMVPVotes(eventID int) ([]models.MVPVote, error) {
