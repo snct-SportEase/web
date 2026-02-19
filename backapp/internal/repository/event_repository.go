@@ -131,14 +131,19 @@ func (r *eventRepository) GetEventByYearAndSeason(year int, season string) (*mod
 }
 
 func (r *eventRepository) CopyClassScores(fromEventID int, toEventID int) error {
-	query := `
-		INSERT INTO class_scores (event_id, class_id, initial_points)
-		SELECT ?, class_id, total_points_current_event
+	deleteQuery := "DELETE FROM score_logs WHERE event_id = ? AND reason = 'initial_points'"
+	_, err := r.db.Exec(deleteQuery, toEventID)
+	if err != nil {
+		return err
+	}
+
+	insertQuery := `
+		INSERT INTO score_logs (event_id, class_id, points, reason)
+		SELECT ?, class_id, total_points_current_event, 'initial_points'
 		FROM class_scores
-		WHERE event_id = ?
-		ON DUPLICATE KEY UPDATE initial_points = VALUES(initial_points)
+		WHERE event_id = ? AND total_points_current_event > 0
 	`
-	_, err := r.db.Exec(query, toEventID, fromEventID)
+	_, err = r.db.Exec(insertQuery, toEventID, fromEventID)
 	return err
 }
 

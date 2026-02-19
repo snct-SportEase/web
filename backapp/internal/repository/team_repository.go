@@ -30,8 +30,8 @@ func NewTeamRepository(db *sql.DB) TeamRepository {
 }
 
 func (r *teamRepository) CreateTeam(team *models.Team) (int64, error) {
-	query := "INSERT INTO teams (name, class_id, sport_id, event_id) VALUES (?, ?, ?, ?)"
-	result, err := r.db.Exec(query, team.Name, team.ClassID, team.SportID, team.EventID)
+	query := "INSERT INTO teams (name, class_id, sport_id) VALUES (?, ?, ?)"
+	result, err := r.db.Exec(query, team.Name, team.ClassID, team.SportID)
 	if err != nil {
 		return 0, err
 	}
@@ -43,17 +43,22 @@ func (r *teamRepository) CreateTeam(team *models.Team) (int64, error) {
 }
 
 func (r *teamRepository) DeleteTeamsByEventAndSportID(eventID int, sportID int) error {
-	query := "DELETE FROM teams WHERE event_id = ? AND sport_id = ?"
+	query := `
+		DELETE t FROM teams t 
+		JOIN classes c ON t.class_id = c.id 
+		WHERE c.event_id = ? AND t.sport_id = ?
+	`
 	_, err := r.db.Exec(query, eventID, sportID)
 	return err
 }
 
 func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error) {
 	query := `
-		SELECT t.id, t.name, t.class_id, t.sport_id, t.event_id, s.name as sport_name
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
 		FROM teams t
 		INNER JOIN team_members tm ON t.id = tm.team_id
 		INNER JOIN sports s ON t.sport_id = s.id
+		INNER JOIN classes c ON t.class_id = c.id
 		WHERE tm.user_id = ?
 	`
 	rows, err := r.db.Query(query, userID)
@@ -75,10 +80,11 @@ func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSpor
 
 func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
 	query := `
-		SELECT t.id, t.name, t.class_id, t.sport_id, t.event_id, s.name as sport_name
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
 		FROM teams t
 		INNER JOIN sports s ON t.sport_id = s.id
-		WHERE t.class_id = ? AND t.event_id = ?
+		INNER JOIN classes c ON t.class_id = c.id
+		WHERE t.class_id = ? AND c.event_id = ?
 	`
 	rows, err := r.db.Query(query, classID, eventID)
 	if err != nil {
@@ -98,7 +104,7 @@ func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.
 }
 
 func (r *teamRepository) GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error) {
-	query := "SELECT id, name, class_id, sport_id, event_id, min_capacity, max_capacity FROM teams WHERE class_id = ? AND sport_id = ? AND event_id = ?"
+	query := "SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, t.min_capacity, t.max_capacity FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.class_id = ? AND t.sport_id = ? AND c.event_id = ?"
 	row := r.db.QueryRow(query, classID, sportID, eventID)
 
 	team := &models.Team{}
@@ -175,13 +181,18 @@ func (r *teamRepository) RemoveTeamMember(teamID int, userID string) error {
 }
 
 func (r *teamRepository) UpdateTeamCapacity(eventID int, sportID int, classID int, minCapacity *int, maxCapacity *int) error {
-	query := "UPDATE teams SET min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ? AND class_id = ?"
-	_, err := r.db.Exec(query, minCapacity, maxCapacity, eventID, sportID, classID)
+	query := "UPDATE teams SET min_capacity = ?, max_capacity = ? WHERE sport_id = ? AND class_id = ?"
+	_, err := r.db.Exec(query, minCapacity, maxCapacity, sportID, classID)
 	return err
 }
 
 func (r *teamRepository) GetTeamCapacity(eventID int, sportID int, classID int) (*models.Team, error) {
-	query := "SELECT id, name, class_id, sport_id, event_id, min_capacity, max_capacity FROM teams WHERE event_id = ? AND sport_id = ? AND class_id = ?"
+	query := `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, t.min_capacity, t.max_capacity 
+		FROM teams t 
+		JOIN classes c ON t.class_id = c.id 
+		WHERE c.event_id = ? AND t.sport_id = ? AND t.class_id = ?
+	`
 	row := r.db.QueryRow(query, eventID, sportID, classID)
 
 	team := &models.Team{}

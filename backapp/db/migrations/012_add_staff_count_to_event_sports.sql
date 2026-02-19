@@ -1,4 +1,0 @@
-ALTER TABLE event_sports
-ADD COLUMN min_capacity INT NULL DEFAULT NULL,
-ADD COLUMN max_capacity INT NULL DEFAULT NULL;
-

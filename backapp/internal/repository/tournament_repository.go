@@ -339,7 +339,13 @@ func (r *tournamentRepository) IsMatchResultAlreadyEntered(matchID int) (bool, e
 
 func (r *tournamentRepository) getTeamByID(teamID int64) (*models.Team, error) {
 	var team models.Team
-	row := r.db.QueryRow("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?", teamID)
+	query := `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id 
+		FROM teams t 
+		JOIN classes c ON t.class_id = c.id 
+		WHERE t.id = ?
+	`
+	row := r.db.QueryRow(query, teamID)
 	if err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID); err != nil {
 		return nil, err
 	}
@@ -348,7 +354,13 @@ func (r *tournamentRepository) getTeamByID(teamID int64) (*models.Team, error) {
 
 func (r *tournamentRepository) getTeamByIDTx(tx *sql.Tx, teamID int64) (*models.Team, error) {
 	var team models.Team
-	row := tx.QueryRow("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?", teamID)
+	query := `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id 
+		FROM teams t 
+		JOIN classes c ON t.class_id = c.id 
+		WHERE t.id = ?
+	`
+	row := tx.QueryRow(query, teamID)
 	if err := row.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID); err != nil {
 		return nil, err
 	}
@@ -400,13 +412,12 @@ func (r *tournamentRepository) addPoints(tx *sql.Tx, eventID int, classID int, c
 		return nil
 	}
 
-	query := fmt.Sprintf(`
-		INSERT INTO class_scores (event_id, class_id, %[1]s)
-		VALUES (?, ?, ?)
-		ON DUPLICATE KEY UPDATE %[1]s = %[1]s + VALUES(%[1]s)
-	`, column)
+	query := `
+		INSERT INTO score_logs (event_id, class_id, points, reason)
+		VALUES (?, ?, ?, ?)
+	`
 
-	_, err := tx.Exec(query, eventID, classID, points)
+	_, err := tx.Exec(query, eventID, classID, points, column)
 	return err
 }
 
@@ -415,13 +426,12 @@ func (r *tournamentRepository) subtractPoints(tx *sql.Tx, eventID int, classID i
 		return nil
 	}
 
-	query := fmt.Sprintf(`
-		UPDATE class_scores
-		SET %[1]s = GREATEST(%[1]s - ?, 0)
-		WHERE event_id = ? AND class_id = ?
-	`, column)
+	query := `
+		INSERT INTO score_logs (event_id, class_id, points, reason)
+		VALUES (?, ?, ?, ?)
+	`
 
-	_, err := tx.Exec(query, points, eventID, classID)
+	_, err := tx.Exec(query, eventID, classID, -points, column)
 	return err
 }
 
@@ -461,21 +471,14 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 		return nil
 	}
 
-	pointsAwarded := false
-
 	// 敗者戦二回戦の場合、勝者に10点付与（敗者戦ブロック優勝）
 	if match.IsLoserBracketMatch && match.LoserBracketRound.Valid && match.LoserBracketRound.Int64 == 2 {
-		// gym2の場合、gym2_loser_bracket_champion_pointsに10点追加
 		if location == "gym2" {
 			if err := r.addPoints(tx, eventID, winnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10); err != nil {
 				return err
 			}
-			pointsAwarded = true
 		}
-		// 敗者戦のスコアリング後は通常の処理をスキップ
-		if pointsAwarded {
-			return r.updateRanks(tx, eventID)
-		}
+		return nil
 	}
 
 	if match.Round >= 0 && match.Round < len(columns.win) {
@@ -483,7 +486,6 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, column, 10); err != nil {
 			return err
 		}
-		pointsAwarded = true
 	}
 
 	if totalRounds <= 0 {
@@ -494,140 +496,26 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 50); err != nil {
 			return err
 		}
-		pointsAwarded = true
 		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 40); err != nil {
 			return err
 		}
-
-		return r.updateRanks(tx, eventID)
+		return nil
 	}
 
 	if match.Round == totalRounds {
 		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 80); err != nil {
 			return err
 		}
-		pointsAwarded = true
 		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 60); err != nil {
 			return err
 		}
-		pointsAwarded = true
-	}
-
-	if pointsAwarded {
-		return r.updateRanks(tx, eventID)
 	}
 
 	return nil
 }
 
 func (r *tournamentRepository) updateRanks(tx *sql.Tx, eventID int) error {
-	var season string
-	if err := tx.QueryRow("SELECT season FROM events WHERE id = ?", eventID).Scan(&season); err != nil {
-		return err
-	}
-
-	if err := updateCurrentEventRanksTx(tx, eventID); err != nil {
-		return err
-	}
-
-	if season == "autumn" {
-		if err := updateOverallRanksTx(tx, eventID); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func updateCurrentEventRanksTx(tx *sql.Tx, eventID int) error {
-	// Check if all classes have 0 points (competition not started)
-	var maxPoints int
-	err := tx.QueryRow(`
-		SELECT COALESCE(MAX(total_points_current_event), 0)
-		FROM class_scores
-		WHERE event_id = ?
-	`, eventID).Scan(&maxPoints)
-	if err != nil {
-		return fmt.Errorf("failed to check max points: %w", err)
-	}
-
-	if maxPoints == 0 {
-		// All classes have 0 points, set all ranks to 0
-		_, err = tx.Exec(`
-			UPDATE class_scores
-			SET rank_current_event = 0
-			WHERE event_id = ?
-		`, eventID)
-		if err != nil {
-			return fmt.Errorf("failed to reset current event ranks: %w", err)
-		}
-		return nil
-	}
-
-	// Normal ranking
-	const query = `
-		UPDATE class_scores cs
-		JOIN (
-			SELECT
-				class_id,
-				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
-			FROM class_scores
-			WHERE event_id = ?
-		) ranked_data ON cs.class_id = ranked_data.class_id
-		SET cs.rank_current_event = ranked_data.new_rank
-		WHERE cs.event_id = ?
-	`
-
-	if _, err := tx.Exec(query, eventID, eventID); err != nil {
-		return fmt.Errorf("failed to update current event ranks: %w", err)
-	}
-
-	return nil
-}
-
-func updateOverallRanksTx(tx *sql.Tx, eventID int) error {
-	// Check if all classes have 0 points (competition not started)
-	var maxPoints int
-	err := tx.QueryRow(`
-		SELECT COALESCE(MAX(total_points_overall), 0)
-		FROM class_scores
-		WHERE event_id = ?
-	`, eventID).Scan(&maxPoints)
-	if err != nil {
-		return fmt.Errorf("failed to check max points: %w", err)
-	}
-
-	if maxPoints == 0 {
-		// All classes have 0 points, set all ranks to 0
-		_, err = tx.Exec(`
-			UPDATE class_scores
-			SET rank_overall = 0
-			WHERE event_id = ?
-		`, eventID)
-		if err != nil {
-			return fmt.Errorf("failed to reset overall ranks: %w", err)
-		}
-		return nil
-	}
-
-	// Normal ranking
-	const query = `
-		UPDATE class_scores cs
-		JOIN (
-			SELECT
-				class_id,
-				RANK() OVER (ORDER BY total_points_overall DESC) AS new_rank
-			FROM class_scores
-			WHERE event_id = ?
-		) ranked_data ON cs.class_id = ranked_data.class_id
-		SET cs.rank_overall = ranked_data.new_rank
-		WHERE cs.event_id = ?
-	`
-
-	if _, err := tx.Exec(query, eventID, eventID); err != nil {
-		return fmt.Errorf("failed to update overall ranks: %w", err)
-	}
-
+	// class_scores is a VIEW, ranking is dynamic
 	return nil
 }
 

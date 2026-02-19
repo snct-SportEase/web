@@ -67,44 +67,17 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(tournamentID).
 			WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(1, 1, "gym1"))
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
 			WithArgs(winnerID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(winnerID, "Winner Team", 101, 1, 1))
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
 			WithArgs(team2ID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team2ID, "Loser Team", 102, 1, 1))
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO class_scores (event_id, class_id, gym1_win2_points) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE gym1_win2_points = gym1_win2_points + VALUES(gym1_win2_points)")).
-			WithArgs(1, 101, 10).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)")).
+			WithArgs(1, 101, 10, "gym1_win2_points").
 			WillReturnResult(sqlmock.NewResult(1, 1))
-
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT season FROM events WHERE id = ?")).
-			WithArgs(1).
-			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-
-		mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COALESCE(MAX(total_points_current_event), 0)
-		FROM class_scores
-		WHERE event_id = ?
-		`)).
-			WithArgs(1).
-			WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
-
-		mock.ExpectExec(regexp.QuoteMeta(`
-		UPDATE class_scores cs
-		JOIN (
-			SELECT
-				class_id,
-				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
-			FROM class_scores
-			WHERE event_id = ?
-		) ranked_data ON cs.class_id = ranked_data.class_id
-		SET cs.rank_current_event = ranked_data.new_rank
-		WHERE cs.event_id = ?
-		`)).
-			WithArgs(1, 1).
-			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		mock.ExpectCommit()
 
@@ -182,44 +155,17 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(tournamentID).
 			WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(1, 1, "gym1"))
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
 			WithArgs(winnerID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(winnerID, "Winner Team", 202, 1, 1))
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
 			WithArgs(loserID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(loserID, "Loser Team", 201, 1, 1))
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO class_scores (event_id, class_id, gym1_win3_points) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE gym1_win3_points = gym1_win3_points + VALUES(gym1_win3_points)")).
-			WithArgs(1, 202, 10).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)")).
+			WithArgs(1, 202, 10, "gym1_win3_points").
 			WillReturnResult(sqlmock.NewResult(1, 1))
-
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT season FROM events WHERE id = ?")).
-			WithArgs(1).
-			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-
-		mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COALESCE(MAX(total_points_current_event), 0)
-		FROM class_scores
-		WHERE event_id = ?
-		`)).
-			WithArgs(1).
-			WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
-
-		mock.ExpectExec(regexp.QuoteMeta(`
-		UPDATE class_scores cs
-		JOIN (
-			SELECT
-				class_id,
-				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
-			FROM class_scores
-			WHERE event_id = ?
-		) ranked_data ON cs.class_id = ranked_data.class_id
-		SET cs.rank_current_event = ranked_data.new_rank
-		WHERE cs.event_id = ?
-		`)).
-			WithArgs(1, 1).
-			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		mock.ExpectCommit()
 
@@ -284,46 +230,19 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(eventID, 2, "gym2"))
 
 		// Mock getTeamByID for winner team
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
 			WithArgs(winnerID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(winnerID, "Winner Team", classID, 2, eventID))
 
 		// Mock getTeamByID for loser team (needed for validation)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, class_id, sport_id, event_id FROM teams WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
 			WithArgs(loserID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(loserID, "Loser Team", 302, 2, eventID))
 
 		// Mock adding points to gym2_loser_bracket_champion_points
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO class_scores (event_id, class_id, gym2_loser_bracket_champion_points) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE gym2_loser_bracket_champion_points = gym2_loser_bracket_champion_points + VALUES(gym2_loser_bracket_champion_points)")).
-			WithArgs(eventID, classID, 10).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)")).
+			WithArgs(eventID, classID, 10, "gym2_loser_bracket_champion_points").
 			WillReturnResult(sqlmock.NewResult(1, 1))
-
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT season FROM events WHERE id = ?")).
-			WithArgs(eventID).
-			WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-
-		mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COALESCE(MAX(total_points_current_event), 0)
-		FROM class_scores
-		WHERE event_id = ?
-		`)).
-			WithArgs(eventID).
-			WillReturnRows(sqlmock.NewRows([]string{"COALESCE(MAX(total_points_current_event), 0)"}).AddRow(10))
-
-		mock.ExpectExec(regexp.QuoteMeta(`
-		UPDATE class_scores cs
-		JOIN (
-			SELECT
-				class_id,
-				RANK() OVER (ORDER BY total_points_current_event DESC) AS new_rank
-			FROM class_scores
-			WHERE event_id = ?
-		) ranked_data ON cs.class_id = ranked_data.class_id
-		SET cs.rank_current_event = ranked_data.new_rank
-		WHERE cs.event_id = ?
-		`)).
-			WithArgs(eventID, eventID).
-			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		mock.ExpectCommit()
 
