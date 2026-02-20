@@ -115,15 +115,12 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 
 			// Determine which start time to use
 			var effectiveStartTime string
-			var effectiveStartTimeForStatus string
 			if isRainyMode && m.RainyModeStartTime.Valid && m.RainyModeStartTime.String != "" {
 				// Use rainy mode start time when rainy mode is enabled
 				effectiveStartTime = m.RainyModeStartTime.String
-				effectiveStartTimeForStatus = m.RainyModeStartTime.String
 			} else if m.StartTime.Valid {
 				// Use normal start time
 				effectiveStartTime = m.StartTime.String
-				effectiveStartTimeForStatus = m.StartTime.String
 			}
 
 			bracketryMatches = append(bracketryMatches, models.Match{
@@ -131,7 +128,7 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 				RoundIndex:          m.Round,
 				Order:               m.MatchNumberInRound,
 				Sides:               sides,
-				MatchStatus:         effectiveStartTimeForStatus,
+				MatchStatus:         m.Status,
 				IsBronzeMatch:       m.IsBronzeMatch,
 				IsLoserBracketMatch: m.IsLoserBracketMatch,
 				LoserBracketRound:   loserBracketRound,
@@ -189,10 +186,14 @@ func (r *tournamentRepository) GetMatchesForTeam(eventID int, teamID int) ([]*mo
 			m.team2_id,
 			m.team1_score,
 			m.team2_score,
-			m.winner_team_id,
+			CASE 
+				WHEN m.team1_score > m.team2_score THEN m.team1_id 
+				WHEN m.team2_score > m.team1_score THEN m.team2_id 
+				ELSE NULL 
+			END AS winner_team_id,
 			m.status,
 			m.next_match_id,
-			m.start_time,
+			m.match_start_time,
 			m.is_bronze_match,
 			team1.name,
 			team2.name
@@ -281,7 +282,7 @@ func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, tea
 }
 
 func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*models.MatchDB, error) {
-	rows, err := r.db.Query("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, team1_score, team2_score, winner_team_id, status, next_match_id, start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
+	rows, err := r.db.Query("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, team1_score, team2_score, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +311,7 @@ func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.Ma
 	var m models.MatchDB
 	var loserBracketRound sql.NullInt64
 	var loserBracketBlock sql.NullString
-	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, winner_team_id, status, next_match_id, start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?", matchID)
+	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?", matchID)
 	if err := row.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch, &m.IsLoserBracketMatch, &loserBracketRound, &loserBracketBlock, &m.RainyModeStartTime); err != nil {
 		return nil, err
 	}
@@ -326,7 +327,7 @@ func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.Ma
 func (r *tournamentRepository) IsMatchResultAlreadyEntered(matchID int) (bool, error) {
 	var winnerID sql.NullInt64
 	var status string
-	err := r.db.QueryRow("SELECT winner_team_id, status FROM matches WHERE id = ?", matchID).Scan(&winnerID, &status)
+	err := r.db.QueryRow("SELECT CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status FROM matches WHERE id = ?", matchID).Scan(&winnerID, &status)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, fmt.Errorf("match not found")
@@ -768,11 +769,11 @@ func (r *tournamentRepository) DeleteTournamentsByEventAndSportID(eventID int, s
 func (r *tournamentRepository) UpdateMatchStartTime(matchID int, startTime string) error {
 	if startTime != "" {
 		// Only change status to 'scheduled' if it is currently 'pending'.
-		_, err := r.db.Exec("UPDATE matches SET start_time = ?, status = CASE WHEN status = 'pending' THEN 'scheduled' ELSE status END WHERE id = ?", startTime, matchID)
+		_, err := r.db.Exec("UPDATE matches SET match_start_time = ?, status = CASE WHEN status = 'pending' THEN 'scheduled' ELSE status END WHERE id = ?", startTime, matchID)
 		return err
 	}
 	// If startTime is empty, just update the time.
-	_, err := r.db.Exec("UPDATE matches SET start_time = ? WHERE id = ?", startTime, matchID)
+	_, err := r.db.Exec("UPDATE matches SET match_start_time = ? WHERE id = ?", startTime, matchID)
 	return err
 }
 
@@ -830,7 +831,7 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 		}
 	}
 
-	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, winnerID, matchID)
+	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, matchID)
 	if err != nil {
 		return err
 	}
@@ -1016,7 +1017,7 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 
 	// 勝者が変わらない場合は通常の更新メソッドと同じ処理
 	if previousWinnerID == newWinnerID {
-		_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, newWinnerID, matchID)
+		_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, matchID)
 		if err != nil {
 			return err
 		}
@@ -1042,7 +1043,7 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 	}
 
 	// 試合結果を更新
-	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, newWinnerID, matchID)
+	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, matchID)
 	if err != nil {
 		return err
 	}
@@ -1071,7 +1072,7 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 			}
 
 			// 次の試合の結果を無効化
-			_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, winner_team_id = NULL, status = 'pending' WHERE id = ?", nextMatch.ID)
+			_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, status = 'pending' WHERE id = ?", nextMatch.ID)
 			if err != nil {
 				return err
 			}
@@ -1368,7 +1369,7 @@ func (r *tournamentRepository) invalidateSubsequentMatches(tx *sql.Tx, matchID i
 	}
 
 	// この試合の結果を無効化
-	_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, winner_team_id = NULL, status = 'pending' WHERE id = ?", matchID)
+	_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, status = 'pending' WHERE id = ?", matchID)
 	if err != nil {
 		return err
 	}
@@ -1389,15 +1390,15 @@ func (r *tournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error
 	return tournamentID, err
 }
 
-// ApplyRainyModeStartTimes applies rainy_mode_start_time to start_time for all matches in the event's tournaments
+// ApplyRainyModeStartTimes applies rainy_mode_start_time to match_start_time for all matches in the event's tournaments
 // This is called when rainy mode is enabled
 func (r *tournamentRepository) ApplyRainyModeStartTimes(eventID int) error {
 	// Update all matches that have rainy_mode_start_time set
-	// Set start_time = rainy_mode_start_time where rainy_mode_start_time is not null
+	// Set match_start_time = rainy_mode_start_time where rainy_mode_start_time is not null
 	query := `
 		UPDATE matches m
 		INNER JOIN tournaments t ON m.tournament_id = t.id
-		SET m.start_time = m.rainy_mode_start_time,
+		SET m.match_start_time = m.rainy_mode_start_time,
 		    m.status = CASE WHEN m.status = 'pending' THEN 'scheduled' ELSE m.status END
 		WHERE t.event_id = ?
 		  AND m.rainy_mode_start_time IS NOT NULL
