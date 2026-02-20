@@ -146,13 +146,14 @@ self.addEventListener('push', (event) => {
 	}
 
 	let payload;
+	const textData = event.data.text();
 	try {
-		payload = event.data.json();
+		payload = JSON.parse(textData);
 	} catch (error) {
 		console.error('[service-worker] push payload JSON parse error', error);
 		payload = {
 			title: '新しい通知',
-			body: event.data.text()
+			body: textData
 		};
 	}
 
