@@ -171,6 +171,9 @@
         <a href="/dashboard/student/sport-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/student/sport-info')}>
           競技一覧・詳細閲覧
         </a>
+        <a href="/dashboard/student/timetable" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/student/timetable')}>
+          タイムテーブル
+        </a>
         <a href="/dashboard/student/tournament" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/student/tournament')}>
           トーナメント
         </a>
