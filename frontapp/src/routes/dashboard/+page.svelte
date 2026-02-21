@@ -23,7 +23,9 @@
         if (data.event_id) {
           activeEvent = {
             id: data.event_id,
-            name: data.event_name
+            name: data.event_name,
+            survey_url: data.survey_url,
+            is_survey_published: data.is_survey_published
           };
           if (data.competition_guidelines_pdf_url) {
             competitionGuidelinesUrl = data.competition_guidelines_pdf_url;
@@ -106,6 +108,31 @@
       ようこそ、{user?.display_name || user?.email || 'User'} さん
     </h1>
   </section>
+
+  {#if activeEvent?.survey_url && activeEvent?.is_survey_published}
+    <div class="bg-indigo-600 rounded-lg shadow-lg overflow-hidden">
+      <div class="max-w-7xl mx-auto py-3 px-3 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between flex-wrap">
+          <div class="w-0 flex-1 flex items-center">
+            <span class="flex p-2 rounded-lg bg-indigo-800">
+              <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+              </svg>
+            </span>
+            <p class="ml-3 font-medium text-white truncate">
+              <span class="md:hidden">アンケートにご協力ください！</span>
+              <span class="hidden md:inline">「{activeEvent.name}」のアンケートが公開されました。ご協力をお願いします。</span>
+            </p>
+          </div>
+          <div class="order-3 mt-2 flex-shrink-0 w-full sm:order-2 sm:mt-0 sm:w-auto">
+            <a href={activeEvent.survey_url} target="_blank" rel="noopener noreferrer" class="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50">
+              アンケートに回答する
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   {#if user && !user.is_profile_complete}
     <ProfileSetupModal classes={classes} form={form} />

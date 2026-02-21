@@ -14,6 +14,7 @@
     season: 'spring',
     start_date: '',
     end_date: '',
+    survey_url: null,
   };
 
   $: {
@@ -78,6 +79,7 @@
       season: 'spring',
       start_date: '',
       end_date: '',
+      survey_url: null,
     };
     showModal = true;
   }
@@ -89,6 +91,7 @@
       ...event,
       start_date: event.start_date ? new Date(event.start_date).toISOString().split('T')[0] : '',
       end_date: event.end_date ? new Date(event.end_date).toISOString().split('T')[0] : '',
+      survey_url: event.survey_url || '',
     };
     showModal = true;
   }
@@ -127,6 +130,46 @@
       alert(error.message);
     }
   }
+
+  async function notifySurvey(id) {
+    if (!confirm('アンケート通知を全ユーザーに送信します。よろしいですか？')) return;
+    try {
+      const resp = await fetch(`/api/root/events/${id}/notify-survey`, { method: 'POST' });
+      if (!resp.ok) {
+        const d = await resp.json();
+        throw new Error(d.error || 'Failed to send notification');
+      }
+      alert('アンケート通知を送信しました。');
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function handleCsvUpload(id, e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const resp = await fetch(`/api/root/events/${id}/import-survey-scores`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!resp.ok) {
+        const d = await resp.json();
+        throw new Error(d.error || 'Failed to import survey scores');
+      }
+      const data = await resp.json();
+      alert(`インポート成功: ${data.imported_classes_count} クラス分の点数が反映されました。`);
+    } catch (err) {
+      alert(err.message);
+    }
+    // Upload inputリセット
+    e.target.value = '';
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -164,6 +207,7 @@
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">年度</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">シーズン</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">期間</th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アンケート操作</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
         </tr>
       </thead>
@@ -176,6 +220,22 @@
             <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
               {event.start_date ? new Date(event.start_date).toLocaleDateString() : ''} - 
               {event.end_date ? new Date(event.end_date).toLocaleDateString() : ''}
+            </td>
+            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+              <div class="flex flex-col space-y-2">
+                {#if event.survey_url}
+                  <button on:click={() => notifySurvey(event.id)} class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 w-fit">
+                    通知を送信
+                  </button>
+                {/if}
+                {#if event.season === 'spring'}
+                  <div class="flex flex-col">
+                    <label class="text-xs text-gray-600 mb-1">点数インポート(CSV)
+                      <input type="file" accept=".csv" class="text-xs mt-1 block" on:change={(e) => handleCsvUpload(event.id, e)} />
+                    </label>
+                  </div>
+                {/if}
+              </div>
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-right">
               <button on:click={() => openEditModal(event)} class="text-indigo-600 hover:text-indigo-900">編集</button>
@@ -222,6 +282,10 @@
             <div>
               <label for="end_date" class="block text-sm font-medium text-gray-700">終了日</label>
               <input type="date" id="end_date" bind:value={currentEvent.end_date} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+              <label for="survey_url" class="block text-sm font-medium text-gray-700">アンケートURL</label>
+              <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
             </div>
           </div>
         </div>
