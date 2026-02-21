@@ -2,11 +2,27 @@
 
 /**
  * Test wrapper script that suppresses Vite SSR module runner transport errors
- * These errors occur after tests complete during cleanup and don't affect test results
+ * and ensures Playwright browsers are installed before running tests
  */
 
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { argv } from 'process';
+
+// Check if we're in a CI environment
+const isCI = process.env.CI === 'true';
+
+// In CI, ensure Playwright browsers are installed
+if (isCI) {
+	console.log('Installing Playwright browsers...');
+	const installResult = spawnSync('npx', ['playwright', 'install', '--with-deps'], {
+		stdio: 'inherit'
+	});
+	
+	if (installResult.status !== 0) {
+		console.error('Failed to install Playwright browsers');
+		process.exit(1);
+	}
+}
 
 const args = argv.slice(2);
 const child = spawn('npm', ['run', 'test:unit', '--', ...args], {

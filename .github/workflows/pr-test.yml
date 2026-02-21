@@ -48,6 +48,10 @@ jobs:
         working-directory: ./frontapp
         run: npm ci
 
+      - name: Install Playwright Browsers
+        working-directory: ./frontapp
+        run: npx playwright install --with-deps
+
       - name: Check Formatting & Lint
         working-directory: ./frontapp
         run: npm run lint
@@ -56,3 +60,5 @@ jobs:
       - name: Run Tests
         working-directory: ./frontapp
         run: npm run test
+        env:
+          CI: 'true'
