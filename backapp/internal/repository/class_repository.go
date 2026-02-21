@@ -18,6 +18,7 @@ type ClassRepository interface {
 	GetClassByRepRole(userID string, eventID int) (*models.Class, error)
 	GetClassMembers(classID int) ([]*models.User, error)
 	SetNoonGamePoints(eventID int, points map[int]int) error
+	SetSurveyPoints(eventID int, points map[int]int) error
 }
 
 type classRepository struct {
@@ -414,6 +415,42 @@ func (r *classRepository) SetNoonGamePoints(eventID int, points map[int]int) err
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit noon_game_points transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (r *classRepository) SetSurveyPoints(eventID int, points map[int]int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Clear old points specifically for the event
+	if _, err := tx.Exec("DELETE FROM score_logs WHERE event_id = ? AND reason = 'survey_points'", eventID); err != nil {
+		return fmt.Errorf("failed to reset survey_points: %w", err)
+	}
+
+	if len(points) > 0 {
+		stmt, err := tx.Prepare(`
+			INSERT INTO score_logs (event_id, class_id, points, reason)
+			VALUES (?, ?, ?, 'survey_points')
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to prepare survey_points statement: %w", err)
+		}
+		defer stmt.Close()
+
+		for classID, value := range points {
+			if _, err := stmt.Exec(eventID, classID, value); err != nil {
+				return fmt.Errorf("failed to update survey_points for class %d: %w", classID, err)
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit survey_points transaction: %w", err)
 	}
 
 	return nil

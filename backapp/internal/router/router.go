@@ -37,7 +37,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	sportRepo := repository.NewSportRepository(db)
 	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo, tournRepo)
 
-	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo, tournRepo)
+	notificationRepo := repository.NewNotificationRepository(db)
+	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo, tournRepo, classRepo, notificationRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 
 	rainyModeRepo := repository.NewRainyModeRepository(db)
 	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)
@@ -46,7 +47,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	noonRepo := repository.NewNoonGameRepository(db)
 	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo)
 
-	notificationRepo := repository.NewNotificationRepository(db)
 	roleRepo := repository.NewRoleRepository(db)
 	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 	notificationRequestRepo := repository.NewNotificationRequestRepository(db)
@@ -262,6 +262,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.POST("/:id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
 				rootEvents.POST("/:id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
+				rootEvents.POST("/:id/notify-survey", eventHandler.NotifySurvey)
+				rootEvents.POST("/:id/import-survey-scores", eventHandler.ImportSurveyScores)
 				// Generic :id route should be last
 				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 			}

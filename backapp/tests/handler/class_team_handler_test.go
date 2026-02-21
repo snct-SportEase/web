@@ -55,10 +55,10 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(managedClass, nil).Once()
 		sport := &models.Sport{ID: 1, Name: "Basketball"}
 		mockSportRepo.On("GetSportByID", 1).Return(sport, nil).Once()
-		
+
 		// Team lookup
 		mockTeamRepo.On("GetTeamByClassAndSport", managedClass.ID, 1, activeEventID).Return(nil, nil).Once()
-		
+
 		// Team creation
 		newTeamID := int64(100)
 		mockTeamRepo.On("CreateTeam", mock.AnythingOfType("*models.Team")).Return(newTeamID, nil).Once()
@@ -121,7 +121,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		r.POST("/assign", h.AssignTeamMembersHandler)
 
 		currentUser := &models.User{
-			ID: "rep-user-id",
+			ID:    "rep-user-id",
 			Roles: []models.Role{{Name: "1A_rep"}},
 		}
 
@@ -180,7 +180,7 @@ func TestClassTeamHandler_RemoveTeamMemberHandler(t *testing.T) {
 		h := handler.NewClassTeamHandler(mockClassRepo, mockTeamRepo, mockUserRepo, mockEventRepo, mockSportRepo)
 
 		currentUser := &models.User{
-			ID: "rep-user-id",
+			ID:    "rep-user-id",
 			Roles: []models.Role{{Name: "1A_rep"}},
 		}
 
@@ -202,7 +202,7 @@ func TestClassTeamHandler_RemoveTeamMemberHandler(t *testing.T) {
 
 		// Remove member
 		mockTeamRepo.On("RemoveTeamMember", existingTeam.ID, "user1").Return(nil).Once()
-		
+
 		// Remove role
 		roleName := fmt.Sprintf("%s_%s", managedClass.Name, sport.Name)
 		mockUserRepo.On("DeleteUserRole", "user1", roleName).Return(nil).Once()

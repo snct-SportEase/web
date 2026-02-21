@@ -17,8 +17,8 @@ type MVPVote struct {
 
 // MVPResult represents the result of the MVP calculation.
 type MVPResult struct {
-	ClassName    string `json:"class_name"`
-	TotalPoints  int    `json:"total_points"`
-	Season       string `json:"season"`
-	EventID      int    `json:"event_id"`
+	ClassName   string `json:"class_name"`
+	TotalPoints int    `json:"total_points"`
+	Season      string `json:"season"`
+	EventID     int    `json:"event_id"`
 }
