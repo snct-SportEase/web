@@ -20,5 +20,11 @@ export default [
 	{
 		files: ['**/*.svelte', '**/*.svelte.js'],
 		languageOptions: { parserOptions: { svelteConfig } }
+	},
+	{
+		rules: {
+			'no-unused-vars': 'warn',
+			'svelte/no-navigation-without-resolve': 'off'
+		}
 	}
 ];
