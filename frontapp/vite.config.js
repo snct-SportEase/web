@@ -15,6 +15,10 @@ export default defineConfig({
 	ssr: {
 		noExternal: ['bracketry', 'marked', 'svelte-dnd-action']
 	},
+	optimizeDeps: {
+		// Disable pre-bundling during tests to avoid dependency scanning issues
+		disabled: process.env.VITEST === 'true'
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
@@ -26,11 +30,14 @@ export default defineConfig({
 					browser: {
 						enabled: true,
 						provider: 'playwright',
-						instances: [{ browser: 'chromium' }]
+						instances: [{ browser: 'chromium' }],
+						headless: true
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}', 'tests/pwa.spec.js'],
 					exclude: ['src/lib/server/**'],
-					setupFiles: ['./vitest-setup-client.js']
+					setupFiles: ['./vitest-setup-client.js'],
+					// Timeout for browser operations
+					testTimeout: 30000
 				}
 			},
 			{

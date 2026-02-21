@@ -1,0 +1,64 @@
+name: Automated PR Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - ci/auto-test # For testing the workflow itself
+
+jobs:
+  backend-test:
+    name: Backend Go Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24' # Using Go 1.24 as seen in the panic logs
+          cache-dependency-path: 'backapp/go.sum'
+
+      - name: Install dependencies
+        working-directory: ./backapp
+        run: go mod download
+
+      - name: Run Tests
+        working-directory: ./backapp
+        run: go test -v ./...
+
+  frontend-test:
+    name: Frontend SvelteKit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontapp/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./frontapp
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        working-directory: ./frontapp
+        run: npx playwright install --with-deps
+
+      - name: Check Formatting & Lint
+        working-directory: ./frontapp
+        run: npm run lint
+        continue-on-error: true # Optionally allow lint to fail but still run tests
+
+      - name: Run Tests
+        working-directory: ./frontapp
+        run: npm run test
+        env:
+          CI: 'true'
