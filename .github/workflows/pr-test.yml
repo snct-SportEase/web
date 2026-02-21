@@ -55,7 +55,7 @@ jobs:
       - name: Check Formatting & Lint
         working-directory: ./frontapp
         run: npm run lint
-        continue-on-error: true # Optionally allow lint to fail but still run tests
+        continue-on-error: true
 
       - name: Run Tests
         working-directory: ./frontapp

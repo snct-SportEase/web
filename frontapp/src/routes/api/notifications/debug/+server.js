@@ -3,7 +3,7 @@ const BACKEND_URL = env.BACKEND_URL;
 import { json } from '@sveltejs/kit';
 
 /** @type {import('./$types').RequestHandler} */
-export async function GET({ request, cookies }) {
+export async function GET({ cookies }) {
   try {
     const sessionToken = cookies.get('session_token');
     const headers = {
