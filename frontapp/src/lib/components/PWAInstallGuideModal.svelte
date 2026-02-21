@@ -5,12 +5,10 @@
   export let isOpen = false;
   export let onClose = () => {};
 
-  let deviceType = 'unknown';
-  let browserType = 'unknown';
-
+  // Note: deviceType and browserType are computed but not currently used in the template
   $: if (isOpen && browser) {
-    deviceType = getDeviceType();
-    browserType = getBrowserType();
+    void(getDeviceType());
+    void(getBrowserType());
   }
 
   function handleKeydown(event) {
