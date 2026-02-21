@@ -86,6 +86,11 @@ func (m *MockClassRepository) SetNoonGamePoints(eventID int, points map[int]int)
 	return args.Error(0)
 }
 
+func (m *MockClassRepository) SetSurveyPoints(eventID int, points map[int]int) error {
+	args := m.Called(eventID, points)
+	return args.Error(0)
+}
+
 type MockEventRepository struct {
 	mock.Mock
 }
@@ -141,6 +146,11 @@ func (m *MockEventRepository) GetEventByID(id int) (*models.Event, error) {
 
 func (m *MockEventRepository) SetRainyMode(eventID int, isRainyMode bool) error {
 	args := m.Called(eventID, isRainyMode)
+	return args.Error(0)
+}
+
+func (m *MockEventRepository) PublishSurvey(eventID int) error {
+	args := m.Called(eventID)
 	return args.Error(0)
 }
 

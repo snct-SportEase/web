@@ -24,8 +24,12 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		startDate := time.Now()
 		endDate := startDate.Add(24 * time.Hour)
@@ -62,8 +66,11 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		springEvent := &models.Event{ID: 1, Year: 2025, Season: "spring"}
 		autumnEventReq := struct {
@@ -101,8 +108,11 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		autumnEventReq := struct {
 			Name      string `json:"name"`
@@ -143,8 +153,11 @@ func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		eventID := 1
 		pdfUrl := "https://example.com/uploads/pdfs/guidelines.pdf"
@@ -183,8 +196,11 @@ func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		eventID := 1
 		existingPdfUrl := "https://example.com/uploads/pdfs/old-guidelines.pdf"
@@ -223,8 +239,11 @@ func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		reqBody := map[string]interface{}{
 			"pdf_url": "https://example.com/uploads/pdfs/guidelines.pdf",
@@ -252,8 +271,11 @@ func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		eventID := 999
 		reqBody := map[string]interface{}{
@@ -284,8 +306,13 @@ func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
+		_ = mockClassRepo
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -306,8 +333,12 @@ func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		eventID := 1
 		reqBody := map[string]interface{}{
@@ -335,8 +366,12 @@ func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, nil, mockNotificationRepo, "", "")
 
 		eventID := 1
 		pdfUrl := "https://example.com/uploads/pdfs/guidelines.pdf"
@@ -377,8 +412,11 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, mockClassRepo, mockNotificationRepo, "", "")
 
 		eventID := 1
 		pdfUrl := "https://example.com/uploads/pdfs/guidelines.pdf"
@@ -412,8 +450,11 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
+		_ = mockClassRepo
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, mockClassRepo, mockNotificationRepo, "", "")
 
 		eventID := 1
 		event := &models.Event{
@@ -446,8 +487,10 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockWhitelistRepo := new(MockWhitelistRepository)
 		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockClassRepo := new(MockClassRepository)
 
-		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo)
+		h := handler.NewEventHandler(mockEventRepo, mockWhitelistRepo, mockTournamentRepo, mockClassRepo, mockNotificationRepo, "", "")
 
 		mockEventRepo.On("GetActiveEvent").Return(0, nil).Once()
 
