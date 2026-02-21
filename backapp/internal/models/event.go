@@ -11,6 +11,8 @@ type Event struct {
 	End_date                    *time.Time `json:"end_date"`
 	IsRainyMode                 bool       `json:"is_rainy_mode"`
 	CompetitionGuidelinesPdfUrl *string    `json:"competition_guidelines_pdf_url,omitempty"`
+	SurveyUrl                   *string    `json:"survey_url,omitempty"`
+	IsSurveyPublished           bool       `json:"is_survey_published"`
 }
 
 type SetActiveEventRequest struct {

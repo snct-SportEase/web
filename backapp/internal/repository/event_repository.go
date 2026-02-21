@@ -15,6 +15,7 @@ type EventRepository interface {
 	CopyClassScores(fromEventID int, toEventID int) error
 	GetEventByID(id int) (*models.Event, error)
 	SetRainyMode(eventID int, isRainyMode bool) error
+	PublishSurvey(eventID int) error
 }
 
 type eventRepository struct {
@@ -26,10 +27,11 @@ func NewEventRepository(db *sql.DB) EventRepository {
 }
 
 func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url FROM events WHERE id = ?"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published FROM events WHERE id = ?"
 	event := &models.Event{}
 	var competitionGuidelinesPdfUrl sql.NullString
-	err := r.db.QueryRow(query, id).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl)
+	var surveyUrl sql.NullString
+	err := r.db.QueryRow(query, id).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl, &surveyUrl, &event.IsSurveyPublished)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
@@ -39,12 +41,15 @@ func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
 	if competitionGuidelinesPdfUrl.Valid {
 		event.CompetitionGuidelinesPdfUrl = &competitionGuidelinesPdfUrl.String
 	}
+	if surveyUrl.Valid {
+		event.SurveyUrl = &surveyUrl.String
+	}
 	return event, nil
 }
 
 func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
-	query := "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	result, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl)
+	query := "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	result, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.SurveyUrl, event.IsSurveyPublished)
 	if err != nil {
 		return 0, err
 	}
@@ -56,7 +61,7 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 }
 
 func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -67,11 +72,15 @@ func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
 	for rows.Next() {
 		event := &models.Event{}
 		var competitionGuidelinesPdfUrl sql.NullString
-		if err := rows.Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl); err != nil {
+		var surveyUrl sql.NullString
+		if err := rows.Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl, &surveyUrl, &event.IsSurveyPublished); err != nil {
 			return nil, err
 		}
 		if competitionGuidelinesPdfUrl.Valid {
 			event.CompetitionGuidelinesPdfUrl = &competitionGuidelinesPdfUrl.String
+		}
+		if surveyUrl.Valid {
+			event.SurveyUrl = &surveyUrl.String
 		}
 		events = append(events, event)
 	}
@@ -79,8 +88,8 @@ func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
 }
 
 func (r *eventRepository) UpdateEvent(event *models.Event) error {
-	query := "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ?, competition_guidelines_pdf_url = ? WHERE id = ?"
-	_, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.ID)
+	query := "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ?, competition_guidelines_pdf_url = ?, survey_url = ?, is_survey_published = ? WHERE id = ?"
+	_, err := r.db.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.SurveyUrl, event.IsSurveyPublished, event.ID)
 	return err
 }
 
@@ -114,10 +123,11 @@ func (r *eventRepository) SetActiveEvent(event_id *int) error {
 }
 
 func (r *eventRepository) GetEventByYearAndSeason(year int, season string) (*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url FROM events WHERE `year` = ? AND season = ?"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published FROM events WHERE `year` = ? AND season = ?"
 	event := &models.Event{}
 	var competitionGuidelinesPdfUrl sql.NullString
-	err := r.db.QueryRow(query, year, season).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl)
+	var surveyUrl sql.NullString
+	err := r.db.QueryRow(query, year, season).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl, &surveyUrl, &event.IsSurveyPublished)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
@@ -126,6 +136,9 @@ func (r *eventRepository) GetEventByYearAndSeason(year int, season string) (*mod
 	}
 	if competitionGuidelinesPdfUrl.Valid {
 		event.CompetitionGuidelinesPdfUrl = &competitionGuidelinesPdfUrl.String
+	}
+	if surveyUrl.Valid {
+		event.SurveyUrl = &surveyUrl.String
 	}
 	return event, nil
 }
@@ -150,5 +163,11 @@ func (r *eventRepository) CopyClassScores(fromEventID int, toEventID int) error 
 func (r *eventRepository) SetRainyMode(eventID int, isRainyMode bool) error {
 	query := "UPDATE events SET is_rainy_mode = ? WHERE id = ?"
 	_, err := r.db.Exec(query, isRainyMode, eventID)
+	return err
+}
+
+func (r *eventRepository) PublishSurvey(eventID int) error {
+	query := "UPDATE events SET is_survey_published = TRUE WHERE id = ?"
+	_, err := r.db.Exec(query, eventID)
 	return err
 }

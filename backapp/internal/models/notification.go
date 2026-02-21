@@ -20,4 +20,3 @@ type PushSubscription struct {
 	P256dhKey string    `json:"p256dh_key"`
 	CreatedAt time.Time `json:"created_at"`
 }
-

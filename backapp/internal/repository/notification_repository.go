@@ -31,10 +31,15 @@ func (r *notificationRepository) CreateNotification(title, body, createdBy strin
 	var result sql.Result
 	var err error
 
+	var createdByParam interface{}
+	if createdBy != "" {
+		createdByParam = createdBy
+	}
+
 	if eventID != nil {
-		result, err = r.db.Exec(query, title, body, createdBy, *eventID)
+		result, err = r.db.Exec(query, title, body, createdByParam, *eventID)
 	} else {
-		result, err = r.db.Exec(query, title, body, createdBy, nil)
+		result, err = r.db.Exec(query, title, body, createdByParam, nil)
 	}
 
 	if err != nil {
