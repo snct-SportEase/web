@@ -13,6 +13,7 @@ type Event struct {
 	CompetitionGuidelinesPdfUrl *string    `json:"competition_guidelines_pdf_url,omitempty"`
 	SurveyUrl                   *string    `json:"survey_url,omitempty"`
 	IsSurveyPublished           bool       `json:"is_survey_published"`
+	Status                      string     `json:"status"`
 }
 
 type SetActiveEventRequest struct {

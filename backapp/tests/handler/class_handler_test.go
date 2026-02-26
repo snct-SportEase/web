@@ -50,6 +50,37 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 
+	t.Run("With event_id query", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
+
+		expectedScores := []*models.ClassScore{
+			{ID: 1, ClassName: "Class A", Season: "spring", TotalPointsCurrentEvent: 100, RankCurrentEvent: 1},
+		}
+
+		mockClassRepo.On("GetClassScoresByEvent", 2).Return(expectedScores, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class?event_id=2", nil)
+
+		h.GetClassScores(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var actualScores []*models.ClassScore
+		err := json.Unmarshal(w.Body.Bytes(), &actualScores)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedScores, actualScores)
+
+		mockClassRepo.AssertExpectations(t)
+		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
+	})
+
 	t.Run("No active event", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockEventRepo := new(MockEventRepository)

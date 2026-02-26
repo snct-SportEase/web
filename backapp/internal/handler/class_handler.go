@@ -171,17 +171,29 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 }
 
 func (h *ClassHandler) GetClassScores(c *gin.Context) {
-	activeEventID, err := h.eventRepo.GetActiveEvent()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
-		return
-	}
-	if activeEventID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No active event found"})
-		return
+	var eventID int
+	eventIDStr := c.Query("event_id")
+	if eventIDStr != "" {
+		id, err := strconv.Atoi(eventIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id query parameter"})
+			return
+		}
+		eventID = id
+	} else {
+		activeEventID, err := h.eventRepo.GetActiveEvent()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+			return
+		}
+		if activeEventID == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No active event found"})
+			return
+		}
+		eventID = activeEventID
 	}
 
-	scores, err := h.classRepo.GetClassScoresByEvent(activeEventID)
+	scores, err := h.classRepo.GetClassScoresByEvent(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

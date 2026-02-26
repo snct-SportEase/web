@@ -46,6 +46,7 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		StartDate string  `json:"start_date"`
 		EndDate   string  `json:"end_date"`
 		SurveyUrl *string `json:"survey_url"`
+		Status    string  `json:"status"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -72,6 +73,10 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		endDate = &t
 	}
 
+	if req.Status == "" {
+		req.Status = "upcoming"
+	}
+
 	event := &models.Event{
 		Name:       req.Name,
 		Year:       req.Year,
@@ -79,6 +84,7 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		Start_date: startDate,
 		End_date:   endDate,
 		SurveyUrl:  req.SurveyUrl,
+		Status:     req.Status,
 	}
 
 	id, err := h.eventRepo.CreateEvent(event)
@@ -131,6 +137,7 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		StartDate string  `json:"start_date"`
 		EndDate   string  `json:"end_date"`
 		SurveyUrl *string `json:"survey_url"`
+		Status    string  `json:"status"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -165,6 +172,7 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		Start_date: startDate,
 		End_date:   endDate,
 		SurveyUrl:  req.SurveyUrl,
+		Status:     req.Status,
 	}
 
 	err = h.eventRepo.UpdateEvent(event)
