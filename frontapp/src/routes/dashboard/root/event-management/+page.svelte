@@ -36,7 +36,12 @@
 
   async function fetchEvents() {
     try {
-      const response = await fetch('/api/root/events');
+      const response = await fetch('/api/root/events', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch events');
       }

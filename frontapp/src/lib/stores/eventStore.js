@@ -10,7 +10,8 @@ export const activeEvent = {
     // initialize store by fetching current active event from backend
     init: async () => {
         try {
-            const res = await fetch('/api/events/active');
+            const fetchOpts = { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' } };
+            const res = await fetch('/api/events/active', fetchOpts);
             if (!res.ok) {
                 console.warn('Failed to fetch active event:', res.status);
                 set(null);
@@ -19,7 +20,7 @@ export const activeEvent = {
             const data = await res.json();
             // Expecting { event_id: <id> } from backend; fetch full event if id present
             if (data && data.event_id) {
-                const evRes = await fetch(`/api/root/events`);
+                const evRes = await fetch(`/api/root/events`, fetchOpts);
                 if (evRes.ok) {
                     const events = await evRes.json();
                     const active = events.find(e => e.id === data.event_id) || null;

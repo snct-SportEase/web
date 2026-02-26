@@ -164,24 +164,31 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		endDate = &t
 	}
 
-	event := &models.Event{
-		ID:         id,
-		Name:       req.Name,
-		Year:       req.Year,
-		Season:     req.Season,
-		Start_date: startDate,
-		End_date:   endDate,
-		SurveyUrl:  req.SurveyUrl,
-		Status:     req.Status,
+	existingEvent, err := h.eventRepo.GetEventByID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if existingEvent == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
 	}
 
-	err = h.eventRepo.UpdateEvent(event)
+	existingEvent.Name = req.Name
+	existingEvent.Year = req.Year
+	existingEvent.Season = req.Season
+	existingEvent.Start_date = startDate
+	existingEvent.End_date = endDate
+	existingEvent.SurveyUrl = req.SurveyUrl
+	existingEvent.Status = req.Status
+
+	err = h.eventRepo.UpdateEvent(existingEvent)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, event)
+	c.JSON(http.StatusOK, existingEvent)
 }
 
 func (h *EventHandler) GetActiveEvent(c *gin.Context) {
