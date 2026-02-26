@@ -265,6 +265,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				rootEvents.POST("/:id/notify-survey", eventHandler.NotifySurvey)
 				rootEvents.POST("/:id/import-survey-scores", eventHandler.ImportSurveyScores)
+
+				// Export endpoints
+				rootEvents.GET("/:id/export/csv", classHandler.ExportClassScoresCSVHandler)
+
 				// Generic :id route should be last
 				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 			}
