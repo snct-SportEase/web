@@ -15,6 +15,7 @@
     start_date: '',
     end_date: '',
     survey_url: null,
+    status: 'upcoming',
   };
 
   $: {
@@ -28,23 +29,19 @@
     isNameManuallyChanged = true;
   }
 
-  let selectedEventIdForActivation = null;
-
   onMount(async () => {
     await fetchEvents();
-    // initialize activeEvent store from backend
-    const active = await activeEvent.init();
-    if (active) {
-      selectedEventIdForActivation = active.id;
-    } else if (events.length > 0) {
-      // If no active event is set, default to the latest one
-      selectedEventIdForActivation = events[0].id;
-    }
+    await activeEvent.init();
   });
 
   async function fetchEvents() {
     try {
-      const response = await fetch('/api/root/events');
+      const response = await fetch('/api/root/events', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch events');
       }
@@ -55,19 +52,7 @@
     }
   }
 
-  function setActiveEvent() {
-    if (selectedEventIdForActivation) {
-      activeEvent.setActiveEventById(selectedEventIdForActivation)
-        .then(() => {
-          const eventToActivate = events.find(e => e.id === parseInt(selectedEventIdForActivation));
-          alert(`「${eventToActivate.name}」がアクティブな大会として設定されました。`);
-        })
-        .catch(err => {
-          console.error(err);
-          alert('アクティブ大会の設定に失敗しました。');
-        });
-    }
-  }
+
 
   function openCreateModal() {
     selectedEvent = null;
@@ -80,6 +65,7 @@
       start_date: '',
       end_date: '',
       survey_url: null,
+      status: 'upcoming',
     };
     showModal = true;
   }
@@ -92,6 +78,7 @@
       start_date: event.start_date ? new Date(event.start_date).toISOString().split('T')[0] : '',
       end_date: event.end_date ? new Date(event.end_date).toISOString().split('T')[0] : '',
       survey_url: event.survey_url || '',
+      status: event.status || 'upcoming',
     };
     showModal = true;
   }
@@ -124,6 +111,7 @@
       }
 
       await fetchEvents();
+      await activeEvent.init();
       closeModal();
     } catch (error) {
       console.error(error);
@@ -180,25 +168,6 @@
     </button>
   </div>
 
-  <div class="mb-8 p-4 border rounded-lg bg-gray-50">
-    <h2 class="text-xl font-bold mb-4">アクティブな大会の設定</h2>
-    <p class="text-sm text-gray-600 mb-4">ここで設定した大会が、他の管理ページでの操作対象となります。</p>
-    <div class="flex items-center space-x-4">
-        <select bind:value={selectedEventIdForActivation} class="block w-full max-w-xs border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            <option value={null} disabled>大会を選択...</option>
-            {#each events as event}
-                <option value={event.id}>{event.name}</option>
-            {/each}
-        </select>
-        <button on:click={setActiveEvent} class="btn btn-secondary bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700" disabled={!selectedEventIdForActivation}>
-            この大会をアクティブにする
-        </button>
-    </div>
-    {#if $activeEvent}
-        <p class="mt-4 text-sm text-gray-600">現在のアクティブな大会: <span class="font-semibold text-indigo-600">{$activeEvent.name}</span></p>
-    {/if}
-  </div>
-
   <div class="bg-white shadow-md rounded-lg overflow-hidden">
     <table class="min-w-full leading-normal">
       <thead>
@@ -207,6 +176,7 @@
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">年度</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">シーズン</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">期間</th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ステータス</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アンケート操作</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
         </tr>
@@ -220,6 +190,15 @@
             <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
               {event.start_date ? new Date(event.start_date).toLocaleDateString() : ''} - 
               {event.end_date ? new Date(event.end_date).toLocaleDateString() : ''}
+            </td>
+            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+              {#if event.status === 'active'}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">開催中</span>
+              {:else if event.status === 'archived'}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">アーカイブ</span>
+              {:else}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">予定</span>
+              {/if}
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
               <div class="flex flex-col space-y-2">
@@ -286,6 +265,14 @@
             <div>
               <label for="survey_url" class="block text-sm font-medium text-gray-700">アンケートURL</label>
               <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+              <label for="status" class="block text-sm font-medium text-gray-700">ステータス</label>
+              <select id="status" bind:value={currentEvent.status} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <option value="upcoming">予定 (Upcoming)</option>
+                <option value="active">開催中 (Active)</option>
+                <option value="archived">アーカイブ (Archived)</option>
+              </select>
             </div>
           </div>
         </div>

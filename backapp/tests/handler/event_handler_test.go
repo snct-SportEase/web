@@ -747,3 +747,115 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		assert.Contains(t, response["error"], "Could not find class name column")
 	})
 }
+
+func TestEventHandler_UpdateEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - Update event status to active", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, nil, "", "")
+
+		eventID := 1
+		existingEvent := &models.Event{
+			ID:     eventID,
+			Name:   "2025春季スポーツ大会",
+			Year:   2025,
+			Season: "spring",
+			Status: "upcoming",
+		}
+
+		reqBody := struct {
+			Name      string `json:"name"`
+			Year      int    `json:"year"`
+			Season    string `json:"season"`
+			StartDate string `json:"start_date"`
+			EndDate   string `json:"end_date"`
+			Status    string `json:"status"`
+		}{
+			Name:      "2025春季スポーツ大会",
+			Year:      2025,
+			Season:    "spring",
+			StartDate: time.Now().Format("2006-01-02"),
+			EndDate:   time.Now().Add(24 * time.Hour).Format("2006-01-02"),
+			Status:    "active",
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return(existingEvent, nil).Once()
+		mockEventRepo.On("UpdateEvent", mock.MatchedBy(func(e *models.Event) bool {
+			return e.ID == eventID && e.Status == "active"
+		})).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Error - Event Not Found on Update", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, nil, "", "")
+
+		eventID := 999
+		reqBody := struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		}{
+			Name:   "Unknown Event",
+			Status: "active",
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return((*models.Event)(nil), nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "999"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/999", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateEvent(c)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		mockEventRepo.AssertExpectations(t)
+		mockEventRepo.AssertNotCalled(t, "UpdateEvent", mock.Anything)
+	})
+}
+
+func TestEventHandler_GetAllEvents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - Get all events including status", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, nil, "", "")
+
+		events := []*models.Event{
+			{ID: 1, Name: "2025春季", Status: "active"},
+			{ID: 2, Name: "2024秋季", Status: "archived"},
+		}
+
+		mockEventRepo.On("GetAllEvents").Return(events, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/root/events", nil)
+
+		h.GetAllEvents(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response []map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Len(t, response, 2)
+		assert.Equal(t, "active", response[0]["status"])
+		assert.Equal(t, "archived", response[1]["status"])
+		mockEventRepo.AssertExpectations(t)
+	})
+}

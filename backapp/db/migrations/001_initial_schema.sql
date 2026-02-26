@@ -30,6 +30,7 @@ CREATE TABLE events (
     survey_url VARCHAR(500) NULL COMMENT 'アンケートURL',
     is_survey_published BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'アンケートが通知済みかどうか',
     is_rainy_mode BOOLEAN NOT NULL DEFAULT FALSE,
+    status ENUM('upcoming', 'active', 'archived') NOT NULL DEFAULT 'upcoming',
     UNIQUE(`year`, season)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

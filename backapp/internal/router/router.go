@@ -104,6 +104,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		events := api.Group("/events")
 		{
 			events.Use(middleware.AuthMiddleware(userRepo))
+			events.GET("", eventHandler.GetAllEvents)
 			// Get sports for a specific event
 			events.GET("/:id/sports", sportHandler.GetSportsByEventHandler)
 		}
