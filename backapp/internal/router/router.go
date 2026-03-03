@@ -66,6 +66,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	wsHandler := handler.NewWebSocketHandler(hubManager)
 
+	systemHandler := handler.NewSystemHandler(cfg)
+
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -265,6 +267,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				rootEvents.POST("/:id/notify-survey", eventHandler.NotifySurvey)
 				rootEvents.POST("/:id/import-survey-scores", eventHandler.ImportSurveyScores)
+
+				// Export endpoints
+				rootEvents.GET("/:id/export/csv", classHandler.ExportClassScoresCSVHandler)
+
 				// Generic :id route should be last
 				rootEvents.PUT("/:id", eventHandler.UpdateEvent)
 			}
@@ -279,6 +285,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootSports.GET("", sportHandler.GetAllSportsHandler)
 				rootSports.POST("", sportHandler.CreateSportHandler)
 				rootSports.GET("/:id/teams", sportHandler.GetTeamsBySportHandler)
+			}
+
+			rootDB := root.Group("/db")
+			{
+				rootDB.GET("/export", systemHandler.ExportDBDump)
 			}
 
 			rootNoon := root.Group("/noon-game")

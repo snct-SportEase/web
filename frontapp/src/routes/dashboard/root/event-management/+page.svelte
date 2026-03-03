@@ -158,14 +158,111 @@
     // Upload inputリセット
     e.target.value = '';
   }
+
+  async function downloadExport(event, type) {
+    try {
+      if (type === 'pdf') {
+        const res = await fetch(`/api/scores/class?event_id=${event.id}`);
+        if (!res.ok) throw new Error('クラススコアの取得に失敗しました');
+        const scores = await res.json();
+        
+        let htmlContent = `
+          <div style="font-family: Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', Meiryo, sans-serif; padding: 20px;">
+              <h1 style="text-align: center; font-size: 24px; margin-bottom: 20px;">${event.name} - 最終結果</h1>
+              <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 14px;">
+                  <thead>
+                      <tr style="background-color: #f2f2f2;">
+                          <th style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">全体順位</th>
+                          <th style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">クラス名</th>
+                          <th style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">総合スコア</th>
+                          <th style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">今大会スコア</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${scores.map(s => `
+                      <tr>
+                          <td style="border: 1px solid #ddd; padding: 12px;">${s.rank_overall}</td>
+                          <td style="border: 1px solid #ddd; padding: 12px;">${s.class_name}</td>
+                          <td style="border: 1px solid #ddd; padding: 12px;">${s.total_points_overall}</td>
+                          <td style="border: 1px solid #ddd; padding: 12px;">${s.total_points_current_event}</td>
+                      </tr>
+                      `).join('')}
+                  </tbody>
+              </table>
+          </div>
+        `;
+        
+        const opt = {
+          margin: 10,
+          filename: `event_${event.id}_class_scores.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        const html2pdf = (await import('html2pdf.js')).default;
+        html2pdf().set(opt).from(htmlContent).save();
+      } else {
+        const resp = await fetch(`/api/root/events/${event.id}/export/${type}`);
+        if (!resp.ok) {
+          const errorData = await resp.json().catch(() => null);
+          throw new Error((errorData && errorData.error) || `${type.toUpperCase()}のダウンロードに失敗しました`);
+        }
+        
+        const blob = await resp.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `event_${event.id}_class_scores.${type}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function downloadDBDump() {
+    try {
+      const resp = await fetch('/api/root/db/export');
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => null);
+        throw new Error((errorData && errorData.error) || 'DBダンプのダウンロードに失敗しました');
+      }
+      
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Get filename from Content-Disposition header if possible, else default
+      const contentDisposition = resp.headers.get('Content-Disposition');
+      let filename = 'database_dump.sql';
+      if (contentDisposition && contentDisposition.includes('filename=')) {
+        filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+      }
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
 </script>
 
 <div class="container mx-auto p-4">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">大会情報登録・管理</h1>
-    <button on:click={openCreateModal} class="btn btn-primary bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
-      新規作成
-    </button>
+    <div class="flex space-x-2">
+      <button on:click={downloadDBDump} class="btn btn-secondary bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+        DBダンプ出力
+      </button>
+      <button on:click={openCreateModal} class="btn btn-primary bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+        新規作成
+      </button>
+    </div>
   </div>
 
   <div class="bg-white shadow-md rounded-lg overflow-hidden">
@@ -178,6 +275,7 @@
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">期間</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ステータス</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アンケート操作</th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">結果出力</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
         </tr>
       </thead>
@@ -214,6 +312,16 @@
                     </label>
                   </div>
                 {/if}
+              </div>
+            </td>
+            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+              <div class="flex flex-col space-y-2">
+                <button on:click={() => downloadExport(event, 'csv')} class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-fit">
+                  CSV出力
+                </button>
+                <button on:click={() => downloadExport(event, 'pdf')} class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 w-fit">
+                  PDF出力
+                </button>
               </div>
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-right">

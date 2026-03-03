@@ -475,3 +475,63 @@ func stageLabel(round, maxRound int, isBronze bool, hasNext bool) string {
 	}
 	return fmt.Sprintf("%d回戦", round+1)
 }
+
+// ExportClassScoresCSVHandler exports class scores as a CSV file
+func (h *ClassHandler) ExportClassScoresCSVHandler(c *gin.Context) {
+	var eventID int
+	eventIDStr := c.Param("id")
+	if eventIDStr != "" {
+		id, err := strconv.Atoi(eventIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID parameter"})
+			return
+		}
+		eventID = id
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Event ID is required"})
+		return
+	}
+
+	scores, err := h.classRepo.GetClassScoresByEvent(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	// Add BOM for Excel compatibility
+	c.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
+
+	filename := fmt.Sprintf("event_%d_class_scores.csv", eventID)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+
+	writer := csv.NewWriter(c.Writer)
+	defer writer.Flush()
+
+	header := []string{
+		"順位 (総合)", "クラス名", "総合スコア",
+		"順位 (今大会)", "今大会スコア",
+		"事前回答点", "出席点", "初期点",
+	}
+	if err := writer.Write(header); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error writing CSV header"})
+		return
+	}
+
+	for _, score := range scores {
+		row := []string{
+			strconv.Itoa(score.RankOverall),
+			score.ClassName,
+			strconv.Itoa(score.TotalPointsOverall),
+			strconv.Itoa(score.RankCurrentEvent),
+			strconv.Itoa(score.TotalPointsCurrentEvent),
+			strconv.Itoa(score.SurveyPoints),
+			strconv.Itoa(score.AttendancePoints),
+			strconv.Itoa(score.InitialPoints),
+		}
+		if err := writer.Write(row); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error writing CSV row"})
+			return
+		}
+	}
+}
