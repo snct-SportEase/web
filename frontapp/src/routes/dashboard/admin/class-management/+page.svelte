@@ -28,6 +28,8 @@
 	let success = null;
 	const isAdmin = data.isAdmin || false;
 
+	let searchQuery = '';
+
 if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 	const parsedInitialClassId = Number(selectedClassId);
 	selectedClassId = Number.isNaN(parsedInitialClassId) ? null : parsedInitialClassId;
@@ -42,6 +44,11 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 		const parsed = Number(value);
 		return Number.isNaN(parsed) ? null : parsed;
 	}
+
+	$: filteredClassMembers = classMembers.filter(member => 
+		(member.display_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+		member.email.toLowerCase().includes(searchQuery.toLowerCase())
+	);
 
 	function authorizedFetch(url, options = {}) {
 		const { headers, ...rest } = options;
@@ -268,10 +275,20 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 			<!-- Class Members -->
 			<div class="bg-white p-6 rounded-lg shadow">
 				<h2 class="text-xl font-semibold mb-4">クラスメンバー</h2>
+				<div class="mb-4">
+					<input
+						type="text"
+						placeholder="表示名またはメールアドレスで検索..."
+						bind:value={searchQuery}
+						class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+					/>
+				</div>
 				{#if membersLoading && classMembers.length === 0}
 					<p class="text-gray-500">読み込み中...</p>
 				{:else if classMembers.length === 0}
 					<p class="text-gray-500">メンバーが登録されていません</p>
+				{:else if filteredClassMembers.length === 0}
+					<p class="text-gray-500">検索条件に一致するメンバーが見つかりません</p>
 				{:else}
 					<div class="overflow-x-auto">
 						<table class="min-w-full divide-y divide-gray-200">
@@ -283,7 +300,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 								</tr>
 							</thead>
 							<tbody class="bg-white divide-y divide-gray-200">
-								{#each classMembers as member}
+								{#each filteredClassMembers as member}
 									<tr class="hover:bg-gray-50">
 										<td class="px-6 py-4 whitespace-nowrap">
 											<input
