@@ -14,6 +14,7 @@ type Event struct {
 	SurveyUrl                   *string    `json:"survey_url,omitempty"`
 	IsSurveyPublished           bool       `json:"is_survey_published"`
 	Status                      string     `json:"status"`
+	HideScores                  bool       `json:"hide_scores"`
 }
 
 type SetActiveEventRequest struct {

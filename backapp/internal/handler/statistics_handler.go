@@ -94,6 +94,23 @@ func (h *StatisticsHandler) GetParticipationRateBySport(c *gin.Context) {
 }
 
 func (h *StatisticsHandler) GetClassScoreTrends(c *gin.Context) {
+	eventID, err := h.eventRepo.GetActiveEvent()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+		return
+	}
+
+	event, err := h.eventRepo.GetEventByID(eventID)
+	if err != nil || event == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event"})
+		return
+	}
+
+	if event.HideScores {
+		c.JSON(http.StatusOK, gin.H{"message": "Scores are hidden for this event"})
+		return
+	}
+
 	events, err := h.eventRepo.GetAllEvents()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get events"})

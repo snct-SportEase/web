@@ -16,6 +16,7 @@
     end_date: '',
     survey_url: null,
     status: 'upcoming',
+    hide_scores: false,
   };
 
   $: {
@@ -66,6 +67,7 @@
       end_date: '',
       survey_url: null,
       status: 'upcoming',
+      hide_scores: false,
     };
     showModal = true;
   }
@@ -79,6 +81,7 @@
       end_date: event.end_date ? new Date(event.end_date).toISOString().split('T')[0] : '',
       survey_url: event.survey_url || '',
       status: event.status || 'upcoming',
+      hide_scores: event.hide_scores || false,
     };
     showModal = true;
   }
@@ -379,6 +382,16 @@
                 <option value="active">開催中 (Active)</option>
                 <option value="archived">アーカイブ (Archived)</option>
               </select>
+            </div>
+            <div class="flex items-center">
+              <label class="flex items-center cursor-pointer">
+                <input type="checkbox" id="hide_scores" bind:checked={currentEvent.hide_scores} class="sr-only">
+                <div class="relative">
+                  <div class="block w-14 h-8 rounded-full transition-colors" class:bg-indigo-600={currentEvent.hide_scores} class:bg-gray-300={!currentEvent.hide_scores}></div>
+                  <div class="dot absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform" class:translate-x-7={currentEvent.hide_scores} class:translate-x-1={!currentEvent.hide_scores}></div>
+                </div>
+                <span class="ml-3 text-sm font-medium text-gray-700">スコアを非表示にする</span>
+              </label>
             </div>
           </div>
         </div>

@@ -31,6 +31,7 @@ CREATE TABLE events (
     is_survey_published BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'アンケートが通知済みかどうか',
     is_rainy_mode BOOLEAN NOT NULL DEFAULT FALSE,
     status ENUM('upcoming', 'active', 'archived') NOT NULL DEFAULT 'upcoming',
+    hide_scores BOOLEAN NOT NULL DEFAULT FALSE,
     UNIQUE(`year`, season)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

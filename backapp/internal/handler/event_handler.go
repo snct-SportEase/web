@@ -42,13 +42,14 @@ func NewEventHandler(eventRepo repository.EventRepository, whitelistRepo reposit
 
 func (h *EventHandler) CreateEvent(c *gin.Context) {
 	var req struct {
-		Name      string  `json:"name"`
-		Year      int     `json:"year"`
-		Season    string  `json:"season"`
-		StartDate string  `json:"start_date"`
-		EndDate   string  `json:"end_date"`
-		SurveyUrl *string `json:"survey_url"`
-		Status    string  `json:"status"`
+		Name       string  `json:"name"`
+		Year       int     `json:"year"`
+		Season     string  `json:"season"`
+		StartDate  string  `json:"start_date"`
+		EndDate    string  `json:"end_date"`
+		SurveyUrl  *string `json:"survey_url"`
+		Status     string  `json:"status"`
+		HideScores bool    `json:"hide_scores"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -87,6 +88,7 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		End_date:   endDate,
 		SurveyUrl:  req.SurveyUrl,
 		Status:     req.Status,
+		HideScores: req.HideScores,
 	}
 
 	id, err := h.eventRepo.CreateEvent(event)
@@ -133,13 +135,14 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	}
 
 	var req struct {
-		Name      string  `json:"name"`
-		Year      int     `json:"year"`
-		Season    string  `json:"season"`
-		StartDate string  `json:"start_date"`
-		EndDate   string  `json:"end_date"`
-		SurveyUrl *string `json:"survey_url"`
-		Status    string  `json:"status"`
+		Name       string  `json:"name"`
+		Year       int     `json:"year"`
+		Season     string  `json:"season"`
+		StartDate  string  `json:"start_date"`
+		EndDate    string  `json:"end_date"`
+		SurveyUrl  *string `json:"survey_url"`
+		Status     string  `json:"status"`
+		HideScores bool    `json:"hide_scores"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -183,6 +186,7 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	existingEvent.End_date = endDate
 	existingEvent.SurveyUrl = req.SurveyUrl
 	existingEvent.Status = req.Status
+	existingEvent.HideScores = req.HideScores
 
 	err = h.eventRepo.UpdateEvent(existingEvent)
 	if err != nil {

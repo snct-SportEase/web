@@ -852,6 +852,122 @@ func TestEventHandler_UpdateEvent(t *testing.T) {
 	})
 }
 
+func TestEventHandler_UpdateEvent_HideScores(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - hide_scores を true に更新", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockUserRepo := new(MockUserRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, nil, mockUserRepo, "", "")
+
+		eventID := 1
+		existingEvent := &models.Event{
+			ID:         eventID,
+			Name:       "2026春季スポーツ大会",
+			Year:       2026,
+			Season:     "spring",
+			Status:     "active",
+			HideScores: false,
+		}
+
+		reqBody := struct {
+			Name       string `json:"name"`
+			Year       int    `json:"year"`
+			Season     string `json:"season"`
+			StartDate  string `json:"start_date"`
+			EndDate    string `json:"end_date"`
+			Status     string `json:"status"`
+			HideScores bool   `json:"hide_scores"`
+		}{
+			Name:       "2026春季スポーツ大会",
+			Year:       2026,
+			Season:     "spring",
+			StartDate:  time.Now().Format("2006-01-02"),
+			EndDate:    time.Now().Add(24 * time.Hour).Format("2006-01-02"),
+			Status:     "active",
+			HideScores: true,
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return(existingEvent, nil).Once()
+		mockEventRepo.On("UpdateEvent", mock.MatchedBy(func(e *models.Event) bool {
+			return e.ID == eventID && e.HideScores == true
+		})).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, true, resp["hide_scores"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - hide_scores を false に更新", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockUserRepo := new(MockUserRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, nil, mockUserRepo, "", "")
+
+		eventID := 2
+		existingEvent := &models.Event{
+			ID:         eventID,
+			Name:       "2026秋季スポーツ大会",
+			Year:       2026,
+			Season:     "autumn",
+			Status:     "active",
+			HideScores: true,
+		}
+
+		reqBody := struct {
+			Name       string `json:"name"`
+			Year       int    `json:"year"`
+			Season     string `json:"season"`
+			StartDate  string `json:"start_date"`
+			EndDate    string `json:"end_date"`
+			Status     string `json:"status"`
+			HideScores bool   `json:"hide_scores"`
+		}{
+			Name:       "2026秋季スポーツ大会",
+			Year:       2026,
+			Season:     "autumn",
+			StartDate:  time.Now().Format("2006-01-02"),
+			EndDate:    time.Now().Add(24 * time.Hour).Format("2006-01-02"),
+			Status:     "active",
+			HideScores: false,
+		}
+
+		mockEventRepo.On("GetEventByID", eventID).Return(existingEvent, nil).Once()
+		mockEventRepo.On("UpdateEvent", mock.MatchedBy(func(e *models.Event) bool {
+			return e.ID == eventID && e.HideScores == false
+		})).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "2"}}
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/2", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, false, resp["hide_scores"])
+		mockEventRepo.AssertExpectations(t)
+	})
+}
+
 func TestEventHandler_GetAllEvents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

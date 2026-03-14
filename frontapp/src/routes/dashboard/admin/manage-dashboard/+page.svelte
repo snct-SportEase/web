@@ -7,6 +7,8 @@
 	let scoreTrends = {};
 	let eventProgress = {};
 
+	let hideScores = false;
+
 	let ws;
 
 	onMount(async () => {
@@ -27,8 +29,16 @@
 			const res4 = await fetch('/api/admin/statistics/progress', { headers });
 			eventProgress = await res4.json();
 
+			const res5 = await fetch('/api/admin/events/active', { headers });
+			const activeEvent = await res5.json();
+			hideScores = activeEvent.hide_scores;
+
 			// グラフを描画
-			setTimeout(drawCharts, 100); // DOMがレンダリングされるのを待つ
+			setTimeout(() => {
+				if (!hideScores) {
+					drawCharts();
+				}
+			}, 100); // DOMがレンダリングされるのを待つ
 
 			// WebSocket接続
 			ws = new WebSocket(`ws://localhost:5000/api/ws/progress`);
@@ -139,6 +149,7 @@
 		];
 		return colors[Math.floor(Math.random() * colors.length)];
 	}
+
 </script>
 
 <div class="min-h-screen bg-gray-50 p-6">
@@ -162,12 +173,19 @@
 			</div>
 
 			<!-- クラス別スコア推移 -->
+			{#if !hideScores}
 			<div class="bg-white rounded-lg shadow-md p-6">
 				<h2 class="text-xl font-semibold text-gray-800 mb-4">クラス別スコア推移</h2>
 				<div class="h-64">
 					<canvas id="scoreChart"></canvas>
 				</div>
 			</div>
+			{:else}
+			<div class="bg-white rounded-lg shadow-md p-6">
+				<h2 class="text-xl font-semibold text-gray-800 mb-4">クラス別スコア推移</h2>
+				<p class="text-gray-600">スコアは現在非表示に設定されています。</p>
+			</div>
+			{/if}
 		</div>
 
 		<!-- リアルタイムイベント進行状況 -->

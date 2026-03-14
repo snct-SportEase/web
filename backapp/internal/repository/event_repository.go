@@ -27,11 +27,11 @@ func NewEventRepository(db *sql.DB) EventRepository {
 }
 
 func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status FROM events WHERE id = ?"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores FROM events WHERE id = ?"
 	event := &models.Event{}
 	var competitionGuidelinesPdfUrl sql.NullString
 	var surveyUrl sql.NullString
-	err := r.db.QueryRow(query, id).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl, &surveyUrl, &event.IsSurveyPublished, &event.Status)
+	err := r.db.QueryRow(query, id).Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl, &surveyUrl, &event.IsSurveyPublished, &event.Status, &event.HideScores)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
@@ -53,8 +53,8 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 		return 0, err
 	}
 
-	query := "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	result, err := tx.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.SurveyUrl, event.IsSurveyPublished, event.Status)
+	query := "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	result, err := tx.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.SurveyUrl, event.IsSurveyPublished, event.Status, event.HideScores)
 	if err != nil {
 		tx.Rollback()
 		return 0, err
@@ -89,7 +89,7 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 }
 
 func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
-	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
+	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
 		event := &models.Event{}
 		var competitionGuidelinesPdfUrl sql.NullString
 		var surveyUrl sql.NullString
-		if err := rows.Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl, &surveyUrl, &event.IsSurveyPublished, &event.Status); err != nil {
+		if err := rows.Scan(&event.ID, &event.Name, &event.Year, &event.Season, &event.Start_date, &event.End_date, &event.IsRainyMode, &competitionGuidelinesPdfUrl, &surveyUrl, &event.IsSurveyPublished, &event.Status, &event.HideScores); err != nil {
 			return nil, err
 		}
 		if competitionGuidelinesPdfUrl.Valid {
@@ -121,8 +121,8 @@ func (r *eventRepository) UpdateEvent(event *models.Event) error {
 		return err
 	}
 
-	query := "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ?, competition_guidelines_pdf_url = ?, survey_url = ?, is_survey_published = ?, status = ? WHERE id = ?"
-	_, err = tx.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.SurveyUrl, event.IsSurveyPublished, event.Status, event.ID)
+	query := "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ?, competition_guidelines_pdf_url = ?, survey_url = ?, is_survey_published = ?, status = ?, hide_scores = ? WHERE id = ?"
+	_, err = tx.Exec(query, event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.SurveyUrl, event.IsSurveyPublished, event.Status, event.HideScores, event.ID)
 	if err != nil {
 		tx.Rollback()
 		return err

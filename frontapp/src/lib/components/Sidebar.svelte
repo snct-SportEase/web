@@ -127,7 +127,7 @@
     {#if isAdmin || isRoot}
       <div class="pt-4">
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</h3>
-        <a href="/admin/manage-dashboard" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/admin/manage-dashboard')}>
+        <a href="/dashboard/admin/manage-dashboard" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/manage-dashboard')}>
           統計ダッシュボード
         </a>
         <a href="/dashboard/admin/class-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/class-management')}>
