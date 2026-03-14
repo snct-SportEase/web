@@ -10,22 +10,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type MVPHandler struct {
-	mvpRepo repository.MVPRepository
+type MICHandler struct {
+	micRepo repository.MICRepository
 }
 
-func NewMVPHandler(mvpRepo repository.MVPRepository) *MVPHandler {
-	return &MVPHandler{mvpRepo: mvpRepo}
+func NewMICHandler(micRepo repository.MICRepository) *MICHandler {
+	return &MICHandler{micRepo: micRepo}
 }
 
-func (h *MVPHandler) GetEligibleClasses(c *gin.Context) {
+func (h *MICHandler) GetEligibleClasses(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Query("event_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event_id"})
 		return
 	}
 
-	classes, err := h.mvpRepo.GetEligibleClasses(eventID)
+	classes, err := h.micRepo.GetEligibleClasses(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -34,14 +34,14 @@ func (h *MVPHandler) GetEligibleClasses(c *gin.Context) {
 	c.JSON(http.StatusOK, classes)
 }
 
-type MVPVoteRequest struct {
+type MICVoteRequest struct {
 	VotedForClassID int    `json:"voted_for_class_id"`
 	Reason          string `json:"reason"`
 	EventID         int    `json:"event_id"`
 }
 
-func (h *MVPHandler) VoteMVP(c *gin.Context) {
-	req := new(MVPVoteRequest)
+func (h *MICHandler) VoteMIC(c *gin.Context) {
+	req := new(MICVoteRequest)
 	if err := c.BindJSON(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -60,7 +60,7 @@ func (h *MVPHandler) VoteMVP(c *gin.Context) {
 	}
 	userID := user.ID
 
-	err := h.mvpRepo.VoteMVP(userID, req.VotedForClassID, req.EventID, req.Reason)
+	err := h.micRepo.VoteMIC(userID, req.VotedForClassID, req.EventID, req.Reason)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -69,14 +69,14 @@ func (h *MVPHandler) VoteMVP(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "vote successful"})
 }
 
-func (h *MVPHandler) GetMVPVotes(c *gin.Context) {
+func (h *MICHandler) GetMICVotes(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Query("event_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event_id"})
 		return
 	}
 
-	votes, err := h.mvpRepo.GetMVPVotes(eventID)
+	votes, err := h.micRepo.GetMICVotes(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -85,7 +85,7 @@ func (h *MVPHandler) GetMVPVotes(c *gin.Context) {
 	c.JSON(http.StatusOK, votes)
 }
 
-func (h *MVPHandler) GetUserVote(c *gin.Context) {
+func (h *MICHandler) GetUserVote(c *gin.Context) {
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in context"})
@@ -105,7 +105,7 @@ func (h *MVPHandler) GetUserVote(c *gin.Context) {
 		return
 	}
 
-	vote, err := h.mvpRepo.GetVoteByUserID(userID, eventID)
+	vote, err := h.micRepo.GetVoteByUserID(userID, eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -119,23 +119,23 @@ func (h *MVPHandler) GetUserVote(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"voted": true, "vote": vote})
 }
 
-func (h *MVPHandler) GetMVPClass(c *gin.Context) {
+func (h *MICHandler) GetMICClass(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Query("event_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event_id"})
 		return
 	}
 
-	mvpResult, err := h.mvpRepo.GetMVPClass(eventID)
+	micResult, err := h.micRepo.GetMICClass(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if mvpResult == nil {
-		c.JSON(http.StatusOK, gin.H{"message": "No MVP class found yet"})
+	if micResult == nil {
+		c.JSON(http.StatusOK, gin.H{"message": "No MIC class found yet"})
 		return
 	}
 
-	c.JSON(http.StatusOK, mvpResult)
+	c.JSON(http.StatusOK, micResult)
 }

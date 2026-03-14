@@ -61,8 +61,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	imageHandler := handler.NewImageHandler()
 	pdfHandler := handler.NewPdfHandler()
 
-	mvpRepo := repository.NewMVPRepository(db)
-	mvpHandler := handler.NewMVPHandler(mvpRepo)
+	micRepo := repository.NewMICRepository(db)
+	micHandler := handler.NewMICHandler(micRepo)
 
 	wsHandler := handler.NewWebSocketHandler(hubManager)
 
@@ -206,18 +206,18 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.POST("/images", imageHandler.UploadImageHandler)
 			admin.POST("/pdfs", pdfHandler.UploadPdfHandler)
 
-			mvp := api.Group("/mvp")
+			mic := api.Group("/mic")
 			{
-				mvp.Use(middleware.AuthMiddleware(userRepo))
-				mvp.GET("/class", mvpHandler.GetMVPClass)
+				mic.Use(middleware.AuthMiddleware(userRepo))
+				mic.GET("/class", micHandler.GetMICClass)
 			}
 
-			adminMvp := admin.Group("/mvp")
+			adminMic := admin.Group("/mic")
 			{
-				adminMvp.GET("/eligible-classes", mvpHandler.GetEligibleClasses)
-				adminMvp.POST("/vote", mvpHandler.VoteMVP)
-				adminMvp.GET("/votes", mvpHandler.GetMVPVotes)
-				adminMvp.GET("/user-vote", mvpHandler.GetUserVote)
+				adminMic.GET("/eligible-classes", micHandler.GetEligibleClasses)
+				adminMic.POST("/vote", micHandler.VoteMIC)
+				adminMic.GET("/votes", micHandler.GetMICVotes)
+				adminMic.GET("/user-vote", micHandler.GetUserVote)
 			}
 
 		}

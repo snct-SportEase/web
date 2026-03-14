@@ -16,7 +16,7 @@ WHERE reason NOT IN (
     'attendance_points',
     'initial_points',
     'survey_points',
-    'mvp_points',
+    'mic_points',
     'gym1_win1_points',
     'gym1_win2_points',
     'gym1_win3_points',
@@ -33,11 +33,11 @@ WHERE reason NOT IN (
     'noon_game_points'
 );
 
--- 2) Normalize known common invalid forms (e.g. "mvp_points: ...")
+-- 2) Normalize known common invalid forms (e.g. "mic_points: ...")
 --    Keep only the allowed canonical value.
 UPDATE score_logs
-SET reason = 'mvp_points'
-WHERE reason LIKE 'mvp_points:%';
+SET reason = 'mic_points'
+WHERE reason LIKE 'mic_points:%';
 
 -- 3) Optionally normalize any remaining invalid values (uncomment and adjust as needed)
 -- UPDATE score_logs
@@ -46,7 +46,7 @@ WHERE reason LIKE 'mvp_points:%';
 --     'attendance_points',
 --     'initial_points',
 --     'survey_points',
---     'mvp_points',
+--     'mic_points',
 --     'gym1_win1_points',
 --     'gym1_win2_points',
 --     'gym1_win3_points',

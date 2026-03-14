@@ -114,8 +114,8 @@
         <a href="/dashboard/root/change-username" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/change-username')}>
           ユーザー名変更
         </a>
-        <a href="/dashboard/root/identify-mvp" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/identify-mvp')}>
-          MVP確認
+        <a href="/dashboard/root/identify-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/identify-mic')}>
+          MIC確認
         </a>
         <a href="/dashboard/root/competition-guidelines-upload" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/competition-guidelines-upload')}>
           競技要項アップロード
@@ -145,9 +145,9 @@
         <a href="/dashboard/admin/attendance-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/attendance-management')}>
           出席登録
         </a>
-        <!-- MVP投票の被対象者は1~2年生のみ。投票はadminとrootしか行えない -->
-        <a href="/dashboard/admin/vorting-mvp" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/vorting-mvp')}>
-          MVP投票
+        <!-- MIC投票の被対象者は1~2年生のみ。投票はadminとrootしか行えない -->
+        <a href="/dashboard/admin/vorting-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/vorting-mic')}>
+          MIC投票
         </a>
         <a href="/dashboard/admin/sport-details-registration" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/admin/sport-details-registration')}>
           競技詳細情報登録

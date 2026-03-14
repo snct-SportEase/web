@@ -35,7 +35,7 @@
     }
 
     // 2. Fetch eligible classes using the active event ID
-    const classRes = await fetch(`/api/admin/mvp/eligible-classes?event_id=${eventId}`);
+    const classRes = await fetch(`/api/admin/mic/eligible-classes?event_id=${eventId}`);
     if (classRes.ok) {
       eligibleClasses = await classRes.json();
     } else {
@@ -44,7 +44,7 @@
     }
 
     // 3. Check if user has already voted for this event
-    const voteRes = await fetch(`/api/admin/mvp/user-vote?event_id=${eventId}`);
+    const voteRes = await fetch(`/api/admin/mic/user-vote?event_id=${eventId}`);
     if (voteRes.ok) {
       const voteData = await voteRes.json();
       if (voteData.voted) {
@@ -73,7 +73,7 @@
       return;
     }
 
-    const res = await fetch('/api/admin/mvp/vote', {
+    const res = await fetch('/api/admin/mic/vote', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,13 +104,13 @@
   }
 </script>
 
-<h1 class="text-2xl font-bold mb-4">MVP投票</h1>
+<h1 class="text-2xl font-bold mb-4">MIC投票</h1>
 
 {#if hasVoted}
   <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 text-center">
     <h2 class="text-xl font-bold mb-2">投票済みです</h2>
     <p>あなたは <span class="font-bold">{votedForClassName}</span> に投票しました。</p>
-    <p class="text-gray-600 mt-4">MVP投票は一人一票までです。</p>
+    <p class="text-gray-600 mt-4">MIC投票は一人一票までです。</p>
   </div>
 {:else}
   <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" on:submit|preventDefault={vote}>

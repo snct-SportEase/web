@@ -2,10 +2,10 @@ package models
 
 import "time"
 
-// MVPVote represents a vote for the MVP.
-// @Description MVPVote represents a vote for the MVP.
-// @Description MVPVote model
-type MVPVote struct {
+// MICVote represents a vote for the MIC.
+// @Description MICVote represents a vote for the MIC.
+// @Description MICVote model
+type MICVote struct {
 	ID              int       `json:"id"`
 	EventID         int       `json:"event_id"`
 	VoterUserID     string    `json:"voter_user_id"`
@@ -15,8 +15,8 @@ type MVPVote struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
-// MVPResult represents the result of the MVP calculation.
-type MVPResult struct {
+// MICResult represents the result of the MIC calculation.
+type MICResult struct {
 	ClassName   string `json:"class_name"`
 	TotalPoints int    `json:"total_points"`
 	Season      string `json:"season"`

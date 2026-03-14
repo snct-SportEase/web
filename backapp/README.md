@@ -119,7 +119,7 @@ CREATE TABLE class_scores (
     ground_win3_points INTEGER DEFAULT 0,
     ground_champion_points INTEGER DEFAULT 0,
     noon_game_points INTEGER DEFAULT 0,
-    mvp_points INTEGER DEFAULT 0,
+    mic_points INTEGER DEFAULT 0,
     total_points_current_event INTEGER,
     rank_current_event INTEGER,
     total_points_overall INTEGER,
@@ -137,7 +137,7 @@ CREATE TABLE score_logs (
         'attendance_points',
         'initial_points',
         'survey_points',
-        'mvp_points',
+        'mic_points',
         'gym1_win1_points',
         'gym1_win2_points',
         'gym1_win3_points',
@@ -166,8 +166,8 @@ CREATE TABLE check_ins (
     checked_in_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- MVP投票テーブル
-CREATE TABLE mvp_votes (
+-- MIC投票テーブル
+CREATE TABLE mic_votes (
     id SERIAL PRIMARY KEY,
     event_id INTEGER NOT NULL, -- FK
     voter_user_id UUID NOT NULL, -- FK
@@ -231,10 +231,10 @@ ALTER TABLE score_logs ADD CONSTRAINT fk_score_logs_source_match_id FOREIGN KEY 
 ALTER TABLE check_ins ADD CONSTRAINT fk_check_ins_user_id FOREIGN KEY (user_id) REFERENCES users(id);
 ALTER TABLE check_ins ADD CONSTRAINT fk_check_ins_event_id FOREIGN KEY (event_id) REFERENCES events(id);
 
--- mvp_votes テーブル
-ALTER TABLE mvp_votes ADD CONSTRAINT fk_mvp_votes_event_id FOREIGN KEY (event_id) REFERENCES events(id);
-ALTER TABLE mvp_votes ADD CONSTRAINT fk_mvp_votes_voter_user_id FOREIGN KEY (voter_user_id) REFERENCES users(id);
-ALTER TABLE mvp_votes ADD CONSTRAINT fk_mvp_votes_voted_for_class_id FOREIGN KEY (voted_for_class_id) REFERENCES classes(id);
+-- mic_votes テーブル
+ALTER TABLE mic_votes ADD CONSTRAINT fk_mic_votes_event_id FOREIGN KEY (event_id) REFERENCES events(id);
+ALTER TABLE mic_votes ADD CONSTRAINT fk_mic_votes_voter_user_id FOREIGN KEY (voter_user_id) REFERENCES users(id);
+ALTER TABLE mic_votes ADD CONSTRAINT fk_mic_votes_voted_for_class_id FOREIGN KEY (voted_for_class_id) REFERENCES classes(id);
 
 -- notifications テーブル
 ALTER TABLE notifications ADD CONSTRAINT fk_notifications_created_by FOREIGN KEY (created_by) REFERENCES users(id);
@@ -325,8 +325,8 @@ ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_class_id FOREIG
     "チェック式 (WITH CHECK)": null
   },
   {
-    "テーブル名": "mvp_votes",
-    "ポリシー名": "Allow admin full access on mvp_votes",
+    "テーブル名": "mic_votes",
+    "ポリシー名": "Allow admin full access on mic_votes",
     "コマンド": "ALL",
     "条件式 (USING)": "(get_my_role() = ANY (ARRAY['root'::text, 'admin'::text]))",
     "チェック式 (WITH CHECK)": "(get_my_role() = ANY (ARRAY['root'::text, 'admin'::text]))"

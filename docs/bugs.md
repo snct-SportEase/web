@@ -32,5 +32,5 @@
     - **修正内容**: `MockNoonGameRepository` に不足していた `GetTemplateDefaultGroups` と `SaveTemplateDefaultGroups` メソッドを実装し、テストコード内のモック期待値を更新しました。
 
 5.  **イベントIDのハードコード (Frontend)**
-    - **場所**: `frontapp/src/routes/dashboard/admin/vorting-mvp/+page.svelte`
-    - **修正内容**: MVP投票画面でイベントIDが `1` に固定されていた問題を修正し、`/api/events/active` から動的に取得するように変更しました。
+    - **場所**: `frontapp/src/routes/dashboard/admin/vorting-mic/+page.svelte`
+    - **修正内容**: MIC投票画面でイベントIDが `1` に固定されていた問題を修正し、`/api/events/active` から動的に取得するように変更しました。

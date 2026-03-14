@@ -186,7 +186,7 @@ CREATE TABLE score_logs (
         'attendance_points',
         'initial_points',
         'survey_points',
-        'mvp_points',
+        'mic_points',
         'gym1_win1_points',
         'gym1_win2_points',
         'gym1_win3_points',
@@ -215,8 +215,8 @@ CREATE TABLE check_ins (
     FOREIGN KEY (event_id) REFERENCES events(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- MVP投票テーブル
-CREATE TABLE mvp_votes (
+-- MIC投票テーブル
+CREATE TABLE mic_votes (
     id INT PRIMARY KEY AUTO_INCREMENT,
     event_id INT NOT NULL, 
     voter_user_id CHAR(36) NOT NULL, 
@@ -488,7 +488,7 @@ WITH aggregated_scores AS (
         COALESCE(SUM(CASE WHEN sl.reason = 'ground_win3_points' THEN sl.points ELSE 0 END), 0) AS ground_win3_points,
         COALESCE(SUM(CASE WHEN sl.reason = 'ground_champion_points' THEN sl.points ELSE 0 END), 0) AS ground_champion_points,
         COALESCE(SUM(CASE WHEN sl.reason = 'noon_game_points' THEN sl.points ELSE 0 END), 0) AS noon_game_points,
-        COALESCE(SUM(CASE WHEN sl.reason = 'mvp_points' THEN sl.points ELSE 0 END), 0) AS mvp_points,
+        COALESCE(SUM(CASE WHEN sl.reason = 'mic_points' THEN sl.points ELSE 0 END), 0) AS mic_points,
         COALESCE(SUM(CASE WHEN sl.reason != 'initial_points' THEN sl.points ELSE 0 END), 0) AS total_points_current_event,
         COALESCE(SUM(sl.points), 0) AS total_points_overall
     FROM classes c
@@ -516,7 +516,7 @@ SELECT
     ground_win3_points,
     ground_champion_points,
     noon_game_points,
-    mvp_points,
+    mic_points,
     total_points_current_event,
     IF(total_points_current_event = 0, 0, RANK() OVER (PARTITION BY event_id ORDER BY total_points_current_event DESC)) AS rank_current_event,
     total_points_overall,

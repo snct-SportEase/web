@@ -7,23 +7,23 @@ import (
 	"backapp/internal/models"
 )
 
-type MVPRepository interface {
+type MICRepository interface {
 	GetEligibleClasses(eventID int) ([]models.Class, error)
-	VoteMVP(userID string, votedForClassID int, eventID int, reason string) error
-	GetMVPVotes(eventID int) ([]models.MVPVote, error)
-	GetVoteByUserID(userID string, eventID int) (*models.MVPVote, error)
-	GetMVPClass(eventID int) (*models.MVPResult, error)
+	VoteMIC(userID string, votedForClassID int, eventID int, reason string) error
+	GetMICVotes(eventID int) ([]models.MICVote, error)
+	GetVoteByUserID(userID string, eventID int) (*models.MICVote, error)
+	GetMICClass(eventID int) (*models.MICResult, error)
 }
 
-type mvpRepository struct {
+type micRepository struct {
 	db *sql.DB
 }
 
-func NewMVPRepository(db *sql.DB) MVPRepository {
-	return &mvpRepository{db: db}
+func NewMICRepository(db *sql.DB) MICRepository {
+	return &micRepository{db: db}
 }
 
-func (r *mvpRepository) GetEligibleClasses(eventID int) ([]models.Class, error) {
+func (r *micRepository) GetEligibleClasses(eventID int) ([]models.Class, error) {
 	rows, err := r.db.Query("SELECT id, name FROM classes WHERE event_id = ? AND name IN ('1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2')", eventID)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (r *mvpRepository) GetEligibleClasses(eventID int) ([]models.Class, error) 
 	return classes, nil
 }
 
-func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int, reason string) error {
+func (r *micRepository) VoteMIC(userID string, votedForClassID int, eventID int, reason string) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 
 	// Check if the user has already voted
 	var count int
-	err = tx.QueryRow("SELECT COUNT(*) FROM mvp_votes WHERE voter_user_id = ? AND event_id = ?", userID, eventID).Scan(&count)
+	err = tx.QueryRow("SELECT COUNT(*) FROM mic_votes WHERE voter_user_id = ? AND event_id = ?", userID, eventID).Scan(&count)
 	if err != nil {
 		return err
 	}
@@ -60,14 +60,14 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 	}
 
 	// Insert the vote
-	mvpPoints := 3
-	_, err = tx.Exec("INSERT INTO mvp_votes (voter_user_id, voted_for_class_id, event_id, reason, points) VALUES (?, ?, ?, ?, ?)", userID, votedForClassID, eventID, reason, mvpPoints)
+	micPoints := 3
+	_, err = tx.Exec("INSERT INTO mic_votes (voter_user_id, voted_for_class_id, event_id, reason, points) VALUES (?, ?, ?, ?, ?)", userID, votedForClassID, eventID, reason, micPoints)
 	if err != nil {
 		return err
 	}
 
 	// Insert into score_logs
-	_, err = tx.Exec("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)", eventID, votedForClassID, mvpPoints, "mvp_points")
+	_, err = tx.Exec("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)", eventID, votedForClassID, micPoints, "mic_points")
 	if err != nil {
 		return err
 	}
@@ -75,16 +75,16 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 	return tx.Commit()
 }
 
-func (r *mvpRepository) GetMVPVotes(eventID int) ([]models.MVPVote, error) {
-	rows, err := r.db.Query("SELECT voted_for_class_id, COUNT(*) as points FROM mvp_votes WHERE event_id = ? GROUP BY voted_for_class_id", eventID)
+func (r *micRepository) GetMICVotes(eventID int) ([]models.MICVote, error) {
+	rows, err := r.db.Query("SELECT voted_for_class_id, COUNT(*) as points FROM mic_votes WHERE event_id = ? GROUP BY voted_for_class_id", eventID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var votes []models.MVPVote
+	var votes []models.MICVote
 	for rows.Next() {
-		var vote models.MVPVote
+		var vote models.MICVote
 		if err := rows.Scan(&vote.VotedForClassID, &vote.Points); err != nil {
 			return nil, err
 		}
@@ -94,9 +94,9 @@ func (r *mvpRepository) GetMVPVotes(eventID int) ([]models.MVPVote, error) {
 	return votes, nil
 }
 
-func (r *mvpRepository) GetVoteByUserID(userID string, eventID int) (*models.MVPVote, error) {
-	var vote models.MVPVote
-	err := r.db.QueryRow("SELECT id, event_id, voter_user_id, voted_for_class_id, reason, points, created_at FROM mvp_votes WHERE voter_user_id = ? AND event_id = ?", userID, eventID).Scan(&vote.ID, &vote.EventID, &vote.VoterUserID, &vote.VotedForClassID, &vote.Reason, &vote.Points, &vote.CreatedAt)
+func (r *micRepository) GetVoteByUserID(userID string, eventID int) (*models.MICVote, error) {
+	var vote models.MICVote
+	err := r.db.QueryRow("SELECT id, event_id, voter_user_id, voted_for_class_id, reason, points, created_at FROM mic_votes WHERE voter_user_id = ? AND event_id = ?", userID, eventID).Scan(&vote.ID, &vote.EventID, &vote.VoterUserID, &vote.VotedForClassID, &vote.Reason, &vote.Points, &vote.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // No vote found, not an error
@@ -106,7 +106,7 @@ func (r *mvpRepository) GetVoteByUserID(userID string, eventID int) (*models.MVP
 	return &vote, nil
 }
 
-func (r *mvpRepository) GetMVPClass(eventID int) (*models.MVPResult, error) {
+func (r *micRepository) GetMICClass(eventID int) (*models.MICResult, error) {
 	var season string
 	err := r.db.QueryRow("SELECT season FROM events WHERE id = ?", eventID).Scan(&season)
 	if err != nil {
@@ -118,7 +118,7 @@ func (r *mvpRepository) GetMVPClass(eventID int) (*models.MVPResult, error) {
 
 	var query string
 	query = `
-		SELECT c.name, (cs.total_points_overall + cs.mvp_points) AS total_points
+		SELECT c.name, (cs.total_points_overall + cs.mic_points) AS total_points
 		FROM class_scores cs
 		JOIN classes c ON cs.class_id = c.id
 		WHERE cs.event_id = ?
@@ -127,11 +127,11 @@ func (r *mvpRepository) GetMVPClass(eventID int) (*models.MVPResult, error) {
 		LIMIT 1
 	`
 
-	var result models.MVPResult
+	var result models.MICResult
 	err = r.db.QueryRow(query, eventID).Scan(&result.ClassName, &result.TotalPoints)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil // No MVP class found yet
+			return nil, nil // No MIC class found yet
 		}
 		return nil, err
 	}
