@@ -265,7 +265,7 @@
     </div>
   </div>
 
-  <div class="bg-white shadow-md rounded-lg overflow-hidden">
+  <div class="bg-white shadow-md rounded-lg overflow-x-auto">
     <table class="min-w-full leading-normal">
       <thead>
         <tr>
@@ -274,22 +274,21 @@
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">シーズン</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">期間</th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ステータス</th>
-          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アンケート操作</th>
-          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">結果出力</th>
-          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider min-w-[120px]">アンケート操作</th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider min-w-[100px]">結果出力</th>
         </tr>
       </thead>
       <tbody>
         {#each events as event}
-          <tr>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">{event.name}</td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">{event.year}</td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">{event.season}</td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+          <tr on:click={() => openEditModal(event)} class="cursor-pointer hover:bg-gray-50 transition-colors">
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.name}</td>
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.year}</td>
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.season === 'spring' ? '春' : '秋'}</td>
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm whitespace-nowrap">
               {event.start_date ? new Date(event.start_date).toLocaleDateString() : ''} - 
               {event.end_date ? new Date(event.end_date).toLocaleDateString() : ''}
             </td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">
               {#if event.status === 'active'}
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">開催中</span>
               {:else if event.status === 'archived'}
@@ -298,13 +297,8 @@
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">予定</span>
               {/if}
             </td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" on:click|stopPropagation>
               <div class="flex flex-col space-y-2">
-                {#if event.survey_url}
-                  <button on:click={() => notifySurvey(event.id)} class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 w-fit">
-                    通知を送信
-                  </button>
-                {/if}
                 {#if event.season === 'spring'}
                   <div class="flex flex-col">
                     <label class="text-xs text-gray-600 mb-1">点数インポート(CSV)
@@ -314,18 +308,15 @@
                 {/if}
               </div>
             </td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" on:click|stopPropagation>
               <div class="flex flex-col space-y-2">
-                <button on:click={() => downloadExport(event, 'csv')} class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-fit">
+                <button type="button" on:click|stopPropagation={() => downloadExport(event, 'csv')} class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-fit">
                   CSV出力
                 </button>
-                <button on:click={() => downloadExport(event, 'pdf')} class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 w-fit">
+                <button type="button" on:click|stopPropagation={() => downloadExport(event, 'pdf')} class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 w-fit">
                   PDF出力
                 </button>
               </div>
-            </td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-right">
-              <button on:click={() => openEditModal(event)} class="text-indigo-600 hover:text-indigo-900">編集</button>
             </td>
           </tr>
         {/each}
@@ -372,7 +363,14 @@
             </div>
             <div>
               <label for="survey_url" class="block text-sm font-medium text-gray-700">アンケートURL</label>
-              <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+              <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-1">
+                <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                {#if selectedEvent && currentEvent.survey_url}
+                  <button type="button" on:click={() => notifySurvey(selectedEvent.id)} class="whitespace-nowrap text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded hover:bg-blue-200 border border-blue-200 font-medium">
+                    通知を送信
+                  </button>
+                {/if}
+              </div>
             </div>
             <div>
               <label for="status" class="block text-sm font-medium text-gray-700">ステータス</label>
