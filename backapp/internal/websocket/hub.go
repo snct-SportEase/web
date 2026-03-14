@@ -50,6 +50,10 @@ func (h *Hub) Run() {
 	}
 }
 
+func (h *Hub) Broadcast(message []byte) {
+	h.broadcast <- message
+}
+
 func (h *Hub) BroadcastJSON(v interface{}) {
 	msg, err := json.Marshal(v)
 	if err != nil {

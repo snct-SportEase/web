@@ -19,3 +19,8 @@ func (h *WebSocketHandler) ServeTournamentWebSocket(c *gin.Context) {
 	hub := h.hubManager.GetHub("tournament:" + tournamentID)
 	websocket.ServeWs(hub, c.Writer, c.Request)
 }
+
+func (h *WebSocketHandler) ServeProgressWebSocket(c *gin.Context) {
+	hub := h.hubManager.GetHub("progress")
+	websocket.ServeWs(hub, c.Writer, c.Request)
+}

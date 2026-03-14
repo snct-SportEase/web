@@ -15,6 +15,8 @@ type TournamentRepository interface {
 	DeleteTournamentsByEventID(eventID int) error
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
+	GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error)
+	GetTeamsByTournamentID(tournamentID int) ([]*models.Team, error)
 	GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchRainyModeStartTime(matchID int, rainyModeStartTime string) error
@@ -336,6 +338,44 @@ func (r *tournamentRepository) IsMatchResultAlreadyEntered(matchID int) (bool, e
 	}
 	// 試合結果が既に入力済みかどうか: winner_team_idが設定されていて、statusが"finished"
 	return winnerID.Valid && status == "finished", nil
+}
+
+func (r *tournamentRepository) GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error) {
+	rows, err := r.db.Query("SELECT id, name, sport_id FROM tournaments WHERE event_id = ? AND sport_id = ?", eventID, sportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tournaments []*models.Tournament
+	for rows.Next() {
+		var t models.Tournament
+		err := rows.Scan(&t.ID, &t.Name, &t.SportID)
+		if err != nil {
+			return nil, err
+		}
+		tournaments = append(tournaments, &t)
+	}
+	return tournaments, nil
+}
+
+func (r *tournamentRepository) GetTeamsByTournamentID(tournamentID int) ([]*models.Team, error) {
+	rows, err := r.db.Query("SELECT id, name, class_id FROM teams WHERE tournament_id = ?", tournamentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []*models.Team
+	for rows.Next() {
+		var t models.Team
+		err := rows.Scan(&t.ID, &t.Name, &t.ClassID)
+		if err != nil {
+			return nil, err
+		}
+		teams = append(teams, &t)
+	}
+	return teams, nil
 }
 
 func (r *tournamentRepository) getTeamByID(teamID int64) (*models.Team, error) {

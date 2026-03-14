@@ -37,6 +37,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	sportRepo := repository.NewSportRepository(db)
 	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo, tournRepo)
 
+	statisticsHandler := handler.NewStatisticsHandler(classRepo, eventRepo, sportRepo, tournRepo)
+
 	notificationRepo := repository.NewNotificationRepository(db)
 	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 
@@ -78,6 +80,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	api := router.Group("/api")
 	{
 		api.GET("/ws/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
+		api.GET("/ws/progress", wsHandler.ServeProgressWebSocket)
 
 		api.GET("/classes", classHandler.GetAllClasses)
 		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), classHandler.GetClassScores)
@@ -219,6 +222,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				adminMic.GET("/votes", micHandler.GetMICVotes)
 				adminMic.GET("/user-vote", micHandler.GetUserVote)
 			}
+
+			admin.GET("/statistics/attendance", statisticsHandler.GetOverallAttendanceRate)
+			admin.GET("/statistics/participation", statisticsHandler.GetParticipationRateBySport)
+			admin.GET("/statistics/scores", statisticsHandler.GetClassScoreTrends)
+			admin.GET("/statistics/progress", statisticsHandler.GetRealtimeEventProgress)
 
 		}
 
