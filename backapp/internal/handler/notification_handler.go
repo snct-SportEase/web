@@ -20,15 +20,17 @@ type NotificationHandler struct {
 	NotificationRepo repository.NotificationRepository
 	EventRepo        repository.EventRepository
 	RoleRepo         repository.RoleRepository
+	UserRepo         repository.UserRepository
 	VAPIDPublicKey   string
 	VAPIDPrivateKey  string
 }
 
-func NewNotificationHandler(notificationRepo repository.NotificationRepository, eventRepo repository.EventRepository, roleRepo repository.RoleRepository, vapidPublicKey, vapidPrivateKey string) *NotificationHandler {
+func NewNotificationHandler(notificationRepo repository.NotificationRepository, eventRepo repository.EventRepository, roleRepo repository.RoleRepository, userRepo repository.UserRepository, vapidPublicKey, vapidPrivateKey string) *NotificationHandler {
 	return &NotificationHandler{
 		NotificationRepo: notificationRepo,
 		EventRepo:        eventRepo,
 		RoleRepo:         roleRepo,
+		UserRepo:         userRepo,
 		VAPIDPublicKey:   vapidPublicKey,
 		VAPIDPrivateKey:  vapidPrivateKey,
 	}
@@ -37,6 +39,7 @@ func NewNotificationHandler(notificationRepo repository.NotificationRepository, 
 type createNotificationRequest struct {
 	Title       string   `json:"title"`
 	Body        string   `json:"body"`
+	Type        string   `json:"type"`
 	TargetRoles []string `json:"target_roles"`
 }
 
@@ -52,6 +55,23 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 
 	if req.Title == "" || req.Body == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "タイトルと本文は必須です"})
+		return
+	}
+
+	// Validate notification type
+	validTypes := []string{"general", "match_my_class", "finals", "all_matches"}
+	if req.Type == "" {
+		req.Type = "general"
+	}
+	isValidType := false
+	for _, t := range validTypes {
+		if req.Type == t {
+			isValidType = true
+			break
+		}
+	}
+	if !isValidType {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "無効な通知タイプです"})
 		return
 	}
 
@@ -90,7 +110,7 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 		eventIDPtr = &activeEventID
 	}
 
-	notificationID, err := h.NotificationRepo.CreateNotification(req.Title, req.Body, user.ID, eventIDPtr)
+	notificationID, err := h.NotificationRepo.CreateNotification(req.Title, req.Body, req.Type, user.ID, eventIDPtr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "通知の作成に失敗しました"})
 		return
@@ -101,7 +121,7 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 		return
 	}
 
-	go h.dispatchPushNotifications(int(notificationID), req.Title, req.Body, targetRoles)
+	go h.dispatchPushNotifications(int(notificationID), req.Title, req.Body, req.Type, targetRoles)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":        "通知を送信しました",
@@ -157,6 +177,66 @@ func (h *NotificationHandler) ListAvailableRoles(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"roles": roles})
+}
+
+type updateNotificationFiltersRequest struct {
+	Filters []string `json:"filters"`
+}
+
+func (h *NotificationHandler) UpdateNotificationFilters(c *gin.Context) {
+	userValue, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できませんでした"})
+		return
+	}
+
+	user, ok := userValue.(*models.User)
+	if !ok || user == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザー情報の解析に失敗しました"})
+		return
+	}
+
+	var req updateNotificationFiltersRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不正なリクエスト形式です"})
+		return
+	}
+
+	// Validate filters
+	validFilters := []string{"general", "match_my_class", "finals", "all_matches"}
+	for _, filter := range req.Filters {
+		isValid := false
+		for _, valid := range validFilters {
+			if filter == valid {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "無効なフィルタが含まれています: " + filter})
+			return
+		}
+	}
+
+	// Ensure at least "general" is included
+	hasGeneral := false
+	for _, filter := range req.Filters {
+		if filter == "general" {
+			hasGeneral = true
+			break
+		}
+	}
+	if !hasGeneral {
+		req.Filters = append(req.Filters, "general")
+	}
+
+	err := h.UserRepo.UpdateNotificationFilters(user.ID, req.Filters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "通知フィルタの更新に失敗しました"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "通知フィルタを更新しました", "filters": req.Filters})
 }
 
 type subscriptionRequest struct {
@@ -316,8 +396,8 @@ func (h *NotificationHandler) GetNotificationDebugInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, debugInfo)
 }
 
-func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body string, targetRoles []string) {
-	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, targetRoles=%v\n", notificationID, title, targetRoles)
+func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
+	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%v\n", notificationID, title, notificationType, targetRoles)
 
 	if h.VAPIDPrivateKey == "" || h.VAPIDPublicKey == "" {
 		log.Println("[notification] VAPIDキーが設定されていないためPush通知をスキップします")
@@ -335,7 +415,19 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		return
 	}
 
-	subs, err := h.NotificationRepo.GetPushSubscriptionsByUserIDs(userIDs)
+	// Apply notification filters
+	filteredUserIDs, err := h.filterUsersByNotificationType(userIDs, notificationType)
+	if err != nil {
+		log.Printf("[notification] 通知フィルタ適用に失敗しました: %v\n", err)
+		return
+	}
+	log.Printf("[notification] フィルタ適用後ユーザー数: %d, filteredUserIDs=%v\n", len(filteredUserIDs), filteredUserIDs)
+	if len(filteredUserIDs) == 0 {
+		log.Println("[notification] フィルタ適用後対象ユーザーが0人のためPush通知をスキップします")
+		return
+	}
+
+	subs, err := h.NotificationRepo.GetPushSubscriptionsByUserIDs(filteredUserIDs)
 	if err != nil {
 		log.Printf("[notification] 購読情報の取得に失敗しました: %v\n", err)
 		return
@@ -439,4 +531,38 @@ func normalizeTargetRoles(requested []string, available []models.Role) ([]string
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+func (h *NotificationHandler) filterUsersByNotificationType(userIDs []string, notificationType string) ([]string, error) {
+	if notificationType == "general" {
+		// General notifications are sent to all users
+		return userIDs, nil
+	}
+
+	var filtered []string
+	for _, userID := range userIDs {
+		user, err := h.UserRepo.GetUserWithRoles(userID)
+		if err != nil {
+			log.Printf("[notification] ユーザー情報取得失敗: userID=%s, error=%v\n", userID, err)
+			continue
+		}
+		if user == nil {
+			continue
+		}
+
+		// Check if user's notification filters include the notification type
+		shouldReceive := false
+		for _, filter := range user.NotificationFilters {
+			if filter == notificationType || filter == "all_matches" {
+				shouldReceive = true
+				break
+			}
+		}
+
+		if shouldReceive {
+			filtered = append(filtered, userID)
+		}
+	}
+
+	return filtered, nil
 }

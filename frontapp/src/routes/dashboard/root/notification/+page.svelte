@@ -36,8 +36,16 @@
     return defaults;
   }
 
+  const notificationTypes = [
+    { value: 'general', label: '一般通知' },
+    { value: 'match_my_class', label: '自分のクラスの試合' },
+    { value: 'finals', label: '決勝戦' },
+    { value: 'all_matches', label: '全ての試合' }
+  ];
+
   let title = '';
   let body = '';
+  let selectedType = 'general';
   let selectedRoles = createDefaultSelections(availableRoles);
 
   let message = '';
@@ -84,6 +92,7 @@
         body: JSON.stringify({
           title,
           body,
+          type: selectedType,
           target_roles: targetRoles
         })
       });
@@ -185,6 +194,22 @@
           bind:value={title}
           placeholder="例）競技開始時刻変更のお知らせ"
         />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="type">通知タイプ</label>
+        <select
+          id="type"
+          class="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          bind:value={selectedType}
+        >
+          {#each notificationTypes as type (type.value)}
+            <option value={type.value}>{type.label}</option>
+          {/each}
+        </select>
+        <p class="mt-1 text-sm text-gray-500">
+          通知の種類を選択してください。ユーザーのフィルタ設定に基づいて配信されます。
+        </p>
       </div>
 
       <div>

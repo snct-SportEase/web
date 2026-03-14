@@ -57,6 +57,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     display_name VARCHAR(255),
     class_id INT, -- FK
+    notification_filters JSON DEFAULT ('["general"]'),
     is_profile_complete BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -234,11 +235,13 @@ CREATE TABLE notifications (
     id INT PRIMARY KEY AUTO_INCREMENT,
     title TEXT NOT NULL,
     body TEXT NOT NULL,
-    created_by CHAR(36), 
-    event_id INT NULL, 
+    type VARCHAR(50) NOT NULL DEFAULT 'general',
+    created_by CHAR(36),
+    event_id INT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(id),
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
+    CONSTRAINT chk_notifications_type CHECK (type IN ('general', 'match_my_class', 'finals', 'all_matches'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 通知の宛先テーブル

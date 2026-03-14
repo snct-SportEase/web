@@ -487,12 +487,17 @@ func (m *MockUserRepository) DeleteUserRole(userID string, roleName string) erro
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) UpdateNotificationFilters(userID string, filters []string) error {
+	args := m.Called(userID, filters)
+	return args.Error(0)
+}
+
 type MockNotificationRepository struct {
 	mock.Mock
 }
 
-func (m *MockNotificationRepository) CreateNotification(title, body, createdBy string, eventID *int) (int64, error) {
-	args := m.Called(title, body, createdBy, eventID)
+func (m *MockNotificationRepository) CreateNotification(title, body, notificationType, createdBy string, eventID *int) (int64, error) {
+	args := m.Called(title, body, notificationType, createdBy, eventID)
 	return args.Get(0).(int64), args.Error(1)
 }
 

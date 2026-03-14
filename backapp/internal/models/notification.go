@@ -6,6 +6,7 @@ type Notification struct {
 	ID          int       `json:"id"`
 	Title       string    `json:"title"`
 	Body        string    `json:"body"`
+	Type        string    `json:"type"`
 	CreatedAt   time.Time `json:"created_at"`
 	CreatedBy   *string   `json:"created_by,omitempty"`
 	EventID     *int      `json:"event_id,omitempty"`

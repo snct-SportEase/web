@@ -38,7 +38,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo, tournRepo)
 
 	notificationRepo := repository.NewNotificationRepository(db)
-	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo, tournRepo, classRepo, notificationRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 
 	rainyModeRepo := repository.NewRainyModeRepository(db)
 	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)
@@ -48,7 +48,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo)
 
 	roleRepo := repository.NewRoleRepository(db)
-	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 	notificationRequestRepo := repository.NewNotificationRequestRepository(db)
 	notificationRequestHandler := handler.NewNotificationRequestHandler(notificationRequestRepo, notificationRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 
@@ -144,6 +144,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		{
 			notifications.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
 			notifications.GET("", notificationHandler.ListNotifications)
+			notifications.PUT("/filters", notificationHandler.UpdateNotificationFilters)
 			notifications.GET("/subscription", notificationHandler.GetSubscription)
 			notifications.POST("/subscription", notificationHandler.SaveSubscription)
 			notifications.DELETE("/subscription", notificationHandler.DeleteSubscription)

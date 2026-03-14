@@ -22,17 +22,19 @@ type EventHandler struct {
 	tournamentRepo   repository.TournamentRepository
 	classRepo        repository.ClassRepository
 	notificationRepo repository.NotificationRepository
+	userRepo         repository.UserRepository
 	vapidPublicKey   string
 	vapidPrivateKey  string
 }
 
-func NewEventHandler(eventRepo repository.EventRepository, whitelistRepo repository.WhitelistRepository, tournamentRepo repository.TournamentRepository, classRepo repository.ClassRepository, notificationRepo repository.NotificationRepository, vapidPublicKey string, vapidPrivateKey string) *EventHandler {
+func NewEventHandler(eventRepo repository.EventRepository, whitelistRepo repository.WhitelistRepository, tournamentRepo repository.TournamentRepository, classRepo repository.ClassRepository, notificationRepo repository.NotificationRepository, userRepo repository.UserRepository, vapidPublicKey string, vapidPrivateKey string) *EventHandler {
 	return &EventHandler{
 		eventRepo:        eventRepo,
 		whitelistRepo:    whitelistRepo,
 		tournamentRepo:   tournamentRepo,
 		classRepo:        classRepo,
 		notificationRepo: notificationRepo,
+		userRepo:         userRepo,
 		vapidPublicKey:   vapidPublicKey,
 		vapidPrivateKey:  vapidPrivateKey,
 	}
@@ -356,7 +358,7 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 		createdBy = userIDVal.(string)
 	}
 
-	notifID, err := h.notificationRepo.CreateNotification(title, body, createdBy, &event.ID)
+	notifID, err := h.notificationRepo.CreateNotification(title, body, "general", createdBy, &event.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create notification"})
 		return
@@ -375,12 +377,12 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 	}
 
 	// Send push notifications
-	go h.dispatchPushNotifications(int(notifID), "アンケート回答のお願い", "アンケートページが公開されました。期間内に回答してください。", targetRoles)
+	go h.dispatchPushNotifications(int(notifID), "アンケート回答のお願い", "アンケートページが公開されました。期間内に回答してください。", "general", targetRoles)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Survey notification sent successfully"})
 }
 
-func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body string, targetRoles []string) {
+func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
 	log.Printf("[event-notification] 通知送信開始: notificationID=%d, title=%s, targetRoles=%v\n", notificationID, title, targetRoles)
 
 	if h.vapidPrivateKey == "" || h.vapidPublicKey == "" {
@@ -399,7 +401,19 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 		return
 	}
 
-	subs, err := h.notificationRepo.GetPushSubscriptionsByUserIDs(userIDs)
+	// Apply notification filters
+	filteredUserIDs, err := h.filterUsersByNotificationType(userIDs, notificationType)
+	if err != nil {
+		log.Printf("[event-notification] 通知フィルタ適用に失敗しました: %v\n", err)
+		return
+	}
+	log.Printf("[event-notification] フィルタ適用後ユーザー数: %d, filteredUserIDs=%v\n", len(filteredUserIDs), filteredUserIDs)
+	if len(filteredUserIDs) == 0 {
+		log.Println("[event-notification] フィルタ適用後対象ユーザーが0人のためPush通知をスキップします")
+		return
+	}
+
+	subs, err := h.notificationRepo.GetPushSubscriptionsByUserIDs(filteredUserIDs)
 	if err != nil {
 		log.Printf("[event-notification] 購読情報の取得に失敗しました: %v\n", err)
 		return
@@ -573,4 +587,38 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Survey scores imported successfully", "imported_classes_count": len(surveyPointsData)})
+}
+
+func (h *EventHandler) filterUsersByNotificationType(userIDs []string, notificationType string) ([]string, error) {
+	if notificationType == "general" {
+		// General notifications are sent to all users
+		return userIDs, nil
+	}
+
+	var filtered []string
+	for _, userID := range userIDs {
+		user, err := h.userRepo.GetUserWithRoles(userID)
+		if err != nil {
+			log.Printf("[event-notification] ユーザー情報取得失敗: userID=%s, error=%v\n", userID, err)
+			continue
+		}
+		if user == nil {
+			continue
+		}
+
+		// Check if user's notification filters include the notification type
+		shouldReceive := false
+		for _, filter := range user.NotificationFilters {
+			if filter == notificationType || filter == "all_matches" {
+				shouldReceive = true
+				break
+			}
+		}
+
+		if shouldReceive {
+			filtered = append(filtered, userID)
+		}
+	}
+
+	return filtered, nil
 }

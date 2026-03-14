@@ -1,5 +1,6 @@
 <script>
   import { page } from '$app/stores';
+  import { enhance } from '$app/forms';
 
   const roleLabels = {
     student: '学生',
@@ -7,8 +8,16 @@
     root: 'ルート'
   };
 
-  let { data } = $page;
+  const filterLabels = {
+    general: '一般通知',
+    match_my_class: '自分のクラスの試合',
+    finals: '決勝戦',
+    all_matches: '全ての試合'
+  };
+
+  let { data, form } = $page;
   let notifications = data.notifications ? [...data.notifications] : [];
+  let selectedFilters = data.user?.notification_filters || ['general'];
 
   function formatDate(value) {
     if (!value) return '';
@@ -24,6 +33,15 @@
       minute: '2-digit'
     });
   }
+
+  function toggleFilter(filter) {
+    if (filter === 'general') return; // general is always required
+    if (selectedFilters.includes(filter)) {
+      selectedFilters = selectedFilters.filter(f => f !== filter);
+    } else {
+      selectedFilters = [...selectedFilters, filter];
+    }
+  }
 </script>
 
 <div class="space-y-8">
@@ -33,6 +51,51 @@
       重要なお知らせを受け取るために、ブラウザの通知を許可してください。通知は最新100件まで表示されます。
     </p>
   </header>
+
+  <section class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">通知フィルタ設定</h2>
+    <p class="text-sm text-gray-600 mb-4">
+      受け取りたい通知の種類を選択してください。最低でも「一般通知」は選択されます。
+    </p>
+
+    <form method="POST" action="?/updateFilters" use:enhance>
+      <div class="space-y-3">
+        {#each Object.entries(filterLabels) as [key, label] (key)}
+          <label class="flex items-center">
+            <input
+              type="checkbox"
+              name="filters"
+              value={key}
+              checked={selectedFilters.includes(key)}
+              disabled={key === 'general'}
+              on:change={() => toggleFilter(key)}
+              class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <span class="ml-2 text-sm text-gray-700">{label}</span>
+            {#if key === 'general'}
+              <span class="ml-1 text-xs text-gray-500">(必須)</span>
+            {/if}
+          </label>
+        {/each}
+      </div>
+
+      <div class="mt-4">
+        <button
+          type="submit"
+          class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          設定を保存
+        </button>
+      </div>
+
+      {#if form?.message}
+        <p class="mt-2 text-sm text-green-600">{form.message}</p>
+      {/if}
+      {#if form?.error}
+        <p class="mt-2 text-sm text-red-600">{form.error}</p>
+      {/if}
+    </form>
+  </section>
 
   <section class="bg-white shadow rounded-lg p-6">
     {#if notifications.length === 0}

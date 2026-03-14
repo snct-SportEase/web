@@ -8,7 +8,7 @@ import (
 )
 
 type NotificationRepository interface {
-	CreateNotification(title, body, createdBy string, eventID *int) (int64, error)
+	CreateNotification(title, body, notificationType, createdBy string, eventID *int) (int64, error)
 	AddNotificationTargets(notificationID int64, roles []string) error
 	GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error)
 	GetUserIDsByRoles(roleNames []string) ([]string, error)
@@ -26,8 +26,8 @@ func NewNotificationRepository(db *sql.DB) NotificationRepository {
 	return &notificationRepository{db: db}
 }
 
-func (r *notificationRepository) CreateNotification(title, body, createdBy string, eventID *int) (int64, error) {
-	query := "INSERT INTO notifications (title, body, created_by, event_id) VALUES (?, ?, ?, ?)"
+func (r *notificationRepository) CreateNotification(title, body, notificationType, createdBy string, eventID *int) (int64, error) {
+	query := "INSERT INTO notifications (title, body, type, created_by, event_id) VALUES (?, ?, ?, ?, ?)"
 	var result sql.Result
 	var err error
 
@@ -37,9 +37,9 @@ func (r *notificationRepository) CreateNotification(title, body, createdBy strin
 	}
 
 	if eventID != nil {
-		result, err = r.db.Exec(query, title, body, createdByParam, *eventID)
+		result, err = r.db.Exec(query, title, body, notificationType, createdByParam, *eventID)
 	} else {
-		result, err = r.db.Exec(query, title, body, createdByParam, nil)
+		result, err = r.db.Exec(query, title, body, notificationType, createdByParam, nil)
 	}
 
 	if err != nil {
@@ -97,6 +97,7 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 			n.id,
 			n.title,
 			n.body,
+			n.type,
 			n.created_by,
 			n.event_id,
 			n.created_at,
@@ -137,6 +138,7 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 			&notif.ID,
 			&notif.Title,
 			&notif.Body,
+			&notif.Type,
 			&createdBy,
 			&eventID,
 			&notif.CreatedAt,

@@ -3,6 +3,7 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,6 +21,7 @@ type UserRepository interface {
 	AddUserRoleIfNotExists(userID string, roleName string) error
 	UpdateUserRole(userID string, roleName string, eventID *int) error
 	DeleteUserRole(userID string, roleName string) error
+	UpdateNotificationFilters(userID string, filters []string) error
 }
 
 func (r *userRepository) DeleteUserRole(userID string, roleName string) error {
@@ -119,7 +121,7 @@ func (r *userRepository) IsEmailWhitelisted(email string) (bool, error) {
 }
 
 func (r *userRepository) FindUsers(query string, searchType string) ([]*models.User, error) {
-	baseQuery := "SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users"
+	baseQuery := "SELECT id, email, display_name, class_id, notification_filters, is_profile_complete, created_at, updated_at FROM users"
 	var args []interface{}
 
 	if query != "" {
@@ -145,8 +147,9 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 		user := &models.User{}
 		var tempClassID sql.NullInt32
 		var tempDisplayName sql.NullString
+		var notificationFiltersStr string
 
-		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &notificationFiltersStr, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -161,6 +164,17 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 			user.ClassID = &val
 		} else {
 			user.ClassID = nil
+		}
+
+		// Parse notification_filters JSON
+		if notificationFiltersStr != "" {
+			err = json.Unmarshal([]byte(notificationFiltersStr), &user.NotificationFilters)
+			if err != nil {
+				// If parsing fails, use default
+				user.NotificationFilters = []string{"general"}
+			}
+		} else {
+			user.NotificationFilters = []string{"general"}
 		}
 		users = append(users, user)
 		userIDs = append(userIDs, user.ID)
@@ -204,15 +218,37 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 }
 
 func (r *userRepository) GetUserByEmail(email string) (*models.User, error) {
-	row := r.db.QueryRow("SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users WHERE email = ?", email)
+	row := r.db.QueryRow("SELECT id, email, display_name, class_id, notification_filters, is_profile_complete, created_at, updated_at FROM users WHERE email = ?", email)
 
 	user := &models.User{}
-	err := row.Scan(&user.ID, &user.Email, &user.DisplayName, &user.ClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+	var tempClassID sql.NullInt32
+	var tempDisplayName sql.NullString
+	var notificationFiltersStr string
+
+	err := row.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &notificationFiltersStr, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // User not found
 		}
 		return nil, err
+	}
+
+	if tempDisplayName.Valid {
+		user.DisplayName = &tempDisplayName.String
+	}
+	if tempClassID.Valid {
+		val := int(tempClassID.Int32)
+		user.ClassID = &val
+	}
+
+	// Parse notification_filters JSON
+	if notificationFiltersStr != "" {
+		err = json.Unmarshal([]byte(notificationFiltersStr), &user.NotificationFilters)
+		if err != nil {
+			user.NotificationFilters = []string{"general"}
+		}
+	} else {
+		user.NotificationFilters = []string{"general"}
 	}
 	return user, nil
 }
@@ -294,13 +330,14 @@ func (r *userRepository) UpdateUserDisplayName(userID string, displayName string
 
 func (r *userRepository) GetUserWithRoles(userID string) (*models.User, error) {
 	// ユーザー情報を取得
-	row := r.db.QueryRow("SELECT id, email, display_name, class_id, is_profile_complete, created_at, updated_at FROM users WHERE id = ?", userID)
+	row := r.db.QueryRow("SELECT id, email, display_name, class_id, notification_filters, is_profile_complete, created_at, updated_at FROM users WHERE id = ?", userID)
 
 	user := &models.User{}
 	var tempClassID sql.NullInt32
 	var tempDisplayName sql.NullString
+	var notificationFiltersStr string
 
-	err := row.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &notificationFiltersStr, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // User not found
@@ -319,6 +356,16 @@ func (r *userRepository) GetUserWithRoles(userID string) (*models.User, error) {
 		user.ClassID = &val
 	} else {
 		user.ClassID = nil
+	}
+
+	// Parse notification_filters JSON
+	if notificationFiltersStr != "" {
+		err = json.Unmarshal([]byte(notificationFiltersStr), &user.NotificationFilters)
+		if err != nil {
+			user.NotificationFilters = []string{"general"}
+		}
+	} else {
+		user.NotificationFilters = []string{"general"}
 	}
 
 	// ユーザーのロール情報を取得
@@ -387,4 +434,14 @@ func (r *userRepository) UpdateUserRole(userID string, roleName string, eventID 
 	}
 
 	return tx.Commit()
+}
+
+func (r *userRepository) UpdateNotificationFilters(userID string, filters []string) error {
+	filtersJSON, err := json.Marshal(filters)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec("UPDATE users SET notification_filters = ? WHERE id = ?", string(filtersJSON), userID)
+	return err
 }

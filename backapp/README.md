@@ -29,6 +29,7 @@ CREATE TABLE users (
     email TEXT UNIQUE NOT NULL,
     display_name TEXT,
     class_id INTEGER, -- FK
+    notification_filters JSON DEFAULT '["general"]',
     role user_role NOT NULL,
     is_profile_complete BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -181,6 +182,7 @@ CREATE TABLE notifications (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
     body TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'general' CHECK (type IN ('general', 'match_my_class', 'finals', 'all_matches')),
     created_by UUID, -- FK
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -3,11 +3,12 @@ package models
 import "time"
 
 type User struct {
-	ID                string  `json:"id"`
-	Email             string  `json:"email"`
-	DisplayName       *string `json:"display_name"`
-	ClassID           *int    `json:"class_id"`
-	IsProfileComplete bool    `json:"is_profile_complete"`
+	ID                   string   `json:"id"`
+	Email                string   `json:"email"`
+	DisplayName          *string  `json:"display_name"`
+	ClassID              *int     `json:"class_id"`
+	NotificationFilters  []string `json:"notification_filters"`
+	IsProfileComplete    bool     `json:"is_profile_complete"`
 	// IsInitRootFirstLogin is true when this user is the initial root user and has not completed profile yet
 	IsInitRootFirstLogin bool      `json:"is_init_root_first_login"`
 	Roles                []Role    `json:"roles,omitempty"`
