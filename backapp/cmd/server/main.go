@@ -131,6 +131,7 @@ func initializeEvent(db *sql.DB, cfg *config.Config) (int64, error) {
 		Season:     season,
 		Start_date: &startDate,
 		End_date:   &endDate,
+		Status:     "upcoming",
 	}
 
 	eventID, err := eventRepo.CreateEvent(event)
