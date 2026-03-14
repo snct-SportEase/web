@@ -132,7 +132,26 @@ CREATE TABLE score_logs (
     event_id INTEGER NOT NULL, -- FK
     class_id INTEGER NOT NULL, -- FK
     points INTEGER NOT NULL,
-    reason TEXT NOT NULL,
+    reason TEXT NOT NULL CHECK (reason IN (
+        'attendance_points',
+        'initial_points',
+        'survey_points',
+        'mvp_points',
+        'gym1_win1_points',
+        'gym1_win2_points',
+        'gym1_win3_points',
+        'gym1_champion_points',
+        'gym2_win1_points',
+        'gym2_win2_points',
+        'gym2_win3_points',
+        'gym2_champion_points',
+        'gym2_loser_bracket_champion_points',
+        'ground_win1_points',
+        'ground_win2_points',
+        'ground_win3_points',
+        'ground_champion_points',
+        'noon_game_points'
+    )),
     source_match_id INTEGER, -- FK
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

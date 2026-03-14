@@ -3,7 +3,6 @@ package repository
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"backapp/internal/models"
 )
@@ -68,11 +67,7 @@ func (r *mvpRepository) VoteMVP(userID string, votedForClassID int, eventID int,
 	}
 
 	// Insert into score_logs
-	logReason := "mvp_points"
-	if reason != "" {
-		logReason = fmt.Sprintf("mvp_points: %s", reason)
-	}
-	_, err = tx.Exec("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)", eventID, votedForClassID, mvpPoints, logReason)
+	_, err = tx.Exec("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)", eventID, votedForClassID, mvpPoints, "mvp_points")
 	if err != nil {
 		return err
 	}

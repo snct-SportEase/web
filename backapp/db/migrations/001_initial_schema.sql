@@ -175,12 +175,32 @@ CREATE TABLE score_logs (
     event_id INT NOT NULL, 
     class_id INT NOT NULL, 
     points INT NOT NULL,
-    reason TEXT NOT NULL,
+    reason VARCHAR(64) NOT NULL,
     source_match_id INT, 
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (event_id) REFERENCES events(id),
     FOREIGN KEY (class_id) REFERENCES classes(id),
-    FOREIGN KEY (source_match_id) REFERENCES matches(id)
+    FOREIGN KEY (source_match_id) REFERENCES matches(id),
+    CONSTRAINT chk_score_logs_reason CHECK (reason IN (
+        'attendance_points',
+        'initial_points',
+        'survey_points',
+        'mvp_points',
+        'gym1_win1_points',
+        'gym1_win2_points',
+        'gym1_win3_points',
+        'gym1_champion_points',
+        'gym2_win1_points',
+        'gym2_win2_points',
+        'gym2_win3_points',
+        'gym2_champion_points',
+        'gym2_loser_bracket_champion_points',
+        'ground_win1_points',
+        'ground_win2_points',
+        'ground_win3_points',
+        'ground_champion_points',
+        'noon_game_points'
+    ))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 出席チェックインテーブル

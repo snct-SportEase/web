@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"database/sql"
-	"fmt"
 	"testing"
 
 	"backapp/internal/models"
@@ -30,7 +29,7 @@ func TestMVPRepository_VoteMVP(t *testing.T) {
 		mock.ExpectBegin()
 		mock.ExpectQuery("SELECT COUNT(.+) FROM mvp_votes").WithArgs(userID, eventID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		mock.ExpectExec("INSERT INTO mvp_votes").WithArgs(userID, classID, eventID, reason, 3).WillReturnResult(sqlmock.NewResult(1, 1))
-		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, fmt.Sprintf("mvp_points: %s", reason)).WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, "mvp_points").WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectCommit()
 
 		err := r.VoteMVP(userID, classID, eventID, reason)
