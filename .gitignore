@@ -2,6 +2,7 @@
 letsencrypt/
 
 latex/*
+latex/how-to-use/*
 !latex/*.tex
 !latex/*.pdf
 !latex/*.png
