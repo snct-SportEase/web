@@ -97,11 +97,9 @@
 	}
 
 	function isClassSportRole(roleName) {
-		// {クラス名_競技名}形式のロールかどうかを判定
-		// アンダースコアが含まれていて、_repで終わっていない場合は、クラス名_競技名形式とみなす
+		// アンダースコアを含むロール（_rep・_競技名どちらも）はクラス管理から操作するため割り当て不可
 		const trimmed = roleName.trim();
-		if (trimmed.includes('_') && !trimmed.endsWith('_rep')) {
-			// デフォルトロールでないことを確認
+		if (trimmed.includes('_')) {
 			if (!defaultRoles.includes(trimmed.toLowerCase())) {
 				return true;
 			}

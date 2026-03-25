@@ -449,24 +449,20 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
 }
 
-// isClassSportRole returns true for {クラス名_競技名} format roles.
-// These roles contain an underscore but do not end with "_rep".
-func isClassSportRole(roleName string) bool {
+// isClassManagedRole returns true for class-managed roles that should not be
+// deleted via role management. This includes {クラス名_競技名} and {クラス名_rep}
+// formats — any role containing an underscore that is not a default role.
+func isClassManagedRole(roleName string) bool {
 	defaultRoles := []string{"root", "admin", "student"}
 	for _, r := range defaultRoles {
 		if roleName == r {
 			return false
 		}
 	}
-	hasUnderscore := false
 	for _, c := range roleName {
 		if c == '_' {
-			hasUnderscore = true
-			break
+			return true
 		}
-	}
-	if hasUnderscore && len(roleName) >= 4 && roleName[len(roleName)-4:] != "_rep" {
-		return true
 	}
 	return false
 }
@@ -489,7 +485,7 @@ func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
 
 	// Prevent deletion of class-sport roles ({クラス名_競技名} format)
 	// These roles must be managed via class/team management, not role management
-	if isClassSportRole(req.Role) {
+	if isClassManagedRole(req.Role) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete class sport roles. Please use class/team management page."})
 		return
 	}

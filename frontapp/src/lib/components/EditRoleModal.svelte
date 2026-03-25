@@ -8,10 +8,8 @@
     const defaultRoles = ['root', 'admin', 'student'];
 
     function isClassSportRole(roleName) {
-        // {クラス名_競技名}形式のロールかどうかを判定
-        // アンダースコアが含まれていて、_repで終わっていない場合は、クラス名_競技名形式とみなす
-        if (roleName.includes('_') && !roleName.endsWith('_rep')) {
-            // デフォルトロールでないことを確認
+        // アンダースコアを含むロール（_rep・_競技名どちらも）はクラス管理から操作するため削除不可
+        if (roleName.includes('_')) {
             if (!defaultRoles.includes(roleName.toLowerCase())) {
                 return true;
             }
