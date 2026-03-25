@@ -18,8 +18,8 @@
   let isIOS = false;
   let isPWA = false;
 
-  $: canEnableNotifications = userHasPushEligibleRole(user);
-  $: vapidKeySet = browser ? (publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '') !== '' : false;
+  let canEnableNotifications = $derived(userHasPushEligibleRole(user));
+  let vapidKeySet = $derived(browser ? (publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '') !== '' : false);
 
   onMount(() => {
     if (browser) {
@@ -300,7 +300,7 @@
         {#if isSubscribed}
           <button
             type="button"
-            on:click={disableNotifications}
+            onclick={disableNotifications}
             disabled={isLoading}
             class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -313,7 +313,7 @@
         {:else}
           <button
             type="button"
-            on:click={enableNotifications}
+            onclick={enableNotifications}
             disabled={isLoading || permissionStatus === 'denied' || !vapidKeySet}
             class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -338,7 +338,7 @@
         <h4 class="text-sm font-semibold text-gray-700">診断情報</h4>
         <button
           type="button"
-          on:click={() => showDebugDetails = !showDebugDetails}
+          onclick={() => showDebugDetails = !showDebugDetails}
           class="text-sm text-indigo-600 hover:text-indigo-700"
         >
           {showDebugDetails ? '非表示' : '詳細を表示'}

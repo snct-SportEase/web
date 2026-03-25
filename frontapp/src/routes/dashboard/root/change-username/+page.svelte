@@ -342,7 +342,7 @@ import { onMount } from 'svelte';
             class="w-full rounded-md border border-gray-300 px-4 py-2 pl-10 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" 
             placeholder="検索キーワードを入力..." 
             bind:value={searchQuery} 
-            on:keydown={(e) => e.key === 'Enter' && searchUsers()}
+            onkeydown={(e) => e.key === 'Enter' && searchUsers()}
           />
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400">
             <path fill-rule="evenodd" d="M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" clip-rule="evenodd" />
@@ -353,7 +353,7 @@ import { onMount } from 'svelte';
       <!-- 検索ボタン -->
       <button 
         class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:bg-indigo-300 disabled:cursor-not-allowed" 
-        on:click={searchUsers}
+        onclick={searchUsers}
         disabled={isLoading}
       >
         {isLoading ? '検索中...' : '検索'}
@@ -362,7 +362,7 @@ import { onMount } from 'svelte';
       <!-- すべて表示ボタン -->
       <button 
         class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed" 
-        on:click={() => { searchQuery = ''; fetchUsers('', ''); }}
+        onclick={() => { searchQuery = ''; fetchUsers('', ''); }}
         disabled={isLoading}
       >
         すべて表示
@@ -418,7 +418,7 @@ import { onMount } from 'svelte';
               <td class="px-4 py-3 text-right">
                 <button 
                   class="inline-flex items-center gap-2 rounded-md border border-indigo-600 bg-white px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1" 
-                  on:click={() => openEditModal(user)}
+                  onclick={() => openEditModal(user)}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
@@ -454,10 +454,10 @@ import { onMount } from 'svelte';
   <div
     class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
     transition:fade={{ duration: 150 }}
-    on:introstart={() => (document.body.style.overflow = 'hidden')}
-    on:outroend={() => (document.body.style.overflow = 'auto')}
-    on:click={handleOverlayClick}
-    on:keydown={(e) => e.key === 'Escape' && closeEditModal()}
+    onintrostart={() => (document.body.style.overflow = 'hidden')}
+    onoutroend={() => (document.body.style.overflow = 'auto')}
+    onclick={handleOverlayClick}
+    onkeydown={(e) => e.key === 'Escape' && closeEditModal()}
     role="button"
     tabindex="-1"
     aria-label="モーダルを閉じる"
@@ -498,7 +498,7 @@ import { onMount } from 'svelte';
             </div>
             <button 
               class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300" 
-              on:click={handleDisplayNameUpdate} 
+              onclick={handleDisplayNameUpdate} 
               disabled={newDisplayName.trim() === ''}
             >
               更新
@@ -530,7 +530,7 @@ import { onMount } from 'svelte';
             </div>
             <button 
               class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:bg-blue-300" 
-              on:click={handleClassRepChange}
+              onclick={handleClassRepChange}
               disabled={!selectedClassRep}
             >
               変更・保存
@@ -554,7 +554,7 @@ import { onMount } from 'svelte';
                     {#if !role.name.endsWith('_rep')}
                       <button 
                         class="text-gray-400 hover:text-red-500 focus:outline-none ml-1"
-                        on:click={() => handleRoleDelete(role.name)}
+                        onclick={() => handleRoleDelete(role.name)}
                         title="ロールを削除"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -587,7 +587,7 @@ import { onMount } from 'svelte';
             </div>
             <button 
               class="rounded-md bg-gray-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:bg-gray-300" 
-              on:click={handleRoleAdd}
+              onclick={handleRoleAdd}
               disabled={!newRoleName.trim()}
             >
               追加
@@ -601,7 +601,7 @@ import { onMount } from 'svelte';
       <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end">
         <button 
           class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100 transition-colors" 
-          on:click={closeEditModal}
+          onclick={closeEditModal}
         >
           閉じる
         </button>

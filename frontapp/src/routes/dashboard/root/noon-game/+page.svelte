@@ -955,7 +955,7 @@
           </p>
           <button
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-            on:click={() => openTemplateConfig('year-relay')}
+            onclick={() => openTemplateConfig('year-relay')}
             disabled={creatingTemplate['year-relay']}>
             {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
           </button>
@@ -969,7 +969,7 @@
           </p>
           <button
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-            on:click={() => openTemplateConfig('course-relay')}
+            onclick={() => openTemplateConfig('course-relay')}
             disabled={creatingTemplate['course-relay']}>
             {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
           </button>
@@ -983,7 +983,7 @@
           </p>
           <button
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-            on:click={() => openTemplateConfig('tug-of-war')}
+            onclick={() => openTemplateConfig('tug-of-war')}
             disabled={creatingTemplate['tug-of-war']}>
             {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
           </button>
@@ -993,8 +993,8 @@
 
     <!-- テンプレート設定モーダル -->
     {#if selectedTemplateType}
-      <div class="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] min-h-screen overflow-y-auto" on:click={closeTemplateConfig}>
-        <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-4 max-h-[90vh] overflow-y-auto" on:click|stopPropagation>
+      <div class="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] min-h-screen overflow-y-auto" onclick={closeTemplateConfig}>
+        <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-4 max-h-[90vh] overflow-y-auto" onclick={(e) => e.stopPropagation()}>
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-semibold text-gray-800">
               {#if selectedTemplateType === 'year-relay'}学年対抗リレー
@@ -1002,7 +1002,7 @@
               {:else if selectedTemplateType === 'tug-of-war'}綱引き
               {/if} テンプレート設定
             </h2>
-            <button class="text-gray-500 hover:text-gray-700" on:click={closeTemplateConfig}>×</button>
+            <button class="text-gray-500 hover:text-gray-700" onclick={closeTemplateConfig}>×</button>
           </div>
 
           <div class="space-y-4">
@@ -1058,7 +1058,7 @@
                         {#each [1, 2, 3, 4, 5, 6] as rank}
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
-                            <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_a[rank]} on:input={(e) => {
+                            <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_a[rank]} oninput={(e) => {
                               templateConfigForm.year_relay_points.block_a = {...templateConfigForm.year_relay_points.block_a, [rank]: Number(e.target.value) || 0};
                             }} />
                           </label>
@@ -1072,7 +1072,7 @@
                         {#each [1, 2, 3, 4, 5, 6] as rank}
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
-                            <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_b[rank]} on:input={(e) => {
+                            <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_b[rank]} oninput={(e) => {
                               templateConfigForm.year_relay_points.block_b = {...templateConfigForm.year_relay_points.block_b, [rank]: Number(e.target.value) || 0};
                             }} />
                           </label>
@@ -1086,7 +1086,7 @@
                         {#each [1, 2, 3, 4, 5, 6] as rank}
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
-                            <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.overall[rank]} on:input={(e) => {
+                            <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.overall[rank]} oninput={(e) => {
                               templateConfigForm.year_relay_points.overall = {...templateConfigForm.year_relay_points.overall, [rank]: Number(e.target.value) || 0};
                             }} />
                           </label>
@@ -1102,25 +1102,25 @@
                   <div class="grid grid-cols-4 gap-4">
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       1位の点数
-                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[1]} on:input={(e) => {
+                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[1]} oninput={(e) => {
                         templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 1: Number(e.target.value) || 0};
                       }} />
                     </label>
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       2位の点数
-                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[2]} on:input={(e) => {
+                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[2]} oninput={(e) => {
                         templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 2: Number(e.target.value) || 0};
                       }} />
                     </label>
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       3位の点数
-                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[3]} on:input={(e) => {
+                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[3]} oninput={(e) => {
                         templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 3: Number(e.target.value) || 0};
                       }} />
                     </label>
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       4位の点数
-                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[4]} on:input={(e) => {
+                      <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[4]} oninput={(e) => {
                         templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 4: Number(e.target.value) || 0};
                       }} />
                     </label>
@@ -1134,7 +1134,7 @@
                   <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">グループ設定</h3>
                   <button
                     class="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    on:click={() => {
+                    onclick={() => {
                       const templateKeyMap = {
                         'year-relay': 'year_relay',
                         'course-relay': 'course_relay',
@@ -1157,7 +1157,7 @@
                             type="text"
                             class="mt-1 border rounded px-2 py-1 text-sm"
                             value={group.group_name}
-                            on:input={(e) => {
+                            oninput={(e) => {
                               templateConfigForm.groups[index].group_name = e.target.value;
                               templateConfigForm.groups = [...templateConfigForm.groups];
                             }}
@@ -1165,7 +1165,7 @@
                         </label>
                         <button
                           class="text-red-500 hover:text-red-700 px-2 py-1 text-sm"
-                          on:click={() => {
+                          onclick={() => {
                             templateConfigForm.groups = templateConfigForm.groups.filter((_, i) => i !== index);
                           }}>
                           削除
@@ -1177,7 +1177,7 @@
                           type="text"
                           class="border rounded px-2 py-1 text-sm"
                           value={group.class_names ? group.class_names.join(', ') : ''}
-                          on:input={(e) => {
+                          oninput={(e) => {
                             const classNames = e.target.value.split(',').map(s => s.trim()).filter(s => s);
                             templateConfigForm.groups[index].class_names = classNames;
                             templateConfigForm.groups = [...templateConfigForm.groups];
@@ -1195,7 +1195,7 @@
                   {/each}
                   <button
                     class="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded text-gray-600 hover:border-gray-400 hover:text-gray-800"
-                    on:click={() => {
+                    onclick={() => {
                       templateConfigForm.groups = [...templateConfigForm.groups, { group_name: '', class_names: [] }];
                     }}>
                     + グループを追加
@@ -1207,12 +1207,12 @@
             <div class="flex justify-end space-x-3">
               <button
                 class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50"
-                on:click={closeTemplateConfig}>
+                onclick={closeTemplateConfig}>
                 キャンセル
               </button>
               <button
                 class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                on:click={createTemplate}
+                onclick={createTemplate}
                 disabled={creatingTemplate[selectedTemplateType]}>
                 {creatingTemplate[selectedTemplateType] ? '作成中...' : 'テンプレートを作成'}
               </button>
@@ -1269,7 +1269,7 @@
               </label>
             </div>
             <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-              on:click={saveSession}
+              onclick={saveSession}
               disabled={savingSession}>
               {savingSession ? '保存中...' : (session ? 'セッションを更新' : 'セッションを作成')}
             </button>
@@ -1280,7 +1280,7 @@
           <div class="border rounded-lg p-4 space-y-4">
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 flex-1">グループ管理</h3>
-              <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" on:click={resetGroupForm}>
+              <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" onclick={resetGroupForm}>
                 フォームをリセット
               </button>
             </div>
@@ -1303,7 +1303,7 @@
                   </select>
                 </label>
                 <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                  on:click={submitGroup}
+                  onclick={submitGroup}
                   disabled={savingGroup}>
                   {groupForm.id ? (savingGroup ? '更新中...' : 'グループを更新') : (savingGroup ? '登録中...' : 'グループを登録')}
                 </button>
@@ -1321,8 +1321,8 @@
                             <p class="text-xs text-gray-500">{group.description}</p>
                           </div>
                           <div class="space-x-2">
-                            <button class="px-3 py-1 text-sm border rounded hover:bg-gray-100" on:click={() => startEditGroup(group)}>編集</button>
-                            <button class="px-3 py-1 text-sm border rounded text-red-600 hover:bg-red-50" on:click={() => deleteGroup(group.id)}>削除</button>
+                            <button class="px-3 py-1 text-sm border rounded hover:bg-gray-100" onclick={() => startEditGroup(group)}>編集</button>
+                            <button class="px-3 py-1 text-sm border rounded text-red-600 hover:bg-red-50" onclick={() => deleteGroup(group.id)}>削除</button>
                           </div>
                         </div>
                         <p class="text-sm text-gray-600 mt-2">
@@ -1347,7 +1347,7 @@
           <div class="border rounded-lg p-4 space-y-4">
             <div class="flex items-center justify-between">
               <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 flex-1">試合設定</h3>
-              <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" on:click={resetMatchForm}>
+              <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" onclick={resetMatchForm}>
                 フォームをリセット
               </button>
             </div>
@@ -1376,7 +1376,7 @@
                 <div class="space-y-3 border rounded p-3">
                   <div class="flex items-center justify-between">
                     <p class="text-sm font-semibold text-gray-700">参加者一覧</p>
-                    <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" on:click={addParticipant}>
+                    <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" onclick={addParticipant}>
                       参加者を追加
                     </button>
                   </div>
@@ -1390,17 +1390,17 @@
                             <span class="text-sm font-semibold text-gray-700">参加者 {index + 1}</span>
                             <div class="space-x-2">
                               <button class="px-2 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-40"
-                                on:click={() => moveParticipant(index, -1)}
+                                onclick={() => moveParticipant(index, -1)}
                                 disabled={index === 0}>
                                 上へ
                               </button>
                               <button class="px-2 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-40"
-                                on:click={() => moveParticipant(index, 1)}
+                                onclick={() => moveParticipant(index, 1)}
                                 disabled={index === matchForm.participants.length - 1}>
                                 下へ
                               </button>
                               <button class="px-2 py-1 text-xs border rounded text-red-600 hover:bg-red-50"
-                                on:click={() => removeParticipant(index)}>
+                                onclick={() => removeParticipant(index)}>
                                 削除
                               </button>
                             </div>
@@ -1412,7 +1412,7 @@
                                 id={`match-form-participant-${index}-type`}
                                 class="border rounded px-2 py-1 w-full"
                                 value={participant.type}
-                                on:change={(e) => setParticipantType(index, e.target.value)}
+                                onchange={(e) => setParticipantType(index, e.target.value)}
                               >
                                 <option value="class">クラス</option>
                                 <option value="group">グループ</option>
@@ -1427,7 +1427,7 @@
                                   id={`match-form-participant-${index}-group`}
                                   class="border rounded px-2 py-1 w-full"
                                   value={participant.group_id}
-                                  on:change={(e) => updateParticipantField(index, 'group_id', e.target.value)}
+                                  onchange={(e) => updateParticipantField(index, 'group_id', e.target.value)}
                                 >
                                   <option value="">選択</option>
                                   {#each groups as group}
@@ -1439,7 +1439,7 @@
                                   id={`match-form-participant-${index}-class`}
                                   class="border rounded px-2 py-1 w-full"
                                   value={participant.class_id}
-                                  on:change={(e) => updateParticipantField(index, 'class_id', e.target.value)}
+                                  onchange={(e) => updateParticipantField(index, 'class_id', e.target.value)}
                                 >
                                   <option value="">選択</option>
                                   {#each classes as cls}
@@ -1454,7 +1454,7 @@
                                 id={`match-form-participant-${index}-display-name`}
                                 class="border rounded px-2 py-1 w-full"
                                 value={participant.display_name}
-                                on:input={(e) => updateParticipantField(index, 'display_name', e.target.value)}
+                                oninput={(e) => updateParticipantField(index, 'display_name', e.target.value)}
                                 placeholder="例: 1年Aチーム"
                               />
                             </div>
@@ -1478,7 +1478,7 @@
                   <span>引き分けを許可</span>
                 </label>
                 <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                  on:click={submitMatch}
+                  onclick={submitMatch}
                   disabled={savingMatch}>
                   {matchForm.id ? (savingMatch ? '更新中...' : '試合を更新') : (savingMatch ? '登録中...' : '試合を登録')}
                 </button>
@@ -1499,8 +1499,8 @@
                             {/if}
                           </div>
                           <div class="space-x-2">
-                            <button class="px-3 py-1 text-sm border rounded hover:bg-white" on:click={() => startEditMatch(match)}>編集</button>
-                            <button class="px-3 py-1 text-sm border rounded text-red-600 hover:bg-red-100" on:click={() => deleteMatch(match.id)}>削除</button>
+                            <button class="px-3 py-1 text-sm border rounded hover:bg-white" onclick={() => startEditMatch(match)}>編集</button>
+                            <button class="px-3 py-1 text-sm border rounded text-red-600 hover:bg-red-100" onclick={() => deleteMatch(match.id)}>削除</button>
                           </div>
                         </div>
                         {#if match.entries && match.entries.length > 0}
@@ -1589,7 +1589,7 @@
                 </label>
               </div>
               <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                on:click={submitManualPoint}
+                onclick={submitManualPoint}
                 disabled={savingManualPoint}>
                 {savingManualPoint ? '登録中...' : '手動加点を登録'}
               </button>

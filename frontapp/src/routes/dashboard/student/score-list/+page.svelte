@@ -2,9 +2,9 @@
 	/** @type {import('./$types').PageData} */
 	export let data;
 
-	$: scores = data.scores || [];
-	$: season = scores.length > 0 ? scores[0].season : '';
-	$: sportNames = scores.length > 0 ? scores[0].sport_names : {};
+	let scores = $derived(data.scores || []);
+	let season = $derived(scores.length > 0 ? scores[0].season : '');
+	let sportNames = $derived(scores.length > 0 ? scores[0].sport_names : {});
 
 	// Helper function to get sport name for a given location
 	function getSportName(location) {
@@ -12,7 +12,7 @@
 	}
 
 	// Define all possible score items and their labels
-	$: scoreItemDefinitions = [
+	let scoreItemDefinitions = $derived([
 		{ key: 'initial_points', label: '初期点' },
 		{ key: 'survey_points', label: 'アンケート' },
 		{ key: 'attendance_points', label: '出席点' },
@@ -34,26 +34,26 @@
 		{ key: 'rank_current_event', label: '順位' },
 		{ key: 'total_points_overall', label: '総合点' },
 		{ key: 'rank_overall', label: '総合順位' }
-	];
+	]);
 
 	// Filter score items based on season
-	$: filteredScoreItems = scoreItemDefinitions.filter(item => {
+	let filteredScoreItems = $derived(scoreItemDefinitions.filter(item => {
 		if (season === 'spring') {
 			return item.key !== 'initial_points' && item.key !== 'total_points_overall' && item.key !== 'rank_overall';
 		}
 		return true; // For autumn, include all
-	});
+	}));
 
 	// Sort scores by rank (1st, 2nd, 3rd, etc.)
 	// Rank 0 (未開始) should be sorted last
-	$: sortedScores = [...scores].sort((a, b) => {
+	let sortedScores = $derived([...scores].sort((a, b) => {
 		const rankA = season === 'spring' ? a.rank_current_event : a.rank_overall;
 		const rankB = season === 'spring' ? b.rank_current_event : b.rank_overall;
 		// If rank is 0, null, or undefined, treat it as Infinity for sorting (put it last)
 		const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
 		const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
 		return normalizedRankA - normalizedRankB;
-	});
+	}));
 
 	// Helper function to get rank style classes
 	function getRankStyle(rank) {

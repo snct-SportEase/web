@@ -302,11 +302,11 @@
                 {#if $activeEvent}
                     <p class="text-sm">アクティブな大会: <span class="font-bold">{$activeEvent.name}</span></p>
                 {/if}
-                <button on:click={previewAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled={!$activeEvent || isGenerating}>
+                <button onclick={previewAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled={!$activeEvent || isGenerating}>
                     {isGenerating ? 'プレビュー生成中...' : 'トーナメントプレビューを生成'}
                 </button>
                 {#if generatedTournamentsPreview}
-                    <button on:click={saveAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" disabled={isSaving}>
+                    <button onclick={saveAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" disabled={isSaving}>
                         {isSaving ? '保存中...' : 'プレビューをDBに保存'}
                     </button>
                 {/if}
@@ -322,7 +322,7 @@
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-lg font-bold">{tournament.name}</h3>
                         {#if generatedTournamentsPreview}
-                        <button on:click={() => toggleEdit(tournament)} class="py-1 px-3 border border-transparent shadow-sm text-sm font-medium rounded-md text-white {editingTournamentId === tournament.id ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}">
+                        <button onclick={() => toggleEdit(tournament)} class="py-1 px-3 border border-transparent shadow-sm text-sm font-medium rounded-md text-white {editingTournamentId === tournament.id ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}">
                             {editingTournamentId === tournament.id ? 'キャンセル' : 'シード順を編集'}
                         </button>
                         {/if}
@@ -331,12 +331,12 @@
                     {#if editingTournamentId === tournament.id}
                         <div class="my-4 p-4 border rounded-lg bg-gray-50">
                             <h4 class="font-semibold mb-2">チームの並び替え (ドラッグ＆ドロップで編集)</h4>
-                            <ul class="draggable-list" use:dndzone={{ items: teamsForEditing, flipDurationMs }} on:consider={handleDnd} on:finalize={handleDnd}>
+                            <ul class="draggable-list" use:dndzone={{ items: teamsForEditing, flipDurationMs }} onconsider={handleDnd} onfinalize={handleDnd}>
                                 {#each teamsForEditing as team (team.id)}
                                     <li class="bg-white">{team.name}</li>
                                 {/each}
                             </ul>
-                            <button on:click={() => saveTeamOrder(tournament)} class="mt-4 w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                            <button onclick={() => saveTeamOrder(tournament)} class="mt-4 w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
                                 この順序でブラケットを更新
                             </button>
                         </div>

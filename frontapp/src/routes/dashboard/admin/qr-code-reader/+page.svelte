@@ -131,13 +131,13 @@
 	<div id="qr-code-full-region" class="w-full md:w-1/2 lg:w-1/3 mx-auto border-2 border-gray-300 rounded-lg overflow-hidden"></div>
 
 	<div class="mt-4 flex justify-center space-x-4">
-		<button on:click={startScan} class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+		<button onclick={startScan} class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
 			Start Scan
 		</button>
-		<button on:click={stopScan} class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+		<button onclick={stopScan} class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
 			Stop Scan
 		</button>
-		<button on:click={resetScanner} class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+		<button onclick={resetScanner} class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
 			Reset
 		</button>
 	</div>

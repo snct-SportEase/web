@@ -24,8 +24,8 @@
     }, 300);
   }
 
-  $: installed = browser ? isPWAInstalled() : false;
-  $: installable = browser ? isPWAInstallable() : false;
+  let installed = $derived(browser ? isPWAInstalled() : false);
+  let installable = $derived(browser ? isPWAInstallable() : false);
 </script>
 
 {#if show && (installed || installable)}
@@ -60,7 +60,7 @@
       </div>
       <button
         type="button"
-        on:click={handleClose}
+        onclick={handleClose}
         aria-label="通知を閉じる"
         class="flex-shrink-0 text-indigo-200 hover:text-white transition-colors"
       >

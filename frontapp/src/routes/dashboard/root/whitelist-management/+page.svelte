@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
 
   let { data } = $page;
-  $: whitelist = data.whitelist;
+  let whitelist = $state(data.whitelist);
 
   // ロールのソート順序を定義 (数値が高いほど上位)
 	const roleRank = {
@@ -32,7 +32,7 @@
 	}
 
   // フィルタリングされたリストをリアクティブに生成
-	$: filteredWhitelist = (() => {
+	let filteredWhitelist = $derived((() => {
 		if (!whitelist) return [];
 
 		return whitelist.filter(entry => {
@@ -45,11 +45,11 @@
 
 			return matchesEmail && matchesRole;
 		});
-	})();
+	})());
 
 	// ソートされたリストをリアクティブに生成
 	// ソートされたリストをリアクティブに生成 (フィルタリングされたリストを基にソート)
-	$: sortedWhitelist = (() => {
+	let sortedWhitelist = $derived((() => {
 		const list = [...filteredWhitelist]; // フィルタリングされたリストを使用
 
 		list.sort((a, b) => {
@@ -82,7 +82,7 @@
 		});
 
 		return list;
-	})();
+	})());
 
   let newEmailLocal = '';
 	let newEmailDomain = '@sendai-nct.jp'; // デフォルト値
@@ -268,7 +268,7 @@
   <!-- Add Single Email -->
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">ホワイトリストに追加</h2>
-    <form on:submit|preventDefault={addEmail} class="flex items-end space-x-4">
+    <form onsubmit={(e) => { e.preventDefault(); addEmail(e); }} class="flex items-end space-x-4">
       <div class="flex-grow">
         <label for="email_local" class="block text-sm font-medium text-gray-700">メールアドレス</label>
 				<div class="flex mt-1">
@@ -308,10 +308,10 @@
   <!-- Bulk Upload CSV -->
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">CSVで一括追加</h2>
-    <form on:submit|preventDefault={uploadCsv} class="flex items-end space-x-4">
+    <form onsubmit={(e) => { e.preventDefault(); uploadCsv(e); }} class="flex items-end space-x-4">
       <div class="flex-grow">
         <label for="csvfile" class="block text-sm font-medium text-gray-700">CSV File (email,role)</label>
-        <input type="file" id="csvfile" on:change={(e) => csvFile = e.target.files[0]} accept=".csv" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+        <input type="file" id="csvfile" onchange={(e) => csvFile = e.target.files[0]} accept=".csv" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
       </div>
       <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Upload</button>
     </form>
@@ -354,7 +354,7 @@
 					{selectedEmails.size}件選択中
 				</div>
 				<button
-					on:click={deleteSelectedEmails}
+					onclick={deleteSelectedEmails}
 					disabled={selectedEmails.size === 0 || isDeleting}
 					class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
 				>
@@ -372,7 +372,7 @@
 							<input
 								type="checkbox"
 								checked={sortedWhitelist && sortedWhitelist.length > 0 && selectedEmails.size === sortedWhitelist.length}
-								on:change={toggleAll}
+								onchange={toggleAll}
 								class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
 							/>
 						</th>
@@ -380,7 +380,7 @@
 						<th
 							scope="col"
 							class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition duration-100"
-							on:click={() => handleSort('email')}
+							onclick={() => handleSort('email')}
 						>
 							<div class="flex items-center">
 								Email
@@ -399,7 +399,7 @@
 						<th
 							scope="col"
 							class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition duration-100"
-							on:click={() => handleSort('role')}
+							onclick={() => handleSort('role')}
 						>
 							<div class="flex items-center">
 								Role
@@ -429,7 +429,7 @@
 									<input
 										type="checkbox"
 										checked={selectedEmails.has(entry.email)}
-										on:change={() => toggleEmail(entry.email)}
+										onchange={() => toggleEmail(entry.email)}
 										class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
 									/>
 								</td>
@@ -437,7 +437,7 @@
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.role}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm">
 									<button
-										on:click={() => deleteEmail(entry.email)}
+										onclick={() => deleteEmail(entry.email)}
 										disabled={isDeleting}
 										class="text-red-600 hover:text-red-900 disabled:text-gray-400 disabled:cursor-not-allowed"
 									>

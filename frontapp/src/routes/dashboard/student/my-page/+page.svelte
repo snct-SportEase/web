@@ -1,30 +1,30 @@
 <script>
-	import { afterUpdate, onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import Chart from 'chart.js/auto';
 
 	export let data;
 
 	let scoreBreakdownChart;
 
-	$: user = data.user;
-	$: myClassScore = data.myClassScore;
-	$: errorMessage = data.error;
-	$: upcomingMatches = data.upcomingMatches || [];
-	$: scoreItems = data.scoreItems || [];
-	$: categoryBreakdown = data.categoryBreakdown || [];
-	$: pointHighlights = data.pointHighlights || [];
-	$: sportSections = data.sportSections || [];
-	$: hasScore = Boolean(myClassScore);
-	$: primaryRankLabel = myClassScore
+	let user = $derived(data.user);
+	let myClassScore = $derived(data.myClassScore);
+	let errorMessage = $derived(data.error);
+	let upcomingMatches = $derived(data.upcomingMatches || []);
+	let scoreItems = $derived(data.scoreItems || []);
+	let categoryBreakdown = $derived(data.categoryBreakdown || []);
+	let pointHighlights = $derived(data.pointHighlights || []);
+	let sportSections = $derived(data.sportSections || []);
+	let hasScore = $derived(Boolean(myClassScore));
+	let primaryRankLabel = $derived(myClassScore
 		? myClassScore.season === 'spring'
 			? '現在の順位'
 			: '総合順位'
-		: '';
-	$: secondaryRankLabel = myClassScore
+		: '');
+	let secondaryRankLabel = $derived(myClassScore
 		? myClassScore.season === 'spring'
 			? '総合順位'
 			: '現在の順位'
-		: '';
+		: '');
 
 	function createChart(ctx, labels, values) {
 		scoreBreakdownChart = new Chart(ctx, {
@@ -116,7 +116,7 @@
 		syncChart();
 	});
 
-	afterUpdate(() => {
+	$effect(() => {
 		syncChart();
 	});
 

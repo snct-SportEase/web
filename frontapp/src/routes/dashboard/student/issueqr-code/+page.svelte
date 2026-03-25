@@ -7,14 +7,14 @@
 	let selectedTeamId = '';
 	let qrCodeData = null;
 
-	$: {
+	$effect(() => {
 		console.log('[QR Code] selectedTeamId変更:', selectedTeamId);
 		console.log('[QR Code] teams:', teams, 'length:', teams?.length, 'isArray:', Array.isArray(teams));
-	}
-	
-	$: selectedTeam = selectedTeamId && teams && Array.isArray(teams)
+	});
+
+	let selectedTeam = $derived(selectedTeamId && teams && Array.isArray(teams)
 		? teams.find((t) => `${t.event_id}-${t.sport_id}` === selectedTeamId)
-		: null;
+		: null);
 	let qrCodeImage = null;
 	let expiresAt = null;
 	let remainingTime = null;
@@ -262,7 +262,7 @@
 
 				{#if selectedTeam && !qrCodeImage}
 					<button
-						on:click={generateQRCode}
+						onclick={generateQRCode}
 						disabled={loading}
 						class="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
 					>
@@ -296,7 +296,7 @@
 					{/if}
 
 					<button
-						on:click={resetQRCode}
+						onclick={resetQRCode}
 						class="mt-4 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700"
 					>
 						新しいQRコードを発行

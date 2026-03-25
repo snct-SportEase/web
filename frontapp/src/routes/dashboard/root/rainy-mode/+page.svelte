@@ -117,7 +117,7 @@
           </p>
         </div>
         <button
-          on:click={toggleRainyMode}
+          onclick={toggleRainyMode}
           disabled={loading}
           class="px-6 py-2 rounded-md font-medium {isRainyMode 
             ? 'bg-gray-600 text-white hover:bg-gray-700' 

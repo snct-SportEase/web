@@ -98,7 +98,7 @@
 
     {#if !isConfirming}
       <!-- プロフィール更新フォーム -->
-      <form on:submit={handleSubmit}>
+      <form onsubmit={handleSubmit}>
         <div class="space-y-4">
           <!-- 表示名 -->
           <div>
@@ -180,7 +180,7 @@
         <div class="mt-6 flex space-x-3">
           <button
             type="button"
-            on:click={handleBack}
+            onclick={handleBack}
             disabled={isLoading}
             class="flex-1 px-4 py-2 font-bold text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
           >
@@ -188,7 +188,7 @@
           </button>
           <button
             type="button"
-            on:click={handleConfirm}
+            onclick={handleConfirm}
             disabled={isLoading}
             class="flex-1 px-4 py-2 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >

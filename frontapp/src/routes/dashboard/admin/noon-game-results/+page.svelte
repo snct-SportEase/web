@@ -759,8 +759,8 @@
                             items: form.participants,
                             flipDurationMs: 200
                           }}
-                          on:consider={(e) => handleDndConsider(e, formKey)}
-                          on:finalize={(e) => handleDndFinalize(e, formKey)}
+                          onconsider={(e) => handleDndConsider(e, formKey)}
+                          onfinalize={(e) => handleDndFinalize(e, formKey)}
                           class="space-y-2"
                         >
                           {#each form.participants as participant, index (participant.id || participant.entry_id)}
@@ -789,7 +789,7 @@
                                     type="number"
                                     class="border border-yellow-300 rounded px-2 py-1 text-sm w-full mt-1"
                                     value={participant.points ?? ''}
-                                    on:input={(e) => updateTemplateParticipantPoints(formKey, index, e.target.value)}
+                                    oninput={(e) => updateTemplateParticipantPoints(formKey, index, e.target.value)}
                                     placeholder="点数を入力"
                                   />
                                 </div>
@@ -809,7 +809,7 @@
                       <div class="flex justify-end">
                         <button
                           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                          on:click={() => submitTemplateResult(run, match, template)}
+                          onclick={() => submitTemplateResult(run, match, template)}
                           disabled={saving[formKey]}>
                           {saving[formKey] ? '送信中...' : '結果を登録'}
                         </button>
@@ -856,7 +856,7 @@
                     <input
                       type="checkbox"
                       checked={resultForms[match.id]?.useRankings}
-                      on:change={(e) => toggleResultUseRankings(match.id, e.target.checked)}
+                      onchange={(e) => toggleResultUseRankings(match.id, e.target.checked)}
                     />
                     <span>参加者ごとの手動得点入力</span>
                   </label>
@@ -875,7 +875,7 @@
                                 min="1"
                                 class="border rounded px-2 py-1 text-sm w-full"
                                 value={participant.rank}
-                                on:input={(e) => updateResultParticipantField(match.id, index, 'rank', e.target.value)}
+                                oninput={(e) => updateResultParticipantField(match.id, index, 'rank', e.target.value)}
                               />
                             </div>
                             <div class="space-y-1">
@@ -885,7 +885,7 @@
                                 type="number"
                                 class="border rounded px-2 py-1 text-sm w-full"
                                 value={participant.points}
-                                on:input={(e) => updateResultParticipantField(match.id, index, 'points', e.target.value)}
+                                oninput={(e) => updateResultParticipantField(match.id, index, 'points', e.target.value)}
                               />
                             </div>
                           </div>
@@ -918,7 +918,7 @@
               </div>
               <div class="flex justify-end">
                 <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                  on:click={() => submitResult(match)}
+                  onclick={() => submitResult(match)}
                   disabled={saving[match.id]}>
                   {saving[match.id] ? '送信中...' : '結果を登録'}
                 </button>

@@ -1,23 +1,14 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { marked } from 'marked';
   import SafeHtml from '$lib/components/SafeHtml.svelte';
 
-  export let showModal = false;
-  export let rulesType;
-  export let rulesContent = ''; // For markdown or text
-  export let rulesPdfUrl = ''; // For pdf
-  export let sportName = '競技ルール';
+  let { showModal = $bindable(false), rulesType, rulesContent = '', rulesPdfUrl = '', sportName = '競技ルール', onclose } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  let renderedRules = '';
-
-  $: renderedRules = rulesType === 'markdown' ? marked.parse(rulesContent || '') : '';
+  let renderedRules = $derived(rulesType === 'markdown' ? marked.parse(rulesContent || '') : '');
 
   function closeModal() {
     showModal = false;
-    dispatch('close');
+    onclose?.();
   }
 
   // Close modal on escape key
@@ -28,7 +19,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if showModal}
   <div
@@ -69,7 +60,7 @@
         <button
           type="button"
           class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
-          on:click={closeModal}
+          onclick={closeModal}
         >
           閉じる
         </button>

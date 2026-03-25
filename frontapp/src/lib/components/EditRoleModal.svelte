@@ -1,10 +1,6 @@
 <script>
-    import { createEventDispatcher } from 'svelte';
+    let { showModal = $bindable(false), user = null, onroleDeleted } = $props();
 
-    export let showModal = false;
-    export let user = null;
-
-    const dispatch = createEventDispatcher();
     const defaultRoles = ['root', 'admin', 'student'];
 
     function isClassSportRole(roleName) {
@@ -46,7 +42,7 @@
 
         if (res.ok) {
             alert('ロールが削除されました。');
-            dispatch('roleDeleted');
+            onroleDeleted?.();
             closeModal();
         } else {
             const error = await res.json();
@@ -68,7 +64,7 @@
                     <div class="flex items-center justify-between bg-gray-100 p-2 rounded-md">
                         <span class="text-sm font-medium text-gray-800">{role.name}</span>
                         {#if !defaultRoles.includes(role.name) && !isClassSportRole(role.name)}
-                            <button on:click={() => deleteRole(role.name)} class="text-red-500 hover:text-red-700 font-semibold text-sm">
+                            <button onclick={() => deleteRole(role.name)} class="text-red-500 hover:text-red-700 font-semibold text-sm">
                                 削除
                             </button>
                         {:else if isClassSportRole(role.name)}
@@ -80,7 +76,7 @@
         </div>
 
         <div class="flex justify-end">
-            <button on:click={closeModal} class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+            <button onclick={closeModal} class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
                 閉じる
             </button>
         </div>

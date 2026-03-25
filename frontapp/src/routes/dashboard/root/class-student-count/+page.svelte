@@ -123,14 +123,14 @@
   <!-- CSV Upload -->
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">CSVで一括更新</h2>
-    <form on:submit|preventDefault={handleCSVUpload} class="flex flex-col sm:flex-row items-start sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
+    <form onsubmit={(e) => { e.preventDefault(); handleCSVUpload(e); }} class="flex flex-col sm:flex-row items-start sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
       <div class="flex-grow w-full">
         <label for="csvfile" class="block text-sm font-medium text-gray-700">CSVファイル</label>
         <input 
           type="file" 
           id="csvfile" 
           accept=".csv" 
-          on:change={handleFileSelect} 
+          onchange={handleFileSelect} 
           class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
         <p class="text-xs text-gray-500 mt-1">フォーマット: 1列目にクラス名, 2列目に生徒数 (ヘッダー行あり)</p>
       </div>
@@ -146,7 +146,7 @@
   <!-- Manual Update -->
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">手動で更新</h2>
-    <form on:submit|preventDefault={handleSave}>
+    <form onsubmit={(e) => { e.preventDefault(); handleSave(e); }}>
       <div class="overflow-x-auto rounded-lg border border-gray-200">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">

@@ -14,16 +14,20 @@ export let onSave = async () => {};
   let displayNameInput;
 
   // モーダルが開かれるたびに現在の表示名をリセット
-  $: if (isOpen) {
-    newDisplayName = currentDisplayName;
-    errorMessage = '';
-  }
+  $effect(() => {
+    if (isOpen) {
+      newDisplayName = currentDisplayName;
+      errorMessage = '';
+    }
+  });
 
-  $: if (isOpen && browser) {
-    tick().then(() => {
-      displayNameInput?.focus();
-    });
-  }
+  $effect(() => {
+    if (isOpen && browser) {
+      tick().then(() => {
+        displayNameInput?.focus();
+      });
+    }
+  });
 
   async function handleSave() {
     if (!newDisplayName.trim()) {
@@ -79,8 +83,8 @@ export let onSave = async () => {};
     class="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm min-h-screen overflow-hidden"
     role="presentation"
     tabindex="-1"
-    on:click={handleCancel}
-    on:keydown={handleOverlayKeydown}
+    onclick={handleCancel}
+    onkeydown={handleOverlayKeydown}
   >
     <!-- モーダルの本体 -->
     <div
@@ -89,14 +93,14 @@ export let onSave = async () => {};
       aria-modal="true"
       aria-labelledby="edit-display-name-title"
       tabindex="-1"
-      on:click|stopPropagation
-      on:keydown={handleKeydown}
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={handleKeydown}
     >
       <div class="flex justify-between items-center">
         <h2 id="edit-display-name-title" class="text-xl font-bold text-gray-800">プロフィール管理</h2>
         <button
           type="button"
-          on:click={handleCancel}
+          onclick={handleCancel}
           aria-label="プロフィール管理を閉じる"
           class="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
         >
@@ -144,7 +148,7 @@ export let onSave = async () => {};
       <div class="flex space-x-3 pt-2">
         <button
           type="button"
-          on:click={handleCancel}
+          onclick={handleCancel}
           disabled={isLoading}
           class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -152,7 +156,7 @@ export let onSave = async () => {};
         </button>
         <button
           type="button"
-          on:click={handleSave}
+          onclick={handleSave}
           disabled={isLoading || !newDisplayName.trim()}
           class="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >

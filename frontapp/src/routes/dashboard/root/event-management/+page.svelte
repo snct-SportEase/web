@@ -19,12 +19,12 @@
     hide_scores: false,
   };
 
-  $: {
+  $effect(() => {
     if (!isNameManuallyChanged && currentEvent.year && currentEvent.season) {
       const seasonText = currentEvent.season === 'spring' ? '春' : '秋';
       currentEvent.name = `${currentEvent.year}${seasonText}季スポーツ大会`;
     }
-  }
+  });
 
   function onNameInput() {
     isNameManuallyChanged = true;
@@ -259,10 +259,10 @@
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">大会情報登録・管理</h1>
     <div class="flex space-x-2">
-      <button on:click={downloadDBDump} class="btn btn-secondary bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+      <button onclick={downloadDBDump} class="btn btn-secondary bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
         DBダンプ出力
       </button>
-      <button on:click={openCreateModal} class="btn btn-primary bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+      <button onclick={openCreateModal} class="btn btn-primary bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
         新規作成
       </button>
     </div>
@@ -283,7 +283,7 @@
       </thead>
       <tbody>
         {#each events as event}
-          <tr on:click={() => openEditModal(event)} class="cursor-pointer hover:bg-gray-50 transition-colors">
+          <tr onclick={() => openEditModal(event)} class="cursor-pointer hover:bg-gray-50 transition-colors">
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.name}</td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.year}</td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.season === 'spring' ? '春' : '秋'}</td>
@@ -300,23 +300,23 @@
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">予定</span>
               {/if}
             </td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" on:click|stopPropagation>
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" onclick={(e) => e.stopPropagation()}>
               <div class="flex flex-col space-y-2">
                 {#if event.season === 'spring'}
                   <div class="flex flex-col">
                     <label class="text-xs text-gray-600 mb-1">点数インポート(CSV)
-                      <input type="file" accept=".csv" class="text-xs mt-1 block" on:change={(e) => handleCsvUpload(event.id, e)} />
+                      <input type="file" accept=".csv" class="text-xs mt-1 block" onchange={(e) => handleCsvUpload(event.id, e)} />
                     </label>
                   </div>
                 {/if}
               </div>
             </td>
-            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" on:click|stopPropagation>
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" onclick={(e) => e.stopPropagation()}>
               <div class="flex flex-col space-y-2">
-                <button type="button" on:click|stopPropagation={() => downloadExport(event, 'csv')} class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-fit">
+                <button type="button" onclick={(e) => { e.stopPropagation(); downloadExport(event, 'csv'); }} class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-fit">
                   CSV出力
                 </button>
-                <button type="button" on:click|stopPropagation={() => downloadExport(event, 'pdf')} class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 w-fit">
+                <button type="button" onclick={(e) => { e.stopPropagation(); downloadExport(event, 'pdf'); }} class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 w-fit">
                   PDF出力
                 </button>
               </div>
@@ -343,7 +343,7 @@
           <div class="space-y-4">
             <div>
               <label for="name" class="block text-sm font-medium text-gray-700">大会名</label>
-              <input type="text" id="name" bind:value={currentEvent.name} on:input={onNameInput} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+              <input type="text" id="name" bind:value={currentEvent.name} oninput={onNameInput} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
             </div>
             <div>
               <label for="year" class="block text-sm font-medium text-gray-700">年度</label>
@@ -369,7 +369,7 @@
               <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-1">
                 <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 {#if selectedEvent && currentEvent.survey_url}
-                  <button type="button" on:click={() => notifySurvey(selectedEvent.id)} class="whitespace-nowrap text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded hover:bg-blue-200 border border-blue-200 font-medium">
+                  <button type="button" onclick={() => notifySurvey(selectedEvent.id)} class="whitespace-nowrap text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded hover:bg-blue-200 border border-blue-200 font-medium">
                     通知を送信
                   </button>
                 {/if}
@@ -396,10 +396,10 @@
           </div>
         </div>
         <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-          <button on:click={handleSave} type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
+          <button onclick={handleSave} type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
             保存
           </button>
-          <button on:click={closeModal} type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+          <button onclick={closeModal} type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
             キャンセル
           </button>
         </div>

@@ -4,8 +4,7 @@
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { marked } from 'marked';
     import SafeHtml from '$lib/components/SafeHtml.svelte';
-    let assignmentPreviewHtml = '';
-    $: assignmentPreviewHtml = marked.parse(newAssignment.rules || '');
+    let assignmentPreviewHtml = $derived(marked.parse(newAssignment.rules || ''));
 
     let allSports = [];
     let eventSports = [];
@@ -29,14 +28,14 @@
     const allLocations = ['gym1', 'gym2', 'ground', 'other'];
 
     // noon_game はこの画面の対象外なので、使用中ロケーションの計算からも除外する
-    $: usedLocations = eventSports
+    let usedLocations = $derived(eventSports
         ? eventSports
               .map(es => es.location)
               .filter(loc => loc !== 'other' && loc !== 'noon_game')
-        : [];
+        : []);
 
     // この画面で扱うのは「通常競技」のみ（noon_game は別画面で管理）
-    $: visibleEventSports = eventSports ? eventSports.filter(es => es.location !== 'noon_game') : [];
+    let visibleEventSports = $derived(eventSports ? eventSports.filter(es => es.location !== 'noon_game') : []);
 
     let unsubscribe = null;
 
@@ -322,7 +321,7 @@
                 <h3 class="font-semibold mb-3 text-lg text-indigo-700">新規競技登録</h3>
                 <div class="space-y-2">
                     <input type="text" bind:value={newSportName} placeholder="新しい競技名を入力" class="input-field" />
-                    <button on:click={createSport} class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 font-semibold transition duration-150">
+                    <button onclick={createSport} class="w-full bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700 font-semibold transition duration-150">
                         競技をマスタに登録
                     </button>
                 </div>
@@ -399,7 +398,7 @@
                             <SafeHtml class="prose mt-1 p-2 border rounded-md bg-gray-100 min-h-[8rem]" html={assignmentPreviewHtml} />
                         </div>
                         
-                        <button on:click={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={!newAssignment.sport_id || isAssigning}>
+                        <button onclick={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={!newAssignment.sport_id || isAssigning}>
                             {isAssigning ? '割り当て中...' : '大会に競技を割り当てる'}
                         </button>
                     </div>
@@ -443,13 +442,13 @@
                                                             class="w-16 px-2 py-1 text-xs border rounded"
                                                         />
                                                         <button 
-                                                            on:click={() => saveCapacity(es.event_id, es.sport_id)}
+                                                            onclick={() => saveCapacity(es.event_id, es.sport_id)}
                                                             class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
                                                         >
                                                             保存
                                                         </button>
                                                         <button 
-                                                            on:click={cancelEditCapacity}
+                                                            onclick={cancelEditCapacity}
                                                             class="text-xs px-2 py-1 bg-gray-400 text-white rounded hover:bg-gray-500"
                                                         >
                                                             取消
@@ -461,7 +460,7 @@
                                                             {es.min_capacity ?? '未設定'} 〜 {es.max_capacity ?? '未設定'}
                                                         </span>
                                                         <button 
-                                                            on:click={() => startEditCapacity(es.event_id, es.sport_id)}
+                                                            onclick={() => startEditCapacity(es.event_id, es.sport_id)}
                                                             class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
                                                         >
                                                             編集
@@ -470,7 +469,7 @@
                                                 {/if}
                                             </td>
                                             <td class="px-4 py-3">
-                                                <button on:click={() => deleteAssignedSport(es.sport_id)} class="text-red-600 hover:text-red-800 font-semibold text-xs py-1 px-3 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-150">
+                                                <button onclick={() => deleteAssignedSport(es.sport_id)} class="text-red-600 hover:text-red-800 font-semibold text-xs py-1 px-3 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-150">
                                                     解除
                                                 </button>
                                             </td>

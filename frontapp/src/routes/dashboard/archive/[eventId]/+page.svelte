@@ -39,16 +39,16 @@
         }
     });
 
-    $: season = eventData ? eventData.season : (scores.length > 0 ? scores[0].season : '');
-    
+    let season = $derived(eventData ? eventData.season : (scores.length > 0 ? scores[0].season : ''));
+
     // Simplistic rank sorting
-    $: sortedScores = [...scores].sort((a, b) => {
+    let sortedScores = $derived([...scores].sort((a, b) => {
         const rankA = season === 'spring' ? a.rank_current_event : a.rank_overall;
         const rankB = season === 'spring' ? b.rank_current_event : b.rank_overall;
         const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
         const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
         return normalizedRankA - normalizedRankB;
-    });
+    }));
 
     function getRankBadge(rank) {
         if (rank === 0 || rank === null || rank === undefined) return '未開始';
@@ -91,13 +91,13 @@
         <div class="border-b border-gray-200 mb-6">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                 <button
-                    on:click={() => activeTab = 'scores'}
+                    onclick={() => activeTab = 'scores'}
                     class="{activeTab === 'scores' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
                 >
                     スコア・順位
                 </button>
                 <button
-                    on:click={() => activeTab = 'tournaments'}
+                    onclick={() => activeTab = 'tournaments'}
                     class="{activeTab === 'tournaments' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
                 >
                     トーナメント結果

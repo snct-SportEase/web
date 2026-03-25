@@ -6,8 +6,8 @@
 	import ConfirmMatchResultModal from '$lib/components/ConfirmMatchResultModal.svelte';
 
 	let { data } = $page;
-	$: user = data.user;
-	$: isRoot = user?.roles?.some(role => role.name === 'root');
+	let user = $derived(data.user);
+	let isRoot = $derived(user?.roles?.some(role => role.name === 'root'));
 
 	let tournaments = [];
 	let selectedTournamentId = '';
@@ -20,34 +20,36 @@
 
 	let ws;
 
-	$: if (selectedTournamentId && typeof window !== 'undefined') {
-		if (ws) {
-			ws.close();
-		}
-		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-		const host = window.location.host;
-		ws = new WebSocket(`${protocol}//${host}/api/ws/tournaments/${selectedTournamentId}`);
-
-		ws.onmessage = (event) => {
-			const data = JSON.parse(event.data);
-			if (data.type === 'update') {
-				// refetch tournament data
-				fetch(`/api/admin/events/${activeEventId}/tournaments`)
-					.then((res) => res.json())
-					.then((data) => {
-						tournaments = data;
-					});
+	$effect(() => {
+		if (selectedTournamentId && typeof window !== 'undefined') {
+			if (ws) {
+				ws.close();
 			}
-		};
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			const host = window.location.host;
+			ws = new WebSocket(`${protocol}//${host}/api/ws/tournaments/${selectedTournamentId}`);
 
-		ws.onclose = () => {
-			console.log('WebSocket connection closed');
-		};
+			ws.onmessage = (event) => {
+				const data = JSON.parse(event.data);
+				if (data.type === 'update') {
+					// refetch tournament data
+					fetch(`/api/admin/events/${activeEventId}/tournaments`)
+						.then((res) => res.json())
+						.then((data) => {
+							tournaments = data;
+						});
+				}
+			};
 
-		ws.onerror = (error) => {
-			console.error('WebSocket error:', error);
-		};
-	}
+			ws.onclose = () => {
+				console.log('WebSocket connection closed');
+			};
+
+			ws.onerror = (error) => {
+				console.error('WebSocket error:', error);
+			};
+		}
+	});
 
 	onMount(async () => {
 		try {
@@ -147,12 +149,17 @@
 		}
 	}
 
-	$: selectedTournament = tournaments.find((t) => t.id === selectedTournamentId);
+	let selectedTournament = $state(undefined);
+	$effect(() => {
+		selectedTournament = tournaments.find((t) => t.id === selectedTournamentId);
+	});
 	// 敗者戦トーナメントが選択されていて、雨天時モードが無効な場合は選択を解除
-	$: if (selectedTournament && selectedTournament.name.includes('敗者戦') && !isRainyMode) {
-		selectedTournamentId = '';
-		selectedTournament = null;
-	}
+	$effect(() => {
+		if (selectedTournament && selectedTournament.name.includes('敗者戦') && !isRainyMode) {
+			selectedTournamentId = '';
+			selectedTournament = undefined;
+		}
+	});
 
 	async function renderBracket() {
 		if (!browser) return;
@@ -175,9 +182,11 @@
 		}, 0);
 	}
 
-	$: if (selectedTournament) {
-		renderBracket();
-	}
+	$effect(() => {
+		if (selectedTournament) {
+			renderBracket();
+		}
+	});
 </script>
 
 <h1 class="text-2xl font-bold mb-4">試合結果入力</h1>
@@ -236,12 +245,12 @@
 							<p class="font-bold text-yellow-600">Draw</p>
 						{/if}
 						{#if isRoot}
-							<button on:click={() => openModal(match)} class="mt-2 text-orange-600 hover:underline text-sm"
+							<button onclick={() => openModal(match)} class="mt-2 text-orange-600 hover:underline text-sm"
 								>結果を修正（rootのみ）</button
 							>
 						{/if}
 					{:else}
-						<button on:click={() => openModal(match)} class="text-blue-500 hover:underline"
+						<button onclick={() => openModal(match)} class="text-blue-500 hover:underline"
 							>結果を入力</button
 						>
 					{/if}
@@ -257,8 +266,8 @@
 	bind:showModal
 	{selectedMatch}
 	{selectedTournament}
-	on:close={closeModal}
-	on:confirm={handleConfirm}
+	onclose={closeModal}
+	onconfirm={handleConfirm}
 />
 
 <ConfirmMatchResultModal
@@ -269,6 +278,6 @@
     team2Name={selectedTournament?.data.contestants[selectedMatch?.sides?.[1]?.contestantId]?.players?.[0]?.title}
     team1Id={selectedMatch?.sides?.[0]?.teamId}
     team2Id={selectedMatch?.sides?.[1]?.teamId}
-    on:confirm={handleSubmit}
-    on:cancel={closeConfirmModal}
+    onconfirm={handleSubmit}
+    oncancel={closeConfirmModal}
 />
