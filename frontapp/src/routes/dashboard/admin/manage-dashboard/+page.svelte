@@ -192,7 +192,7 @@
 		<div class="bg-white rounded-lg shadow-md p-6">
 			<h2 class="text-xl font-semibold text-gray-800 mb-4">リアルタイムイベント進行状況</h2>
 			<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-				{#each Object.entries(eventProgress) as [sport, status]}
+				{#each Object.entries(eventProgress) as [sport, status] (sport)}
 					<div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
 						<h3 class="font-medium text-gray-900">{sport}</h3>
 						<p class="text-sm text-gray-600 mt-1">{status}</p>

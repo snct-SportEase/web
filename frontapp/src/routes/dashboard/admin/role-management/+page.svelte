@@ -154,7 +154,7 @@
 	});
 </script>
 
-<EditRoleModal bind:showModal={showEditModal} user={selectedUserForEdit} on:roleDeleted={handleRoleUpdate} />
+<EditRoleModal bind:showModal={showEditModal} user={selectedUserForEdit} onroleDeleted={handleRoleUpdate} />
 
 <h1 class="text-2xl font-bold mb-4">ロール管理</h1>
 
@@ -168,23 +168,23 @@
                     id="email-search"
                     type="email"
                     bind:value={emailSearch}
-                    on:focus={async () => {
+                    onfocus={async () => {
                         await fetchAllUsers();
                         searchUsers();
                         showUserList = true;
                     }}
-                    on:input={searchUsers}
+                    oninput={searchUsers}
                     placeholder="メールアドレスで検索"
                     class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
                 {#if showUserList && filteredUsers.length > 0}
                     <ul class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
-                        {#each filteredUsers as user}
+                        {#each filteredUsers as user (user.id)}
                             <li class="text-gray-900 select-none relative">
                                 <button
 									type="button"
 									class="w-full text-left py-2 pl-3 pr-9 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-md"
-									on:click={() => selectUser(user)}
+									onclick={() => selectUser(user)}
 									aria-label={`ユーザー ${user.email} を選択`}
 								>
 									<span class="block truncate">{user.email}</span>
@@ -195,12 +195,12 @@
                 {/if}
             </div>
             <div class="mt-2 space-x-1">
-                {#each selectedUsers as user}
+                {#each selectedUsers as user (user.id)}
                     <span class="inline-flex items-center gap-x-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800">
                         {user.email}
                         <button
 							type="button"
-							on:click={() => removeUser(user)}
+							onclick={() => removeUser(user)}
 							class="-mr-0.5 h-5 w-5 p-0.5 rounded-full inline-flex items-center justify-center text-indigo-500 hover:bg-indigo-200 hover:text-indigo-600"
 							aria-label={`ユーザー ${user.email} をリストから削除`}
 						>
@@ -222,7 +222,7 @@
             />
         </div>
 
-        <button on:click={assignRole} class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+        <button onclick={assignRole} class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="-ml-1 mr-2 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
             </svg>
@@ -237,19 +237,19 @@
 		<table class="min-w-full divide-y divide-gray-200">
 			<thead class="bg-gray-50">
 				<tr>
-					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" on:click={() => sortUsers('email')}>
+					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onclick={() => sortUsers('email')}>
 						メールアドレス
 						{#if sortColumn === 'email'}
 							<span>{sortAsc ? '▲' : '▼'}</span>
 						{/if}
 					</th>
-					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" on:click={() => sortUsers('display_name')}>
+					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onclick={() => sortUsers('display_name')}>
 						表示名
 						{#if sortColumn === 'display_name'}
 							<span>{sortAsc ? '▲' : '▼'}</span>
 						{/if}
 					</th>
-					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" on:click={() => sortUsers('roles')}>
+					<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onclick={() => sortUsers('roles')}>
 						ロール
 						{#if sortColumn === 'roles'}
 							<span>{sortAsc ? '▲' : '▼'}</span>
@@ -258,8 +258,8 @@
 				</tr>
 			</thead>
 			<tbody class="bg-white divide-y divide-gray-200">
-				{#each usersWithRoles as user}
-					<tr class="hover:bg-gray-50 cursor-pointer" on:click={() => openEditModal(user)}>
+				{#each usersWithRoles as user (user.id)}
+					<tr class="hover:bg-gray-50 cursor-pointer" onclick={() => openEditModal(user)}>
 						<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
 							{user.email}
 						</td>
@@ -269,7 +269,7 @@
 						<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 							{#if user.roles}
 								<div class="flex space-x-2">
-									{#each user.roles as role}
+									{#each user.roles as role (role.id)}
 										{#if !defaultRoles.includes(role.name)}
 											<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800"										>
 												{role.name}

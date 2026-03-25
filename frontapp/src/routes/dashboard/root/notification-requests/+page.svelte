@@ -4,9 +4,9 @@
 
   let { data } = $page;
 
-  $: requests = data.requests ?? [];
-  $: activeRequest = data.activeRequest;
-  $: hasRequests = requests.length > 0;
+  let requests = $derived(data.requests ?? []);
+  let activeRequest = $state(data.activeRequest);
+  let hasRequests = $derived(requests.length > 0);
 
   let messageInput = '';
   let isPostingMessage = false;
@@ -137,7 +137,7 @@
             {@const status = formatStatus(item.status)}
             <button
               class="w-full rounded-md border px-4 py-3 text-left text-sm transition hover:border-indigo-300 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 {activeRequest?.id === item.id ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white'}"
-              on:click={() => selectRequest(item.id)}
+              onclick={() => selectRequest(item.id)}
             >
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-900">{item.title}</span>
@@ -196,7 +196,7 @@
             {/if}
           </div>
 
-          <form class="space-y-3" on:submit|preventDefault={handleMessageSubmit}>
+          <form class="space-y-3" onsubmit={(e) => { e.preventDefault(); handleMessageSubmit(e); }}>
             <label class="block text-sm font-medium text-gray-700" for="rootMessageInput">メッセージを送信</label>
             <textarea
               class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -219,14 +219,14 @@
           <div class="flex items-center justify-end space-x-3">
             <button
               class="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-              on:click={() => decide('rejected')}
+              onclick={() => decide('rejected')}
               disabled={isDeciding || activeRequest.status !== 'pending'}
             >
               否認する
             </button>
             <button
               class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 disabled:bg-indigo-300"
-              on:click={() => decide('approved')}
+              onclick={() => decide('approved')}
               disabled={isDeciding || activeRequest.status !== 'pending'}
             >
               承認する

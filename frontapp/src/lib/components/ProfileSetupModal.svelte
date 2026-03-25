@@ -2,7 +2,7 @@
   import { browser } from '$app/environment';
 
   /** @type {Array<{id: number, name: string}>} */
-  export let classes = [];
+  let { classes = [] } = $props();
 
   let isLoading = false;
   let errorMessage = '';
@@ -98,7 +98,7 @@
 
     {#if !isConfirming}
       <!-- プロフィール更新フォーム -->
-      <form on:submit={handleSubmit}>
+      <form onsubmit={handleSubmit}>
         <div class="space-y-4">
           <!-- 表示名 -->
           <div>
@@ -130,7 +130,7 @@
                 value={confirmData.classId}
               >
                 <option value="" disabled selected={!confirmData.classId}>クラスを選択してください</option>
-                {#each classes as cls}
+                {#each classes as cls (cls.id)}
                   <option value={cls.id} selected={String(cls.id) === confirmData.classId}>{cls.name}</option>
                 {/each}
               </select>
@@ -180,7 +180,7 @@
         <div class="mt-6 flex space-x-3">
           <button
             type="button"
-            on:click={handleBack}
+            onclick={handleBack}
             disabled={isLoading}
             class="flex-1 px-4 py-2 font-bold text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
           >
@@ -188,7 +188,7 @@
           </button>
           <button
             type="button"
-            on:click={handleConfirm}
+            onclick={handleConfirm}
             disabled={isLoading}
             class="flex-1 px-4 py-2 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >

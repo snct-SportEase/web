@@ -2,14 +2,15 @@
   import { browser } from '$app/environment';
   import { getDeviceType, getBrowserType } from '$lib/utils/pwa.js';
 
-  export let isOpen = false;
-  export let onClose = () => {};
+  let { isOpen = false, onClose = () => {} } = $props();
 
   // Note: deviceType and browserType are computed but not currently used in the template
-  $: if (isOpen && browser) {
-    void(getDeviceType());
-    void(getBrowserType());
-  }
+  $effect(() => {
+    if (isOpen && browser) {
+      void(getDeviceType());
+      void(getBrowserType());
+    }
+  });
 
   function handleKeydown(event) {
     if (event.key === 'Escape') {
@@ -35,8 +36,8 @@
     class="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto min-h-screen py-4"
     role="presentation"
     tabindex="-1"
-    on:click={onClose}
-    on:keydown={handleOverlayKeydown}
+    onclick={onClose}
+    onkeydown={handleOverlayKeydown}
   >
     <!-- モーダルの本体 -->
     <div
@@ -45,15 +46,15 @@
       aria-modal="true"
       aria-labelledby="pwa-install-guide-title"
       tabindex="-1"
-      on:click|stopPropagation
-      on:keydown={handleKeydown}
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={handleKeydown}
     >
       <!-- ヘッダー（固定） -->
       <div class="flex justify-between items-center p-6 pb-4 border-b border-gray-200 flex-shrink-0">
         <h2 id="pwa-install-guide-title" class="text-2xl font-bold text-gray-800">PWAインストール方法</h2>
         <button
           type="button"
-          on:click={onClose}
+          onclick={onClose}
           aria-label="モーダルを閉じる"
           class="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 flex-shrink-0 ml-4"
         >
@@ -150,7 +151,7 @@
       <div class="flex justify-end p-6 pt-4 border-t border-gray-200 flex-shrink-0">
         <button
           type="button"
-          on:click={onClose}
+          onclick={onClose}
           class="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           閉じる

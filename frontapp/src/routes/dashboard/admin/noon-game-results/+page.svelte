@@ -734,7 +734,7 @@
       <section class="bg-white shadow rounded-lg p-6 space-y-6">
         <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">テンプレート結果入力</h2>
         <div class="space-y-6">
-          {#each templateRuns as run}
+          {#each templateRuns as run (run.id || run.template?.id)}
             <div class="border rounded-lg p-4 bg-blue-50 space-y-4">
               <h3 class="text-lg font-semibold text-gray-800">
                 {#if run.type === 'year-relay'}
@@ -745,7 +745,7 @@
                   綱引き
                 {/if}
               </h3>
-              {#each run.matches as { match, template }}
+              {#each run.matches as { match, template } (match.id)}
                 {@const formKey = `${run.key}-${match.id}`}
                 {@const form = templateRunForms[formKey]}
                 {#if form}
@@ -759,8 +759,8 @@
                             items: form.participants,
                             flipDurationMs: 200
                           }}
-                          on:consider={(e) => handleDndConsider(e, formKey)}
-                          on:finalize={(e) => handleDndFinalize(e, formKey)}
+                          onconsider={(e) => handleDndConsider(e, formKey)}
+                          onfinalize={(e) => handleDndFinalize(e, formKey)}
                           class="space-y-2"
                         >
                           {#each form.participants as participant, index (participant.id || participant.entry_id)}
@@ -789,7 +789,7 @@
                                     type="number"
                                     class="border border-yellow-300 rounded px-2 py-1 text-sm w-full mt-1"
                                     value={participant.points ?? ''}
-                                    on:input={(e) => updateTemplateParticipantPoints(formKey, index, e.target.value)}
+                                    oninput={(e) => updateTemplateParticipantPoints(formKey, index, e.target.value)}
                                     placeholder="点数を入力"
                                   />
                                 </div>
@@ -809,7 +809,7 @@
                       <div class="flex justify-end">
                         <button
                           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                          on:click={() => submitTemplateResult(run, match, template)}
+                          onclick={() => submitTemplateResult(run, match, template)}
                           disabled={saving[formKey]}>
                           {saving[formKey] ? '送信中...' : '結果を登録'}
                         </button>
@@ -830,7 +830,7 @@
         <p class="text-gray-500">登録された試合がありません。</p>
       {:else}
         <div class="space-y-4">
-          {#each matches.filter(m => !detectTemplateFromMatch(m)) as match}
+          {#each matches.filter(m => !detectTemplateFromMatch(m)) as match (match.id)}
             <div class="border rounded-lg p-4 bg-gray-50 space-y-3">
               <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                 <div>
@@ -856,14 +856,14 @@
                     <input
                       type="checkbox"
                       checked={resultForms[match.id]?.useRankings}
-                      on:change={(e) => toggleResultUseRankings(match.id, e.target.checked)}
+                      onchange={(e) => toggleResultUseRankings(match.id, e.target.checked)}
                     />
                     <span>参加者ごとの手動得点入力</span>
                   </label>
                   {#if resultForms[match.id]?.useRankings}
                     <p class="text-sm font-semibold text-gray-700">順位・得点</p>
                     <div class="space-y-3">
-                      {#each resultForms[match.id].participants as participant, index}
+                      {#each resultForms[match.id].participants as participant, index (index)}
                         <div class="border rounded px-3 py-3 space-y-2 bg-white">
                           <p class="text-sm font-semibold text-gray-800">{participant.name}</p>
                           <div class="grid grid-cols-2 gap-2">
@@ -875,7 +875,7 @@
                                 min="1"
                                 class="border rounded px-2 py-1 text-sm w-full"
                                 value={participant.rank}
-                                on:input={(e) => updateResultParticipantField(match.id, index, 'rank', e.target.value)}
+                                oninput={(e) => updateResultParticipantField(match.id, index, 'rank', e.target.value)}
                               />
                             </div>
                             <div class="space-y-1">
@@ -885,7 +885,7 @@
                                 type="number"
                                 class="border rounded px-2 py-1 text-sm w-full"
                                 value={participant.points}
-                                on:input={(e) => updateResultParticipantField(match.id, index, 'points', e.target.value)}
+                                oninput={(e) => updateResultParticipantField(match.id, index, 'points', e.target.value)}
                               />
                             </div>
                           </div>
@@ -918,7 +918,7 @@
               </div>
               <div class="flex justify-end">
                 <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                  on:click={() => submitResult(match)}
+                  onclick={() => submitResult(match)}
                   disabled={saving[match.id]}>
                   {saving[match.id] ? '送信中...' : '結果を登録'}
                 </button>
@@ -943,7 +943,7 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              {#each pointsSummary as item}
+              {#each pointsSummary as item (item.class_id || item.id)}
                 <tr>
                   <td class="px-4 py-2">{item.class_name}</td>
                   <td class="px-4 py-2 text-right">{item.points}</td>

@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
 
-  export let data;
+  let { data } = $props();
   let { classes, managedClass } = data;
 
   let selectedClassId = null;
@@ -122,11 +122,11 @@
         <select
           id="classSelector"
           class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          on:change={handleClassSelection}
+          onchange={handleClassSelection}
           bind:value={selectedClassId}
         >
           <option value={null}>-- クラスを選択してください --</option>
-          {#each classes as cls}
+          {#each classes as cls (cls.id)}
             <option value={cls.id}>{cls.name}</option>
           {/each}
         </select>
@@ -146,7 +146,7 @@
           <p>現在の出席ポイント: {classDetails.attendancePoints}ポイント</p>
         </div>
 
-        <form on:submit|preventDefault={handleSubmit}>
+        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(e); }}>
           <div class="mb-4">
             <label for="attendanceCount" class="block text-sm font-medium text-gray-700">出席人数</label>
             <input

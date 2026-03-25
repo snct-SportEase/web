@@ -91,7 +91,7 @@
 
   {#if eventSports.length > 0 && allSports.length > 0}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {#each eventSports as sport}
+      {#each eventSports as sport (sport.id)}
         <div class="bg-white p-6 rounded-lg shadow-lg flex flex-col">
           <h2 class="text-xl font-semibold text-gray-800 mb-2">{getSportName(sport.sport_id)}</h2>
           {#if sport.description}
@@ -114,7 +114,7 @@
             <div>
               <button
                 class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                on:click={() => openRulesModal(sport)}
+                onclick={() => openRulesModal(sport)}
               >
                 ルールを見る
               </button>
@@ -137,5 +137,5 @@
   rulesContent={selectedRulesContent}
   rulesPdfUrl={selectedRulesPdfUrl}
   sportName={selectedSportName}
-  on:close={closeRulesModal}
+  onclose={closeRulesModal}
 />

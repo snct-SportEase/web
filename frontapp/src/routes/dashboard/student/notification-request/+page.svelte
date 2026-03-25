@@ -5,9 +5,9 @@
 
   let { data } = $page;
 
-  $: requests = data.requests ?? [];
-  $: activeRequest = data.activeRequest;
-  $: hasRequests = requests.length > 0;
+  let requests = $derived(data.requests ?? []);
+  let activeRequest = $state(data.activeRequest);
+  let hasRequests = $derived(requests.length > 0);
 
   let showNewForm = false;
   let newTitle = '';
@@ -159,14 +159,14 @@
       </div>
       <button
         class="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-        on:click={() => (showNewForm = !showNewForm)}
+        onclick={() => (showNewForm = !showNewForm)}
       >
         {showNewForm ? '閉じる' : '申請フォームを開く'}
       </button>
     </div>
 
     {#if showNewForm}
-      <form class="mt-6 space-y-4" on:submit|preventDefault={handleCreateRequest}>
+      <form class="mt-6 space-y-4" onsubmit={(e) => { e.preventDefault(); handleCreateRequest(e); }}>
         <div>
           <label class="block text-sm font-medium text-gray-700" for="requestTitle">タイトル</label>
           <input
@@ -199,7 +199,7 @@
           <button
             type="button"
             class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            on:click={() => {
+            onclick={() => {
               showNewForm = false;
               newTitle = '';
               newBody = '';
@@ -237,7 +237,7 @@
             {@const status = formatStatus(item.status)}
             <button
               class="w-full rounded-md border px-4 py-3 text-left text-sm transition hover:border-indigo-300 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 {activeRequest?.id === item.id ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white'}"
-              on:click={() => selectRequest(item.id)}
+              onclick={() => selectRequest(item.id)}
             >
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-900">{item.title}</span>
@@ -292,7 +292,7 @@
             {/if}
           </div>
 
-          <form class="space-y-3" on:submit|preventDefault={handleMessageSubmit}>
+          <form class="space-y-3" onsubmit={(e) => { e.preventDefault(); handleMessageSubmit(e); }}>
             <label class="block text-sm font-medium text-gray-700" for="studentMessageInput">メッセージを送信</label>
             <textarea
               class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"

@@ -39,16 +39,16 @@
         }
     });
 
-    $: season = eventData ? eventData.season : (scores.length > 0 ? scores[0].season : '');
-    
+    let season = $derived(eventData ? eventData.season : (scores.length > 0 ? scores[0].season : ''));
+
     // Simplistic rank sorting
-    $: sortedScores = [...scores].sort((a, b) => {
+    let sortedScores = $derived([...scores].sort((a, b) => {
         const rankA = season === 'spring' ? a.rank_current_event : a.rank_overall;
         const rankB = season === 'spring' ? b.rank_current_event : b.rank_overall;
         const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
         const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
         return normalizedRankA - normalizedRankB;
-    });
+    }));
 
     function getRankBadge(rank) {
         if (rank === 0 || rank === null || rank === undefined) return '未開始';
@@ -91,13 +91,13 @@
         <div class="border-b border-gray-200 mb-6">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                 <button
-                    on:click={() => activeTab = 'scores'}
+                    onclick={() => activeTab = 'scores'}
                     class="{activeTab === 'scores' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
                 >
                     スコア・順位
                 </button>
                 <button
-                    on:click={() => activeTab = 'tournaments'}
+                    onclick={() => activeTab = 'tournaments'}
                     class="{activeTab === 'tournaments' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
                 >
                     トーナメント結果
@@ -113,7 +113,7 @@
                 </div>
             {:else}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {#each sortedScores as score}
+                    {#each sortedScores as score (score.id || score.class_id)}
                         {@const rank = season === 'spring' ? score.rank_current_event : score.rank_overall}
                         {@const totalPoints = season === 'spring' ? score.total_points_current_event : score.total_points_overall}
                         <div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex flex-col hover:shadow-md transition-shadow">
@@ -135,7 +135,7 @@
                 </div>
             {:else}
                 <div class="space-y-6">
-                    {#each tournaments as tournament}
+                    {#each tournaments as tournament (tournament.id)}
                         <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                             <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                                 <h3 class="text-lg font-bold text-gray-900">{tournament.name}</h3>
@@ -161,7 +161,7 @@
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white divide-y divide-gray-200">
-                                            {#each tournament.matches as match}
+                                            {#each tournament.matches as match (match.id)}
                                                 <tr class="hover:bg-gray-50">
                                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">#{match.match_id}</td>
                                                     <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">

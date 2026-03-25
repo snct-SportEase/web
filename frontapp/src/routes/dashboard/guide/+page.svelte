@@ -47,7 +47,7 @@
     <div class="grid gap-6 md:grid-cols-2">
       <button
         type="button"
-        on:click={() => showPWAInstallGuide = true}
+        onclick={() => showPWAInstallGuide = true}
         class="group block rounded-lg border border-indigo-100 bg-white p-6 shadow-sm transition hover:border-indigo-300 hover:shadow text-left"
       >
         <div class="flex items-center mb-3">
@@ -72,7 +72,7 @@
       {#if competitionGuidelinesUrl}
         <button
           type="button"
-          on:click={openCompetitionGuidelines}
+          onclick={openCompetitionGuidelines}
           class="group block rounded-lg border border-indigo-100 bg-white p-6 shadow-sm transition hover:border-indigo-300 hover:shadow text-left w-full"
         >
           <div class="flex items-center mb-3">

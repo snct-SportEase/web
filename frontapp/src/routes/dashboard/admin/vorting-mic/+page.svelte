@@ -113,7 +113,7 @@
     <p class="text-gray-600 mt-4">MIC投票は一人一票までです。</p>
   </div>
 {:else}
-  <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" on:submit|preventDefault={vote}>
+  <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" onsubmit={(e) => { e.preventDefault(); vote(e); }}>
     <div>
       <label for="class-select" class="block text-gray-700 font-bold mb-2">投票対象クラス</label>
       <select
@@ -123,7 +123,7 @@
         class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
       >
         <option value="" disabled selected>クラスを選択してください</option>
-        {#each eligibleClasses as c}
+        {#each eligibleClasses as c (c.id)}
           <option value={c.id}>{c.name}</option>
         {/each}
       </select>

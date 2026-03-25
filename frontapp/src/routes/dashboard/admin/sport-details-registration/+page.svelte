@@ -38,7 +38,7 @@
       }
     },
     renderer(token) {
-      return `<span style="color: ${token.color};">${this.parser.parseInline(token.text)}</span>`;
+      return `<span data-mk-color="${token.color}">${this.parser.parseInline(token.text)}</span>`;
     }
   };
 
@@ -69,10 +69,11 @@
   let matchRainyModeStartTimes = {};
   let rulesTextarea;
   let previewDiv;
-  let markdownPreviewHtml = '';
-  $: markdownPreviewHtml = sportDetails.rules_type === 'markdown'
-    ? marked.parse(sportDetails.rules || '')
-    : '';
+  let markdownPreviewHtml = $derived(
+    sportDetails.rules_type === 'markdown'
+      ? marked.parse(sportDetails.rules || '')
+      : ''
+  );
   let selectedPdfFile = null;
   let pdfPreviewUrl = null;
   let activeEventName = '';
@@ -1132,9 +1133,9 @@
       </div>
       <div>
         <label for="sport-select" class="block text-sm font-medium text-gray-700">競技選択</label>
-        <select id="sport-select" on:change={handleSportChange} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+        <select id="sport-select" onchange={handleSportChange} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
           <option value="">競技を選択してください</option>
-          {#each sports as sport}
+          {#each sports as sport (sport.id)}
             <option value={sport.id}>{sport.name}</option>
           {/each}
         </select>
@@ -1189,7 +1190,7 @@
               />
             </div>
             <button 
-              on:click={handleSaveCapacity}
+              onclick={handleSaveCapacity}
               class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
             >
               定員設定を保存
@@ -1210,16 +1211,16 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each classes as cls}
+                    {#each classes as cls (cls.id)}
                       <tr class="border-b hover:bg-gray-50">
                         <td class="px-4 py-2 text-sm text-gray-900">{cls.name}</td>
                         <td class="px-4 py-2">
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             placeholder="未設定"
                             min="0"
                             value={classCapacities[cls.id]?.min ?? ''}
-                            on:input={(e) => updateClassCapacity(cls.id, 'min', e.target.value)}
+                            oninput={(e) => updateClassCapacity(cls.id, 'min', e.target.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -1229,7 +1230,7 @@
                             placeholder="未設定"
                             min="0"
                             value={classCapacities[cls.id]?.max ?? ''}
-                            on:input={(e) => updateClassCapacity(cls.id, 'max', e.target.value)}
+                            oninput={(e) => updateClassCapacity(cls.id, 'max', e.target.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -1239,7 +1240,7 @@
                 </table>
               </div>
               <button 
-                on:click={handleSaveCapacity}
+                onclick={handleSaveCapacity}
                 class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
               >
                 すべてのクラスの定員設定を保存
@@ -1297,7 +1298,7 @@
               </div>
             </div>
             <button 
-              on:click={handleSaveRainyModeCapacity}
+              onclick={handleSaveRainyModeCapacity}
               class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
             >
               雨天時定員設定を保存
@@ -1320,16 +1321,16 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each classes as cls}
+                    {#each classes as cls (cls.id)}
                       <tr class="border-b hover:bg-gray-50">
                         <td class="px-4 py-2 text-sm text-gray-900">{cls.name}</td>
                         <td class="px-4 py-2">
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             placeholder="未設定"
                             min="0"
                             value={rainyModeClassCapacities[cls.id]?.min ?? ''}
-                            on:input={(e) => updateRainyModeClassCapacity(cls.id, 'min', e.target.value)}
+                            oninput={(e) => updateRainyModeClassCapacity(cls.id, 'min', e.target.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -1339,7 +1340,7 @@
                             placeholder="未設定"
                             min="0"
                             value={rainyModeClassCapacities[cls.id]?.max ?? ''}
-                            on:input={(e) => updateRainyModeClassCapacity(cls.id, 'max', e.target.value)}
+                            oninput={(e) => updateRainyModeClassCapacity(cls.id, 'max', e.target.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -1349,7 +1350,7 @@
                 </table>
               </div>
               <button 
-                on:click={handleSaveRainyModeCapacity}
+                onclick={handleSaveRainyModeCapacity}
                 class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
               >
                 すべてのクラスの雨天時定員設定を保存
@@ -1377,36 +1378,36 @@
         {#if sportDetails.rules_type === 'markdown'}
           <div>
             <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
-              <button on:click={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
-              <button on:click={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
-              <button on:click={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
-              <button on:click={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
-              <button on:click={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
-              <button on:click={addLink} class="px-3 py-1">Link</button>
-              <button on:click={addList} class="px-3 py-1">List</button>
-              <button on:click={addTable} class="px-3 py-1">Table</button>
-              <button on:click={() => applyMarkdown('##', '##')} class="px-3 py-1 text-red-600 font-bold">Red</button>
+              <button onclick={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
+              <button onclick={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
+              <button onclick={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
+              <button onclick={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
+              <button onclick={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
+              <button onclick={addLink} class="px-3 py-1">Link</button>
+              <button onclick={addList} class="px-3 py-1">List</button>
+              <button onclick={addTable} class="px-3 py-1">Table</button>
+              <button onclick={() => applyMarkdown('##', '##')} class="px-3 py-1 text-red-600 font-bold">Red</button>
               <div class="flex items-center gap-2 border border-gray-300 rounded-md p-1">
                 <input type="color" bind:value={customColor} class="w-8 h-7 p-0 border-none cursor-pointer" title="Select a color">
-                <button on:click={applyCustomColor} class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm hover:bg-gray-300">Apply</button>
+                <button onclick={applyCustomColor} class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm hover:bg-gray-300">Apply</button>
               </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} on:scroll={syncScroll} on:paste={handlePaste} on:keydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
+              <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} onscroll={syncScroll} onpaste={handlePaste} onkeydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
               <SafeHtml
                 bind:element={previewDiv}
                 class="prose border p-4 rounded-md h-96 overflow-y-scroll"
                 html={markdownPreviewHtml}
               />
             </div>
-            <input type="file" id="image-upload" accept="image/*" class="hidden" on:change={handleFileSelect}>
-            <button on:click={() => { if (browser) { const el = document.getElementById('image-upload'); if (el) el.click(); } }} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
+            <input type="file" id="image-upload" accept="image/*" class="hidden" onchange={handleFileSelect}>
+            <button onclick={() => { if (browser) { const el = document.getElementById('image-upload'); if (el) el.click(); } }} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
               画像アップロード
             </button>
           </div>
         {:else}
           <div class="flex flex-col gap-4">
-            <input type="file" accept=".pdf" on:change={handlePdfFileSelect} class="file-input file-input-bordered w-full max-w-xs">
+            <input type="file" accept=".pdf" onchange={handlePdfFileSelect} class="file-input file-input-bordered w-full max-w-xs">
             {#if pdfPreviewUrl || sportDetails.rules_pdf_url}
               <div class="border rounded-md h-96">
                 <embed src={pdfPreviewUrl || sportDetails.rules_pdf_url} type="application/pdf" width="100%" height="100%">
@@ -1417,7 +1418,7 @@
       </div>
 
       <div class="flex justify-end mb-4">
-        <button on:click={handleSave} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">保存</button>
+        <button onclick={handleSave} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">保存</button>
       </div>
 
       <div class="mb-4">
@@ -1439,11 +1440,11 @@
                 <h3 class="text-lg font-medium mb-2">通常モード</h3>
                 <div class="flex items-center gap-4 mb-4">
                   <input type="datetime-local" bind:value={bulkStartTime} class="border rounded px-2 py-1">
-                  <button on:click={handleBulkTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
-                  <button on:click={handleSaveAllMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
+                  <button onclick={handleBulkTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
+                  <button onclick={handleSaveAllMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
                 </div>
                 <div class="space-y-2">
-                    {#each selectedTournament.data.matches as match}
+                    {#each selectedTournament.data.matches as match (match.id)}
                         <div class="flex items-center justify-between p-2 border rounded">
                             <span class="font-medium">Round {match.roundIndex + 1}, Match {match.order + 1}</span>
                             <div class="flex items-center gap-4">
@@ -1456,7 +1457,7 @@
                                     type="datetime-local" 
                                     class="border rounded px-2 py-1"
                                     value={match.startTime ? match.startTime.slice(0, 16) : ''} 
-                                    on:change={(e) => updateMatchTimeLocally(match.id, e.target.value)}
+                                    onchange={(e) => updateMatchTimeLocally(match.id, e.target.value)}
                                 />
                             </div>
                         </div>
@@ -1471,11 +1472,11 @@
                 {#if isRainyMode && allMatchesForSport && allMatchesForSport.length > 0}
                   <div class="flex items-center gap-4 mb-4">
                     <input type="datetime-local" bind:value={bulkRainyModeStartTime} class="border rounded px-2 py-1">
-                    <button on:click={handleBulkRainyModeTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
-                    <button on:click={handleSaveAllRainyModeMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
+                    <button onclick={handleBulkRainyModeTimeUpdate} class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">全試合に適用</button>
+                    <button onclick={handleSaveAllRainyModeMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
                   </div>
                   <div class="space-y-2">
-                      {#each allMatchesForSport as match}
+                      {#each allMatchesForSport as match (match.id)}
                           <div class="flex items-center justify-between p-2 border rounded {match.isLoserBracketMatch ? 'bg-yellow-50' : ''}">
                               <div class="flex items-center gap-2">
                                 <span class="font-medium">
@@ -1502,7 +1503,7 @@
                                       type="datetime-local" 
                                       class="border rounded px-2 py-1"
                                       value={match.rainyModeStartTime ? match.rainyModeStartTime.slice(0, 16) : ''} 
-                                      on:change={(e) => updateMatchRainyModeTimeLocally(match.id, e.target.value)}
+                                      onchange={(e) => updateMatchRainyModeTimeLocally(match.id, e.target.value)}
                                   />
                               </div>
                           </div>

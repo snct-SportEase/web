@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 
-	export let data;
+	let { data } = $props();
 
 	let { classes: initialClasses = [] } = data ?? {};
 
@@ -16,7 +16,7 @@
 	let loading = false;
 	let error = null;
 
-	$: selectedClass = selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null;
+	let selectedClass = $derived(selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null);
 
 	function toNumber(value) {
 		if (value === '' || value === null || value === undefined) {
@@ -129,11 +129,11 @@
 			<h2 class="text-xl font-semibold mb-4">クラス選択</h2>
 			<select
 				bind:value={selectedClassId}
-				on:change={handleClassChange}
+				onchange={handleClassChange}
 				class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 			>
 				<option value={null}>クラスを選択してください</option>
-				{#each classes as classItem}
+				{#each classes as classItem (classItem.id)}
 					<option value={classItem.id}>{classItem.name}</option>
 				{/each}
 			</select>
@@ -145,11 +145,11 @@
 				<h2 class="text-xl font-semibold mb-4">競技選択</h2>
 				<select
 					bind:value={selectedSportId}
-					on:change={handleSportChange}
+					onchange={handleSportChange}
 					class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 				>
 					<option value={null}>競技を選択してください</option>
-					{#each allSports as sport}
+					{#each allSports as sport (sport.id)}
 						<option value={sport.id}>{sport.name}</option>
 					{/each}
 				</select>
@@ -201,7 +201,7 @@
 									</tr>
 								</thead>
 								<tbody class="bg-white divide-y divide-gray-200">
-									{#each confirmedMembers as member}
+									{#each confirmedMembers as member (member.id)}
 										<tr class="hover:bg-gray-50">
 											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 												{member.display_name || '未設定'}

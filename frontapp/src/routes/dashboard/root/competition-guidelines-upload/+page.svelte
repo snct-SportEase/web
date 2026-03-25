@@ -252,11 +252,11 @@
         <select
           id="event-select"
           bind:value={selectedEventId}
-          on:change={handleEventChange}
+          onchange={handleEventChange}
           class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
         >
           <option value={null}>大会を選択してください</option>
-          {#each events as event}
+          {#each events as event (event.id)}
             <option value={event.id}>{event.name}</option>
           {/each}
         </select>
@@ -271,7 +271,7 @@
             id="pdf-file-input"
             type="file"
             accept=".pdf"
-            on:change={handleFileSelect}
+            onchange={handleFileSelect}
             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
             disabled={isUploading}
           />
@@ -293,7 +293,7 @@
 
         <div class="flex gap-4">
           <button
-            on:click={handleUpload}
+            onclick={handleUpload}
             disabled={!pdfFile || isUploading}
             class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
           >
@@ -301,7 +301,7 @@
           </button>
           {#if existingPdfUrl}
             <button
-              on:click={handleDelete}
+              onclick={handleDelete}
               disabled={isUploading}
               class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
             >

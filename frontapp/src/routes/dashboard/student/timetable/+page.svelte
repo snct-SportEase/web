@@ -135,7 +135,7 @@
     <div class="flex items-center justify-between border-b pb-2">
         <h1 class="text-2xl md:text-3xl font-bold text-gray-800">タイムテーブル</h1>
         <button 
-            on:click={fetchTimetableData} 
+            onclick={fetchTimetableData} 
             class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded flex items-center transition-colors"
             disabled={isLoading}
         >

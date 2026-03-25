@@ -8,7 +8,7 @@
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
 
   let { data } = $page;
-  $: user = data.user;
+  let user = $derived(data.user);
 
   let showEditDisplayNameModal = false;
   let showPWANotification = false;
@@ -133,7 +133,7 @@
     <header class="bg-white shadow-sm p-4 sticky top-0 z-[100] pointer-events-auto">
       <div class="flex justify-between items-center pointer-events-auto">
         <div class="flex items-center pointer-events-auto">
-          <button type="button" on:click={openSidebar} class="mr-4 p-2 rounded-md hover:bg-gray-100 pointer-events-auto" aria-label="サイドバーを開く">
+          <button type="button" onclick={openSidebar} class="mr-4 p-2 rounded-md hover:bg-gray-100 pointer-events-auto" aria-label="サイドバーを開く">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>
           <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800">Dashboard</h1></a>
@@ -141,7 +141,7 @@
         <div class="flex items-center pointer-events-auto">
           <button 
             type="button"
-            on:click={handleDisplayNameClick}
+            onclick={handleDisplayNameClick}
             class="mr-4 flex items-center {isMobile ? 'px-2 space-x-0' : 'space-x-2 px-3'} py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pointer-events-auto"
             title="表示名をクリックして変更"
           >
@@ -154,7 +154,7 @@
           </button>
           <button 
             type="button" 
-            on:click={handleLogout}
+            onclick={handleLogout}
             class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors duration-200 pointer-events-auto"
           >
             Logout

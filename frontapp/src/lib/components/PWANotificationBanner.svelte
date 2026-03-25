@@ -3,8 +3,7 @@
   import { onMount } from 'svelte';
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
 
-  export let show = false;
-  export let onClose = () => {};
+  let { show = false, onClose = () => {} } = $props();
 
   let isVisible = false;
 
@@ -24,8 +23,8 @@
     }, 300);
   }
 
-  $: installed = browser ? isPWAInstalled() : false;
-  $: installable = browser ? isPWAInstallable() : false;
+  let installed = $derived(browser ? isPWAInstalled() : false);
+  let installable = $derived(browser ? isPWAInstallable() : false);
 </script>
 
 {#if show && (installed || installable)}
@@ -60,7 +59,7 @@
       </div>
       <button
         type="button"
-        on:click={handleClose}
+        onclick={handleClose}
         aria-label="通知を閉じる"
         class="flex-shrink-0 text-indigo-200 hover:text-white transition-colors"
       >

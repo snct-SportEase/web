@@ -5,11 +5,11 @@
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
   import NotificationSettings from '$lib/components/NotificationSettings.svelte';
 
-  export let data;
-  $: user = data.user;
-  $: classes = data.classes;
-  $: events = data.events;
-  $: form = data.form;
+  let { data } = $props();
+  let user = $derived(data.user);
+  let classes = $derived(data.classes);
+  let events = $derived(data.events);
+  let form = $derived(data.form);
   
   let showPWAInstallGuide = false;
   let activeEvent = null;
@@ -43,10 +43,10 @@
     }
   }
 
-  $: isRoot = user?.roles?.some(role => role.name === 'root');
-  $: isAdmin = user?.roles?.some(role => role.name === 'admin' || role.name === 'root');
-  $: isStudent = user?.roles?.some(role => role.name === 'student' || role.name === 'admin' || role.name === 'root');
-  $: showEventSetup = isRoot && user?.is_init_root_first_login && events?.length === 0;
+  let isRoot = $derived(user?.roles?.some(role => role.name === 'root'));
+  let isAdmin = $derived(user?.roles?.some(role => role.name === 'admin' || role.name === 'root'));
+  let isStudent = $derived(user?.roles?.some(role => role.name === 'student' || role.name === 'admin' || role.name === 'root'));
+  let showEventSetup = $derived(isRoot && user?.is_init_root_first_login && events?.length === 0);
 
   const rootShortcuts = [
     { title: '通知管理', description: '通知作成と配信先の管理', href: '/dashboard/root/notification' },
@@ -76,12 +76,11 @@
     { title: 'QRコード発行', description: '参加証QRコードを生成', href: '/dashboard/student/issueqr-code' }
   ];
 
-  let shortcutSections = [];
-  $: shortcutSections = [
+  let shortcutSections = $derived([
     ...(isRoot ? [{ title: 'Rootメニュー', shortcuts: rootShortcuts }] : []),
     ...(isAdmin ? [{ title: 'Adminメニュー', shortcuts: adminShortcuts }] : []),
     ...(isStudent ? [{ title: 'Studentメニュー', shortcuts: studentShortcuts }] : [])
-  ];
+  ]);
 
   const classMembers = data.members ?? [];
   const progressEntries = data.progress ?? [];
@@ -150,7 +149,7 @@
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <button
         type="button"
-        on:click={() => showPWAInstallGuide = true}
+        onclick={() => showPWAInstallGuide = true}
         class="group block rounded-lg border border-indigo-100 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow text-left"
       >
         <div class="flex items-center mb-2">
@@ -170,7 +169,7 @@
       {#if competitionGuidelinesUrl}
         <button
           type="button"
-          on:click={openCompetitionGuidelines}
+          onclick={openCompetitionGuidelines}
           class="group block rounded-lg border border-indigo-100 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow text-left"
         >
           <div class="flex items-center mb-2">

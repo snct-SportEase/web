@@ -1,5 +1,5 @@
 <script>
-	export let data;
+	let { data } = $props();
 
 	const {
 		classes: initialClasses = [],
@@ -35,8 +35,9 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 	selectedClassId = Number.isNaN(parsedInitialClassId) ? null : parsedInitialClassId;
 }
 
-	$: selectedClass =
-		selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null;
+	let selectedClass = $derived(
+		selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null
+	);
 	function toNumber(value) {
 		if (value === '' || value === null || value === undefined) {
 			return null;
@@ -45,10 +46,10 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 		return Number.isNaN(parsed) ? null : parsed;
 	}
 
-	$: filteredClassMembers = classMembers.filter(member => 
+	let filteredClassMembers = $derived(classMembers.filter(member =>
 		(member.display_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
 		member.email.toLowerCase().includes(searchQuery.toLowerCase())
-	);
+	));
 
 	function authorizedFetch(url, options = {}) {
 		const { headers, ...rest } = options;
@@ -256,12 +257,12 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 			{#if isAdmin}
 				<select
 					value={selectedClassId ?? ''}
-					on:change={handleClassChange}
+					onchange={handleClassChange}
 					class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 					disabled={membersLoading || assignLoading}
 				>
 					<option value=''>クラスを選択してください</option>
-					{#each classes as cls}
+					{#each classes as cls (cls.id)}
 						<option value={cls.id} selected={selectedClassId === cls.id}>{cls.name}</option>
 					{/each}
 				</select>
@@ -300,13 +301,13 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 								</tr>
 							</thead>
 							<tbody class="bg-white divide-y divide-gray-200">
-								{#each filteredClassMembers as member}
+								{#each filteredClassMembers as member (member.id)}
 									<tr class="hover:bg-gray-50">
 										<td class="px-6 py-4 whitespace-nowrap">
 											<input
 												type="checkbox"
 												checked={selectedMembers.some((m) => m.id === member.id)}
-												on:change={() => toggleMemberSelection(member)}
+												onchange={() => toggleMemberSelection(member)}
 												class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 											/>
 										</td>
@@ -327,12 +328,12 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 				<h2 class="text-xl font-semibold mb-4">競技選択</h2>
 				<select
 					value={selectedSportId ?? ''}
-					on:change={handleSportChange}
+					onchange={handleSportChange}
 					class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 					disabled={sportsLoading || membersLoading || assignLoading}
 				>
 					<option value=''>競技を選択してください</option>
-					{#each eventSports as eventSport}
+					{#each eventSports as eventSport (eventSport.id)}
 						<option value={eventSport.sport_id} selected={selectedSportId === eventSport.sport_id}>
 							{getSportName(eventSport.sport_id)}
 						</option>
@@ -344,7 +345,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 				<!-- Assign Button -->
 				<div class="bg-white p-6 rounded-lg shadow">
 					<button
-						on:click={assignMembers}
+						onclick={assignMembers}
 						disabled={assignLoading}
 						class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
 					>
@@ -374,7 +375,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 									</tr>
 								</thead>
 								<tbody class="bg-white divide-y divide-gray-200">
-									{#each assignedMembers as member}
+									{#each assignedMembers as member (member.id)}
 										<tr class="hover:bg-gray-50">
 											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 												{member.display_name || '未設定'}
@@ -382,7 +383,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
 											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 												<button
-													on:click={() => removeMember(member)}
+													onclick={() => removeMember(member)}
 													disabled={assignLoading}
 													class="text-red-600 hover:text-red-900 disabled:text-gray-400"
 												>

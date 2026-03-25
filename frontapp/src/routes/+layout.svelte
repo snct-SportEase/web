@@ -6,7 +6,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
-  $: data = $page.data;
+  let data = $derived($page.data);
 
   onMount(() => {
     if (browser && 'serviceWorker' in navigator) {
@@ -129,9 +129,9 @@
       <button 
         type="button"
         class="sidebar-overlay md:hidden"
-        on:click={closeSidebar}
-        on:touchstart|stopPropagation={closeSidebar}
-        on:keydown={(e) => e.key === 'Enter' || e.key === ' ' ? closeSidebar() : null}
+        onclick={closeSidebar}
+        ontouchstart={(e) => { e.stopPropagation(); closeSidebar(e); }}
+        onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? closeSidebar() : null}
         aria-label="メニューを閉じる"
       ></button>
     {/if}
