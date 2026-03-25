@@ -5,23 +5,33 @@ import (
 	"backapp/internal/repository"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Note: In a production environment, use a persistent session store like Redis.
-var sessionStore = make(map[string]string)
+var (
+	sessionStore = make(map[string]string)
+	sessionMu    sync.RWMutex
+)
 
 func CreateSession(token, userID string) {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
 	sessionStore[token] = userID
 }
 
 func GetUserIDFromSession(token string) (string, bool) {
+	sessionMu.RLock()
+	defer sessionMu.RUnlock()
 	userID, exists := sessionStore[token]
 	return userID, exists
 }
 
 func DeleteSession(token string) {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
 	delete(sessionStore, token)
 }
 
