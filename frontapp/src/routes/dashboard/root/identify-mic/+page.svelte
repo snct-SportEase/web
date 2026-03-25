@@ -1,25 +1,25 @@
 <script>
   import { onMount } from 'svelte';
-  import { activeEventId } from '$lib/stores/eventStore.js';
 
   let micResult = null;
   let error = null;
-  let eventId;
-
-  activeEventId.subscribe(value => {
-    eventId = value;
-  });
 
   onMount(async () => {
-    if (!eventId) {
-      error = 'No active event selected.';
-      return;
-    }
-
     try {
-      const response = await fetch(`/api/mic/class?event_id=${eventId}`);
+      const eventRes = await fetch('/api/events/active');
+      if (!eventRes.ok) {
+        error = '開催中のイベント情報の取得に失敗しました。';
+        return;
+      }
+      const eventData = await eventRes.json();
+      if (!eventData.event_id) {
+        error = '開催中のイベントがありません。';
+        return;
+      }
+
+      const response = await fetch(`/api/mic/class?event_id=${eventData.event_id}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch MIC data');
+        throw new Error('MICデータの取得に失敗しました。');
       }
       const data = await response.json();
       if (data.message) {
