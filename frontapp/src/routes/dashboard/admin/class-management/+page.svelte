@@ -262,7 +262,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 					disabled={membersLoading || assignLoading}
 				>
 					<option value=''>クラスを選択してください</option>
-					{#each classes as cls}
+					{#each classes as cls (cls.id)}
 						<option value={cls.id} selected={selectedClassId === cls.id}>{cls.name}</option>
 					{/each}
 				</select>
@@ -301,7 +301,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 								</tr>
 							</thead>
 							<tbody class="bg-white divide-y divide-gray-200">
-								{#each filteredClassMembers as member}
+								{#each filteredClassMembers as member (member.id)}
 									<tr class="hover:bg-gray-50">
 										<td class="px-6 py-4 whitespace-nowrap">
 											<input
@@ -333,7 +333,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 					disabled={sportsLoading || membersLoading || assignLoading}
 				>
 					<option value=''>競技を選択してください</option>
-					{#each eventSports as eventSport}
+					{#each eventSports as eventSport (eventSport.id)}
 						<option value={eventSport.sport_id} selected={selectedSportId === eventSport.sport_id}>
 							{getSportName(eventSport.sport_id)}
 						</option>
@@ -375,7 +375,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 									</tr>
 								</thead>
 								<tbody class="bg-white divide-y divide-gray-200">
-									{#each assignedMembers as member}
+									{#each assignedMembers as member (member.id)}
 										<tr class="hover:bg-gray-50">
 											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 												{member.display_name || '未設定'}

@@ -1055,7 +1055,7 @@
                     <div>
                       <h4 class="text-md font-semibold text-gray-700 mb-2">Aブロック</h4>
                       <div class="grid grid-cols-6 gap-2">
-                        {#each [1, 2, 3, 4, 5, 6] as rank}
+                        {#each [1, 2, 3, 4, 5, 6] as rank (rank)}
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
                             <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_a[rank]} oninput={(e) => {
@@ -1069,7 +1069,7 @@
                     <div>
                       <h4 class="text-md font-semibold text-gray-700 mb-2">Bブロック</h4>
                       <div class="grid grid-cols-6 gap-2">
-                        {#each [1, 2, 3, 4, 5, 6] as rank}
+                        {#each [1, 2, 3, 4, 5, 6] as rank (rank)}
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
                             <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_b[rank]} oninput={(e) => {
@@ -1083,7 +1083,7 @@
                     <div>
                       <h4 class="text-md font-semibold text-gray-700 mb-2">総合順位</h4>
                       <div class="grid grid-cols-6 gap-2">
-                        {#each [1, 2, 3, 4, 5, 6] as rank}
+                        {#each [1, 2, 3, 4, 5, 6] as rank (rank)}
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
                             <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.overall[rank]} oninput={(e) => {
@@ -1148,7 +1148,7 @@
                 <p class="text-sm text-gray-600">各グループの名前と所属クラスを設定します。デフォルト設定として保存することもできます。</p>
                 
                 <div class="space-y-3">
-                  {#each templateConfigForm.groups as group, index}
+                  {#each templateConfigForm.groups as group, index (index)}
                     <div class="border rounded p-3 bg-white">
                       <div class="flex items-center space-x-2 mb-2">
                         <label class="flex-1 flex flex-col text-sm font-medium text-gray-700">
@@ -1185,7 +1185,7 @@
                           placeholder="例: 1-1, 1-2, 1-3" />
                         {#if group.class_names && group.class_names.length > 0}
                           <div class="flex flex-wrap gap-1">
-                            {#each group.class_names as className}
+                            {#each group.class_names as className (className)}
                               <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">{className}</span>
                             {/each}
                           </div>
@@ -1297,7 +1297,7 @@
                 <label class="flex flex-col text-sm font-medium text-gray-700">
                   所属クラス（複数選択可）
                   <select multiple size="6" class="mt-1 border rounded px-3 py-2" bind:value={groupForm.class_ids}>
-                    {#each classes as cls}
+                    {#each classes as cls (cls.id)}
                       <option value={cls.id}>{cls.name}</option>
                     {/each}
                   </select>
@@ -1313,7 +1313,7 @@
                   <p class="text-gray-500">登録済みグループはありません。</p>
                 {:else}
                   <ul class="space-y-3">
-                    {#each groups as group}
+                    {#each groups as group (group.id)}
                       <li class="border rounded px-3 py-2">
                         <div class="flex justify-between items-center">
                           <div>
@@ -1384,7 +1384,7 @@
                     <p class="text-sm text-gray-500">参加者が登録されていません。</p>
                   {:else}
                     <div class="space-y-3">
-                      {#each matchForm.participants as participant, index}
+                      {#each matchForm.participants as participant, index (index)}
                         <div class="border rounded px-3 py-3 space-y-3 bg-white">
                           <div class="flex items-center justify-between">
                             <span class="text-sm font-semibold text-gray-700">参加者 {index + 1}</span>
@@ -1430,7 +1430,7 @@
                                   onchange={(e) => updateParticipantField(index, 'group_id', e.target.value)}
                                 >
                                   <option value="">選択</option>
-                                  {#each groups as group}
+                                  {#each groups as group (group.id)}
                                     <option value={group.id}>{group.name}</option>
                                   {/each}
                                 </select>
@@ -1442,7 +1442,7 @@
                                   onchange={(e) => updateParticipantField(index, 'class_id', e.target.value)}
                                 >
                                   <option value="">選択</option>
-                                  {#each classes as cls}
+                                  {#each classes as cls (cls.id)}
                                     <option value={cls.id}>{cls.name}</option>
                                   {/each}
                                 </select>
@@ -1488,7 +1488,7 @@
                   <p class="text-gray-500">登録済みの試合はありません。</p>
                 {:else}
                   <div class="space-y-3 max-h-[32rem] overflow-y-auto pr-2">
-                    {#each matches as match}
+                    {#each matches as match (match.id)}
                       <div class="border rounded px-3 py-3 space-y-2 bg-gray-50">
                         <div class="flex justify-between items-start">
                           <div>
@@ -1505,7 +1505,7 @@
                         </div>
                         {#if match.entries && match.entries.length > 0}
                           <ul class="text-sm text-gray-700 list-disc list-inside space-y-1">
-                            {#each match.entries as entry}
+                            {#each match.entries as entry (entry.id || entry.class_id)}
                               <li>{entry.resolved_name}</li>
                             {/each}
                           </ul>
@@ -1547,7 +1547,7 @@
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
-                    {#each pointsSummary as item}
+                    {#each pointsSummary as item (item.class_id || item.id)}
                       <tr>
                         <td class="px-4 py-2">{item.class_name}</td>
                         <td class="px-4 py-2 text-right">{item.points}</td>
@@ -1574,7 +1574,7 @@
                   クラス
                   <select class="mt-1 border rounded px-3 py-2" bind:value={manualPointForm.class_id}>
                     <option value="">クラスを選択</option>
-                    {#each classes as cls}
+                    {#each classes as cls (cls.id)}
                       <option value={cls.id}>{cls.name}</option>
                     {/each}
                   </select>

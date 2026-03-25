@@ -287,7 +287,7 @@
 						bind:value={newEmailDomain}
 						class="block w-1/3 rounded-r-lg border-l-0 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-gray-50 text-gray-700 font-medium"
 					>
-						{#each allowedDomains as domain}
+						{#each allowedDomains as domain (domain)}
 							<option value={domain}>{domain}</option>
 						{/each}
 					</select>
@@ -423,7 +423,7 @@
 				<tbody class="bg-white divide-y divide-gray-200">
 					<!-- 💡 sortedWhitelist を使用 -->
 					{#if sortedWhitelist && sortedWhitelist.length > 0}
-						{#each sortedWhitelist as entry}
+						{#each sortedWhitelist as entry (entry.id)}
 							<tr class="hover:bg-gray-50 transition duration-100">
 								<td class="px-6 py-4 whitespace-nowrap">
 									<input

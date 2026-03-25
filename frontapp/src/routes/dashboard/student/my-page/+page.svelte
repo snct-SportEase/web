@@ -214,7 +214,7 @@
 						{#if pointHighlights.length === 0}
 							<p class="text-sm text-gray-500 text-center py-4">表示できる得点データがありません。</p>
 						{:else}
-							{#each pointHighlights as highlight, index}
+							{#each pointHighlights as highlight, index (index)}
 								<div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 hover:bg-gray-100 transition-colors">
 									<div class="flex items-center gap-3">
 										<div class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
@@ -255,7 +255,7 @@
 										</td>
 									</tr>
 								{:else}
-									{#each scoreItems as item, index}
+									{#each scoreItems as item, index (index)}
 										<tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
 											<td class="px-4 py-3 font-medium text-gray-900">{item.label}</td>
 											<td class="px-4 py-3 text-right font-semibold text-indigo-600">{item.value} 点</td>
@@ -292,7 +292,7 @@
 						種目別の詳細
 					</h2>
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-						{#each sportSections as section}
+						{#each sportSections as section (section.sport_id || section.id)}
 							<div class="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm hover:shadow-md transition-shadow">
 								<div class="flex items-center justify-between mb-4">
 									<h3 class="text-lg font-semibold text-gray-900">{section.label}</h3>
@@ -300,7 +300,7 @@
 								</div>
 								<div class="border-t border-gray-200 my-3"></div>
 								<ul class="space-y-2 text-sm">
-									{#each section.entries as entry}
+									{#each section.entries as entry (entry.id || entry.label)}
 										<li class="flex items-center justify-between py-1">
 											<span class="text-gray-600">{entry.label}</span>
 											<span class="font-semibold text-gray-900">{entry.value} 点</span>
@@ -333,7 +333,7 @@
 								</tr>
 							</thead>
 							<tbody>
-								{#each upcomingMatches as match, index}
+								{#each upcomingMatches as match, index (match.id || index)}
 									<tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
 										<td class="px-4 py-3 text-sm text-gray-900">{new Date(match.start_time).toLocaleString('ja-JP')}</td>
 										<td class="px-4 py-3 text-sm text-gray-900">{match.sport_name}</td>

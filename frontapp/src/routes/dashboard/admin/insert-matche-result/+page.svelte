@@ -201,7 +201,7 @@
 		class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
 	>
 		<option value="">トーナメントを選択してください</option>
-		{#each tournaments as tournament}
+		{#each tournaments as tournament (tournament.id)}
 			{@const isLoserBracket = tournament.name.includes('敗者戦')}
 			{#if !isLoserBracket || isRainyMode}
 				<option value={tournament.id}>{tournament.name}</option>
@@ -213,7 +213,7 @@
 {#if selectedTournament}
 	<h2 class="text-xl font-bold mt-6 mb-2">{selectedTournament.name}</h2>
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-		{#each selectedTournament.data.matches as match}
+		{#each selectedTournament.data.matches as match (match.id)}
 			{@const isLoserBracketMatch = match.isLoserBracketMatch}
 			{#if !isLoserBracketMatch || isRainyMode}
 				<div class="border rounded-lg p-4 {isLoserBracketMatch ? 'bg-yellow-50' : ''}">

@@ -404,7 +404,7 @@ import { onMount } from 'svelte';
               <td class="px-4 py-3 text-sm text-gray-700">
                 {#if user.roles && user.roles.length > 0}
                   <div class="flex flex-wrap gap-1">
-                    {#each user.roles as role}
+                    {#each user.roles as role (role.id)}
                       <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                         {role.name}
                       </span>
@@ -523,7 +523,7 @@ import { onMount } from 'svelte';
                 bind:value={selectedClassRep}
               >
                 <option value="">（選択してください）</option>
-                {#each classes as cls}
+                {#each classes as cls (cls.id)}
                   <option value={cls.id}>{cls.name}</option>
                 {/each}
               </select>
@@ -547,7 +547,7 @@ import { onMount } from 'svelte';
             <p class="text-sm font-medium text-gray-700 mb-2">現在のロール:</p>
             <div class="flex flex-wrap gap-2">
               {#if selectedUser.roles && selectedUser.roles.length > 0}
-                {#each selectedUser.roles as role}
+                {#each selectedUser.roles as role (role.id)}
                   <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 border border-gray-200">
                     <span>{role.name}</span>
                     <!-- _repロールは削除不可（上のセクションで変更） -->

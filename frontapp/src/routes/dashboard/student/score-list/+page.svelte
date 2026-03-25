@@ -165,7 +165,7 @@
 
 {#if scores.length > 0}
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 py-4">
-		{#each sortedScores as score}
+		{#each sortedScores as score (score.id || score.class_id)}
 			{@const rank = season === 'spring' ? score.rank_current_event : score.rank_overall}
 			{@const totalPoints = season === 'spring' ? score.total_points_current_event : score.total_points_overall}
 			{@const isNotStarted = rank === 0 || rank === null || rank === undefined}
@@ -179,7 +179,7 @@
 				</div>
 				
 				<div class="space-y-1">
-					{#each filteredScoreItems as item}
+					{#each filteredScoreItems as item (item.key || item.label)}
 						{#if item.key !== 'rank_current_event' && item.key !== 'rank_overall' && item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'}
 							<div class="flex justify-between py-2 border-b border-black/10">
 								<span class="text-gray-500">{item.label}:</span>

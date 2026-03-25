@@ -368,7 +368,7 @@
             <p class="text-xs text-gray-500 mb-2">購読詳細:</p>
             {#if debugInfo.subscriptions && debugInfo.subscriptions.length > 0}
               <ul class="space-y-1">
-                {#each debugInfo.subscriptions as sub}
+                {#each debugInfo.subscriptions as sub (sub.endpoint || sub.id || sub)}
                   <li class="text-xs text-gray-600">
                     <span class="font-medium">ID {sub.id}:</span> {sub.endpoint.substring(0, 50)}...
                   </li>

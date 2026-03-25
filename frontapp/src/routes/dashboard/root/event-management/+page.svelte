@@ -282,7 +282,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each events as event}
+        {#each events as event (event.id)}
           <tr onclick={() => openEditModal(event)} class="cursor-pointer hover:bg-gray-50 transition-colors">
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.name}</td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.year}</td>

@@ -130,7 +130,7 @@
                 value={confirmData.classId}
               >
                 <option value="" disabled selected={!confirmData.classId}>クラスを選択してください</option>
-                {#each classes as cls}
+                {#each classes as cls (cls.id)}
                   <option value={cls.id} selected={String(cls.id) === confirmData.classId}>{cls.name}</option>
                 {/each}
               </select>

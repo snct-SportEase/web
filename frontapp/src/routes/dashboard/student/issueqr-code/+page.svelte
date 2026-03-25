@@ -254,7 +254,7 @@
 				>
 					<option value="">競技を選択してください</option>
 					{#if teams && Array.isArray(teams)}
-						{#each teams as team}
+						{#each teams as team (team.id)}
 							<option value={`${team.event_id}-${team.sport_id}`}>{team.sport_name}</option>
 						{/each}
 					{/if}

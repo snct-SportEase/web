@@ -60,7 +60,7 @@
         <div class="mb-4">
             <h3 class="font-semibold">現在のロール:</h3>
             <div class="mt-2 space-y-2">
-                {#each user.roles.filter(r => r.name !== 'student') as role}
+                {#each user.roles.filter(r => r.name !== 'student') as role (role.id)}
                     <div class="flex items-center justify-between bg-gray-100 p-2 rounded-md">
                         <span class="text-sm font-medium text-gray-800">{role.name}</span>
                         {#if !defaultRoles.includes(role.name) && !isClassSportRole(role.name)}

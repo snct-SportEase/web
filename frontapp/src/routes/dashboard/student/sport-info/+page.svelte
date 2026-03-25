@@ -91,7 +91,7 @@
 
   {#if eventSports.length > 0 && allSports.length > 0}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {#each eventSports as sport}
+      {#each eventSports as sport (sport.id)}
         <div class="bg-white p-6 rounded-lg shadow-lg flex flex-col">
           <h2 class="text-xl font-semibold text-gray-800 mb-2">{getSportName(sport.sport_id)}</h2>
           {#if sport.description}

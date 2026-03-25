@@ -171,7 +171,7 @@
       <section class="bg-white shadow rounded-lg p-6 space-y-6">
         <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">テンプレート結果</h2>
         <div class="space-y-6">
-          {#each matches.filter(m => detectTemplateFromMatch(m)) as match}
+          {#each matches.filter(m => detectTemplateFromMatch(m)) as match (match.id)}
             {@const template = detectTemplateFromMatch(match)}
             {#if template}
               <div class="border rounded-lg p-4 bg-blue-50 space-y-3">
@@ -182,7 +182,7 @@
                       <div class="space-y-2">
                         <p class="text-sm font-semibold text-gray-700">順位・得点</p>
                         <div class="space-y-2">
-                          {#each match.result.details.sort((a, b) => (a.rank || 999) - (b.rank || 999)) as detail}
+                          {#each match.result.details.sort((a, b) => (a.rank || 999) - (b.rank || 999)) as detail (detail.class_id || detail.id)}
                             <div class="border rounded px-3 py-2 bg-gray-50">
                               <div class="flex justify-between items-center">
                                 <span class="text-sm font-semibold text-gray-800">
@@ -236,7 +236,7 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              {#each pointsSummary.sort((a, b) => b.points - a.points) as item}
+              {#each pointsSummary.sort((a, b) => b.points - a.points) as item (item.class_id || item.id)}
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-2">{item.class_name}</td>
                   <td class="px-4 py-2 text-right font-semibold">{item.points}</td>

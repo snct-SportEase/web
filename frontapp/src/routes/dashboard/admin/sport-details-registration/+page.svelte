@@ -1135,7 +1135,7 @@
         <label for="sport-select" class="block text-sm font-medium text-gray-700">競技選択</label>
         <select id="sport-select" onchange={handleSportChange} class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
           <option value="">競技を選択してください</option>
-          {#each sports as sport}
+          {#each sports as sport (sport.id)}
             <option value={sport.id}>{sport.name}</option>
           {/each}
         </select>
@@ -1211,12 +1211,12 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each classes as cls}
+                    {#each classes as cls (cls.id)}
                       <tr class="border-b hover:bg-gray-50">
                         <td class="px-4 py-2 text-sm text-gray-900">{cls.name}</td>
                         <td class="px-4 py-2">
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             placeholder="未設定"
                             min="0"
                             value={classCapacities[cls.id]?.min ?? ''}
@@ -1321,12 +1321,12 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each classes as cls}
+                    {#each classes as cls (cls.id)}
                       <tr class="border-b hover:bg-gray-50">
                         <td class="px-4 py-2 text-sm text-gray-900">{cls.name}</td>
                         <td class="px-4 py-2">
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             placeholder="未設定"
                             min="0"
                             value={rainyModeClassCapacities[cls.id]?.min ?? ''}
@@ -1444,7 +1444,7 @@
                   <button onclick={handleSaveAllMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
                 </div>
                 <div class="space-y-2">
-                    {#each selectedTournament.data.matches as match}
+                    {#each selectedTournament.data.matches as match (match.id)}
                         <div class="flex items-center justify-between p-2 border rounded">
                             <span class="font-medium">Round {match.roundIndex + 1}, Match {match.order + 1}</span>
                             <div class="flex items-center gap-4">
@@ -1476,7 +1476,7 @@
                     <button onclick={handleSaveAllRainyModeMatchTimes} class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">設定した時間をすべて保存</button>
                   </div>
                   <div class="space-y-2">
-                      {#each allMatchesForSport as match}
+                      {#each allMatchesForSport as match (match.id)}
                           <div class="flex items-center justify-between p-2 border rounded {match.isLoserBracketMatch ? 'bg-yellow-50' : ''}">
                               <div class="flex items-center gap-2">
                                 <span class="font-medium">

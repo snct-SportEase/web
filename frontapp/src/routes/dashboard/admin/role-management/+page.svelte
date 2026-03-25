@@ -179,7 +179,7 @@
                 />
                 {#if showUserList && filteredUsers.length > 0}
                     <ul class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
-                        {#each filteredUsers as user}
+                        {#each filteredUsers as user (user.id)}
                             <li class="text-gray-900 select-none relative">
                                 <button
 									type="button"
@@ -195,7 +195,7 @@
                 {/if}
             </div>
             <div class="mt-2 space-x-1">
-                {#each selectedUsers as user}
+                {#each selectedUsers as user (user.id)}
                     <span class="inline-flex items-center gap-x-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800">
                         {user.email}
                         <button
@@ -258,7 +258,7 @@
 				</tr>
 			</thead>
 			<tbody class="bg-white divide-y divide-gray-200">
-				{#each usersWithRoles as user}
+				{#each usersWithRoles as user (user.id)}
 					<tr class="hover:bg-gray-50 cursor-pointer" onclick={() => openEditModal(user)}>
 						<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
 							{user.email}
@@ -269,7 +269,7 @@
 						<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 							{#if user.roles}
 								<div class="flex space-x-2">
-									{#each user.roles as role}
+									{#each user.roles as role (role.id)}
 										{#if !defaultRoles.includes(role.name)}
 											<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800"										>
 												{role.name}

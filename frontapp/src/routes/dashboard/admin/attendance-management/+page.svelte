@@ -126,7 +126,7 @@
           bind:value={selectedClassId}
         >
           <option value={null}>-- クラスを選択してください --</option>
-          {#each classes as cls}
+          {#each classes as cls (cls.id)}
             <option value={cls.id}>{cls.name}</option>
           {/each}
         </select>
