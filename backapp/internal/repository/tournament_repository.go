@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"backapp/internal/models"
 )
@@ -125,12 +126,23 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 				effectiveStartTime = m.StartTime.String
 			}
 
+			matchStatus := m.Status
+			if effectiveStartTime != "" {
+				formats := []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05"}
+				for _, f := range formats {
+					if t, err := time.Parse(f, effectiveStartTime); err == nil {
+						matchStatus = t.Format("1/2 15:04")
+						break
+					}
+				}
+			}
+
 			bracketryMatches = append(bracketryMatches, models.Match{
 				ID:                  m.ID,
 				RoundIndex:          m.Round,
 				Order:               m.MatchNumberInRound,
 				Sides:               sides,
-				MatchStatus:         m.Status,
+				MatchStatus:         matchStatus,
 				IsBronzeMatch:       m.IsBronzeMatch,
 				IsLoserBracketMatch: m.IsLoserBracketMatch,
 				LoserBracketRound:   loserBracketRound,

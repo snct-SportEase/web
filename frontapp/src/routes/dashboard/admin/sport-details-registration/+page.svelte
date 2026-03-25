@@ -568,10 +568,12 @@
     if (!isoString) return '';
     try {
         const date = new Date(isoString);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         const hours = String(date.getHours()).padStart(2, '0');
         const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${day}日 ${hours}:${minutes}`;
+        return `${year}-${month}-${day} ${hours}:${minutes}:00`;
     } catch {
         console.error("Invalid date format for startTime:", isoString);
         return '';
@@ -1446,8 +1448,8 @@
                             <span class="font-medium">Round {match.roundIndex + 1}, Match {match.order + 1}</span>
                             <div class="flex items-center gap-4">
                                 <span class="text-sm text-gray-600">
-                                    {#if match.matchStatus}
-                                        開始日時: {match.matchStatus}
+                                    {#if match.startTime}
+                                        開始日時: {new Date(match.startTime).toLocaleString('ja-JP')}
                                     {/if}
                                 </span>
                                 <input 

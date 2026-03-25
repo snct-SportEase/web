@@ -136,7 +136,7 @@
       const uploadData = await uploadResponse.json();
       const pdfUrl = uploadData.url;
 
-      // 次にイベントの競技要項URLを更新
+      // 次にイベントの大会要項URLを更新
       const updateResponse = await fetch(`/api/root/events/${selectedEventId}/competition-guidelines`, {
         method: 'PUT',
         headers: {
@@ -149,10 +149,10 @@
 
       if (!updateResponse.ok) {
         const errorData = await updateResponse.json();
-        throw new Error(errorData.error || '競技要項の更新に失敗しました');
+        throw new Error(errorData.error || '大会要項の更新に失敗しました');
       }
 
-      message = '競技要項をアップロードしました';
+      message = '大会要項をアップロードしました';
       existingPdfUrl = pdfUrl;
       pdfFile = null;
       
@@ -180,7 +180,7 @@
       return;
     }
 
-    if (!confirm('競技要項を削除しますか？')) {
+    if (!confirm('大会要項を削除しますか？')) {
       return;
     }
 
@@ -201,10 +201,10 @@
 
       if (!updateResponse.ok) {
         const errorData = await updateResponse.json();
-        throw new Error(errorData.error || '競技要項の削除に失敗しました');
+        throw new Error(errorData.error || '大会要項の削除に失敗しました');
       }
 
-      message = '競技要項を削除しました';
+      message = '大会要項を削除しました';
       existingPdfUrl = null;
       pdfPreviewUrl = null;
       
@@ -220,14 +220,14 @@
 </script>
 
 <svelte:head>
-  <title>競技要項アップロード | Dashboard</title>
+  <title>大会要項アップロード | Dashboard</title>
 </svelte:head>
 
 <div class="space-y-6">
   <header class="space-y-2">
-    <h1 class="text-2xl font-semibold text-gray-900">競技要項アップロード</h1>
+    <h1 class="text-2xl font-semibold text-gray-900">大会要項アップロード</h1>
     <p class="text-sm text-gray-600">
-      大会の競技要項PDFをアップロードします。アップロードされた競技要項は資料ページで確認できます。
+      大会の大会要項PDFをアップロードします。アップロードされた大会要項は資料ページで確認できます。
     </p>
   </header>
 

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
 
-  let showPWAInstallGuide = true;
+  let showPWAInstallGuide = false;
   let activeEvent = null;
   let competitionGuidelinesUrl = null;
 
@@ -80,18 +80,18 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
             </svg>
             <h2 class="text-xl font-semibold text-indigo-700 group-hover:text-indigo-800">
-              競技要項
+              大会要項
             </h2>
           </div>
           <p class="text-sm text-gray-600 mb-4">
             {#if activeEvent}
-              {activeEvent.name}の競技要項を確認できます。
+              {activeEvent.name}の大会要項を確認できます。
             {:else}
-              大会の競技要項を確認できます。
+              大会の大会要項を確認できます。
             {/if}
           </p>
           <div class="flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
-            競技要項を見る
+            大会要項を見る
             <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>

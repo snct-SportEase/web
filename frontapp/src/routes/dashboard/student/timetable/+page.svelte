@@ -7,10 +7,16 @@
     let isLoading = true;
 
     // ヘルパー：hh:mm 形式に変換
+    // DBに "YYYY-MM-DD HH:MM:SS" 形式（スペース区切り）で保存されているため、
+    // JavaScriptのDateでUTC解釈されないよう、文字列から直接時刻を抽出する
     function formatTime(dateStr) {
         if (!dateStr) return '未定';
         try {
-            const d = new Date(dateStr);
+            const match = dateStr.match(/\d{4}-\d{2}-\d{2}[T ]\s*(\d{2}):(\d{2})/);
+            if (match) {
+                return `${match[1]}:${match[2]}`;
+            }
+            const d = new Date(dateStr.replace(' ', 'T'));
             if (isNaN(d.getTime())) return '未定';
             return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         } catch {
@@ -59,12 +65,18 @@
                             }
 
                             if (timeStr) {
-                                // チーム名を抽出
+                                // チーム名を抽出（contestants マップ経由で解決）
+                                const getTeamName = (side) => {
+                                    if (!side) return "未定";
+                                    if (side.title) return side.title;
+                                    const contestant = data.contestants?.[side.contestantId];
+                                    return contestant?.players?.[0]?.title || "未定";
+                                };
                                 let team1 = "未定";
                                 let team2 = "未定";
                                 if (match.sides && match.sides.length >= 2) {
-                                    team1 = match.sides[0]?.title || "未定";
-                                    team2 = match.sides[1]?.title || "未定";
+                                    team1 = getTeamName(match.sides[0]);
+                                    team2 = getTeamName(match.sides[1]);
                                 }
 
                                 rawItems.push({
@@ -73,7 +85,7 @@
                                     title: tour.name,
                                     subtitle: `${team1} vs ${team2}`,
                                     timeStr: timeStr,
-                                    timeObj: new Date(timeStr),
+                                    timeObj: new Date(timeStr.replace(' ', 'T')),
                                     status: match.matchStatus || 'SCHEDULED'
                                 });
                             }
@@ -95,7 +107,7 @@
                                 title: match.title || session.name,
                                 subtitle: match.format ? `形式: ${match.format}` : (match.location ? `場所: ${match.location}` : '昼競技'),
                                 timeStr: match.scheduled_at,
-                                timeObj: new Date(match.scheduled_at),
+                                timeObj: new Date(match.scheduled_at.replace(' ', 'T')),
                                 status: match.status || 'scheduled'
                             });
                         }

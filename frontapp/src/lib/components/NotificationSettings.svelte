@@ -1,6 +1,7 @@
 <script>
   import { browser } from '$app/environment';
   import { ensurePushSubscription, userHasPushEligibleRole } from '$lib/utils/push.js';
+  import { isPWAInstalled, getDeviceType } from '$lib/utils/pwa.js';
   import { env as publicEnv } from '$env/dynamic/public';
   import { onMount } from 'svelte';
 
@@ -14,12 +15,16 @@
   let subscriptionCount = 0;
   let debugInfo = null;
   let showDebugDetails = false;
+  let isIOS = false;
+  let isPWA = false;
 
   $: canEnableNotifications = userHasPushEligibleRole(user);
   $: vapidKeySet = browser ? (publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '') !== '' : false;
 
   onMount(() => {
     if (browser) {
+      isIOS = getDeviceType() === 'ios';
+      isPWA = isPWAInstalled();
       checkNotificationSupport();
       checkPermissionStatus();
       loadSubscriptionStatus();
@@ -250,9 +255,21 @@
       通知機能は学生、管理者、ルートユーザーのみ利用できます。
     </div>
   {:else if !isSupported}
-    <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-      このブラウザはプッシュ通知をサポートしていません。モバイルブラウザまたは最新のデスクトップブラウザをご利用ください。
-    </div>
+    {#if isIOS && !isPWA}
+      <div class="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <p class="font-semibold mb-1">iOSでプッシュ通知を受け取るには、ホーム画面への追加が必要です</p>
+        <ol class="list-decimal list-inside space-y-1 mt-2">
+          <li>SafariでこのページをSafariで開く</li>
+          <li>画面下の共有ボタン（四角に矢印のアイコン）をタップ</li>
+          <li>「ホーム画面に追加」を選択</li>
+          <li>ホーム画面のアイコンからアプリを開き、通知を有効化する</li>
+        </ol>
+      </div>
+    {:else}
+      <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        このブラウザはプッシュ通知をサポートしていません。モバイルブラウザまたは最新のデスクトップブラウザをご利用ください。
+      </div>
+    {/if}
   {:else if errorMessage}
     <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
       {errorMessage}
