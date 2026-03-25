@@ -61,11 +61,11 @@
 			return 'bg-gray-100 border-2 border-gray-300 shadow';
 		}
 		if (rank === 1) {
-			return 'rank-first relative overflow-hidden scale-105';
+			return 'rank-first relative overflow-hidden z-10';
 		} else if (rank === 2) {
-			return 'bg-gradient-to-br from-gray-300 via-gray-200 to-gray-300 border-[3px] border-gray-400 shadow-lg scale-105';
+			return 'bg-gradient-to-br from-gray-300 via-gray-200 to-gray-300 border-[3px] border-gray-400 shadow-lg relative z-10';
 		} else if (rank === 3) {
-			return 'bg-gradient-to-br from-amber-700 via-amber-500 to-amber-700 border-[3px] border-amber-800 shadow-lg scale-105';
+			return 'bg-gradient-to-br from-amber-700 via-amber-500 to-amber-700 border-[3px] border-amber-800 shadow-lg relative z-10';
 		}
 		return 'bg-white border-2 border-gray-200 shadow';
 	}
@@ -84,11 +84,10 @@
 	.rank-first {
 		background: linear-gradient(135deg, #ffd700 0%, #ffed4e 30%, #ffd700 60%, #ffed4e 100%);
 		border: 4px solid #ffb300;
-		box-shadow: 
+		box-shadow:
 			0 10px 40px rgba(255, 215, 0, 0.5),
 			0 0 30px rgba(255, 215, 0, 0.4),
 			inset 0 0 20px rgba(255, 255, 255, 0.3);
-		transform: scale(1.08);
 		position: relative;
 		overflow: hidden;
 		animation: pulse-gold 2s ease-in-out infinite;
@@ -152,15 +151,6 @@
 	}
 
 	/* Custom styles for rank-first that require complex animations and gradients */
-	.rank-first {
-		background: linear-gradient(135deg, #ffd700 0%, #ffed4e 30%, #ffd700 60%, #ffed4e 100%);
-		border: 4px solid #ffb300;
-		box-shadow: 
-			0 10px 40px rgba(255, 215, 0, 0.5),
-			0 0 30px rgba(255, 215, 0, 0.4),
-			inset 0 0 20px rgba(255, 255, 255, 0.3);
-		animation: pulse-gold 2s ease-in-out infinite;
-	}
 
 	.rank-first:hover {
 		transform: translateY(-6px) scale(1.1) !important;
@@ -174,12 +164,12 @@
 <h1 class="text-2xl font-bold mb-6">点数一覧</h1>
 
 {#if scores.length > 0}
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 py-4">
 		{#each sortedScores as score}
 			{@const rank = season === 'spring' ? score.rank_current_event : score.rank_overall}
 			{@const totalPoints = season === 'spring' ? score.total_points_current_event : score.total_points_overall}
 			{@const isNotStarted = rank === 0 || rank === null || rank === undefined}
-			<div class="transition-all duration-300 rounded-xl p-6 mb-6 hover:-translate-y-1 hover:shadow-xl {getRankStyle(rank)}">
+			<div class="transition-all duration-300 rounded-xl p-6 hover:-translate-y-1 hover:shadow-xl {getRankStyle(rank)}">
 				{#if rank === 1}
 					<span class="absolute top-2.5 right-2.5 text-2xl pointer-events-none animate-pulse">✨</span>
 				{/if}
