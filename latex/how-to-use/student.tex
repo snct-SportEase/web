@@ -160,6 +160,12 @@
 
 自分のクラスに関する情報を一覧で確認できるページである。
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-mypage.png}
+  \caption{マイページ画面}
+\end{figure}
+
 \subsection{クラスのスコアと順位}
 
 現在の大会におけるクラスの合計得点と順位を表示する。
@@ -187,6 +193,12 @@
 
 大会の全競技にわたるトーナメントブラケットを確認するページである。
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-tournament-list.png}
+  \caption{トーナメント画面}
+\end{figure}
+
 \subsection{トーナメントブラケットの閲覧}
 
 競技ごとのトーナメント対戦表を表示する。
@@ -206,6 +218,12 @@
 
 大会全体の試合スケジュールを時系列で確認するページである。
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-timetable.png}
+  \caption{タイムテーブル画面}
+\end{figure}
+
 \subsection{試合一覧の確認}
 
 全競技の試合日時・開催場所・対戦クラスを一覧で表示する。
@@ -224,6 +242,12 @@
 \textbf{ページ}: \code{/dashboard/student/noon-game}
 
 昼休みに行われる特別競技（昼競技）の詳細を確認するページである。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-noon-game-result.png}
+  \caption{昼競技結果}
+\end{figure}
 
 \subsection{セッション情報の確認}
 
@@ -247,6 +271,12 @@
 
 大会で実施される各競技の詳細情報を確認するページである。
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-sports-info.png}
+  \caption{競技情報閲覧画面}
+\end{figure}
+
 \subsection{競技一覧の閲覧}
 
 大会に登録されている全競技の名称・開催場所・概要を一覧で確認できる。
@@ -265,6 +295,12 @@
 
 全クラスの得点状況を確認するページである。
 なお、rootの設定によってスコアが非表示になる場合がある。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-score.png}
+  \caption{スコア一覧画面}
+\end{figure}
 
 \subsection{クラス別スコアの閲覧}
 
@@ -293,6 +329,12 @@
 競技への参加確認に使用するQRコードを発行するページである。
 試合当日にadminのスキャナーにかざして参加を登録する。
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-qr.png}
+  \caption{QRコード発行画面}
+\end{figure}
+
 \subsection{チームと大会の選択}
 
 自分が登録されているチームと対象の大会を選択してQRコードを生成する。
@@ -301,6 +343,7 @@
 
 発行されたQRコードには有効期限があり、画面上にカウントダウンが表示される。
 有効期限が切れた場合は再発行が必要である。
+
 
 \newpage
 
@@ -311,6 +354,12 @@
 \textbf{ページ}: \code{/dashboard/student/notification}
 
 運営から配信された通知を受信・管理するページである。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-receive-notice.png}
+  \caption{通知画面}
+\end{figure}
 
 \subsection{通知の確認}
 
@@ -330,7 +379,13 @@
 \subsection{プッシュ通知の設定}
 
 ブラウザのプッシュ通知を有効にすることで、ページを開いていない状態でも通知を受け取ることができる。
-プッシュ通知の登録・解除はこのページから行う。
+プッシュ通知の登録・解除はダッシュボードから行う。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./dashboard-notice-setting.png}
+  \caption{プッシュ通知の有効化}
+\end{figure}
 
 \newpage
 
@@ -342,6 +397,12 @@
 
 運営に対して通知の配信を申請するページである。
 申請はroot権限の担当者が審査し、承認された場合に通知が配信される。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-notice-req.png}
+  \caption{通知申請画面}
+\end{figure}
 
 \subsection{申請の作成}
 
@@ -363,11 +424,6 @@
 \bottomrule
 \end{tabular}
 \end{center}
-
-\subsection{メッセージのやり取り}
-
-申請ごとにチャット形式でrootとメッセージのやり取りができる。
-内容の確認や追加情報の提供に利用する。
 
 \newpage
 
@@ -397,6 +453,12 @@
 
 アプリの利用に関する各種案内を確認するページである。
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-guide.png}
+  \caption{ガイド画面}
+\end{figure}
+
 \subsection{PWAインストール手順}
 
 SportEaseをスマートフォンのホーム画面に追加する手順を確認できる。
@@ -416,6 +478,12 @@ rootがアップロードした競技要項PDFをここから参照できる。
 \textbf{ページ}: \code{/dashboard/student/class-info}
 
 \code{クラス名\_rep} ロールを持つ学生がアクセスできるページである。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/student-class-info.png}
+  \caption{クラス情報画面}
+\end{figure}
 
 \subsection{クラスの概要確認}
 
