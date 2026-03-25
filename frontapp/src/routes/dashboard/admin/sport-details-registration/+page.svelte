@@ -38,7 +38,7 @@
       }
     },
     renderer(token) {
-      return `<span style="color: ${token.color};">${this.parser.parseInline(token.text)}</span>`;
+      return `<span data-mk-color="${token.color}">${this.parser.parseInline(token.text)}</span>`;
     }
   };
 

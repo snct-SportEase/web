@@ -14,9 +14,9 @@ const config = {
 				'default-src': ['self'],
 				// script-src は mode:'auto' により 'nonce-{random}' が自動付与される
 				'script-src': ['self'],
-				// style属性 (style="...") とDOMPurifyの出力にunsafe-inlineが必要。
-				// スクリプトと違いスタイルはコード実行ができないため許容する。
-				'style-src': ['self', 'unsafe-inline'],
+				// style-src も nonce のみ。インラインスタイルは <style> ブロックへ移行済み。
+				// マークダウンの色付けは data-mk-color 属性 + JS 適用で実現。
+				'style-src': ['self'],
 				// 画像: アップロード画像(同一オリジン) + data URI (Chart.js等)
 				'img-src': ['self', 'data:', 'blob:'],
 				// WebSocket接続は同一オリジン (wss/ws)
