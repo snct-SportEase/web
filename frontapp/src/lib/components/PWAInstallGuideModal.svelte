@@ -2,8 +2,7 @@
   import { browser } from '$app/environment';
   import { getDeviceType, getBrowserType } from '$lib/utils/pwa.js';
 
-  export let isOpen = false;
-  export let onClose = () => {};
+  let { isOpen = false, onClose = () => {} } = $props();
 
   // Note: deviceType and browserType are computed but not currently used in the template
   $effect(() => {

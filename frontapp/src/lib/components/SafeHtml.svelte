@@ -2,11 +2,7 @@
 <script>
   import { sanitizeHtml } from '$lib/utils/sanitizeHtml.js';
 
-  export let html = '';
-  export let tag = 'div';
-  export let sanitizeContent = true;
-  let element;
-  export { element };
+  let { html = '', tag = 'div', sanitizeContent = true, element = $bindable() } = $props();
 
   let safeHtml = $derived(sanitizeContent ? sanitizeHtml(html) : html);
 

@@ -1,6 +1,6 @@
 <script>
 	/** @type {import('./$types').PageData} */
-	export let data;
+	let { data } = $props();
 
 	let scores = $derived(data.scores || []);
 	let season = $derived(scores.length > 0 ? scores[0].season : '');

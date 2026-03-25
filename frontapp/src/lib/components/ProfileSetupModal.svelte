@@ -2,7 +2,7 @@
   import { browser } from '$app/environment';
 
   /** @type {Array<{id: number, name: string}>} */
-  export let classes = [];
+  let { classes = [] } = $props();
 
   let isLoading = false;
   let errorMessage = '';

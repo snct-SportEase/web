@@ -2,11 +2,7 @@
   import { browser } from '$app/environment';
   import { tick } from 'svelte';
 
-  export let isOpen = false;
-  export let currentDisplayName = '';
-  export let userRoles = [];
-  export let onClose = () => {};
-export let onSave = async () => {};
+  let { isOpen = false, currentDisplayName = '', userRoles = [], onClose = () => {}, onSave = async () => {} } = $props();
 
   let newDisplayName = currentDisplayName;
   let isLoading = false;

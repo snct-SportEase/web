@@ -5,7 +5,7 @@
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
   import NotificationSettings from '$lib/components/NotificationSettings.svelte';
 
-  export let data;
+  let { data } = $props();
   let user = $derived(data.user);
   let classes = $derived(data.classes);
   let events = $derived(data.events);

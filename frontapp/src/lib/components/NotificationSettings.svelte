@@ -5,7 +5,7 @@
   import { env as publicEnv } from '$env/dynamic/public';
   import { onMount } from 'svelte';
 
-  export let user;
+  let { user } = $props();
 
   let isSubscribed = false;
   let isLoading = false;

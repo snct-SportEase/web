@@ -5,7 +5,7 @@
   import { browser } from '$app/environment';
 
   /** @type {import('@sveltejs/kit').MaybePromise<import('../../routes/$types').LayoutData>} */
-  export let user;
+  let { user } = $props();
 
   const hasRole = (roleName) => {
     return user?.roles?.some(role => role.name === roleName);

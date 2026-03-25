@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
 
   /** @type {import('./$types').PageData} */
-  export let data;
+  let { data } = $props();
 
   let classes = [];
   let originalClasses = []; // 保存前の状態を保持

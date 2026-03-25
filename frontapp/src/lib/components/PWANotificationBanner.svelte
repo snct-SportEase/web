@@ -3,8 +3,7 @@
   import { onMount } from 'svelte';
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
 
-  export let show = false;
-  export let onClose = () => {};
+  let { show = false, onClose = () => {} } = $props();
 
   let isVisible = false;
 

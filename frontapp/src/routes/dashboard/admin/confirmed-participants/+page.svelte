@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 
-	export let data;
+	let { data } = $props();
 
 	let { classes: initialClasses = [] } = data ?? {};
 
