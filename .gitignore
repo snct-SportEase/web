@@ -9,4 +9,4 @@ latex/*
 latex/how-to-use/*
 !latex/how-to-use/*.tex
 !latex/how-to-use/*.pdf
-!latex/how-to-use/images/*.png
+!latex/how-to-use/images/
