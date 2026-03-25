@@ -17,7 +17,7 @@
         return;
       }
 
-      const response = await fetch(`/api/mic/class?event_id=${eventData.event_id}`);
+      const response = await fetch(`/api/root/mic/class?event_id=${eventData.event_id}`);
       if (!response.ok) {
         throw new Error('MICデータの取得に失敗しました。');
       }

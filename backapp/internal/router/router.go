@@ -208,12 +208,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.POST("/images", imageHandler.UploadImageHandler)
 			admin.POST("/pdfs", pdfHandler.UploadPdfHandler)
 
-			mic := api.Group("/mic")
-			{
-				mic.Use(middleware.AuthMiddleware(userRepo))
-				mic.GET("/class", micHandler.GetMICClass)
-			}
-
 			adminMic := admin.Group("/mic")
 			{
 				adminMic.GET("/eligible-classes", micHandler.GetEligibleClasses)
@@ -311,6 +305,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootNoon.POST("/sessions/:session_id/manual-points", noonHandler.AddManualPoint)
 				rootNoon.GET("/templates/:template_key/default-groups", noonHandler.GetTemplateDefaultGroups)
 				rootNoon.PUT("/templates/:template_key/default-groups", noonHandler.SaveTemplateDefaultGroups)
+			}
+
+			rootMic := root.Group("/mic")
+			{
+				rootMic.GET("/class", micHandler.GetMICClass)
 			}
 
 			rootNotifications := root.Group("/notifications")
