@@ -3,11 +3,9 @@
 
 	export let data;
 
-	let { classes: initialClasses = [], managedClass: initialManagedClass = null, isRoot: initialIsRoot = false } = data ?? {};
+	let { classes: initialClasses = [] } = data ?? {};
 
 	let classes = [...initialClasses];
-	let managedClass = initialManagedClass;
-	let isRoot = initialIsRoot;
 	let allSports = [];
 	let selectedClassId = null;
 	let selectedSportId = null;
@@ -17,11 +15,6 @@
 	let capacityOK = true;
 	let loading = false;
 	let error = null;
-
-	// クラス名_repロールを持つadminの場合は、管理クラスを自動選択
-	if (managedClass && !isRoot) {
-		selectedClassId = managedClass.id;
-	}
 
 	$: selectedClass = selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null;
 
@@ -134,24 +127,16 @@
 		<!-- Class Selection -->
 		<div class="bg-white p-6 rounded-lg shadow">
 			<h2 class="text-xl font-semibold mb-4">クラス選択</h2>
-			{#if managedClass && !isRoot}
-				<!-- クラス名_repロールを持つadminの場合は選択不可（自動選択済み） -->
-				<div class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600">
-					{managedClass.name}
-				</div>
-			{:else}
-				<!-- Rootまたはクラス名_repロールを持たないadminは選択可能 -->
-				<select
-					bind:value={selectedClassId}
-					on:change={handleClassChange}
-					class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-				>
-					<option value={null}>クラスを選択してください</option>
-					{#each classes as classItem}
-						<option value={classItem.id}>{classItem.name}</option>
-					{/each}
-				</select>
-			{/if}
+			<select
+				bind:value={selectedClassId}
+				on:change={handleClassChange}
+				class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+			>
+				<option value={null}>クラスを選択してください</option>
+				{#each classes as classItem}
+					<option value={classItem.id}>{classItem.name}</option>
+				{/each}
+			</select>
 		</div>
 
 		{#if selectedClass}
