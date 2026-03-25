@@ -112,13 +112,13 @@
           各クラス人数設定
         </a>
         <a href="/dashboard/root/change-username" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/change-username')}>
-          ユーザー名変更
+          ユーザー管理
         </a>
         <a href="/dashboard/root/identify-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/identify-mic')}>
           MIC確認
         </a>
         <a href="/dashboard/root/competition-guidelines-upload" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" on:click={(e) => handleLinkClick(e, '/dashboard/root/competition-guidelines-upload')}>
-          競技要項アップロード
+          大会要項アップロード
         </a>
       </div>
     {/if}
