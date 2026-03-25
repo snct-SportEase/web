@@ -14,7 +14,7 @@ import { onMount } from 'svelte';
   let newDisplayName = '';
   // ロール管理用
   let newRoleName = '';
-  let selectedClassRep = ''; // クラス代表変更用
+  let selectedClassRep = ''; // クラス所属変更用
 
   let showModal = false;
   let isLoading = false;
@@ -97,7 +97,7 @@ import { onMount } from 'svelte';
     newDisplayName = user.display_name || '';
     newRoleName = '';
     
-    // 現在のクラス代表ロールを探す
+    // 現在のクラス所属ロールを探す
     const repRole = user.roles?.find(r => r.name.endsWith('_rep'));
     if (repRole) {
       // "3A_rep" -> "3A" を抽出して初期値にする
@@ -164,7 +164,7 @@ import { onMount } from 'svelte';
     }
   }
 
-  // クラス代表ロールの付け替え
+  // クラス所属ロールの付け替え
   async function handleClassRepChange() {
     if (!selectedUser || !selectedClassRep) return;
 
@@ -205,7 +205,7 @@ import { onMount } from 'svelte';
         });
       }
 
-      alert('クラス代表を変更しました');
+      alert('クラス所属を変更しました');
       await fetchUsers(searchQuery, searchType);
       await checkAndInvalidateIfSelf(selectedUser.id);
       closeEditModal();
@@ -222,7 +222,7 @@ import { onMount } from 'svelte';
     
     // _rep制限
     if (newRoleName.endsWith('_rep')) {
-      alert('クラス代表ロール（_rep）はここからは追加できません。「クラス代表の変更」を使用してください。');
+      alert('クラス所属ロール（_rep）はここからは追加できません。「クラス所属の変更」を使用してください。');
       return;
     }
 
@@ -506,11 +506,11 @@ import { onMount } from 'svelte';
           </div>
         </section>
 
-        <!-- セクション2: クラス代表ロール変更 -->
+        <!-- セクション2: クラス所属ロール変更 -->
         <section class="bg-blue-50 p-4 rounded-md border border-blue-100">
-          <h4 class="text-md font-bold text-blue-900 mb-2">クラス代表の変更</h4>
+          <h4 class="text-md font-bold text-blue-900 mb-2">クラス所属の変更</h4>
           <p class="text-xs text-blue-700 mb-3">
-            誤ったクラスの代表権限を持ってしまった場合、ここで正しいクラスに付け替えることができます。
+            誤ったクラスの所属ロールを持ってしまった場合、ここで正しいクラスに付け替えることができます。
           </p>
           <div class="flex gap-4 items-end">
             <div class="flex-1">
