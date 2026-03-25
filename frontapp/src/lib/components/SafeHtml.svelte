@@ -2,7 +2,7 @@
 <script>
   import { sanitizeHtml } from '$lib/utils/sanitizeHtml.js';
 
-  let { html = '', tag = 'div', sanitizeContent = true, element = $bindable() } = $props();
+  let { html = '', tag = 'div', sanitizeContent = true, element = $bindable(), ...restProps } = $props();
 
   let safeHtml = $derived(sanitizeContent ? sanitizeHtml(html) : html);
 
@@ -21,8 +21,7 @@
   });
 </script>
 
-<svelte:element this={tag} bind:this={element} {...$$restProps}>
-  <!-- svelte-ignore svelte/no-at-html-tags -->
+<svelte:element this={tag} bind:this={element} {...restProps}>
   {@html safeHtml}
 </svelte:element>
 
