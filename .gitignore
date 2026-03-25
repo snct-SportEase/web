@@ -2,7 +2,11 @@
 letsencrypt/
 
 latex/*
-latex/how-to-use/*
 !latex/*.tex
 !latex/*.pdf
 !latex/*.png
+!latex/how-to-use/
+latex/how-to-use/*
+!latex/how-to-use/*.tex
+!latex/how-to-use/*.pdf
+!latex/how-to-use/images/*.png

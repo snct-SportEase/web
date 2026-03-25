@@ -1,0 +1,404 @@
+\documentclass[12pt]{ltjsarticle}
+
+% 基本パッケージ
+\usepackage[utf8]{inputenc}
+\usepackage{luatexja}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+
+% 表のデザインを向上させるパッケージ
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{makecell}
+
+% セクションやタイトルのデザイン調整
+\usepackage{titlesec}
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+\usepackage{enumitem}
+\usepackage{fontspec}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=cyan,
+  citecolor=green
+]{hyperref}
+
+\usepackage{listing}
+\usepackage{xcolor}
+\newcommand{\code}[1]{\colorbox{gray!20}{\texttt{#1}}}
+\usepackage{float}
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+\usepackage{minted}
+
+\usemintedstyle{vs}
+\setminted{
+    linenos,
+    frame=single,
+    framesep=2mm,
+    baselinestretch=1.2,
+    fontsize=\small,
+    breaklines
+}
+
+% 数式
+\usepackage{bm}
+
+% 画像
+\usepackage{float}
+
+\begin{document}
+
+\title{SportEase（スポーティーズ） admin操作説明書}
+\author{行事委員会 佐藤佑作 s2301059}
+\date{\today}
+\maketitle
+\tableofcontents
+
+\newpage
+
+% =====================================================================
+\section{はじめに}
+% =====================================================================
+
+本書は、SportEase（スポーティーズ）の\textbf{admin権限を持つ運営スタッフ}向けの操作説明書である。
+adminアカウントは大会当日の運営補助を主な役割とし、試合進行・結果入力・参加者管理など
+競技運営に必要な操作を行うことができる。
+
+\subsection*{権限の種類}
+\begin{itemize}
+  \item \textbf{root} ── 最上位権限。大会設定・システム管理・ユーザー管理など全機能にアクセス可能。
+  \item \textbf{admin} ── 本書が対象とする権限。試合進行・結果入力など大会運営補助が可能。
+  \item \textbf{student} ── エントリー・観戦・通知受信のみ。
+\end{itemize}
+
+adminダッシュボードは \code{/dashboard/admin/} 以下の各ページから操作する。
+admin権限を持たないアカウントでアクセスしようとした場合は、自動的に \code{/dashboard} へリダイレクトされる。
+
+\subsection{大会当日の業務フロー}
+
+大会当日のadmin業務は、以下の順序で進めることを推奨する。
+各手順の詳細は対応するセクションを参照すること。
+なお、QRコードスキャンによる参加確認は必要に応じて実施する任意の操作である。
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=1.3cm,
+  main/.style={
+    rectangle, draw, rounded corners=4pt,
+    minimum width=9cm, minimum height=0.9cm,
+    text centered, fill=blue!8, font=\bfseries
+  },
+  opt/.style={
+    rectangle, draw, dashed, rounded corners=4pt,
+    minimum width=4.5cm, minimum height=0.9cm,
+    text centered, fill=gray!8, font=\bfseries
+  },
+  arr/.style={->, thick, >=Stealth},
+  optarr/.style={->, dashed, >=Stealth}
+]
+\node[main] (s1) {① ログイン・ダッシュボード確認　→ 第\ref{sec:dashboard}章};
+\node[main, below of=s1] (s2) {② クラス代表ロール付与（事前準備）　→ 第\ref{sec:role}章};
+\node[main, below of=s2] (s3) {③ 出席者数の登録　→ 第\ref{sec:attendance}章};
+\node[main, below of=s3] (s4) {④ 試合ステータス更新・結果入力　→ 第\ref{sec:match}章};
+\node[main, below of=s4] (s5) {⑤ 昼競技結果入力　→ 第\ref{sec:noon}章};
+\node[main, below of=s5] (s6) {⑥ MIC投票　→ 第\ref{sec:mic}章};
+
+\node[opt, right=1.5cm of s3] (qr) {QRスキャン（任意）→ 第\ref{sec:qr}章};
+
+\draw[arr] (s1) -- (s2);
+\draw[arr] (s2) -- (s3);
+\draw[arr] (s3) -- (s4);
+\draw[arr] (s4) -- (s5);
+\draw[arr] (s5) -- (s6);
+\draw[optarr] (s3.east) -- (qr.west);
+
+\end{tikzpicture}
+\end{center}
+
+\subsection{初回ログイン}
+
+\href{https://nitsche-gyouji.com}{https://nitsche-gyouji.com} をお好みのブラウザで開いてください。
+すると、以下のような画面にアクセスできます。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/HP_first.png}
+  \caption{アクセス結果}
+\end{figure}
+
+\texttt{Googleでサインイン}をクリックしてください。\\
+\textcolor{red}{※学校のGoogle アカウントを必ず選択してください。学校のアカウント以外を選択してしまった場合は、ブラウザのキャッシュをクリアして再度アクセスしてください。}
+
+サインインが成功すると、以下のように表示名とクラスを設定する画面に移ります。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/set-display-name.png}
+  \caption{表示名とクラス設定画面}
+\end{figure}
+
+ここで、アプリないでの表示名とクラスを決定してください。
+確認画面も表示されるので、クラスに関しては間違えないようにお願いします。
+
+\newpage
+
+% =====================================================================
+\section{管理者ダッシュボード}\label{sec:dashboard}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/manage-dashboard}
+
+大会運営の状況をリアルタイムで把握するための統計ダッシュボードである。
+
+\subsection{表示される統計情報}
+
+以下の集計データを一覧で確認できる。
+
+\begin{itemize}
+  \item \textbf{出席率} ── クラスごとの出席状況の集計
+  \item \textbf{競技別参加率} ── 各スポーツへの参加割合
+  \item \textbf{クラス別スコア推移} ── 得点の推移グラフ
+  \item \textbf{イベント進捗状況} ── 現在進行中の試合・残り試合数など
+\end{itemize}
+
+\newpage
+
+% =====================================================================
+\section{クラス・チーム管理}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/class-management}
+
+各クラスのチーム編成を管理する機能である。
+クラス代表（\code{クラス名\_rep} ロールを持つユーザー）も同様の操作が可能である。
+
+\subsection{担当クラスの確認}
+
+自分が担当するクラスの情報を確認する。
+ロール管理でクラス代表ロールが割り当てられたクラスが対象となる。
+
+\subsection{チームメンバーの割り当て}
+
+競技ごとに参加するチームメンバーを登録する。
+クラスの学生一覧からメンバーを選択し、チームに割り当てる。
+
+\subsection{チームメンバーの削除}
+
+割り当て済みのメンバーをチームから外すことができる。
+
+\subsection{参加確認済みメンバーの確認}
+
+QRコードスキャンによって参加が確認されたメンバーの一覧を競技ごとに確認できる。
+
+\newpage
+
+% =====================================================================
+\section{ロール管理}\label{sec:role}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/role-management}
+
+学生に対してクラス代表ロールを付与・削除する機能である。
+
+\subsection{クラス代表ロールの付与}
+
+対象ユーザーを検索し、\code{クラス名\_rep} 形式のクラス代表ロールを付与する。
+クラス代表ロールを持つ学生は、自クラスのチーム管理操作が可能になる。
+
+\subsection{クラス代表ロールの削除}
+
+付与済みのクラス代表ロールを削除する。
+
+\newpage
+
+% =====================================================================
+\section{QRコードスキャン・参加確認}\label{sec:qr}
+% =====================================================================
+
+\subsection{QRコードスキャン}
+
+\textbf{ページ}: \code{/dashboard/admin/qr-code-reader}
+
+学生のQRコードを読み取り、競技への参加を確認する機能である。
+カメラを起動してQRコードをスキャンすると、対象学生の参加登録が完了する。
+
+\subsection{参加確認済み一覧}
+
+\textbf{ページ}: \code{/dashboard/admin/confirmed-participants}
+
+QRコードスキャンによって参加が確認された学生の一覧を表示する。
+クラスおよび競技ごとにフィルタリングして確認できる。
+
+\newpage
+
+% =====================================================================
+\section{出席管理}\label{sec:attendance}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/attendance-management}
+
+各クラスの出席者数を登録・管理する機能である。
+
+\subsection{出席者数の登録}
+
+クラスを選択し、出席者数を入力して登録する。
+登録された数値は統計ダッシュボードや参加率の計算に使用される。
+
+\subsection{クラス別出席状況の確認}
+
+クラスごとの出席詳細を参照できる。
+
+\newpage
+
+% =====================================================================
+\section{競技詳細登録}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/sport-details-registration}
+
+大会に割り当てられた各競技の詳細情報を登録・更新する機能である。
+
+\subsection{競技概要・ルールの登録}
+
+競技の説明やルールをMarkdown形式で記述・更新する。
+PDFファイルによるルール説明のアップロードも可能である。
+
+\subsection{定員の設定}
+
+競技全体の最低定員・最高定員を設定する。
+クラスごとの定員を個別に設定することもできる。
+
+\subsection{試合開始時間の設定}
+
+通常時および雨天時の試合開始時間を設定する。
+
+\newpage
+
+% =====================================================================
+\section{試合結果入力}\label{sec:match}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/insert-matche-result}
+
+トーナメントの各試合について、進行状況と結果を入力する機能である。
+
+\subsection{試合ステータスの更新}
+
+試合ごとに以下のステータスを設定する。
+
+\begin{center}
+\begin{tabular}{lp{9cm}}
+\toprule
+\textbf{ステータス} & \textbf{説明} \\
+\midrule
+予定 & 試合がまだ始まっていない状態。 \\
+進行中 & 試合が現在行われている状態。 \\
+終了 & 試合が完了し結果が確定した状態。 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{試合開始時間の更新}
+
+試合の開始時間を変更する場合に更新する。
+
+\subsection{試合結果の入力}
+
+試合終了後、各チームのスコアや勝敗を入力する。
+入力された結果はトーナメントブラケットに即時反映される。
+
+\newpage
+
+% =====================================================================
+\section{昼競技（Noon Game）結果入力}\label{sec:noon}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/noon-game-results}
+
+昼休みに行われる特別競技（昼競技）の結果を入力する機能である。
+
+\subsection{通常マッチの結果入力}
+
+昼競技の通常試合について、試合結果を入力する。
+
+\subsection{テンプレートランの結果入力}
+
+rootが生成した競技テンプレートに対して、以下の各種結果を入力する。
+
+\begin{itemize}
+  \item \textbf{年リレー} ── ブロックごとの結果と総合ボーナス
+  \item \textbf{コースリレー} ── コース別の結果
+  \item \textbf{綱引き} ── 各試合の勝敗
+\end{itemize}
+
+\newpage
+
+% =====================================================================
+\section{MIC投票}\label{sec:mic}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/admin/vorting-mic}
+
+MIC（Most Improved Class：最も改善したクラス）の投票を行う機能である。
+
+\subsection{投票対象クラスの確認}
+
+投票対象となる候補クラスの一覧を確認する。
+
+\subsection{投票の実施}
+
+候補クラスの中から1つを選択して投票する。
+投票は1アカウントにつき1票のみ有効である。
+
+\subsection{投票結果の確認}
+
+自分が投票した内容および全体の投票状況を確認できる。
+なお、最終的なMIC決定はrootが確認・公表する。
+
+\newpage
+
+% =====================================================================
+\section{機能一覧まとめ}
+% =====================================================================
+
+以下にadmin権限で実行可能な操作を一覧にまとめる。
+
+\begin{longtable}{p{4.5cm}p{9cm}}
+\toprule
+\textbf{機能} & \textbf{概要} \\
+\midrule
+\endhead
+管理者ダッシュボード閲覧 & 出席率・参加率・スコア推移・イベント進捗をリアルタイムで確認 \\
+\midrule
+チームメンバー割り当て & 競技ごとに参加メンバーをクラスから選択して登録・削除 \\
+\midrule
+クラス代表ロール付与・削除 & 学生に \code{クラス名\_rep} ロールを付与または削除 \\
+\midrule
+QRコードスキャン & 学生のQRコードを読み取り参加を確認 \\
+\midrule
+参加確認済み一覧の確認 & QRスキャン済み学生の一覧をクラス・競技別に確認 \\
+\midrule
+出席者数の登録 & クラスごとの出席者数を入力して登録 \\
+\midrule
+競技詳細の登録・更新 & 競技のルール・定員・開始時間を設定 \\
+\midrule
+試合ステータスの更新 & 各試合の進行状況（予定・進行中・終了）を変更 \\
+\midrule
+試合結果の入力 & トーナメント試合のスコアおよび勝敗を入力 \\
+\midrule
+昼競技結果の入力 & 昼競技（年リレー・コースリレー・綱引き等）の結果を登録 \\
+\midrule
+MIC投票 & Most Improved Classの候補に投票 \\
+\bottomrule
+\end{longtable}
+
+\end{document}

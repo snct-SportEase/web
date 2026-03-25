@@ -1,0 +1,475 @@
+\documentclass[12pt]{ltjsarticle}
+
+% 基本パッケージ
+\usepackage[utf8]{inputenc}
+\usepackage{luatexja}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+
+% 表のデザインを向上させるパッケージ
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{makecell}
+
+% セクションやタイトルのデザイン調整
+\usepackage{titlesec}
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+\usepackage{enumitem}
+\usepackage{fontspec}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=cyan,
+  citecolor=green
+]{hyperref}
+
+\usepackage{listing}
+\usepackage{xcolor}
+\newcommand{\code}[1]{\colorbox{gray!20}{\texttt{#1}}}
+\usepackage{float}
+\geometry{top=2cm, bottom=2cm, left=2cm, right=2cm}
+\usepackage{minted}
+
+\usemintedstyle{vs}
+\setminted{
+    linenos,
+    frame=single,
+    framesep=2mm,
+    baselinestretch=1.2,
+    fontsize=\small,
+    breaklines
+}
+
+% 数式
+\usepackage{bm}
+
+% 画像
+\usepackage{float}
+
+\begin{document}
+
+\title{SportEase（スポーティーズ） 学生操作説明書}
+\author{行事委員会 佐藤佑作 s2301059}
+\date{\today}
+\maketitle
+\tableofcontents
+
+\newpage
+
+% =====================================================================
+\section{はじめに}
+% =====================================================================
+
+本書は、SportEase（スポーティーズ）の\textbf{student権限を持つ学生}向けの操作説明書である。
+学生アカウントでは、大会のスコア閲覧・試合日程の確認・QRコードの発行・通知の受信など、
+大会参加に必要な基本的な操作を行うことができる。
+
+\subsection*{権限の種類}
+\begin{itemize}
+  \item \textbf{root} ── 最上位権限。大会設定・システム管理・ユーザー管理など全機能にアクセス可能。
+  \item \textbf{admin} ── 試合進行・結果入力など大会運営補助が可能。
+  \item \textbf{student} ── 本書が対象とする基本権限。エントリー・観戦・通知受信のみ。
+\end{itemize}
+
+\subsection*{クラス代表について}
+
+初回ログイン時にクラスを選択すると、\code{クラス名\_rep} 形式のロールが自動的に付与される。
+このロールにより、自クラスのチーム編成管理など、追加の操作が利用できる。
+
+学生ダッシュボードは \code{/dashboard/student/} 以下の各ページから操作する。
+
+\subsection{大会当日の利用フロー}
+
+以下の流れで SportEase を活用することを推奨する。
+各手順の詳細は対応するセクションを参照すること。
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=1.3cm,
+  main/.style={
+    rectangle, draw, rounded corners=4pt,
+    minimum width=9cm, minimum height=0.9cm,
+    text centered, fill=blue!8, font=\bfseries
+  },
+  opt/.style={
+    rectangle, draw, dashed, rounded corners=4pt,
+    minimum width=4.5cm, minimum height=0.9cm,
+    text centered, fill=gray!8, font=\bfseries
+  },
+  arr/.style={->, thick, >=Stealth},
+  optarr/.style={->, dashed, >=Stealth}
+]
+\node[main] (s1) {① ガイド確認・PWAインストール（事前準備）→ 第\ref{sec:guide}章};
+\node[main, below of=s1] (s2) {② タイムテーブルで日程確認　→ 第\ref{sec:timetable}章};
+\node[main, below of=s2] (s3) {③ トーナメント・昼競技・スコア閲覧　→ 第\ref{sec:tournament}章};
+\node[main, below of=s3] (s4) {④ 通知受信・管理　→ 第\ref{sec:notification}章};
+
+\node[opt, right=1.5cm of s2] (qr) {QRコード発行（任意）→ 第\ref{sec:qr}章};
+\node[opt, right=1.5cm of s4] (req) {通知申請（任意）→ 第\ref{sec:notificationreq}章};
+
+\draw[arr] (s1) -- (s2);
+\draw[arr] (s2) -- (s3);
+\draw[arr] (s3) -- (s4);
+\draw[optarr] (s2.east) -- (qr.west);
+\draw[optarr] (s4.east) -- (req.west);
+
+\end{tikzpicture}
+\end{center}
+
+\subsection{初回ログイン}
+
+\href{https://nitsche-gyouji.com}{https://nitsche-gyouji.com} をお好みのブラウザで開いてください。
+すると、以下のような画面にアクセスできます。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/HP_first.png}
+  \caption{アクセス結果}
+\end{figure}
+
+\texttt{Googleでサインイン}をクリックしてください。\\
+\textcolor{red}{※学校のGoogle アカウントを必ず選択してください。学校のアカウント以外を選択してしまった場合は、ブラウザのキャッシュをクリアして再度アクセスしてください。}
+
+サインインが成功すると、以下のように表示名とクラスを設定する画面に移ります。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./images/set-display-name.png}
+  \caption{表示名とクラス設定画面}
+\end{figure}
+
+ここで、アプリないでの表示名とクラスを決定してください。
+確認画面も表示されるので、クラスに関しては間違えないようにお願いします。
+
+\newpage
+
+% =====================================================================
+\section{マイページ}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/my-page}
+
+自分のクラスに関する情報を一覧で確認できるページである。
+
+\subsection{クラスのスコアと順位}
+
+現在の大会におけるクラスの合計得点と順位を表示する。
+得点の内訳（競技別・カテゴリ別）も確認できる。
+
+\subsection{直近の試合スケジュール}
+
+自クラスが出場する直近の試合の日時・場所・対戦相手を確認できる。
+
+\subsection{アンケートへのアクセス}
+
+大会終了後にrootからアンケートが配信された場合、マイページからアンケートURLへアクセスできる。
+
+\subsection{クラスの試合進捗}
+
+自クラスの全競技にわたるトーナメント進捗状況を確認できる。
+
+\newpage
+
+% =====================================================================
+\section{トーナメント情報}\label{sec:tournament}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/tournament}
+
+大会の全競技にわたるトーナメントブラケットを確認するページである。
+
+\subsection{トーナメントブラケットの閲覧}
+
+競技ごとのトーナメント対戦表を表示する。
+各試合の対戦クラス・日時・結果を確認できる。
+
+\subsection{雨天時のブラケット}
+
+雨天時モードが有効な場合、雨天時に対応したブラケット（敗者復活戦追加後）も表示される。
+
+\newpage
+
+% =====================================================================
+\section{タイムテーブル}\label{sec:timetable}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/timetable}
+
+大会全体の試合スケジュールを時系列で確認するページである。
+
+\subsection{試合一覧の確認}
+
+全競技の試合日時・開催場所・対戦クラスを一覧で表示する。
+通常時および雨天時の開始時間を確認できる。
+
+\subsection{昼競技のスケジュール}
+
+トーナメント競技に加えて、昼競技（Noon Game）の日程も表示される。
+
+\newpage
+
+% =====================================================================
+\section{昼競技（Noon Game）情報}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/noon-game}
+
+昼休みに行われる特別競技（昼競技）の詳細を確認するページである。
+
+\subsection{セッション情報の確認}
+
+現在の昼競技セッションの概要・ポイント設定を確認できる。
+
+\subsection{試合結果の確認}
+
+各試合（年リレー・コースリレー・綱引きなど）の進行状況と結果を閲覧できる。
+
+\subsection{クラス別ポイントの確認}
+
+昼競技で各クラスが獲得したポイントの集計を確認できる。
+
+\newpage
+
+% =====================================================================
+\section{競技情報}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/sport-info}
+
+大会で実施される各競技の詳細情報を確認するページである。
+
+\subsection{競技一覧の閲覧}
+
+大会に登録されている全競技の名称・開催場所・概要を一覧で確認できる。
+
+\subsection{ルールの確認}
+
+各競技のルールをMarkdown形式またはPDFで閲覧できる。
+
+\newpage
+
+% =====================================================================
+\section{スコア一覧}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/score-list}
+
+全クラスの得点状況を確認するページである。
+なお、rootの設定によってスコアが非表示になる場合がある。
+
+\subsection{クラス別スコアの閲覧}
+
+全クラスの合計得点とランキングを確認できる。
+
+\subsection{得点内訳の確認}
+
+クラスごとの得点は以下のカテゴリ別に内訳が表示される。
+
+\begin{itemize}
+  \item \textbf{初期ポイント} ── 大会開始時の基礎点
+  \item \textbf{アンケートポイント} ── アンケート参加による加点
+  \item \textbf{出席ポイント} ── 出席状況に応じた加点
+  \item \textbf{トーナメント順位} ── 1位・2位・3位・優勝による獲得ポイント
+  \item \textbf{昼競技ポイント} ── 昼競技の結果による加点
+\end{itemize}
+
+\newpage
+
+% =====================================================================
+\section{QRコードの発行}\label{sec:qr}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/issueqr-code}
+
+競技への参加確認に使用するQRコードを発行するページである。
+試合当日にadminのスキャナーにかざして参加を登録する。
+
+\subsection{チームと大会の選択}
+
+自分が登録されているチームと対象の大会を選択してQRコードを生成する。
+
+\subsection{QRコードの有効期限}
+
+発行されたQRコードには有効期限があり、画面上にカウントダウンが表示される。
+有効期限が切れた場合は再発行が必要である。
+
+\newpage
+
+% =====================================================================
+\section{通知}\label{sec:notification}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/notification}
+
+運営から配信された通知を受信・管理するページである。
+
+\subsection{通知の確認}
+
+受信した通知の一覧を表示する。最新100件まで確認できる。
+
+\subsection{通知のフィルタリング}
+
+以下の通知タイプごとに表示・非表示を切り替えられる。
+
+\begin{itemize}
+  \item \textbf{一般通知} ── 運営からの全体向けお知らせ（常に表示）
+  \item \textbf{自分のクラスの試合} ── 自クラスが出場する試合の通知
+  \item \textbf{決勝戦} ── 決勝戦に関する通知
+  \item \textbf{全試合} ── 全試合に関する通知
+\end{itemize}
+
+\subsection{プッシュ通知の設定}
+
+ブラウザのプッシュ通知を有効にすることで、ページを開いていない状態でも通知を受け取ることができる。
+プッシュ通知の登録・解除はこのページから行う。
+
+\newpage
+
+% =====================================================================
+\section{通知申請}\label{sec:notificationreq}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/notification-request}
+
+運営に対して通知の配信を申請するページである。
+申請はroot権限の担当者が審査し、承認された場合に通知が配信される。
+
+\subsection{申請の作成}
+
+通知のタイトル・本文・対象情報を入力して申請を提出する。
+
+\subsection{申請状況の確認}
+
+提出済みの申請一覧と、各申請の審査状況を確認できる。
+審査状況は以下のいずれかで表示される。
+
+\begin{center}
+\begin{tabular}{lp{9cm}}
+\toprule
+\textbf{ステータス} & \textbf{説明} \\
+\midrule
+審査中 & 申請が提出され、rootによる審査を待っている状態。 \\
+承認済み & 申請が承認され、通知が配信された状態。 \\
+否認 & 申請が否認された状態。 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{メッセージのやり取り}
+
+申請ごとにチャット形式でrootとメッセージのやり取りができる。
+内容の確認や追加情報の提供に利用する。
+
+\newpage
+
+% =====================================================================
+\section{過去大会のアーカイブ}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/archive}
+
+過去に開催された大会の記録を閲覧するページである。
+
+\subsection{大会の検索}
+
+年度・シーズン（春季・秋季）で過去の大会を絞り込んで参照できる。
+
+\subsection{過去大会の結果確認}
+
+選択した大会のクラス別スコアやランキングを確認できる。
+
+\newpage
+
+% =====================================================================
+\section{ガイド}\label{sec:guide}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/guide}
+
+アプリの利用に関する各種案内を確認するページである。
+
+\subsection{PWAインストール手順}
+
+SportEaseをスマートフォンのホーム画面に追加する手順を確認できる。
+iOS・Androidそれぞれの操作手順が掲載されている。
+
+\subsection{競技要項PDFの閲覧}
+
+rootがアップロードした競技要項PDFをここから参照できる。
+
+
+\newpage
+
+% =====================================================================
+\section{クラス情報}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/class-info}
+
+\code{クラス名\_rep} ロールを持つ学生がアクセスできるページである。
+
+\subsection{クラスの概要確認}
+
+クラス名・登録学生数・出席者数・出席率を確認できる。
+
+\subsection{メンバー一覧の確認}
+
+クラス内の全メンバーの競技別チーム割り当て状況を一覧で確認できる。
+
+\subsection{試合進捗の確認}
+
+自クラスの全競技にわたるトーナメント進捗状況を確認できる。
+
+\newpage
+
+% =====================================================================
+\section{機能一覧まとめ}
+% =====================================================================
+
+以下にstudent権限で利用可能な操作を一覧にまとめる。
+
+\begin{longtable}{p{4.5cm}p{9cm}}
+\toprule
+\textbf{機能} & \textbf{概要} \\
+\midrule
+\endhead
+マイページの閲覧 & クラスのスコア・順位・直近の試合スケジュールを確認 \\
+\midrule
+トーナメントの閲覧 & 競技ごとのトーナメントブラケットと試合結果を確認 \\
+\midrule
+タイムテーブルの閲覧 & 全競技の試合日時・場所・対戦クラスを一覧で確認 \\
+\midrule
+昼競技情報の閲覧 & 昼競技のセッション情報・試合結果・ポイントを確認 \\
+\midrule
+競技情報の閲覧 & 各競技のルール・開催場所・概要を確認 \\
+\midrule
+スコア一覧の閲覧 & 全クラスの得点・ランキング・カテゴリ別内訳を確認 \\
+\midrule
+QRコードの発行 & 競技参加確認用のQRコードを生成 \\
+\midrule
+通知の受信・フィルタリング & 運営からの通知を受信し、種別ごとに表示を管理 \\
+\midrule
+プッシュ通知の設定 & ブラウザのプッシュ通知を登録・解除 \\
+\midrule
+通知申請の提出 & 運営への通知配信申請を作成・提出 \\
+\midrule
+申請状況の確認 & 提出済み申請の審査状況とメッセージを確認 \\
+\midrule
+過去大会の閲覧 & アーカイブから過去大会のスコアや結果を参照 \\
+\midrule
+ガイドの閲覧 & PWAインストール手順・競技要項PDFを確認 \\
+\midrule
+クラス情報の閲覧 & クラスの出席状況・メンバー一覧・試合進捗を確認 \\
+\bottomrule
+\end{longtable}
+
+\end{document}
