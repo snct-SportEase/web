@@ -243,11 +243,13 @@
         モバイルデバイスで通知を受け取ることができます
       </p>
     </div>
+    {#if isSupported}
     <div class="text-right">
       <span class="text-sm font-medium {getStatusColor()}">
         {getStatusText()}
       </span>
     </div>
+    {/if}
   </div>
 
   {#if !canEnableNotifications}
