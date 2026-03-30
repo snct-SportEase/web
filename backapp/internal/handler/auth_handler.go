@@ -7,6 +7,7 @@ import (
 	"backapp/internal/repository"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -57,7 +58,7 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 
 func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	oauthState, _ := c.Cookie("oauthstate")
-	if c.Query("state") != oauthState {
+	if subtle.ConstantTimeCompare([]byte(c.Query("state")), []byte(oauthState)) != 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
 		return
 	}
