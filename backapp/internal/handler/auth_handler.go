@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -66,7 +67,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	code := c.Query("code")
 	token, err := h.oauth2Config.Exchange(context.Background(), code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("oauth2 token exchange error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 
@@ -86,7 +88,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("failed to read userinfo response: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 
@@ -94,7 +97,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		Email string `json:"email"`
 	}
 	if err := json.Unmarshal(data, &userInfo); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("failed to parse userinfo: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 
@@ -121,7 +125,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	// ホワイトリストチェック
 	isWhitelisted, err := h.userRepo.IsEmailWhitelisted(userInfo.Email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("IsEmailWhitelisted error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 	if !isWhitelisted {
@@ -236,7 +241,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	user.IsProfileComplete = true
 
 	if err := h.userRepo.UpdateUser(user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("UpdateUser error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
 
@@ -346,7 +352,8 @@ func (h *AuthHandler) UpdateUserDisplayNameByAdmin(c *gin.Context) {
 	}
 
 	if err := h.userRepo.UpdateUserDisplayName(req.UserID, req.DisplayName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("UpdateUserDisplayName error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update display name"})
 		return
 	}
 
@@ -402,7 +409,8 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 	}
 
 	if err := h.userRepo.UpdateUserRole(req.UserID, req.Role, req.Event); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("UpdateUserRole error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user role"})
 		return
 	}
 
@@ -477,7 +485,8 @@ func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
 	}
 
 	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("DeleteUserRole error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user role"})
 		return
 	}
 

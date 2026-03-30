@@ -48,7 +48,7 @@ func (h *TournamentHandler) GetTournamentsByEventHandler(c *gin.Context) {
 
 	tournaments, err := h.tournRepo.GetTournamentsByEventID(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tournaments", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tournaments"})
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context)
 
 	sports, err := h.sportRepo.GetSportsByEventID(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event"})
 		return
 	}
 
@@ -163,14 +163,14 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 
 	var tournamentsToCreate []models.GeneratedTournament
 	if err := c.ShouldBindJSON(&tournamentsToCreate); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
 	// 昼競技(noon_game)のトーナメントは作成させない（フロント改変や直叩き対策）
 	eventSports, err := h.sportRepo.GetSportsByEventID(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event"})
 		return
 	}
 	locationBySportID := make(map[int]string, len(eventSports))
@@ -190,7 +190,7 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 
 	// First, delete existing tournaments for this event
 	if err := h.tournRepo.DeleteTournamentsByEventID(eventID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete existing tournaments", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete existing tournaments"})
 		return
 	}
 
@@ -206,7 +206,7 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 		if err != nil {
 			log.Printf("[BulkCreateTournaments] ERROR: Failed to save tournament for sport %s: %v", t.SportName, err)
 			// Attempt to rollback or handle partial save might be needed here
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + t.SportName, "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + t.SportName})
 			return
 		}
 		log.Printf("[BulkCreateTournaments] Successfully saved tournament for sport: %s", t.SportName)
@@ -227,13 +227,13 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 	}
 
 	if err := h.tournRepo.DeleteTournamentsByEventID(eventID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete existing tournaments", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete existing tournaments"})
 		return
 	}
 
 	sports, err := h.sportRepo.GetSportsByEventID(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event"})
 		return
 	}
 
@@ -261,7 +261,7 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 		// 本戦トーナメントを保存
 		err = h.tournRepo.SaveTournament(eventID, sport.ID, sport.Name, tournamentData, shuffledTeams)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + sport.Name, "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + sport.Name})
 			return
 		}
 
@@ -281,7 +281,7 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 				loserBracketA := generateLoserBracketTournament("A")
 				err = h.tournRepo.SaveTournament(eventID, sport.ID, fmt.Sprintf("%s Tournament - 敗者戦Aブロック", sport.Name), loserBracketA, []*models.Team{})
 				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket A tournament for sport " + sport.Name, "details": err.Error()})
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket A tournament for sport " + sport.Name})
 					return
 				}
 
@@ -289,7 +289,7 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 				loserBracketB := generateLoserBracketTournament("B")
 				err = h.tournRepo.SaveTournament(eventID, sport.ID, fmt.Sprintf("%s Tournament - 敗者戦Bブロック", sport.Name), loserBracketB, []*models.Team{})
 				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket B tournament for sport " + sport.Name, "details": err.Error()})
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket B tournament for sport " + sport.Name})
 					return
 				}
 			}

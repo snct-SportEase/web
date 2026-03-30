@@ -56,7 +56,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 
 	session, err := h.noonRepo.GetSessionByEvent(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -94,7 +94,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		}
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 			return
 		}
 	} else {
@@ -105,13 +105,13 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	// 既にテンプレートランが存在する場合は、既存のテンプレートと関連データを削除してから新しいテンプレートを作成
 	existingRuns, err := h.noonRepo.ListTemplateRunsBySession(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs"})
 		return
 	}
 	if len(existingRuns) > 0 {
 		// 既存のテンプレートランと関連データ（試合、グループなど）を削除
 		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(session.ID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run"})
 			return
 		}
 	}
@@ -193,7 +193,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 
 	classes, err := h.classRepo.GetAllClasses(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
 		return
 	}
 	classIDByName := make(map[string]int, len(classes))
@@ -219,7 +219,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 			Description: nil,
 		}, memberIDs)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create year relay group", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create year relay group"})
 			return
 		}
 		groupIDs = append(groupIDs, grp.ID)
@@ -253,17 +253,17 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 
 	matchA, err := createMatchWithEntries("学年対抗リレー Aブロック")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create A block match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create A block match"})
 		return
 	}
 	matchB, err := createMatchWithEntries("学年対抗リレー Bブロック")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create B block match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create B block match"})
 		return
 	}
 	matchBonus, err := createMatchWithEntries("学年対抗リレー 総合ボーナス")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create bonus match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create bonus match"})
 		return
 	}
 
@@ -283,20 +283,20 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(session.ID, noonTemplateYearRelay, fmt.Sprintf("学年対抗リレー (event_id=%d)", eventID), user.ID, pointsByRankJSON)
 	if err != nil {
 		log.Printf("ERROR: CreateYearRelayRun failed to create template run: session_id=%d, user_id=%q, error=%v", session.ID, user.ID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run"})
 		return
 	}
 
 	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchA.ID, yearRelayMatchA); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match A", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match A"})
 		return
 	}
 	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchB.ID, yearRelayMatchB); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match B", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match B"})
 		return
 	}
 	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchBonus.ID, yearRelayMatchBonus); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match bonus", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match bonus"})
 		return
 	}
 
@@ -341,7 +341,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 
 	session, err := h.noonRepo.GetSessionByEvent(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -379,7 +379,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		}
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 			return
 		}
 	} else {
@@ -390,13 +390,13 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 	// 既にテンプレートランが存在する場合は、既存のテンプレートと関連データを削除してから新しいテンプレートを作成
 	existingRuns, err := h.noonRepo.ListTemplateRunsBySession(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs"})
 		return
 	}
 	if len(existingRuns) > 0 {
 		// 既存のテンプレートランと関連データ（試合、グループなど）を削除
 		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(session.ID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run"})
 			return
 		}
 	}
@@ -404,7 +404,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 	// 全クラスを取得
 	classes, err := h.classRepo.GetAllClasses(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
 		return
 	}
 	if len(classes) == 0 {
@@ -509,7 +509,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 			Description: nil,
 		}, memberIDs)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create course relay group", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create course relay group"})
 			return
 		}
 		groupIDs = append(groupIDs, grp.ID)
@@ -537,12 +537,12 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 	}
 	saved, err := h.noonRepo.SaveMatch(m)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create match"})
 		return
 	}
 	match, err := h.noonRepo.GetMatchByID(saved.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 
@@ -565,12 +565,12 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(session.ID, noonTemplateCourseRelay, fmt.Sprintf("コース対抗リレー (event_id=%d)", eventID), user.ID, pointsByRankInterface)
 	if err != nil {
 		log.Printf("ERROR: CreateCourseRelayRun failed to create template run: session_id=%d, user_id=%q, error=%v", session.ID, user.ID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run"})
 		return
 	}
 
 	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, match.ID, courseRelayMatchMain); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match"})
 		return
 	}
 
@@ -613,7 +613,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 
 	session, err := h.noonRepo.GetSessionByEvent(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -651,7 +651,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		}
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 			return
 		}
 	} else {
@@ -662,13 +662,13 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 	// 既にテンプレートランが存在する場合は、既存のテンプレートと関連データを削除してから新しいテンプレートを作成
 	existingRuns, err := h.noonRepo.ListTemplateRunsBySession(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing template runs"})
 		return
 	}
 	if len(existingRuns) > 0 {
 		// 既存のテンプレートランと関連データ（試合、グループなど）を削除
 		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(session.ID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete existing template run"})
 			return
 		}
 	}
@@ -676,7 +676,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 	// 全クラスを取得
 	classes, err := h.classRepo.GetAllClasses(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
 		return
 	}
 	if len(classes) == 0 {
@@ -760,7 +760,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 			Description: nil,
 		}, memberIDs)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tug of war group", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tug of war group"})
 			return
 		}
 		groupIDs = append(groupIDs, grp.ID)
@@ -788,12 +788,12 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 	}
 	saved, err := h.noonRepo.SaveMatch(m)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create match"})
 		return
 	}
 	match, err := h.noonRepo.GetMatchByID(saved.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 
@@ -816,12 +816,12 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(session.ID, noonTemplateTugOfWar, fmt.Sprintf("綱引き (event_id=%d)", eventID), user.ID, pointsByRankInterface)
 	if err != nil {
 		log.Printf("ERROR: CreateTugOfWarRun failed to create template run: session_id=%d, user_id=%q, error=%v", session.ID, user.ID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create template run"})
 		return
 	}
 
 	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, match.ID, tugOfWarMatchMain); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match"})
 		return
 	}
 
@@ -996,24 +996,25 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 	}
 
 	if err := h.ensureEventExists(eventID); err != nil {
-		status := http.StatusInternalServerError
 		if errors.Is(err, errNotFound) {
-			status = http.StatusNotFound
+			c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		} else {
+			log.Printf("ensureEventExists error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
 	session, err := h.noonRepo.GetSessionByEvent(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session"})
 		return
 	}
 
 	if session == nil {
 		classes, clsErr := h.classRepo.GetAllClasses(eventID)
 		if clsErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": clsErr.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -1029,7 +1030,7 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 
 	payload, err := h.buildSessionPayload(session)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload"})
 		return
 	}
 
@@ -1048,17 +1049,18 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 	}
 
 	if err := h.ensureEventExists(eventID); err != nil {
-		status := http.StatusInternalServerError
 		if errors.Is(err, errNotFound) {
-			status = http.StatusNotFound
+			c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		} else {
+			log.Printf("ensureEventExists error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
 	var req upsertNoonSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -1082,14 +1084,14 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 
 	updated, err := h.noonRepo.UpsertSession(session)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save noon game session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save noon game session"})
 		return
 	}
 
 	payload, err := h.buildSessionPayload(updated)
 	if err != nil {
 		log.Printf("ERROR: UpsertSession failed to build session payload: session_id=%d, error=%v", updated.ID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload"})
 		return
 	}
 
@@ -1105,7 +1107,7 @@ func (h *NoonGameHandler) SaveGroup(c *gin.Context) {
 
 	session, err := h.noonRepo.GetSessionByID(sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session"})
 		return
 	}
 	if session == nil {
@@ -1124,7 +1126,7 @@ func (h *NoonGameHandler) SaveGroup(c *gin.Context) {
 
 	var req upsertNoonGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -1137,7 +1139,7 @@ func (h *NoonGameHandler) SaveGroup(c *gin.Context) {
 
 	updated, err := h.noonRepo.SaveGroup(group, req.ClassIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save group", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save group"})
 		return
 	}
 
@@ -1157,11 +1159,12 @@ func (h *NoonGameHandler) DeleteGroup(c *gin.Context) {
 	}
 
 	if err := h.noonRepo.DeleteGroup(sessionID, groupID); err != nil {
-		status := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") {
-			status = http.StatusNotFound
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		} else {
+			log.Printf("DeleteGroup error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1178,7 +1181,7 @@ func (h *NoonGameHandler) GetTemplateDefaultGroups(c *gin.Context) {
 
 	groups, err := h.noonRepo.GetTemplateDefaultGroups(templateKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch default groups", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch default groups"})
 		return
 	}
 
@@ -1201,7 +1204,7 @@ func (h *NoonGameHandler) SaveTemplateDefaultGroups(c *gin.Context) {
 		} `json:"groups" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -1244,7 +1247,7 @@ func (h *NoonGameHandler) SaveTemplateDefaultGroups(c *gin.Context) {
 	}
 
 	if err := h.noonRepo.SaveTemplateDefaultGroups(templateKey, groups); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save default groups", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save default groups"})
 		return
 	}
 
@@ -1260,7 +1263,7 @@ func (h *NoonGameHandler) SaveMatch(c *gin.Context) {
 
 	session, err := h.noonRepo.GetSessionByID(sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session"})
 		return
 	}
 	if session == nil {
@@ -1279,7 +1282,7 @@ func (h *NoonGameHandler) SaveMatch(c *gin.Context) {
 
 	var req upsertNoonMatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -1393,13 +1396,13 @@ func (h *NoonGameHandler) SaveMatch(c *gin.Context) {
 
 	updated, err := h.noonRepo.SaveMatch(match)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save match"})
 		return
 	}
 
 	full, err := h.noonRepo.GetMatchByID(updated.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve match"})
 		return
 	}
 	if full == nil {
@@ -1408,7 +1411,7 @@ func (h *NoonGameHandler) SaveMatch(c *gin.Context) {
 	}
 
 	if err := h.decorateMatches([]*models.NoonGameMatchWithResult{full}, nil, nil); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
 
@@ -1428,11 +1431,12 @@ func (h *NoonGameHandler) DeleteMatch(c *gin.Context) {
 	}
 
 	if err := h.noonRepo.DeleteMatch(sessionID, matchID); err != nil {
-		status := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") {
-			status = http.StatusNotFound
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		} else {
+			log.Printf("DeleteMatch error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1459,7 +1463,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 
 	match, err := h.noonRepo.GetMatchByID(matchID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if match == nil {
@@ -1469,7 +1473,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 
 	session, err := h.noonRepo.GetSessionByID(match.SessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -1486,7 +1490,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 
 	var req recordNoonMatchResultRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -1507,7 +1511,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 	}
 
 	if err := h.noonRepo.ClearPointsForMatch(matchID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
 		return
 	}
 
@@ -1651,7 +1655,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 	}
 
 	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
 		return
 	}
 
@@ -1662,30 +1666,30 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 		Note:       req.Note,
 		Details:    resultDetails,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result"})
 		return
 	}
 
 	match.Status = "completed"
 	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
 		return
 	}
 
 	summary, err := h.noonRepo.SumPointsByClass(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
 		return
 	}
 
 	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
 
 	fullMatch, err := h.noonRepo.GetMatchByID(matchID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if fullMatch == nil {
@@ -1694,13 +1698,13 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 	}
 
 	if err := h.decorateMatches([]*models.NoonGameMatchWithResult{fullMatch}, nil, nil); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
 
 	payload, err := h.buildSessionPayload(session)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload"})
 		return
 	}
 
@@ -1723,7 +1727,7 @@ func (h *NoonGameHandler) AddManualPoint(c *gin.Context) {
 
 	session, err := h.noonRepo.GetSessionByID(sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -1737,7 +1741,7 @@ func (h *NoonGameHandler) AddManualPoint(c *gin.Context) {
 
 	var req manualPointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -1760,24 +1764,24 @@ func (h *NoonGameHandler) AddManualPoint(c *gin.Context) {
 		Source:    "manual",
 		CreatedBy: user.ID,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store manual points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store manual points"})
 		return
 	}
 
 	summary, err := h.noonRepo.SumPointsByClass(sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
 		return
 	}
 
 	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
 
 	payload, err := h.buildSessionPayload(session)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload"})
 		return
 	}
 
@@ -1800,14 +1804,14 @@ func (h *NoonGameHandler) RecordYearRelayBlockResult(c *gin.Context) {
 
 	var req yearRelayBlockResultRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
 	// テンプレートランから点数設定を取得
 	run, err := h.noonRepo.GetTemplateRunByID(runID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run"})
 		return
 	}
 	if run == nil {
@@ -1851,14 +1855,14 @@ func (h *NoonGameHandler) RecordYearRelayOverallBonus(c *gin.Context) {
 
 	var req yearRelayOverallResultRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
 	// テンプレートランから点数設定を取得
 	run, err := h.noonRepo.GetTemplateRunByID(runID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run"})
 		return
 	}
 	if run == nil {
@@ -1898,14 +1902,14 @@ func (h *NoonGameHandler) RecordCourseRelayResult(c *gin.Context) {
 
 	var req courseRelayResultRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
 	// テンプレートランから点数設定を取得
 	run, err := h.noonRepo.GetTemplateRunByID(runID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run"})
 		return
 	}
 	if run == nil {
@@ -1958,14 +1962,14 @@ func (h *NoonGameHandler) RecordTugOfWarResult(c *gin.Context) {
 
 	var req tugOfWarResultRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
 	// テンプレートランから点数設定を取得
 	run, err := h.noonRepo.GetTemplateRunByID(runID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run"})
 		return
 	}
 	if run == nil {
@@ -2075,7 +2079,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 
 	run, err := h.noonRepo.GetTemplateRunByID(runID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run"})
 		return
 	}
 	if run == nil || run.TemplateKey != noonTemplateYearRelay {
@@ -2085,7 +2089,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 
 	link, err := h.noonRepo.GetTemplateRunMatchByKey(runID, matchKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match"})
 		return
 	}
 	if link == nil {
@@ -2095,7 +2099,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 
 	match, err := h.noonRepo.GetMatchByID(link.MatchID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if match == nil {
@@ -2105,7 +2109,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 
 	session, err := h.noonRepo.GetSessionByID(match.SessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -2137,7 +2141,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 	// classMap と groupMap を取得
 	classes, err := h.classRepo.GetAllClasses(session.EventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
 		return
 	}
 	classMap := make(map[int]*models.Class)
@@ -2146,7 +2150,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 	}
 	groups, err := h.noonRepo.GetGroupsWithMembers(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups"})
 		return
 	}
 	groupMap := make(map[int]*models.NoonGameGroupWithMembers)
@@ -2197,7 +2201,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 
 	// 既存ポイントを消す
 	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
 		return
 	}
 
@@ -2280,7 +2284,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 	}
 
 	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
 		return
 	}
 
@@ -2302,30 +2306,30 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		Note:       req.Note,
 		Details:    resultDetails,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result"})
 		return
 	}
 
 	match.Status = "completed"
 	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
 		return
 	}
 
 	// クラス得点へ反映
 	summary, err := h.noonRepo.SumPointsByClass(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
 		return
 	}
 	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
 
 	full, err := h.noonRepo.GetMatchByID(match.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if full == nil {
@@ -2333,7 +2337,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		return
 	}
 	if err := h.decorateMatches([]*models.NoonGameMatchWithResult{full}, nil, nil); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
 
@@ -2836,7 +2840,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 
 	run, err := h.noonRepo.GetTemplateRunByID(runID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run"})
 		return
 	}
 	if run == nil || run.TemplateKey != noonTemplateCourseRelay {
@@ -2846,7 +2850,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 
 	link, err := h.noonRepo.GetTemplateRunMatchByKey(runID, matchKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match"})
 		return
 	}
 	if link == nil {
@@ -2856,7 +2860,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 
 	match, err := h.noonRepo.GetMatchByID(link.MatchID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if match == nil {
@@ -2866,7 +2870,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 
 	session, err := h.noonRepo.GetSessionByID(match.SessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -2898,7 +2902,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 	// classMap と groupMap を取得
 	classes, err := h.classRepo.GetAllClasses(session.EventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
 		return
 	}
 	classMap := make(map[int]*models.Class)
@@ -2907,7 +2911,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 	}
 	groups, err := h.noonRepo.GetGroupsWithMembers(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups"})
 		return
 	}
 	groupMap := make(map[int]*models.NoonGameGroupWithMembers)
@@ -2958,7 +2962,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 
 	// 既存ポイントを消す
 	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
 		return
 	}
 
@@ -3041,7 +3045,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 	}
 
 	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
 		return
 	}
 
@@ -3063,30 +3067,30 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		Note:       req.Note,
 		Details:    resultDetails,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result"})
 		return
 	}
 
 	match.Status = "completed"
 	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
 		return
 	}
 
 	// クラス得点へ反映
 	summary, err := h.noonRepo.SumPointsByClass(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
 		return
 	}
 	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
 
 	full, err := h.noonRepo.GetMatchByID(match.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if full == nil {
@@ -3094,7 +3098,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		return
 	}
 	if err := h.decorateMatches([]*models.NoonGameMatchWithResult{full}, nil, nil); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
 
@@ -3121,7 +3125,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 
 	run, err := h.noonRepo.GetTemplateRunByID(runID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run"})
 		return
 	}
 	if run == nil || run.TemplateKey != noonTemplateTugOfWar {
@@ -3131,7 +3135,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 
 	link, err := h.noonRepo.GetTemplateRunMatchByKey(runID, matchKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match"})
 		return
 	}
 	if link == nil {
@@ -3141,7 +3145,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 
 	match, err := h.noonRepo.GetMatchByID(link.MatchID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if match == nil {
@@ -3151,7 +3155,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 
 	session, err := h.noonRepo.GetSessionByID(match.SessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
 	if session == nil {
@@ -3183,7 +3187,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 	// classMap と groupMap を取得
 	classes, err := h.classRepo.GetAllClasses(session.EventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
 		return
 	}
 	classMap := make(map[int]*models.Class)
@@ -3192,7 +3196,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 	}
 	groups, err := h.noonRepo.GetGroupsWithMembers(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups"})
 		return
 	}
 	groupMap := make(map[int]*models.NoonGameGroupWithMembers)
@@ -3243,7 +3247,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 
 	// 既存ポイントを消す
 	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
 		return
 	}
 
@@ -3326,7 +3330,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 	}
 
 	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
 		return
 	}
 
@@ -3348,30 +3352,30 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		Note:       req.Note,
 		Details:    resultDetails,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result"})
 		return
 	}
 
 	match.Status = "completed"
 	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
 		return
 	}
 
 	// クラス得点へ反映
 	summary, err := h.noonRepo.SumPointsByClass(session.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
 		return
 	}
 	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
 
 	full, err := h.noonRepo.GetMatchByID(match.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
 		return
 	}
 	if full == nil {
@@ -3379,7 +3383,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		return
 	}
 	if err := h.decorateMatches([]*models.NoonGameMatchWithResult{full}, nil, nil); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
 
@@ -3761,7 +3765,7 @@ func (h *NoonGameHandler) GetTemplateRunByMatchID(c *gin.Context) {
 
 	link, err := h.noonRepo.GetTemplateRunMatchByMatchID(matchID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run match", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run match"})
 		return
 	}
 	if link == nil {
@@ -3771,7 +3775,7 @@ func (h *NoonGameHandler) GetTemplateRunByMatchID(c *gin.Context) {
 
 	run, err := h.noonRepo.GetTemplateRunByID(link.RunID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch template run"})
 		return
 	}
 	if run == nil {
