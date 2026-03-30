@@ -15,6 +15,7 @@ type Config struct {
 	InitEventYear                                                        string
 	WebPushPublicKey                                                     string
 	WebPushPrivateKey                                                    string
+	RedisAddr                                                            string
 }
 
 func Load() (*Config, error) {
@@ -41,6 +42,7 @@ func Load() (*Config, error) {
 		InitEventEndDate:   os.Getenv("INIT_EVENT_END_DATE"),
 		WebPushPublicKey:   os.Getenv("WEBPUSH_PUBLIC_KEY"),
 		WebPushPrivateKey:  os.Getenv("WEBPUSH_PRIVATE_KEY"),
+		RedisAddr:          os.Getenv("REDIS_ADDR"),
 	}
 	return cfg, nil
 }
