@@ -7,6 +7,7 @@ import (
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
 	"database/sql"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -90,6 +91,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		auth := api.Group("/auth")
 		{
 			google := auth.Group("/google")
+			google.Use(middleware.RateLimit(10, time.Minute))
 			{
 				google.GET("/login", authHandler.GoogleLogin)
 				google.GET("/callback", authHandler.GoogleCallback)
@@ -119,7 +121,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			qrcode.Use(middleware.AuthMiddleware(userRepo))
 			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
 			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
-			qrcode.POST("/verify", qrCodeHandler.VerifyQRCodeHandler)
+			qrcode.POST("/verify", middleware.RateLimit(20, time.Minute), qrCodeHandler.VerifyQRCodeHandler)
 		}
 
 		student := api.Group("/student")
