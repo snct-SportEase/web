@@ -50,7 +50,7 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 // ... (GoogleLogin, GoogleCallback, GetUser are unchanged)
 
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
-	state := generateStateOauthCookie(c.Writer)
+	state := generateStateOauthCookie(c.Writer, c.Request)
 	url := h.oauth2Config.AuthCodeURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
@@ -478,12 +478,20 @@ func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User role deleted successfully"})
 }
 
-func generateStateOauthCookie(w http.ResponseWriter) string {
+func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 	var expiration = time.Now().Add(20 * time.Minute)
 	b := make([]byte, 16)
 	rand.Read(b)
 	state := base64.URLEncoding.EncodeToString(b)
-	cookie := http.Cookie{Name: "oauthstate", Value: state, Expires: expiration}
+	cookie := http.Cookie{
+		Name:     "oauthstate",
+		Value:    state,
+		Expires:  expiration,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   middleware.IsRequestSecure(r),
+		SameSite: http.SameSiteLaxMode,
+	}
 	http.SetCookie(w, &cookie)
 
 	return state
