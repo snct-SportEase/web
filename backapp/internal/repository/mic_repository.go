@@ -49,6 +49,19 @@ func (r *micRepository) VoteMIC(userID string, votedForClassID int, eventID int,
 	}
 	defer tx.Rollback() // Rollback on any error
 
+	// 投票対象クラスがそのイベントの有効なMIC対象クラスか確認
+	var eligibleCount int
+	err = tx.QueryRow(
+		"SELECT COUNT(*) FROM classes WHERE id = ? AND event_id = ? AND name IN ('1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2')",
+		votedForClassID, eventID,
+	).Scan(&eligibleCount)
+	if err != nil {
+		return err
+	}
+	if eligibleCount == 0 {
+		return errors.New("voted class is not eligible for MIC")
+	}
+
 	// Check if the user has already voted
 	var count int
 	err = tx.QueryRow("SELECT COUNT(*) FROM mic_votes WHERE voter_user_id = ? AND event_id = ?", userID, eventID).Scan(&count)

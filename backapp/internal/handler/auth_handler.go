@@ -99,7 +99,12 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	// ドメイン制限
 	allowedDomains := []string{"sendai-nct.jp", "sendai-nct.ac.jp"}
-	emailDomain := strings.Split(userInfo.Email, "@")[1]
+	parts := strings.Split(userInfo.Email, "@")
+	if len(parts) != 2 || parts[1] == "" {
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=domain_not_allowed")
+		return
+	}
+	emailDomain := parts[1]
 	isAllowed := false
 	for _, domain := range allowedDomains {
 		if emailDomain == domain {
