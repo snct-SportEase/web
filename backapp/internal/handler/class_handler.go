@@ -36,7 +36,6 @@ func (h *ClassHandler) GetAllClasses(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
 		return
 	}
-	fmt.Printf("activeEventID: %d\n", activeEventID)
 	if activeEventID == 0 {
 		// アクティブなイベントがない場合は空の配列を返す
 		// 初回ログイン時など、イベントがまだ設定されていない場合に対応

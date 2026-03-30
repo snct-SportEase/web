@@ -10,7 +10,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -152,7 +151,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 				c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
 				return
 			}
-			fmt.Printf("userhandler_err: %s\n", err)
+			log.Printf("CreateUser error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}

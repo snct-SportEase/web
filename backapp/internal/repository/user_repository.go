@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -259,8 +258,6 @@ func (r *userRepository) CreateUser(user *models.User) error {
 		return err
 	}
 	defer tx.Rollback()
-
-	fmt.Printf("user.ClassID: %d\n", user.ClassID)
 
 	// ユーザーをusersテーブルに挿入
 	if user.ClassID != nil && *user.ClassID != 0 {
