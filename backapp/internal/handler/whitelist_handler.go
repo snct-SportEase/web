@@ -46,7 +46,7 @@ func (h *WhitelistHandler) AddWhitelistedEmailHandler(c *gin.Context) {
 	if err != nil {
 		// If there is an error other than "no rows", it's a server error.
 		// "no rows" is handled by GetActiveEvent returning 0, so we don't need to check sql.ErrNoRows here.
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
 		return
 	}
 
@@ -82,7 +82,7 @@ func (h *WhitelistHandler) BulkAddWhitelistedEmailsHandler(c *gin.Context) {
 	// Get active event_id
 	activeEventID, err := h.EventRepo.GetActiveEvent()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
 		return
 	}
 

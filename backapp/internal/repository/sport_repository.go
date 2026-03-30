@@ -4,7 +4,7 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"errors"
-	"fmt"
+	"log"
 )
 
 // SportRepository defines the interface for sport and event_sport related database operations.
@@ -125,7 +125,7 @@ func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) erro
 	query = "INSERT INTO event_sports (event_id, sport_id, description, rules, rules_type, rules_pdf_url, location, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	_, err = r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.Rules, eventSport.RulesType, eventSport.RulesPdfURL, eventSport.Location, eventSport.MinCapacity, eventSport.MaxCapacity)
 	if err != nil {
-		fmt.Printf("Error inserting EventSport: %v\n", err)
+		log.Printf("Error inserting EventSport: %v", err)
 	}
 	return err
 }

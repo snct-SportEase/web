@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -35,7 +36,6 @@ func (h *ClassHandler) GetAllClasses(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
 		return
 	}
-	fmt.Printf("activeEventID: %d\n", activeEventID)
 	if activeEventID == 0 {
 		// アクティブなイベントがない場合は空の配列を返す
 		// 初回ログイン時など、イベントがまだ設定されていない場合に対応
@@ -45,7 +45,8 @@ func (h *ClassHandler) GetAllClasses(c *gin.Context) {
 
 	classes, err := h.classRepo.GetAllClasses(activeEventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("GetAllClasses error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -80,7 +81,8 @@ func (h *ClassHandler) UpdateStudentCountsHandler(c *gin.Context) {
 	}
 
 	if err := h.classRepo.UpdateStudentCounts(activeEventID, counts); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student counts: " + err.Error()})
+		log.Printf("UpdateStudentCounts error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student counts"})
 		return
 	}
 
@@ -121,7 +123,7 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 
 	// Skip header row
 	if _, err := reader.Read(); err != nil && err != io.EOF {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read CSV header: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read CSV header"})
 		return
 	}
 
@@ -131,7 +133,8 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 			break
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read CSV record: " + err.Error()})
+			log.Printf("CSV read error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read CSV"})
 			return
 		}
 
@@ -163,7 +166,8 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 	}
 
 	if err := h.classRepo.UpdateStudentCounts(activeEventID, counts); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student counts from CSV: " + err.Error()})
+		log.Printf("UpdateStudentCounts from CSV error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student counts"})
 		return
 	}
 
@@ -195,7 +199,8 @@ func (h *ClassHandler) GetClassScores(c *gin.Context) {
 
 	scores, err := h.classRepo.GetClassScoresByEvent(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("GetClassScoresByEvent error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -494,7 +499,8 @@ func (h *ClassHandler) ExportClassScoresCSVHandler(c *gin.Context) {
 
 	scores, err := h.classRepo.GetClassScoresByEvent(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("GetClassScoresByEvent error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 

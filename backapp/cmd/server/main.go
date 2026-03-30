@@ -2,6 +2,7 @@ package main
 
 import (
 	"backapp/internal/config"
+	"backapp/internal/middleware"
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"backapp/internal/router"
@@ -11,9 +12,13 @@ import (
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	gin.SetMode(gin.ReleaseMode)
+
 	log.Println("Starting the application...")
 	cfg, err := config.Load()
 	if err != nil {
@@ -26,6 +31,10 @@ func main() {
 	}
 	defer db.Close()
 	log.Println("Database connection successful.")
+
+	// Redisセッションストアを初期化
+	middleware.InitSessionStore(cfg.RedisAddr)
+	log.Println("Redis session store initialized.")
 
 	// 初期ルートユーザーを登録
 	if err := initializeRootUser(db, cfg); err != nil {

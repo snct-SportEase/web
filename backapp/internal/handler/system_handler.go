@@ -46,7 +46,7 @@ func (h *SystemHandler) ExportDBDump(c *gin.Context) {
 
 	// Print stderr if any error occurs
 	if err := cmd.Run(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate database dump", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate database dump"})
 		return
 	}
 }

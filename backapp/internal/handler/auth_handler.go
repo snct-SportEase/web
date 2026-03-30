@@ -7,10 +7,11 @@ import (
 	"backapp/internal/repository"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -50,14 +51,14 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 // ... (GoogleLogin, GoogleCallback, GetUser are unchanged)
 
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
-	state := generateStateOauthCookie(c.Writer)
+	state := generateStateOauthCookie(c.Writer, c.Request)
 	url := h.oauth2Config.AuthCodeURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
 func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	oauthState, _ := c.Cookie("oauthstate")
-	if c.Query("state") != oauthState {
+	if subtle.ConstantTimeCompare([]byte(c.Query("state")), []byte(oauthState)) != 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
 		return
 	}
@@ -65,7 +66,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	code := c.Query("code")
 	token, err := h.oauth2Config.Exchange(context.Background(), code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("oauth2 token exchange error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 
@@ -85,7 +87,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("failed to read userinfo response: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 
@@ -93,13 +96,19 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		Email string `json:"email"`
 	}
 	if err := json.Unmarshal(data, &userInfo); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("failed to parse userinfo: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 
 	// ドメイン制限
 	allowedDomains := []string{"sendai-nct.jp", "sendai-nct.ac.jp"}
-	emailDomain := strings.Split(userInfo.Email, "@")[1]
+	parts := strings.Split(userInfo.Email, "@")
+	if len(parts) != 2 || parts[1] == "" {
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=domain_not_allowed")
+		return
+	}
+	emailDomain := parts[1]
 	isAllowed := false
 	for _, domain := range allowedDomains {
 		if emailDomain == domain {
@@ -115,7 +124,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	// ホワイトリストチェック
 	isWhitelisted, err := h.userRepo.IsEmailWhitelisted(userInfo.Email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("IsEmailWhitelisted error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 	if !isWhitelisted {
@@ -141,7 +151,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 				c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
 				return
 			}
-			fmt.Printf("userhandler_err: %s\n", err)
+			log.Printf("CreateUser error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}
@@ -222,6 +232,11 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	if len([]rune(req.DisplayName)) > 12 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "表示名は12文字以内で入力してください"})
+		return
+	}
+
 	// Check if it's the first time the profile is being completed
 	isFirstCompletion := !user.IsProfileComplete
 
@@ -230,7 +245,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	user.IsProfileComplete = true
 
 	if err := h.userRepo.UpdateUser(user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("UpdateUser error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
 
@@ -313,6 +329,11 @@ func (h *AuthHandler) UpdateUserDisplayNameByAdmin(c *gin.Context) {
 		return
 	}
 
+	if len([]rune(req.DisplayName)) > 12 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "表示名は12文字以内で入力してください"})
+		return
+	}
+
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
@@ -340,7 +361,8 @@ func (h *AuthHandler) UpdateUserDisplayNameByAdmin(c *gin.Context) {
 	}
 
 	if err := h.userRepo.UpdateUserDisplayName(req.UserID, req.DisplayName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("UpdateUserDisplayName error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update display name"})
 		return
 	}
 
@@ -396,7 +418,8 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 	}
 
 	if err := h.userRepo.UpdateUserRole(req.UserID, req.Role, req.Event); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("UpdateUserRole error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user role"})
 		return
 	}
 
@@ -471,19 +494,28 @@ func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
 	}
 
 	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("DeleteUserRole error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user role"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User role deleted successfully"})
 }
 
-func generateStateOauthCookie(w http.ResponseWriter) string {
+func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 	var expiration = time.Now().Add(20 * time.Minute)
 	b := make([]byte, 16)
 	rand.Read(b)
 	state := base64.URLEncoding.EncodeToString(b)
-	cookie := http.Cookie{Name: "oauthstate", Value: state, Expires: expiration}
+	cookie := http.Cookie{
+		Name:     "oauthstate",
+		Value:    state,
+		Expires:  expiration,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   middleware.IsRequestSecure(r),
+		SameSite: http.SameSiteLaxMode,
+	}
 	http.SetCookie(w, &cookie)
 
 	return state

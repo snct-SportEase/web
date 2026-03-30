@@ -21,7 +21,6 @@ type TournamentRepository interface {
 	GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchRainyModeStartTime(matchID int, rainyModeStartTime string) error
-	UpdateMatchStatus(matchID int, status string) error
 	UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error
 	UpdateMatchResultForCorrection(matchID, team1Score, team2Score, winnerID int) error
 	GetTournamentIDByMatchID(matchID int) (int, error)
@@ -567,10 +566,6 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 	return nil
 }
 
-func (r *tournamentRepository) updateRanks(tx *sql.Tx, eventID int) error {
-	// class_scores is a VIEW, ranking is dynamic
-	return nil
-}
 
 func (r *tournamentRepository) marshal(data interface{}) (json.RawMessage, error) {
 	bytes, err := json.Marshal(data)
@@ -834,10 +829,6 @@ func (r *tournamentRepository) UpdateMatchRainyModeStartTime(matchID int, rainyM
 	return err
 }
 
-func (r *tournamentRepository) UpdateMatchStatus(matchID int, status string) error {
-	_, err := r.db.Exec("UPDATE matches SET status = ? WHERE id = ?", status, matchID)
-	return err
-}
 
 func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score, winnerIDInput int) error {
 	tx, err := r.db.Begin()
@@ -1341,7 +1332,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 			if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10); err != nil {
 				return err
 			}
-			return r.updateRanks(tx, eventID)
+			return nil
 		}
 	}
 
@@ -1363,7 +1354,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	}
 
 	if totalRounds <= 0 {
-		return r.updateRanks(tx, eventID)
+		return nil
 	}
 
 	// 3位決定戦の場合
@@ -1374,7 +1365,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 		if err := r.subtractPoints(tx, eventID, previousLoserTeam.ClassID, columns.champion, 40); err != nil {
 			return err
 		}
-		return r.updateRanks(tx, eventID)
+		return nil
 	}
 
 	// 決勝の場合
@@ -1387,7 +1378,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 		}
 	}
 
-	return r.updateRanks(tx, eventID)
+	return nil
 }
 
 // invalidateSubsequentMatches invalidates all subsequent matches that depend on the given match

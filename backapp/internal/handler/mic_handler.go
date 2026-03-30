@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -27,7 +28,8 @@ func (h *MICHandler) GetEligibleClasses(c *gin.Context) {
 
 	classes, err := h.micRepo.GetEligibleClasses(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("GetEligibleClasses error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -62,7 +64,8 @@ func (h *MICHandler) VoteMIC(c *gin.Context) {
 
 	err := h.micRepo.VoteMIC(userID, req.VotedForClassID, req.EventID, req.Reason)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("VoteMIC error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -78,7 +81,8 @@ func (h *MICHandler) GetMICVotes(c *gin.Context) {
 
 	votes, err := h.micRepo.GetMICVotes(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("GetMICVotes error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -107,7 +111,8 @@ func (h *MICHandler) GetUserVote(c *gin.Context) {
 
 	vote, err := h.micRepo.GetVoteByUserID(userID, eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("GetVoteByUserID error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -128,7 +133,8 @@ func (h *MICHandler) GetMICClass(c *gin.Context) {
 
 	micResult, err := h.micRepo.GetMICClass(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("GetMICClass error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 

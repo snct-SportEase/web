@@ -93,7 +93,8 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 
 	id, err := h.eventRepo.CreateEvent(event)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	event.ID = int(id)
@@ -101,14 +102,16 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 	if event.Season == "autumn" {
 		springEvent, err := h.eventRepo.GetEventByYearAndSeason(event.Year, "spring")
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			log.Printf("error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 			return
 		}
 
 		if springEvent != nil {
 			err := h.eventRepo.CopyClassScores(springEvent.ID, event.ID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				log.Printf("error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 				return
 			}
 		}
@@ -120,7 +123,8 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 func (h *EventHandler) GetAllEvents(c *gin.Context) {
 	events, err := h.eventRepo.GetAllEvents()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, events)
@@ -171,7 +175,8 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 
 	existingEvent, err := h.eventRepo.GetEventByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	if existingEvent == nil {
@@ -190,7 +195,8 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 
 	err = h.eventRepo.UpdateEvent(existingEvent)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -200,7 +206,8 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 	event_id, err := h.eventRepo.GetActiveEvent()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	if event_id == 0 {
@@ -210,7 +217,8 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 
 	event, err := h.eventRepo.GetEventByID(event_id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	if event == nil {
@@ -234,7 +242,7 @@ func (h *EventHandler) SetActiveEvent(c *gin.Context) {
 	// 2. リクエストボディをパースし、バリデーション
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// バリデーションエラーやJSONパースエラーの場合、400 Bad Requestを返す
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body or missing event_id", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body or missing event_id"})
 		return
 	}
 
@@ -242,7 +250,7 @@ func (h *EventHandler) SetActiveEvent(c *gin.Context) {
 	err := h.eventRepo.SetActiveEvent(req.EventID)
 	if err != nil {
 		// DB更新に失敗した場合、500 Internal Server Errorを返す
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set active event", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set active event"})
 		return
 	}
 
@@ -250,7 +258,7 @@ func (h *EventHandler) SetActiveEvent(c *gin.Context) {
 	if req.EventID != nil {
 		if err := h.whitelistRepo.UpdateNullEventIDs(*req.EventID); err != nil {
 			// このエラーはクリティカルではないので、ログには残すがクライアントには成功を返す
-			// c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update whitelist event IDs", "details": err.Error()})
+			// c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update whitelist event IDs"})
 			// return
 			// TODO: Add proper logging here
 		}
@@ -282,7 +290,8 @@ func (h *EventHandler) SetRainyMode(c *gin.Context) {
 
 	err = h.eventRepo.SetRainyMode(eventID, req.IsRainyMode)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -290,7 +299,7 @@ func (h *EventHandler) SetRainyMode(c *gin.Context) {
 	if req.IsRainyMode {
 		err = h.tournamentRepo.ApplyRainyModeStartTimes(eventID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to apply rainy mode start times", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to apply rainy mode start times"})
 			return
 		}
 	}
@@ -317,7 +326,8 @@ func (h *EventHandler) UpdateCompetitionGuidelines(c *gin.Context) {
 
 	event, err := h.eventRepo.GetEventByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	if event == nil {
@@ -328,7 +338,8 @@ func (h *EventHandler) UpdateCompetitionGuidelines(c *gin.Context) {
 	event.CompetitionGuidelinesPdfUrl = req.PdfUrl
 	err = h.eventRepo.UpdateEvent(event)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -345,7 +356,8 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 
 	event, err := h.eventRepo.GetEventByID(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	if event == nil || event.SurveyUrl == nil || *event.SurveyUrl == "" {
@@ -488,7 +500,8 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 
 	event, err := h.eventRepo.GetEventByID(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	if event == nil {

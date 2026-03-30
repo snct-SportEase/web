@@ -50,6 +50,18 @@ services:
       timeout: 5s
       retries: 5
 
+  sportease-redis:
+    image: redis:7-alpine
+    container_name: sportease-redis
+    networks:
+      - spotease-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   sportease-backapp:
     build:
       context: ./backapp
@@ -60,6 +72,8 @@ services:
       - uploads-data:/app/uploads
     depends_on:
       sportease-db:
+        condition: service_healthy
+      sportease-redis:
         condition: service_healthy
     networks:
       - spotease-net

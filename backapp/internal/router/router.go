@@ -7,6 +7,7 @@ import (
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
 	"database/sql"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -90,6 +91,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		auth := api.Group("/auth")
 		{
 			google := auth.Group("/google")
+			google.Use(middleware.RateLimit(10, time.Minute))
 			{
 				google.GET("/login", authHandler.GoogleLogin)
 				google.GET("/callback", authHandler.GoogleCallback)
@@ -119,7 +121,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			qrcode.Use(middleware.AuthMiddleware(userRepo))
 			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
 			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
-			qrcode.POST("/verify", qrCodeHandler.VerifyQRCodeHandler)
+			qrcode.POST("/verify", middleware.RateLimit(20, time.Minute), qrCodeHandler.VerifyQRCodeHandler)
 		}
 
 		student := api.Group("/student")
@@ -150,7 +152,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			notifications.GET("/subscription", notificationHandler.GetSubscription)
 			notifications.POST("/subscription", notificationHandler.SaveSubscription)
 			notifications.DELETE("/subscription", notificationHandler.DeleteSubscription)
-			notifications.GET("/debug", notificationHandler.GetNotificationDebugInfo)
 		}
 
 		admin := api.Group("/admin")
@@ -186,7 +187,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
 			admin.PUT("/matches/:match_id/rainy-mode-start-time", tournHandler.UpdateMatchRainyModeStartTimeHandler)
-			admin.PUT("/matches/:match_id/status", tournHandler.UpdateMatchStatusHandler)
 			admin.PUT("/matches/:match_id/result", tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/noon-game/matches/:match_id/result", noonHandler.RecordMatchResult)
 			admin.GET("/noon-game/matches/:match_id/template-run", noonHandler.GetTemplateRunByMatchID)

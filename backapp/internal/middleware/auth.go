@@ -3,36 +3,40 @@ package middleware
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"context"
 	"net/http"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
-// Note: In a production environment, use a persistent session store like Redis.
-var (
-	sessionStore = make(map[string]string)
-	sessionMu    sync.RWMutex
-)
+const sessionTTL = 24 * time.Hour
+const sessionKeyPrefix = "session:"
+
+var redisClient *redis.Client
+
+func InitSessionStore(addr string) {
+	redisClient = redis.NewClient(&redis.Options{
+		Addr: addr,
+	})
+}
 
 func CreateSession(token, userID string) {
-	sessionMu.Lock()
-	defer sessionMu.Unlock()
-	sessionStore[token] = userID
+	redisClient.Set(context.Background(), sessionKeyPrefix+token, userID, sessionTTL)
 }
 
 func GetUserIDFromSession(token string) (string, bool) {
-	sessionMu.RLock()
-	defer sessionMu.RUnlock()
-	userID, exists := sessionStore[token]
-	return userID, exists
+	val, err := redisClient.Get(context.Background(), sessionKeyPrefix+token).Result()
+	if err != nil {
+		return "", false
+	}
+	return val, true
 }
 
 func DeleteSession(token string) {
-	sessionMu.Lock()
-	defer sessionMu.Unlock()
-	delete(sessionStore, token)
+	redisClient.Del(context.Background(), sessionKeyPrefix+token)
 }
 
 func IsRequestSecure(r *http.Request) bool {

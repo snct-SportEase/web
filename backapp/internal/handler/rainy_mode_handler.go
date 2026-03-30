@@ -31,7 +31,7 @@ func (h *RainyModeHandler) GetRainyModeSettingsHandler(c *gin.Context) {
 
 	settings, err := h.rainyModeRepo.GetSettingsByEventID(eventID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve rainy mode settings", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve rainy mode settings"})
 		return
 	}
 
@@ -48,7 +48,7 @@ func (h *RainyModeHandler) UpsertRainyModeSettingHandler(c *gin.Context) {
 
 	var req models.RainyModeSettingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *RainyModeHandler) UpsertRainyModeSettingHandler(c *gin.Context) {
 
 	err = h.rainyModeRepo.UpsertSetting(setting)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save rainy mode setting", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save rainy mode setting"})
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *RainyModeHandler) DeleteRainyModeSettingHandler(c *gin.Context) {
 
 	err = h.rainyModeRepo.DeleteSetting(eventID, sportID, classID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete rainy mode setting", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete rainy mode setting"})
 		return
 	}
 
