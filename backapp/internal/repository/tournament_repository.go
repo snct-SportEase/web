@@ -566,10 +566,6 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 	return nil
 }
 
-func (r *tournamentRepository) updateRanks(tx *sql.Tx, eventID int) error {
-	// class_scores is a VIEW, ranking is dynamic
-	return nil
-}
 
 func (r *tournamentRepository) marshal(data interface{}) (json.RawMessage, error) {
 	bytes, err := json.Marshal(data)
@@ -1336,7 +1332,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 			if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10); err != nil {
 				return err
 			}
-			return r.updateRanks(tx, eventID)
+			return nil
 		}
 	}
 
@@ -1358,7 +1354,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	}
 
 	if totalRounds <= 0 {
-		return r.updateRanks(tx, eventID)
+		return nil
 	}
 
 	// 3位決定戦の場合
@@ -1369,7 +1365,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 		if err := r.subtractPoints(tx, eventID, previousLoserTeam.ClassID, columns.champion, 40); err != nil {
 			return err
 		}
-		return r.updateRanks(tx, eventID)
+		return nil
 	}
 
 	// 決勝の場合
@@ -1382,7 +1378,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 		}
 	}
 
-	return r.updateRanks(tx, eventID)
+	return nil
 }
 
 // invalidateSubsequentMatches invalidates all subsequent matches that depend on the given match
