@@ -21,7 +21,6 @@ type TournamentRepository interface {
 	GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchRainyModeStartTime(matchID int, rainyModeStartTime string) error
-	UpdateMatchStatus(matchID int, status string) error
 	UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error
 	UpdateMatchResultForCorrection(matchID, team1Score, team2Score, winnerID int) error
 	GetTournamentIDByMatchID(matchID int) (int, error)
@@ -834,10 +833,6 @@ func (r *tournamentRepository) UpdateMatchRainyModeStartTime(matchID int, rainyM
 	return err
 }
 
-func (r *tournamentRepository) UpdateMatchStatus(matchID int, status string) error {
-	_, err := r.db.Exec("UPDATE matches SET status = ? WHERE id = ?", status, matchID)
-	return err
-}
 
 func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score, winnerIDInput int) error {
 	tx, err := r.db.Begin()

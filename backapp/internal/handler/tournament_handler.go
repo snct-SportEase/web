@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -60,41 +59,6 @@ func (h *TournamentHandler) UpdateMatchRainyModeStartTimeHandler(c *gin.Context)
 	c.JSON(http.StatusOK, gin.H{"message": "Match rainy mode start time updated successfully"})
 }
 
-type UpdateMatchStatusRequest struct {
-	Status string `json:"status"`
-}
-
-func (h *TournamentHandler) UpdateMatchStatusHandler(c *gin.Context) {
-	matchID, err := strconv.Atoi(c.Param("match_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
-		return
-	}
-
-	var req UpdateMatchStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
-		return
-	}
-
-	if err := h.tournRepo.UpdateMatchStatus(matchID, req.Status); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match status"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Match status updated successfully"})
-
-	// Broadcast progress update
-	eventID, _ := h.eventRepo.GetActiveEvent()
-	tournaments, _ := h.tournRepo.GetTournamentsByEventID(eventID)
-	progress := make(map[string]string)
-	for _, tourn := range tournaments {
-		sport, _ := h.sportRepo.GetSportByID(tourn.SportID)
-		progress[sport.Name] = "進行中"
-	}
-	message, _ := json.Marshal(progress)
-	h.hubManager.GetHub("progress").Broadcast(message)
-}
 
 type UpdateMatchResultRequest struct {
 	Team1Score int `json:"team1_score"`

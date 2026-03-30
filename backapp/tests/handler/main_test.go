@@ -341,11 +341,6 @@ func (m *MockTournamentRepository) UpdateMatchRainyModeStartTime(matchID int, ra
 	return args.Error(0)
 }
 
-func (m *MockTournamentRepository) UpdateMatchStatus(matchID int, status string) error {
-	args := m.Called(matchID, status)
-	return args.Error(0)
-}
-
 func (m *MockTournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error {
 	args := m.Called(matchID, team1Score, team2Score, winnerID)
 	return args.Error(0)
