@@ -232,6 +232,11 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	if len([]rune(req.DisplayName)) > 12 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "表示名は12文字以内で入力してください"})
+		return
+	}
+
 	// Check if it's the first time the profile is being completed
 	isFirstCompletion := !user.IsProfileComplete
 
@@ -321,6 +326,11 @@ func (h *AuthHandler) UpdateUserDisplayNameByAdmin(c *gin.Context) {
 	var req UpdateUserDisplayNameRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len([]rune(req.DisplayName)) > 12 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "表示名は12文字以内で入力してください"})
 		return
 	}
 
