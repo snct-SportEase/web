@@ -172,15 +172,21 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	sessionToken := uuid.New().String()
 	middleware.CreateSession(sessionToken, user.ID)
 
+	isSecure := middleware.IsRequestSecure(c.Request)
+	
+	// Set session cookie
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session_token",
 		Value:    sessionToken,
 		Expires:  time.Now().Add(24 * time.Hour),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   middleware.IsRequestSecure(c.Request),
+		Secure:   isSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
+
+	// Add a debug log to verify cookie flags
+	log.Printf("[auth] Session created for user %s, secure=%v, origin=%s", user.Email, isSecure, c.Request.RemoteAddr)
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }

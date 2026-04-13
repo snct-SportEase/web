@@ -17,7 +17,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	router := gin.Default()
 
 	// CORS middleware
-	router.Use(middleware.CORSMiddleware())
+	router.Use(middleware.CORSMiddleware(cfg))
 
 	// Serve static files for uploaded images
 	router.Static("/uploads", "./uploads")

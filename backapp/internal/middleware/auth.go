@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"context"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -24,12 +25,18 @@ func InitSessionStore(addr string) {
 }
 
 func CreateSession(token, userID string) {
-	redisClient.Set(context.Background(), sessionKeyPrefix+token, userID, sessionTTL)
+	err := redisClient.Set(context.Background(), sessionKeyPrefix+token, userID, sessionTTL).Err()
+	if err != nil {
+		log.Printf("[redis] Failed to create session in Redis: %v", err)
+	}
 }
 
 func GetUserIDFromSession(token string) (string, bool) {
 	val, err := redisClient.Get(context.Background(), sessionKeyPrefix+token).Result()
 	if err != nil {
+		if err != redis.Nil {
+			log.Printf("[redis] Redis error during session lookup: %v", err)
+		}
 		return "", false
 	}
 	return val, true
@@ -60,21 +67,24 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cookie, err := c.Cookie("session_token")
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			log.Printf("[auth] No session_token cookie found for path: %s", c.Request.URL.Path)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: No session cookie"})
 			c.Abort()
 			return
 		}
 
 		userID, exists := GetUserIDFromSession(cookie)
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			log.Printf("[auth] Session token not found in Redis: %s", cookie)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Session expired or invalid"})
 			c.Abort()
 			return
 		}
 
 		user, err := userRepo.GetUserWithRoles(userID)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			log.Printf("[auth] Failed to fetch user from DB for ID %s: %v", userID, err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User fetch failed"})
 			c.Abort()
 			return
 		}
