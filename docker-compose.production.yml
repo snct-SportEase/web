@@ -93,6 +93,11 @@ services:
     container_name: frontapp
     env_file:
       - ./frontapp/.env
+    environment:
+      - BACKEND_URL=http://sportease-backapp:8080
+      - ORIGIN=https://nitsche-gyouji.com
+      - PROTOCOL_HEADER=x-forwarded-proto
+      - HOST_HEADER=x-forwarded-host
     depends_on:
       - sportease-backapp
     networks:
