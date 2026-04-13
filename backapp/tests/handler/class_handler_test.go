@@ -5,6 +5,7 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +18,7 @@ import (
 func TestClassHandler_GetClassScores(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockEventRepo := new(MockEventRepository)
 		mockTeamRepo := new(MockTeamRepository)
@@ -50,7 +51,7 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 
-	t.Run("With event_id query", func(t *testing.T) {
+	t.Run("with event_id query", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockEventRepo := new(MockEventRepository)
 		mockTeamRepo := new(MockTeamRepository)
@@ -81,7 +82,7 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
 	})
 
-	t.Run("No active event", func(t *testing.T) {
+	t.Run("no active event", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockEventRepo := new(MockEventRepository)
 		mockTeamRepo := new(MockTeamRepository)
@@ -102,17 +103,64 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 		mockClassRepo.AssertNotCalled(t, "GetClassScoresByEvent", mock.Anything)
 	})
+
+	t.Run("GetActiveEvent returns error", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(0, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class", nil)
+
+		h.GetClassScores(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertNotCalled(t, "GetClassScoresByEvent", mock.Anything)
+	})
+
+	t.Run("repository returns error", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassScoresByEvent", 1).Return(nil, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class", nil)
+
+		h.GetClassScores(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockClassRepo.AssertExpectations(t)
+		mockEventRepo.AssertExpectations(t)
+	})
 }
 
 func TestClassHandler_GetClassProgress(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	mockClassRepo := new(MockClassRepository)
-	mockEventRepo := new(MockEventRepository)
-	mockTeamRepo := new(MockTeamRepository)
-	mockTournamentRepo := new(MockTournamentRepository)
-
-	h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
+	newHandler := func() (*handler.ClassHandler, *MockClassRepository, *MockEventRepository, *MockTeamRepository, *MockTournamentRepository) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+		h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
+		return h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo
+	}
 
 	user := &models.User{ID: "user-1"}
 	class := &models.Class{ID: 10, Name: "IS3"}
@@ -123,7 +171,6 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		{ID: "user-a", Email: "a@example.com", DisplayName: &displayNameA},
 		{ID: "user-b", Email: "b@example.com", DisplayName: &displayNameB},
 	}
-
 	matchDetails := []*models.MatchDetail{
 		{
 			MatchID:        1,
@@ -159,42 +206,231 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		},
 	}
 
-	mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-	mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
-	mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
-	mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
-	mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(map[int][]*models.User{team.ID: members}, nil).Once()
-	mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: matchDetails}, nil).Once()
+	t.Run("success", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
 
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
-	c.Set("user", user)
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
+		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(map[int][]*models.User{team.ID: members}, nil).Once()
+		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: matchDetails}, nil).Once()
 
-	h.GetClassProgress(c)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+		h.GetClassProgress(c)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, float64(class.ID), response["class_id"])
-	assert.Equal(t, class.Name, response["class_name"])
+		assert.Equal(t, http.StatusOK, w.Code)
 
-	memberList, ok := response["members"].([]interface{})
-	assert.True(t, ok)
-	assert.Len(t, memberList, 2)
-	firstMember := memberList[0].(map[string]interface{})
-	assignments, ok := firstMember["assignments"].([]interface{})
-	assert.True(t, ok)
-	assert.Len(t, assignments, 1)
+		var response map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(class.ID), response["class_id"])
+		assert.Equal(t, class.Name, response["class_name"])
 
-	progressData, ok := response["progress"].([]interface{})
-	assert.True(t, ok)
-	assert.Len(t, progressData, 1)
+		memberList, ok := response["members"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, memberList, 2)
+		firstMember := memberList[0].(map[string]any)
+		assignments, ok := firstMember["assignments"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, assignments, 1)
 
-	mockEventRepo.AssertExpectations(t)
-	mockClassRepo.AssertExpectations(t)
-	mockTeamRepo.AssertExpectations(t)
-	mockTournamentRepo.AssertExpectations(t)
+		progressData, ok := response["progress"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, progressData, 1)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("unauthorized - no user in context", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+
+		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
+		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
+		mockTeamRepo.AssertNotCalled(t, "GetTeamsByClassID", mock.Anything, mock.Anything)
+		mockTournamentRepo.AssertNotCalled(t, "GetMatchesForTeams", mock.Anything, mock.Anything)
+	})
+
+	t.Run("GetActiveEvent returns error", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, _, _ := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(0, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
+	})
+
+	t.Run("no active event", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, _, _ := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(0, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
+	})
+
+	t.Run("GetClassByRepRole returns error", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "GetTeamsByClassID", mock.Anything, mock.Anything)
+	})
+
+	t.Run("user is not a class rep", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "GetTeamsByClassID", mock.Anything, mock.Anything)
+	})
+
+	t.Run("GetTeamsByClassID returns error", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return(nil, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetClassMembers returns error", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
+		mockClassRepo.On("GetClassMembers", class.ID).Return(nil, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetMatchesForTeams returns error", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
+		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
+		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(nil, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetTeamMembersByTeamIDs returns error", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
+		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
+		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: matchDetails}, nil).Once()
+		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(nil, errors.New("db error")).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
 }

@@ -624,3 +624,44 @@ func (m *MockRainyModeRepository) DeleteSetting(eventID int, sportID int, classI
 	args := m.Called(eventID, sportID, classID)
 	return args.Error(0)
 }
+
+type MockMICRepository struct {
+	mock.Mock
+}
+
+func (m *MockMICRepository) GetEligibleClasses(eventID int) ([]models.Class, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Class), args.Error(1)
+}
+
+func (m *MockMICRepository) VoteMIC(userID string, votedForClassID int, eventID int, reason string) error {
+	args := m.Called(userID, votedForClassID, eventID, reason)
+	return args.Error(0)
+}
+
+func (m *MockMICRepository) GetMICVotes(eventID int) ([]models.MICVote, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.MICVote), args.Error(1)
+}
+
+func (m *MockMICRepository) GetVoteByUserID(userID string, eventID int) (*models.MICVote, error) {
+	args := m.Called(userID, eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.MICVote), args.Error(1)
+}
+
+func (m *MockMICRepository) GetMICClass(eventID int) (*models.MICResult, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.MICResult), args.Error(1)
+}

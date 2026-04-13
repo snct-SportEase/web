@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"database/sql"
+	"errors"
 	"regexp"
 	"testing"
 
@@ -157,6 +158,32 @@ func TestRainyModeRepository_GetSetting(t *testing.T) {
 
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+
+	t.Run("db error", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewRainyModeRepository(db)
+		dbErr := errors.New("connection timeout")
+
+		mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, event_id, sport_id, class_id, min_capacity, max_capacity, match_start_time
+		FROM rainy_mode_settings
+		WHERE event_id = ? AND sport_id = ? AND class_id = ?
+		`)).
+			WithArgs(1, 1, 1).
+			WillReturnError(dbErr)
+
+		setting, err := r.GetSetting(1, 1, 1)
+
+		assert.Error(t, err)
+		assert.Nil(t, setting)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRainyModeRepository_UpsertSetting(t *testing.T) {
@@ -243,10 +270,53 @@ func TestRainyModeRepository_UpsertSetting(t *testing.T) {
 
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+
+	t.Run("db error", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewRainyModeRepository(db)
+		dbErr := errors.New("db error")
+		minCapacity := 5
+		maxCapacity := 10
+
+		setting := &models.RainyModeSetting{
+			EventID:     1,
+			SportID:     1,
+			ClassID:     1,
+			MinCapacity: &minCapacity,
+			MaxCapacity: &maxCapacity,
+		}
+
+		mock.ExpectExec(regexp.QuoteMeta(`
+		INSERT INTO rainy_mode_settings (event_id, sport_id, class_id, min_capacity, max_capacity, match_start_time)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+			min_capacity = VALUES(min_capacity),
+			max_capacity = VALUES(max_capacity),
+			match_start_time = VALUES(match_start_time)
+		`)).
+			WithArgs(1, 1, 1, minCapacity, maxCapacity, nil).
+			WillReturnError(dbErr)
+
+		err = r.UpsertSetting(setting)
+
+		assert.Error(t, err)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRainyModeRepository_DeleteSetting(t *testing.T) {
-	t.Run("Success - Delete setting", func(t *testing.T) {
+	const deleteQuery = `
+		DELETE FROM rainy_mode_settings
+		WHERE event_id = ? AND sport_id = ? AND class_id = ?
+		`
+
+	t.Run("success", func(t *testing.T) {
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -255,21 +325,52 @@ func TestRainyModeRepository_DeleteSetting(t *testing.T) {
 
 		r := repository.NewRainyModeRepository(db)
 
-		eventID := 1
-		sportID := 1
-		classID := 1
-
-		mock.ExpectExec(regexp.QuoteMeta(`
-		DELETE FROM rainy_mode_settings
-		WHERE event_id = ? AND sport_id = ? AND class_id = ?
-		`)).
-			WithArgs(eventID, sportID, classID).
+		mock.ExpectExec(regexp.QuoteMeta(deleteQuery)).
+			WithArgs(1, 1, 1).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 
-		err = r.DeleteSetting(eventID, sportID, classID)
+		err = r.DeleteSetting(1, 1, 1)
 
 		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
+	t.Run("setting not found - no rows affected", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewRainyModeRepository(db)
+
+		mock.ExpectExec(regexp.QuoteMeta(deleteQuery)).
+			WithArgs(1, 1, 999).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+
+		err = r.DeleteSetting(1, 1, 999)
+
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewRainyModeRepository(db)
+		dbErr := errors.New("db error")
+
+		mock.ExpectExec(regexp.QuoteMeta(deleteQuery)).
+			WithArgs(1, 1, 1).
+			WillReturnError(dbErr)
+
+		err = r.DeleteSetting(1, 1, 1)
+
+		assert.Error(t, err)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
