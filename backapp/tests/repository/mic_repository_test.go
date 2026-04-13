@@ -27,6 +27,9 @@ func TestMICRepository_VoteMIC(t *testing.T) {
 		reason := "test reason"
 
 		mock.ExpectBegin()
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM classes WHERE id = \\? AND event_id = \\? AND name IN \\('1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2'\\)").
+			WithArgs(classID, eventID).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SELECT COUNT(.+) FROM mic_votes").WithArgs(userID, eventID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		mock.ExpectExec("INSERT INTO mic_votes").WithArgs(userID, classID, eventID, reason, 3).WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, "mic_points").WillReturnResult(sqlmock.NewResult(1, 1))
@@ -44,6 +47,9 @@ func TestMICRepository_VoteMIC(t *testing.T) {
 		reason := ""
 
 		mock.ExpectBegin()
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM classes WHERE id = \\? AND event_id = \\? AND name IN \\('1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2'\\)").
+			WithArgs(classID, eventID).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SELECT COUNT(.+) FROM mic_votes").WithArgs(userID, eventID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		mock.ExpectExec("INSERT INTO mic_votes").WithArgs(userID, classID, eventID, reason, 3).WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectExec("INSERT INTO score_logs").WithArgs(eventID, classID, 3, "mic_points").WillReturnResult(sqlmock.NewResult(1, 1))
@@ -61,6 +67,9 @@ func TestMICRepository_VoteMIC(t *testing.T) {
 		reason := ""
 
 		mock.ExpectBegin()
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM classes WHERE id = \\? AND event_id = \\? AND name IN \\('1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2'\\)").
+			WithArgs(classID, eventID).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectQuery("SELECT COUNT(.+) FROM mic_votes").WithArgs(userID, eventID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 		mock.ExpectRollback()
 

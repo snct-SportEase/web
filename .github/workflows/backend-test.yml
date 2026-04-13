@@ -1,0 +1,62 @@
+name: Backend Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - ci/auto-test
+
+jobs:
+  backend-test:
+    name: Backend Go Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: 'backapp/go.sum'
+
+      - name: Install dependencies
+        working-directory: ./backapp
+        run: go mod download
+
+      - name: Run unit tests
+        working-directory: ./backapp
+        run: go test -v ./...
+
+      - name: Run race detector
+        working-directory: ./backapp
+        run: go test -race -v ./...
+
+      - name: Generate coverage report
+        working-directory: ./backapp
+        run: |
+          go test -covermode=atomic -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | tee coverage.txt
+
+      - name: Publish coverage summary
+        working-directory: ./backapp
+        run: |
+          {
+            echo "## Backend Coverage"
+            echo
+            echo '```text'
+            cat coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backapp/coverage.out
+            backapp/coverage.txt
