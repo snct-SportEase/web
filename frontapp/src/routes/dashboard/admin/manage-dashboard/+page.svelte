@@ -40,8 +40,9 @@
 				}
 			}, 100); // DOMがレンダリングされるのを待つ
 
-			// WebSocket接続
-			ws = new WebSocket(`ws://localhost:5000/api/ws/progress`);
+			// WebSocket接続は現在のオリジンに追従させる
+			const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			ws = new WebSocket(`${wsProtocol}//${window.location.host}/api/ws/progress`);
 			ws.onopen = () => {
 				console.log('WebSocket connected');
 			};
