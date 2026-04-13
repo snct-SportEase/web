@@ -29,12 +29,8 @@ const child = spawn('npm', ['run', 'test:unit', '--', ...args], {
 	stdio: 'pipe'
 });
 
-let stdoutBuffer = '';
-let stderrBuffer = '';
-
 child.stdout.on('data', (data) => {
 	const output = data.toString();
-	stdoutBuffer += output;
 	// Always show stdout
 	process.stdout.write(output);
 });
@@ -45,7 +41,6 @@ child.stderr.on('data', (data) => {
 	if (!output.includes('transport was disconnected') && !output.includes('cannot call "fetchModule"')) {
 		process.stderr.write(output);
 	}
-	stderrBuffer += output;
 });
 
 child.on('close', (code) => {

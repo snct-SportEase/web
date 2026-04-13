@@ -3,8 +3,6 @@
 	import { Html5Qrcode } from 'html5-qrcode';
 
 	let html5QrCode;
-	let cameraId;
-	let scannedData = '';
 	let errorMessage = '';
 
 	let verificationResult = null;
@@ -15,7 +13,7 @@
 		Html5Qrcode.getCameras()
 			.then((devices) => {
 				if (devices && devices.length) {
-					cameraId = devices[0].id;
+					return devices[0].id;
 				}
 			})
 			.catch((err) => {
@@ -88,7 +86,6 @@
 					qrbox: { width: 250, height: 250 }
 				},
 				(decodedText) => {
-					scannedData = decodedText;
 					verifyQRCode(decodedText);
 					stopScan();
 				},
@@ -115,7 +112,6 @@
 	}
 
 	function resetScanner() {
-		scannedData = '';
 		verificationResult = null;
 		errorMessage = '';
 		if (countdownInterval) {

@@ -5,7 +5,6 @@
   let selectedClass = '';
   let reason = '';
   let eventId = null;
-  let eventName = '';
 
   let hasVoted = false;
   let votedForClassId = null;
@@ -27,7 +26,6 @@
         return;
       }
       eventId = eventData.event_id;
-      eventName = eventData.event_name;
     } catch (error) {
       console.error('Error fetching active event:', error);
       alert('イベント情報の取得中にエラーが発生しました。');

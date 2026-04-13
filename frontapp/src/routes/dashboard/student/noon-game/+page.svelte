@@ -68,18 +68,6 @@
     }
   }
 
-  function displayWinner(match) {
-    if (!match.result) return '未登録';
-    if (match.result.winner === 'home') {
-      return match.home_display_name || 'ホーム';
-    } else if (match.result.winner === 'away') {
-      return match.away_display_name || 'アウェイ';
-    } else if (match.result.winner === 'draw') {
-      return '引き分け';
-    }
-    return '未登録';
-  }
-
   function detectTemplateFromMatch(match) {
     const title = match.title || '';
     if (title.includes('学年対抗リレー')) {
@@ -134,20 +122,6 @@
     return detail.resolved_name || detail.display_name || '-';
   }
 
-  function formatResultDetails(details, entries) {
-    if (!details || details.length === 0) return '未登録';
-    const sorted = [...details].sort((a, b) => {
-      const rankA = a.rank || 999;
-      const rankB = b.rank || 999;
-      return rankA - rankB;
-    });
-    return sorted.map(d => {
-      const rank = d.rank ? `${d.rank}位` : '-';
-      const points = d.points !== null && d.points !== undefined ? ` (${d.points}点)` : '';
-      const name = getEntryName(d, entries);
-      return `${rank}: ${name}${points}`;
-    }).join(', ');
-  }
 </script>
 
 <div class="space-y-8 p-4 md:p-8">
@@ -249,4 +223,3 @@
     </section>
   {/if}
 </div>
-

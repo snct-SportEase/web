@@ -908,7 +908,7 @@
         throw new Error(detail?.error || `${templateNames[selectedTemplateType]}テンプレートの作成に失敗しました`);
       }
 
-      const data = await res.json();
+      await res.json();
       if (templateRuns.length > 0) {
         alert(`${templateNames[selectedTemplateType]}テンプレートに更新しました。既存のテンプレートと関連データは削除されました。`);
       } else {
@@ -1599,4 +1599,3 @@
       </section>
   {/if}
 </div>
-
