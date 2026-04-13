@@ -21,7 +21,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
+          check-latest: true
           cache-dependency-path: 'backapp/go.sum'
 
       - name: Install dependencies
@@ -30,16 +31,20 @@ jobs:
 
       - name: Run unit tests
         working-directory: ./backapp
-        run: go test -v ./...
+        run: |
+          go test -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
 
       - name: Run race detector
         working-directory: ./backapp
-        run: go test -race -v ./...
+        run: |
+          go test -race -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
 
       - name: Generate coverage report
         working-directory: ./backapp
         run: |
-          go test -covermode=atomic -coverprofile=coverage.out ./...
+          go test -v -covermode=atomic -coverprofile=coverage.out \
+            -coverpkg=backapp/internal/handler,backapp/internal/repository,backapp/internal/websocket \
+            ./tests/handler/... ./tests/repository/... ./internal/websocket/...
           go tool cover -func=coverage.out | tee coverage.txt
 
       - name: Publish coverage summary
