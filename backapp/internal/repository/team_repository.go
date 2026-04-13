@@ -21,6 +21,7 @@ type TeamRepository interface {
 	ConfirmTeamMember(teamID int, userID string) error
 	GetConfirmedTeamMembers(teamID int) ([]*models.User, error)
 	GetConfirmedTeamMembersCount(teamID int) (int, error)
+	CreateTeamsBulk(teams []*models.Team) error
 }
 
 type teamRepository struct {
@@ -336,4 +337,25 @@ func (r *teamRepository) GetConfirmedTeamMembersCount(teamID int) (int, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *teamRepository) CreateTeamsBulk(teams []*models.Team) error {
+	if len(teams) == 0 {
+		return nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString("INSERT INTO teams (name, class_id, sport_id) VALUES ")
+
+	args := make([]interface{}, 0, len(teams)*3)
+	for i, team := range teams {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString("(?, ?, ?)")
+		args = append(args, team.Name, team.ClassID, team.SportID)
+	}
+
+	_, err := r.db.Exec(sb.String(), args...)
+	return err
 }

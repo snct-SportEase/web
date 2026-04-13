@@ -299,6 +299,11 @@ func (m *MockTeamRepository) GetConfirmedTeamMembersCount(teamID int) (int, erro
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockTeamRepository) CreateTeamsBulk(teams []*models.Team) error {
+	args := m.Called(teams)
+	return args.Error(0)
+}
+
 type MockTournamentRepository struct {
 	mock.Mock
 }

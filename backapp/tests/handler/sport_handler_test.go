@@ -1053,7 +1053,7 @@ func TestSportHandler_AssignSportToEventHandler(t *testing.T) {
 		mockSportRepo.On("AssignSportToEvent", mock.Anything).Return(nil).Once()
 		mockSportRepo.On("GetSportByID", 1).Return(&sport, nil).Once()
 		mockClassRepo.On("GetAllClasses", 1).Return(classes, nil).Once()
-		mockTeamRepo.On("CreateTeam", mock.Anything).Return(int64(1), nil).Once()
+		mockTeamRepo.On("CreateTeamsBulk", mock.Anything).Return(nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)

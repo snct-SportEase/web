@@ -3,14 +3,12 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/sync/errgroup"
 )
 
 // SportHandler handles sport-related API requests.
@@ -155,26 +153,20 @@ func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
 		return
 	}
 
-	// Create teams for each class in parallel
-	g, _ := errgroup.WithContext(context.Background())
+	// Prepare teams for bulk insert
+	teams := make([]*models.Team, 0, len(classes))
 	for _, class := range classes {
-		c := class // capture loop variable
-		g.Go(func() error {
-			team := &models.Team{
-				Name:    fmt.Sprintf("%s", c.Name),
-				ClassID: c.ID,
-				SportID: sport.ID,
-				EventID: eventID,
-			}
-			if _, err := h.teamRepo.CreateTeam(team); err != nil {
-				return fmt.Errorf("failed to create team for class %d: %w", c.ID, err)
-			}
-			return nil
+		teams = append(teams, &models.Team{
+			Name:    fmt.Sprintf("%s", class.Name),
+			ClassID: class.ID,
+			SportID: sport.ID,
+			EventID: eventID,
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teams in parallel"})
+	// Create all teams in a single bulk insert
+	if err := h.teamRepo.CreateTeamsBulk(teams); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teams in bulk"})
 		return
 	}
 
