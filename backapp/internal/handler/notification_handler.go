@@ -3,7 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
-	"encoding/json"
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -11,9 +11,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/SherClockHolmes/webpush-go"
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 type NotificationHandler struct {
@@ -439,7 +442,7 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		return
 	}
 
-	payload, err := json.Marshal(gin.H{
+	payload, err := sonic.Marshal(gin.H{
 		"title": title,
 		"body":  body,
 		"data": gin.H{
@@ -451,40 +454,52 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		return
 	}
 
-	log.Printf("[notification] %d件の購読に対してPush通知を送信します\n", len(subs))
+	log.Printf("[notification] %d件の購読に対してPush通知を送信します (ants pool)\n", len(subs))
+	var wg sync.WaitGroup
 	for i, sub := range subs {
-		subscription := &webpush.Subscription{
-			Endpoint: sub.Endpoint,
-			Keys: webpush.Keys{
-				Auth:   sub.AuthKey,
-				P256dh: sub.P256dhKey,
-			},
-		}
+		index, s := i, sub
+		wg.Add(1)
+		err := repository.GlobalAnts.Submit(func() {
+			defer wg.Done()
+			subscription := &webpush.Subscription{
+				Endpoint: s.Endpoint,
+				Keys: webpush.Keys{
+					Auth:   s.AuthKey,
+					P256dh: s.P256dhKey,
+				},
+			}
 
-		log.Printf("[notification] [%d/%d] Push送信試行: userID=%s, endpoint=%s\n", i+1, len(subs), sub.UserID, sub.Endpoint)
+			log.Printf("[notification] [%d/%d] Push送信試行: userID=%s, endpoint=%s\n", index+1, len(subs), s.UserID, s.Endpoint)
 
-		resp, err := webpush.SendNotification(payload, subscription, &webpush.Options{
-			Subscriber:      "mailto:notifications@sportease.local",
-			VAPIDPublicKey:  h.VAPIDPublicKey,
-			VAPIDPrivateKey: h.VAPIDPrivateKey,
-			TTL:             60,
+			resp, err := webpush.SendNotification(payload, subscription, &webpush.Options{
+				Subscriber:      "mailto:notifications@sportease.local",
+				VAPIDPublicKey:  h.VAPIDPublicKey,
+				VAPIDPrivateKey: h.VAPIDPrivateKey,
+				TTL:             60,
+			})
+
+			if err != nil {
+				log.Printf("[notification] [%d/%d] Push送信に失敗しました: userID=%s, endpoint=%s, error=%v\n", index+1, len(subs), s.UserID, s.Endpoint, err)
+				return
+			}
+
+			if resp != nil {
+				defer resp.Body.Close()
+				if resp.StatusCode >= 400 {
+					bodyBytes, _ := io.ReadAll(resp.Body)
+					log.Printf("[notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode, string(bodyBytes))
+				} else {
+					log.Printf("[notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode)
+				}
+			}
 		})
 
 		if err != nil {
-			log.Printf("[notification] [%d/%d] Push送信に失敗しました: userID=%s, endpoint=%s, error=%v\n", i+1, len(subs), sub.UserID, sub.Endpoint, err)
-			continue
-		}
-
-		if resp != nil {
-			if resp.StatusCode >= 400 {
-				bodyBytes, _ := io.ReadAll(resp.Body)
-				log.Printf("[notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode, string(bodyBytes))
-			} else {
-				log.Printf("[notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode)
-			}
-			resp.Body.Close()
+			log.Printf("[notification] ants worker pool submission failed: %v\n", err)
+			wg.Done() // compensate for failed submission
 		}
 	}
+	wg.Wait()
 	log.Printf("[notification] 通知送信完了: notificationID=%d\n", notificationID)
 }
 
@@ -540,29 +555,41 @@ func (h *NotificationHandler) filterUsersByNotificationType(userIDs []string, no
 	}
 
 	var filtered []string
+	var mu sync.Mutex
+	g, _ := errgroup.WithContext(context.Background())
+	// Limit concurrency to avoid too many DB connections
+	g.SetLimit(10)
+
 	for _, userID := range userIDs {
-		user, err := h.UserRepo.GetUserWithRoles(userID)
-		if err != nil {
-			log.Printf("[notification] ユーザー情報取得失敗: userID=%s, error=%v\n", userID, err)
-			continue
-		}
-		if user == nil {
-			continue
-		}
-
-		// Check if user's notification filters include the notification type
-		shouldReceive := false
-		for _, filter := range user.NotificationFilters {
-			if filter == notificationType || filter == "all_matches" {
-				shouldReceive = true
-				break
+		id := userID // capture loop variable
+		g.Go(func() error {
+			user, err := h.UserRepo.GetUserWithRoles(id)
+			if err != nil {
+				log.Printf("[notification] ユーザー情報取得失敗: userID=%s, error=%v\n", id, err)
+				return nil // continue filtering others
 			}
-		}
+			if user == nil {
+				return nil
+			}
 
-		if shouldReceive {
-			filtered = append(filtered, userID)
-		}
+			// Check if user's notification filters include the notification type
+			shouldReceive := false
+			for _, filter := range user.NotificationFilters {
+				if filter == notificationType || filter == "all_matches" {
+					shouldReceive = true
+					break
+				}
+			}
+
+			if shouldReceive {
+				mu.Lock()
+				filtered = append(filtered, id)
+				mu.Unlock()
+			}
+			return nil
+		})
 	}
 
+	g.Wait()
 	return filtered, nil
 }

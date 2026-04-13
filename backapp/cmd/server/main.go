@@ -25,6 +25,9 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
+	// Initialize performance optimization resources
+	repository.InitOptimizationResources()
+
 	db, err := repository.NewDB(cfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)

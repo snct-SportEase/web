@@ -3,6 +3,7 @@ package handler_test
 import (
 	"backapp/internal/handler"
 	"backapp/internal/models"
+	"backapp/internal/repository"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -909,6 +910,7 @@ func TestSportHandler_GetAllSportsHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
@@ -927,6 +929,7 @@ func TestSportHandler_GetAllSportsHandler(t *testing.T) {
 	})
 
 	t.Run("Empty", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
@@ -941,6 +944,7 @@ func TestSportHandler_GetAllSportsHandler(t *testing.T) {
 	})
 
 	t.Run("Error", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
@@ -958,6 +962,7 @@ func TestSportHandler_CreateSportHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
@@ -1002,6 +1007,7 @@ func TestSportHandler_GetSportsByEventHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
@@ -1034,6 +1040,7 @@ func TestSportHandler_AssignSportToEventHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		mockClassRepo := new(MockClassRepository)
 		mockTeamRepo := new(MockTeamRepository)
@@ -1076,6 +1083,7 @@ func TestSportHandler_DeleteSportFromEventHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		mockTeamRepo := new(MockTeamRepository)
 		mockTournRepo := new(MockTournamentRepository)
@@ -1098,6 +1106,7 @@ func TestSportHandler_GetTeamsBySportHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
@@ -1120,6 +1129,7 @@ func TestSportHandler_GetSportDetailsHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
@@ -1142,6 +1152,7 @@ func TestSportHandler_UpdateSportDetailsHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("Success", func(t *testing.T) {
+		repository.GlobalCache.Flush()
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 

@@ -3,11 +3,14 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 // SportHandler handles sport-related API requests.
@@ -32,14 +35,32 @@ func NewSportHandler(sportRepo repository.SportRepository, classRepo repository.
 
 // GetAllSportsHandler handles the request to get all sports.
 func (h *SportHandler) GetAllSportsHandler(c *gin.Context) {
-	sports, err := h.sportRepo.GetAllSports()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve sports"})
+	cacheKey := "all_sports"
+
+	// 1. Try to get from cache
+	if val, found := repository.GlobalCache.Get(cacheKey); found {
+		c.JSON(http.StatusOK, val)
 		return
 	}
 
-	if sports == nil {
-		c.JSON(http.StatusOK, []*models.Sport{})
+	// 2. Use Singleflight to prevent multiple DB queries for the same key
+	sports, err, _ := repository.GlobalSFGroup.Do(cacheKey, func() (interface{}, error) {
+		res, err := h.sportRepo.GetAllSports()
+		if err != nil {
+			return nil, err
+		}
+
+		if res == nil {
+			res = []*models.Sport{}
+		}
+
+		// Cache for 10 minutes
+		repository.GlobalCache.Set(cacheKey, res, 10*time.Minute)
+		return res, nil
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve sports"})
 		return
 	}
 
@@ -66,6 +87,9 @@ func (h *SportHandler) CreateSportHandler(c *gin.Context) {
 		return
 	}
 	sport.ID = int(id)
+
+	// Clear sports cache
+	repository.GlobalCache.Delete("all_sports")
 
 	c.JSON(http.StatusCreated, sport)
 }
@@ -131,18 +155,27 @@ func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
 		return
 	}
 
-	// Create teams for each class
+	// Create teams for each class in parallel
+	g, _ := errgroup.WithContext(context.Background())
 	for _, class := range classes {
-		team := &models.Team{
-			Name:    fmt.Sprintf("%s", class.Name),
-			ClassID: class.ID,
-			SportID: sport.ID,
-			EventID: eventID,
-		}
-		if _, err := h.teamRepo.CreateTeam(team); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create team"})
-			return
-		}
+		c := class // capture loop variable
+		g.Go(func() error {
+			team := &models.Team{
+				Name:    fmt.Sprintf("%s", c.Name),
+				ClassID: c.ID,
+				SportID: sport.ID,
+				EventID: eventID,
+			}
+			if _, err := h.teamRepo.CreateTeam(team); err != nil {
+				return fmt.Errorf("failed to create team for class %d: %w", c.ID, err)
+			}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teams in parallel"})
+		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Sport assigned to event successfully"})

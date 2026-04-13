@@ -3,9 +3,20 @@ package handler_test
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"os"
+	"testing"
 
 	"github.com/stretchr/testify/mock"
 )
+
+func TestMain(m *testing.M) {
+	// Initialize global cache and pools for tests
+	repository.InitOptimizationResources()
+
+	// Run tests
+	code := m.Run()
+	os.Exit(code)
+}
 
 // --- Mocks ---
 
