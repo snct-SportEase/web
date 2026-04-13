@@ -4,11 +4,11 @@
   /** @type {Array<{id: number, name: string}>} */
   let { classes = [] } = $props();
 
-  let isLoading = false;
-  let errorMessage = '';
+  let isLoading = $state(false);
+  let errorMessage = $state('');
 
-  let isConfirming = false;
-  let confirmData = { displayName: '', className: '', classId: '' };
+  let isConfirming = $state(false);
+  let confirmData = $state({ displayName: '', className: '', classId: '' });
 
   function handleSubmit(event) {
     event.preventDefault();

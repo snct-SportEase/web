@@ -22,6 +22,6 @@
 </script>
 
 <svelte:element this={tag} bind:this={element} {...restProps}>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html safeHtml}
 </svelte:element>
-

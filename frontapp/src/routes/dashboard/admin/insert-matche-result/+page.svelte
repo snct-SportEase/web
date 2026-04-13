@@ -149,15 +149,11 @@
 		}
 	}
 
-	let selectedTournament = $state(undefined);
-	$effect(() => {
-		selectedTournament = tournaments.find((t) => t.id === selectedTournamentId);
-	});
+	let selectedTournament = $derived(tournaments.find((t) => t.id === selectedTournamentId));
 	// 敗者戦トーナメントが選択されていて、雨天時モードが無効な場合は選択を解除
 	$effect(() => {
 		if (selectedTournament && selectedTournament.name.includes('敗者戦') && !isRainyMode) {
 			selectedTournamentId = '';
-			selectedTournament = undefined;
 		}
 	});
 

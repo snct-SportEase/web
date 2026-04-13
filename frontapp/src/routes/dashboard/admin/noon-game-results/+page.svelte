@@ -1,7 +1,8 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import { get } from 'svelte/store';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { dndzone } from 'svelte-dnd-action';
 
   let session = null;
@@ -50,7 +51,7 @@
     const forms = {};
     for (const match of matchList) {
       const hasEntries = Array.isArray(match.entries) && match.entries.length > 0;
-      const detailMap = new Map();
+      const detailMap = new SvelteMap();
       if (match.result?.details) {
         for (const detail of match.result.details) {
           detailMap.set(detail.entry_id, detail);
@@ -214,31 +215,9 @@
     return null;
   }
 
-  // 試合IDからrun_idを取得（試合のタイトルから推測）
-  async function getRunIdFromMatch(match) {
-    const template = detectTemplateFromMatch(match);
-    if (!template) return null;
-
-    // 同じセッション内で同じテンプレートタイプの試合を探す
-    const sameTemplateMatches = matches.filter(m => {
-      const t = detectTemplateFromMatch(m);
-      return t && t.type === template.type;
-    });
-
-    // 学年対抗リレーの場合、A/B/BONUSの3試合が同じrun_idを持つ
-    if (template.type === 'year-relay') {
-      // 最初に見つかった試合のrun_idを取得（実際にはAPIから取得する必要がある）
-      // ここでは仮実装として、試合IDからrun_idを推測する
-      return null; // 後で実装
-    }
-
-    // コース対抗リレーと綱引きの場合、1試合が1run_idを持つ
-    return null; // 後で実装
-  }
-
   async function initializeTemplateRuns(matchList) {
     // テンプレートランをグループ化
-    const runs = new Map();
+    const runs = new SvelteMap();
     
     // 学年対抗リレーの場合、A/B/BONUSの3試合を同じrun_idとしてグループ化
     const yearRelayMatches = [];
@@ -305,7 +284,7 @@
       for (const { match, template } of run.matches) {
         const formKey = `${run.key}-${match.id}`;
         const hasEntries = Array.isArray(match.entries) && match.entries.length > 0;
-        const detailMap = new Map();
+        const detailMap = new SvelteMap();
         if (match.result?.details) {
           for (const detail of match.result.details) {
             detailMap.set(detail.entry_id, detail);
@@ -319,7 +298,7 @@
         if (hasEntries) {
           if (existingForm && existingForm.participants && existingForm.participants.length > 0) {
             // 既存のフォームの順序を完全に保持（ドラッグ&ドロップで設定した順序を優先）
-            const existingEntryIds = new Set(existingForm.participants.map(p => p.entry_id));
+            const existingEntryIds = new SvelteSet(existingForm.participants.map(p => p.entry_id));
             const missingEntries = match.entries.filter(entry => !existingEntryIds.has(entry.id));
             
             // 既存の順序で参加者を再構築（順位はリストの位置から自動計算）
@@ -404,10 +383,13 @@
               return a._rank - b._rank;
             });
             
-            participants = participantsWithRank.map(p => {
-              const { _rank, ...rest } = p;
-              return rest;
-            });
+            participants = participantsWithRank.map((p) => ({
+              id: p.id,
+              entry_id: p.entry_id,
+              name: p.name,
+              rank: p.rank,
+              points: p.points
+            }));
           }
         }
 
@@ -528,23 +510,6 @@
     }
   }
 
-  function updateTemplateParticipantField(formKey, index, field, value) {
-    const form = templateRunForms[formKey];
-    if (!form || !Array.isArray(form.participants)) return;
-    const participants = [...form.participants];
-    participants[index] = {
-      ...participants[index],
-      [field]: value === '' ? null : (field === 'rank' ? Number(value) : Number(value))
-    };
-    templateRunForms = {
-      ...templateRunForms,
-      [formKey]: {
-        ...form,
-        participants
-      }
-    };
-  }
-
   function handleDndConsider(e, formKey) {
     // considerイベントでは順序を更新（dndzoneが期待する動作）
     console.log('[DND] consider event:', formKey, e.detail);
@@ -559,13 +524,13 @@
     });
     
     // 既存のプロパティを保持しながら順序を更新
-    const existingMap = new Map();
+    const existingMap = new SvelteMap();
     form.participants.forEach(p => {
       const key = p.entry_id || p.id;
       if (key) existingMap.set(key, p);
     });
     
-    const updatedParticipants = newParticipants.map((p, index) => {
+    const updatedParticipants = newParticipants.map((p) => {
       const key = p.entry_id || p.id;
       const existing = existingMap.get(key);
       return existing || p;
@@ -603,7 +568,7 @@
       console.log('[DND] Filtered participants (without placeholder):', newParticipants);
       
       // 既存のparticipantsをentry_idでマッピング（名前やその他のプロパティを保持するため）
-      const existingParticipantsMap = new Map();
+      const existingParticipantsMap = new SvelteMap();
       form.participants.forEach(p => {
         const key = p.entry_id || p.id;
         if (key) {
@@ -956,4 +921,3 @@
     </section>
   {/if}
 </div>
-

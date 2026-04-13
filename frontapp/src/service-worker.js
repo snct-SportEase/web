@@ -98,13 +98,7 @@ self.addEventListener('fetch', (event) => {
 			}
 			
 			// If no cache, wait for network
-			try {
-				return await networkFetch;
-			} catch (err) {
-				// If both cache and network fail, we can't do much for API calls
-				// maybe return a fallback JSON if needed, but for now just throw
-				throw err;
-			}
+			return await networkFetch;
 		}
 
 		// for everything else, try the network first, but

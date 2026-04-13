@@ -1154,11 +1154,11 @@
         <!-- Mode Selection -->
         <div class="flex gap-4 mb-4">
           <label class="flex items-center">
-            <input type="radio" bind:group={capacityMode} value={'bulk'} class="mr-1">
+            <input type="radio" bind:group={capacityMode} value="bulk" class="mr-1">
             一括設定
           </label>
           <label class="flex items-center">
-            <input type="radio" bind:group={capacityMode} value={'per-class'} class="mr-1">
+            <input type="radio" bind:group={capacityMode} value="per-class" class="mr-1">
             クラスごと設定
           </label>
         </div>
@@ -1260,11 +1260,11 @@
         <!-- Mode Selection -->
         <div class="flex gap-4 mb-4">
           <label class="flex items-center">
-            <input type="radio" bind:group={rainyModeCapacityMode} value={'bulk'} class="mr-1">
+            <input type="radio" bind:group={rainyModeCapacityMode} value="bulk" class="mr-1">
             一括設定
           </label>
           <label class="flex items-center">
-            <input type="radio" bind:group={rainyModeCapacityMode} value={'per-class'} class="mr-1">
+            <input type="radio" bind:group={rainyModeCapacityMode} value="per-class" class="mr-1">
             クラスごと設定
           </label>
         </div>
@@ -1366,11 +1366,11 @@
         <h2 class="text-xl font-semibold mb-2">ルール詳細</h2>
         <div class="flex gap-4 mb-2">
           <label class="flex items-center">
-            <input type="radio" bind:group={sportDetails.rules_type} value={'markdown'} class="mr-1">
+            <input type="radio" bind:group={sportDetails.rules_type} value="markdown" class="mr-1">
             Markdown
           </label>
           <label class="flex items-center">
-            <input type="radio" bind:group={sportDetails.rules_type} value={'pdf'} class="mr-1">
+            <input type="radio" bind:group={sportDetails.rules_type} value="pdf" class="mr-1">
             PDF
           </label>
         </div>

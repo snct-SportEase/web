@@ -54,40 +54,36 @@
   }
 
   async function handleSaveDisplayName(newDisplayName) {
-    try {
-      let sessionToken = null;
-      if (browser) {
-        const cookies = document.cookie.split('; ');
-        const sessionCookie = cookies.find(row => row.startsWith('session_token='));
-        sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
-      }
-
-      if (!sessionToken) {
-        throw new Error('セッションが見つかりません。再度ログインしてください。');
-      }
-
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `session_token=${sessionToken}`,
-        },
-        body: JSON.stringify({ 
-          display_name: newDisplayName, 
-          class_id: user?.class_id || 0 
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || '表示名の更新に失敗しました。');
-      }
-
-      window.location.reload();
-    } catch (error) {
-      throw error;
+    let sessionToken = null;
+    if (browser) {
+      const cookies = document.cookie.split('; ');
+      const sessionCookie = cookies.find(row => row.startsWith('session_token='));
+      sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
     }
+
+    if (!sessionToken) {
+      throw new Error('セッションが見つかりません。再度ログインしてください。');
+    }
+
+    const response = await fetch('/api/user/profile', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': `session_token=${sessionToken}`,
+      },
+      body: JSON.stringify({ 
+        display_name: newDisplayName, 
+        class_id: user?.class_id || 0 
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '表示名の更新に失敗しました。');
+    }
+
+    window.location.reload();
   }
 
   async function handleLogout() {

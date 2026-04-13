@@ -1,5 +1,6 @@
 <script>
   import { page } from '$app/stores';
+  import { SvelteSet } from 'svelte/reactivity';
 
   let { data } = $page;
   let whitelist = $state(data.whitelist);
@@ -12,12 +13,12 @@
 	};
 
   // フィルタリング用の状態変数を追加
-	let filterText = ''; // Email search term (メールアドレス検索用語)
-	let filterRole = 'all'; // Role filter ('all', 'root', 'admin', 'student')
+	let filterText = $state(''); // Email search term (メールアドレス検索用語)
+	let filterRole = $state('all'); // Role filter ('all', 'root', 'admin', 'student')
 
   // ソート用の状態変数を追加
-	let sortColumn = 'email'; // デフォルトはメールアドレスでソート
-	let sortDirection = 'asc'; // デフォルトは昇順
+	let sortColumn = $state('email'); // デフォルトはメールアドレスでソート
+	let sortDirection = $state('asc'); // デフォルトは昇順
 
 	// ソートロジック
 	function handleSort(column) {
@@ -84,18 +85,18 @@
 		return list;
 	})());
 
-  let newEmailLocal = '';
-	let newEmailDomain = '@sendai-nct.jp'; // デフォルト値
+  let newEmailLocal = $state('');
+	let newEmailDomain = $state('@sendai-nct.jp'); // デフォルト値
   const allowedDomains = ['@sendai-nct.jp', '@sendai-nct.ac.jp'];
 
-  let newRole = 'student';
-  let csvFile = null;
-  let message = '';
-  let errorMessage = '';
+  let newRole = $state('student');
+  let csvFile = $state(null);
+  let message = $state('');
+  let errorMessage = $state('');
   
   // 削除機能用の状態変数
-  let selectedEmails = new Set();
-  let isDeleting = false;
+  let selectedEmails = new SvelteSet();
+  let isDeleting = $state(false);
 
   async function addEmail() {
     errorMessage = '';
@@ -157,7 +158,7 @@
 
   // チェックボックスのトグル
   function toggleEmail(email) {
-    const newSet = new Set(selectedEmails);
+    const newSet = new SvelteSet(selectedEmails);
     if (newSet.has(email)) {
       newSet.delete(email);
     } else {
@@ -168,7 +169,7 @@
 
   // すべて選択/解除
   function toggleAll() {
-    const newSet = new Set();
+    const newSet = new SvelteSet();
     if (selectedEmails.size !== sortedWhitelist.length) {
       sortedWhitelist.forEach(entry => newSet.add(entry.email));
     }
@@ -201,7 +202,7 @@
       // Refresh whitelist
       const res = await fetch('/api/root/whitelist');
       whitelist = await res.json();
-      selectedEmails.clear();
+      selectedEmails = new SvelteSet();
     } catch (error) {
       errorMessage = error.message;
     } finally {
@@ -241,7 +242,7 @@
       // Refresh whitelist
       const res = await fetch('/api/root/whitelist');
       whitelist = await res.json();
-      selectedEmails.clear();
+      selectedEmails = new SvelteSet();
     } catch (error) {
       errorMessage = error.message;
     } finally {
