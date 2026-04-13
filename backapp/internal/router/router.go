@@ -150,6 +150,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			notifications.GET("", notificationHandler.ListNotifications)
 			notifications.PUT("/filters", notificationHandler.UpdateNotificationFilters)
 			notifications.GET("/subscription", notificationHandler.GetSubscription)
+			notifications.GET("/debug", notificationHandler.GetNotificationDebugInfo)
 			notifications.POST("/subscription", notificationHandler.SaveSubscription)
 			notifications.DELETE("/subscription", notificationHandler.DeleteSubscription)
 		}
