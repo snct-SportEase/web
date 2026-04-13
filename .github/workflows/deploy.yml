@@ -28,7 +28,6 @@ jobs:
             
             # Dockerコンテナを再構築して起動
             # --build をつけることでDockerfileの変更も反映されます
-            docker compose down -v
 
             docker compose -f docker-compose.production.yml build --no-cache
             docker compose -f docker-compose.production.yml up -d --build
