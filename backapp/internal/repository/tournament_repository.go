@@ -18,7 +18,9 @@ type TournamentRepository interface {
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 	GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error)
 	GetTeamsByTournamentID(tournamentID int) ([]*models.Team, error)
+	CountTeamsBySportForEvent(eventID int) (map[int]int, error)
 	GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error)
+	GetMatchesForTeams(eventID int, teamIDs []int) (map[int][]*models.MatchDetail, error)
 	UpdateMatchStartTime(matchID int, startTime string) error
 	UpdateMatchRainyModeStartTime(matchID int, rainyModeStartTime string) error
 	UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error
@@ -51,6 +53,16 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 	}
 	defer rows.Close()
 
+	matchesByTournament, err := r.getMatchesByEventID(eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	teamMap, err := r.getTeamsByEventID(eventID)
+	if err != nil {
+		return nil, err
+	}
+
 	tournaments := make([]*models.Tournament, 0)
 	for rows.Next() {
 		var t models.Tournament
@@ -58,21 +70,17 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 			return nil, err
 		}
 
-		matches, err := r.getMatchesByTournamentID(int64(t.ID))
-		if err != nil {
-			return nil, err
-		}
+		matches := matchesByTournament[t.ID]
 
 		var bracketryMatches []models.Match
 		contestants := make(map[string]models.Contestant)
-		teamMap := make(map[int]*models.Team)
 		contestantCounter := 0
 
 		for _, m := range matches {
 			var sides []models.Side
 
 			if m.Team1ID.Valid {
-				side, team, err := r.getSide(m.Team1ID.Int64, &contestantCounter, teamMap, contestants)
+				side, _, err := r.getSide(m.Team1ID.Int64, &contestantCounter, teamMap, contestants)
 				if err != nil {
 					return nil, err
 				}
@@ -83,13 +91,10 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 					side.IsWinner = true
 				}
 				sides = append(sides, side)
-				if team != nil {
-					teamMap[int(m.Team1ID.Int64)] = team
-				}
 			}
 
 			if m.Team2ID.Valid {
-				side, team, err := r.getSide(m.Team2ID.Int64, &contestantCounter, teamMap, contestants)
+				side, _, err := r.getSide(m.Team2ID.Int64, &contestantCounter, teamMap, contestants)
 				if err != nil {
 					return nil, err
 				}
@@ -100,9 +105,6 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 					side.IsWinner = true
 				}
 				sides = append(sides, side)
-				if team != nil {
-					teamMap[int(m.Team2ID.Int64)] = team
-				}
 			}
 
 			var loserBracketRound *int
@@ -181,6 +183,101 @@ func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.T
 	return tournaments, nil
 }
 
+func (r *tournamentRepository) getMatchesByEventID(eventID int) (map[int][]*models.MatchDB, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			m.id,
+			m.tournament_id,
+			m.round,
+			m.match_number_in_round,
+			m.team1_id,
+			m.team2_id,
+			m.team1_score,
+			m.team2_score,
+			CASE
+				WHEN m.team1_score > m.team2_score THEN m.team1_id
+				WHEN m.team2_score > m.team1_score THEN m.team2_id
+				ELSE NULL
+			END AS winner_team_id,
+			m.status,
+			m.next_match_id,
+			m.match_start_time,
+			m.is_bronze_match,
+			m.is_loser_bracket_match,
+			m.loser_bracket_round,
+			m.loser_bracket_block,
+			m.rainy_mode_start_time
+		FROM matches m
+		JOIN tournaments t ON m.tournament_id = t.id
+		WHERE t.event_id = ?
+		ORDER BY m.tournament_id, m.round, m.match_number_in_round
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int][]*models.MatchDB)
+	for rows.Next() {
+		var m models.MatchDB
+		var loserBracketRound sql.NullInt64
+		var loserBracketBlock sql.NullString
+		if err := rows.Scan(
+			&m.ID,
+			&m.TournamentID,
+			&m.Round,
+			&m.MatchNumberInRound,
+			&m.Team1ID,
+			&m.Team2ID,
+			&m.Team1Score,
+			&m.Team2Score,
+			&m.WinnerID,
+			&m.Status,
+			&m.NextMatchID,
+			&m.StartTime,
+			&m.IsBronzeMatch,
+			&m.IsLoserBracketMatch,
+			&loserBracketRound,
+			&loserBracketBlock,
+			&m.RainyModeStartTime,
+		); err != nil {
+			return nil, err
+		}
+		if loserBracketRound.Valid {
+			m.LoserBracketRound = loserBracketRound
+		}
+		if loserBracketBlock.Valid {
+			m.LoserBracketBlock = loserBracketBlock
+		}
+		result[m.TournamentID] = append(result[m.TournamentID], &m)
+	}
+
+	return result, rows.Err()
+}
+
+func (r *tournamentRepository) getTeamsByEventID(eventID int) (map[int]*models.Team, error) {
+	rows, err := r.db.Query(`
+		SELECT id, name, class_id, sport_id, event_id
+		FROM teams
+		WHERE event_id = ?
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int]*models.Team)
+	for rows.Next() {
+		team := &models.Team{}
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID); err != nil {
+			return nil, err
+		}
+		result[team.ID] = team
+	}
+
+	return result, rows.Err()
+}
+
 func (r *tournamentRepository) GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error) {
 	query := `
 		SELECT
@@ -254,6 +351,114 @@ func (r *tournamentRepository) GetMatchesForTeam(eventID int, teamID int) ([]*mo
 	}
 
 	return matches, nil
+}
+
+func (r *tournamentRepository) GetMatchesForTeams(eventID int, teamIDs []int) (map[int][]*models.MatchDetail, error) {
+	result := make(map[int][]*models.MatchDetail)
+	if len(teamIDs) == 0 {
+		return result, nil
+	}
+
+	placeholders := make([]string, len(teamIDs))
+	args := make([]interface{}, 0, 1+len(teamIDs)*2)
+	args = append(args, eventID)
+	for _, teamID := range teamIDs {
+		placeholders[len(args)-1] = "?"
+		args = append(args, teamID)
+	}
+	for _, teamID := range teamIDs {
+		args = append(args, teamID)
+	}
+
+	inClause := strings.Join(placeholders[:len(teamIDs)], ",")
+	query := `
+		SELECT
+			m.id,
+			t.id,
+			t.name,
+			s.name,
+			(
+				SELECT MAX(round)
+				FROM matches
+				WHERE tournament_id = t.id
+			) AS max_round,
+			m.round,
+			m.match_number_in_round,
+			m.team1_id,
+			m.team2_id,
+			m.team1_score,
+			m.team2_score,
+			CASE
+				WHEN m.team1_score > m.team2_score THEN m.team1_id
+				WHEN m.team2_score > m.team1_score THEN m.team2_id
+				ELSE NULL
+			END AS winner_team_id,
+			m.status,
+			m.next_match_id,
+			m.match_start_time,
+			m.is_bronze_match,
+			team1.name,
+			team2.name
+		FROM matches m
+		JOIN tournaments t ON m.tournament_id = t.id
+		JOIN sports s ON t.sport_id = s.id
+		LEFT JOIN teams team1 ON m.team1_id = team1.id
+		LEFT JOIN teams team2 ON m.team2_id = team2.id
+		WHERE t.event_id = ? AND (m.team1_id IN (` + inClause + `) OR m.team2_id IN (` + inClause + `))
+		ORDER BY t.id, m.round, m.match_number_in_round
+	`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	teamIDSet := make(map[int64]struct{}, len(teamIDs))
+	for _, teamID := range teamIDs {
+		teamIDSet[int64(teamID)] = struct{}{}
+	}
+
+	for rows.Next() {
+		var detail models.MatchDetail
+		if err := rows.Scan(
+			&detail.MatchID,
+			&detail.TournamentID,
+			&detail.TournamentName,
+			&detail.SportName,
+			&detail.MaxRound,
+			&detail.Round,
+			&detail.MatchNumber,
+			&detail.Team1ID,
+			&detail.Team2ID,
+			&detail.Team1Score,
+			&detail.Team2Score,
+			&detail.WinnerTeamID,
+			&detail.Status,
+			&detail.NextMatchID,
+			&detail.StartTime,
+			&detail.IsBronzeMatch,
+			&detail.Team1Name,
+			&detail.Team2Name,
+		); err != nil {
+			return nil, err
+		}
+
+		if detail.Team1ID.Valid {
+			if _, ok := teamIDSet[detail.Team1ID.Int64]; ok {
+				copied := detail
+				result[int(detail.Team1ID.Int64)] = append(result[int(detail.Team1ID.Int64)], &copied)
+			}
+		}
+		if detail.Team2ID.Valid {
+			if _, ok := teamIDSet[detail.Team2ID.Int64]; ok && (!detail.Team1ID.Valid || detail.Team2ID.Int64 != detail.Team1ID.Int64) {
+				copied := detail
+				result[int(detail.Team2ID.Int64)] = append(result[int(detail.Team2ID.Int64)], &copied)
+			}
+		}
+	}
+
+	return result, rows.Err()
 }
 
 func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, teamMap map[int]*models.Team, contestants map[string]models.Contestant) (models.Side, *models.Team, error) {
@@ -387,6 +592,32 @@ func (r *tournamentRepository) GetTeamsByTournamentID(tournamentID int) ([]*mode
 		teams = append(teams, &t)
 	}
 	return teams, nil
+}
+
+func (r *tournamentRepository) CountTeamsBySportForEvent(eventID int) (map[int]int, error) {
+	rows, err := r.db.Query(`
+		SELECT t.sport_id, COUNT(team.id) AS participant_count
+		FROM tournaments t
+		LEFT JOIN teams team ON team.tournament_id = t.id
+		WHERE t.event_id = ?
+		GROUP BY t.sport_id
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int]int)
+	for rows.Next() {
+		var sportID int
+		var participantCount int
+		if err := rows.Scan(&sportID, &participantCount); err != nil {
+			return nil, err
+		}
+		result[sportID] = participantCount
+	}
+
+	return result, rows.Err()
 }
 
 func (r *tournamentRepository) getTeamByID(teamID int64) (*models.Team, error) {
@@ -565,7 +796,6 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 
 	return nil
 }
-
 
 func (r *tournamentRepository) marshal(data interface{}) (json.RawMessage, error) {
 	bytes, err := json.Marshal(data)
@@ -828,7 +1058,6 @@ func (r *tournamentRepository) UpdateMatchRainyModeStartTime(matchID int, rainyM
 	_, err := r.db.Exec("UPDATE matches SET rainy_mode_start_time = ? WHERE id = ?", rainyModeStartTime, matchID)
 	return err
 }
-
 
 func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score, winnerIDInput int) error {
 	tx, err := r.db.Begin()

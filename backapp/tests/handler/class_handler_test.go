@@ -163,8 +163,8 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 	mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
 	mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 	mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
-	mockTeamRepo.On("GetTeamMembers", team.ID).Return(members, nil).Once()
-	mockTournamentRepo.On("GetMatchesForTeam", 1, team.ID).Return(matchDetails, nil).Once()
+	mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(map[int][]*models.User{team.ID: members}, nil).Once()
+	mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: matchDetails}, nil).Once()
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)

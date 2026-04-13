@@ -3,6 +3,7 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"strings"
 )
 
 type TeamRepository interface {
@@ -13,6 +14,7 @@ type TeamRepository interface {
 	GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error)
 	AddTeamMember(teamID int, userID string) error
 	GetTeamMembers(teamID int) ([]*models.User, error)
+	GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*models.User, error)
 	RemoveTeamMember(teamID int, userID string) error
 	UpdateTeamCapacity(eventID int, sportID int, classID int, minCapacity *int, maxCapacity *int) error
 	GetTeamCapacity(eventID int, sportID int, classID int) (*models.Team, error)
@@ -172,6 +174,56 @@ func (r *teamRepository) GetTeamMembers(teamID int) ([]*models.User, error) {
 	}
 
 	return users, nil
+}
+
+func (r *teamRepository) GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*models.User, error) {
+	result := make(map[int][]*models.User)
+	if len(teamIDs) == 0 {
+		return result, nil
+	}
+
+	placeholders := make([]string, len(teamIDs))
+	args := make([]interface{}, len(teamIDs))
+	for i, teamID := range teamIDs {
+		placeholders[i] = "?"
+		args[i] = teamID
+	}
+
+	query := `
+		SELECT tm.team_id, u.id, u.email, u.display_name, u.class_id, u.is_profile_complete, u.created_at, u.updated_at
+		FROM users u
+		INNER JOIN team_members tm ON u.id = tm.user_id
+		WHERE tm.team_id IN (` + strings.Join(placeholders, ",") + `)
+		ORDER BY tm.team_id, u.display_name, u.email
+	`
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var teamID int
+		user := &models.User{}
+		var tempClassID sql.NullInt32
+		var tempDisplayName sql.NullString
+
+		if err := rows.Scan(&teamID, &user.ID, &user.Email, &tempDisplayName, &tempClassID, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			return nil, err
+		}
+
+		if tempDisplayName.Valid {
+			user.DisplayName = &tempDisplayName.String
+		}
+		if tempClassID.Valid {
+			val := int(tempClassID.Int32)
+			user.ClassID = &val
+		}
+
+		result[teamID] = append(result[teamID], user)
+	}
+
+	return result, rows.Err()
 }
 
 func (r *teamRepository) RemoveTeamMember(teamID int, userID string) error {

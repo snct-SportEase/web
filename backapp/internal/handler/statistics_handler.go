@@ -65,24 +65,22 @@ func (h *StatisticsHandler) GetParticipationRateBySport(c *gin.Context) {
 		return
 	}
 
+	classes, err := h.classRepo.GetAllClasses(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get classes"})
+		return
+	}
+	totalPossible := len(classes)
+
+	participantCounts, err := h.tournRepo.CountTeamsBySportForEvent(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get participation counts"})
+		return
+	}
+
 	result := make(map[string]float64)
 	for _, sport := range sports {
-		tournaments, err := h.tournRepo.GetTournamentsByEventAndSportID(eventID, sport.ID)
-		if err != nil {
-			continue
-		}
-
-		participantCount := 0
-		for _, tourn := range tournaments {
-			teams, err := h.tournRepo.GetTeamsByTournamentID(tourn.ID)
-			if err != nil {
-				continue
-			}
-			participantCount += len(teams)
-		}
-
-		classes, _ := h.classRepo.GetAllClasses(eventID)
-		totalPossible := len(classes)
+		participantCount := participantCounts[sport.ID]
 		rate := 0.0
 		if totalPossible > 0 {
 			rate = float64(participantCount) / float64(totalPossible) * 100

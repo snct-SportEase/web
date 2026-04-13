@@ -268,18 +268,27 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		memberList = append(memberList, view)
 	}
 
+	teamIDs := make([]int, 0, len(teams))
+	for _, team := range teams {
+		teamIDs = append(teamIDs, team.ID)
+	}
+
+	matchesByTeamID, err := h.tournamentRepo.GetMatchesForTeams(activeEventID, teamIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match details"})
+		return
+	}
+
+	teamMembersByTeamID, err := h.teamRepo.GetTeamMembersByTeamIDs(teamIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
+		return
+	}
+
 	var progress []models.ClassProgress
 	for _, team := range teams {
-		matchDetails, err := h.tournamentRepo.GetMatchesForTeam(activeEventID, team.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match details"})
-			return
-		}
-		teamMembers, err := h.teamRepo.GetTeamMembers(team.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
-			return
-		}
+		matchDetails := matchesByTeamID[team.ID]
+		teamMembers := teamMembersByTeamID[team.ID]
 		for _, tm := range teamMembers {
 			view, exists := memberLookup[tm.ID]
 			if !exists {

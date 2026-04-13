@@ -244,6 +244,14 @@ func (m *MockTeamRepository) GetTeamMembers(teamID int) ([]*models.User, error) 
 	return args.Get(0).([]*models.User), args.Error(1)
 }
 
+func (m *MockTeamRepository) GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*models.User, error) {
+	args := m.Called(teamIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[int][]*models.User), args.Error(1)
+}
+
 func (m *MockTeamRepository) RemoveTeamMember(teamID int, userID string) error {
 	args := m.Called(teamID, userID)
 	return args.Error(0)
@@ -323,12 +331,28 @@ func (m *MockTournamentRepository) GetTeamsByTournamentID(tournamentID int) ([]*
 	return args.Get(0).([]*models.Team), args.Error(1)
 }
 
+func (m *MockTournamentRepository) CountTeamsBySportForEvent(eventID int) (map[int]int, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[int]int), args.Error(1)
+}
+
 func (m *MockTournamentRepository) GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error) {
 	args := m.Called(eventID, teamID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*models.MatchDetail), args.Error(1)
+}
+
+func (m *MockTournamentRepository) GetMatchesForTeams(eventID int, teamIDs []int) (map[int][]*models.MatchDetail, error) {
+	args := m.Called(eventID, teamIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[int][]*models.MatchDetail), args.Error(1)
 }
 
 func (m *MockTournamentRepository) UpdateMatchStartTime(matchID int, startTime string) error {
