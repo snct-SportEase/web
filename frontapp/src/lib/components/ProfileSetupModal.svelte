@@ -47,24 +47,11 @@
     errorMessage = '';
 
     try {
-      // セッションクッキーを取得
-      let sessionToken = null;
-      if (browser) {
-        const cookies = document.cookie.split('; ');
-        const sessionCookie = cookies.find(row => row.startsWith('session_token='));
-        sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
-      }
-
-      if (!sessionToken) {
-        throw new Error('セッションが見つかりません。再度ログインしてください。');
-      }
-
       const response = await fetch('/api/user/profile', {
         method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Cookie': `session_token=${sessionToken}`,
         },
         body: JSON.stringify({ 
           display_name: confirmData.displayName, 
@@ -73,6 +60,9 @@
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('セッションが期限切れです。再度ログインしてください。');
+        }
         const error = await response.json();
         throw new Error(error.error || 'プロフィールの更新に失敗しました。');
       }
@@ -82,7 +72,7 @@
       
     } catch (error) {
       errorMessage = error.message;
-      isConfirming = false; // エラー時は入力画面に戻るか、確認画面のままにするか。ここでは入力画面に戻す
+      isConfirming = false;
     } finally {
       isLoading = false;
     }
