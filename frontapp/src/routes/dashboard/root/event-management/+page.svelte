@@ -2,12 +2,12 @@
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
 
-  let events = [];
-  let showModal = false;
-  let selectedEvent = null;
-  let isNameManuallyChanged = false;
+  let events = $state([]);
+  let showModal = $state(false);
+  let selectedEvent = $state(null);
+  let isNameManuallyChanged = $state(false);
 
-  let currentEvent = {
+  let currentEvent = $state({
     id: null,
     name: '',
     year: new Date().getFullYear(),
@@ -17,7 +17,7 @@
     survey_url: null,
     status: 'upcoming',
     hide_scores: false,
-  };
+  });
 
   $effect(() => {
     if (!isNameManuallyChanged && currentEvent.year && currentEvent.season) {

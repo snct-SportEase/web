@@ -17,9 +17,21 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5000',
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: 'node scripts/mock-backend.js',
+      url: 'http://127.0.0.1:8081/health',
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:5000',
+      reuseExistingServer: !process.env.CI,
+      env: {
+        ...process.env,
+        BACKEND_URL: 'http://127.0.0.1:8081',
+        PUBLIC_BACKEND_URL: 'http://127.0.0.1:8081',
+      },
+    },
+  ],
 });
