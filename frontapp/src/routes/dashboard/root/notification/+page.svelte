@@ -230,14 +230,15 @@
         {:else}
           <div class="flex flex-wrap gap-4">
             {#each availableRoles as role (role.id ?? role.name)}
-              <label class="inline-flex items-center space-x-2 text-sm text-gray-700">
+              <div class="inline-flex items-center space-x-2">
                 <input
                   type="checkbox"
+                  id={`role-checkbox-${role.name}`}
                   checked={!!selectedRoles[role.name]}
                   onchange={() => toggleRole(role.name)}
                 />
-                <span>{role.label}</span>
-              </label>
+                <label class="text-sm text-gray-700" for={`role-checkbox-${role.name}`}>{role.label}</label>
+              </div>
             {/each}
           </div>
         {/if}

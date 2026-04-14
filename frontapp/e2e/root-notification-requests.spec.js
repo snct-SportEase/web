@@ -16,7 +16,7 @@ test.describe('通知申請管理 (root)', () => {
 
   test('メッセージを送信できる', async ({ page }) => {
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/notification-requests/1/messages') && request.method() === 'POST');
-    await page.getByRole('textbox', { name: 'メッセージを送信' }).fill('了解しました。');
+    await page.getByRole('textbox', { name: 'メッセージを送信' }).pressSequentially('了解しました。');
     await page.getByRole('button', { name: 'メッセージを送信' }).click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({ message: '了解しました。' });

@@ -16,7 +16,7 @@ test.describe('ホワイトリスト管理 (root)', () => {
 
   test('メールアドレスを追加できる', async ({ page }) => {
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/whitelist') && request.method() === 'POST');
-    await page.getByLabel('メールアドレス').fill('new.user');
+    await page.getByLabel('メールアドレス').pressSequentially('new.user');
     await page.locator('#role').selectOption('admin');
     await page.getByRole('button', { name: 'Add' }).click();
     const req = await requestPromise;
