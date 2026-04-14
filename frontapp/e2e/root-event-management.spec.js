@@ -60,6 +60,36 @@ test.describe('大会情報登録・管理 (root)', () => {
     await expect(page.getByText('大会作成')).not.toBeVisible();
   });
 
+  test('新規作成でスコア非表示設定を保存できる', async ({ page }) => {
+    await page.getByRole('button', { name: '新規作成' }).click();
+
+    const hideScoresCheckbox = page.getByLabel('スコアを非表示にする');
+    await expect(hideScoresCheckbox).not.toBeChecked();
+
+    await page.getByRole('spinbutton', { name: '年度' }).fill('2026');
+    await page.getByRole('combobox', { name: 'シーズン' }).selectOption('autumn');
+    await page.getByLabel('開始日').fill('2026-10-01');
+    await page.getByLabel('終了日').fill('2026-10-02');
+    await hideScoresCheckbox.check({ force: true });
+
+    const saveRequest = page.waitForRequest((request) => {
+      if (request.url().endsWith('/api/root/events') && request.method() === 'POST') {
+        const body = JSON.parse(request.postData() ?? '{}');
+        return body.hide_scores === true;
+      }
+
+      return false;
+    });
+
+    await page.getByRole('button', { name: '保存' }).click();
+
+    const request = await saveRequest;
+    const body = JSON.parse(request.postData() ?? '{}');
+    expect(body).toMatchObject({
+      hide_scores: true
+    });
+  });
+
   test('大会名を手動で変更した後は自動生成が停止する', async ({ page }) => {
     await page.getByRole('button', { name: '新規作成' }).click();
 
@@ -105,6 +135,32 @@ test.describe('大会情報登録・管理 (root)', () => {
     });
 
     await expect(page.getByText('大会編集')).not.toBeVisible();
+  });
+
+  test('既存大会のスコア非表示設定を更新できる', async ({ page }) => {
+    await page.getByText('2025春季スポーツ大会').click();
+
+    const hideScoresCheckbox = page.getByLabel('スコアを非表示にする');
+    await expect(hideScoresCheckbox).not.toBeChecked();
+    await hideScoresCheckbox.check({ force: true });
+
+    const saveRequest = page.waitForRequest((request) => {
+      if (request.url().endsWith('/api/root/events/1') && request.method() === 'PUT') {
+        const body = JSON.parse(request.postData() ?? '{}');
+        return body.hide_scores === true;
+      }
+
+      return false;
+    });
+
+    await page.getByRole('button', { name: '保存' }).click();
+
+    const request = await saveRequest;
+    const body = JSON.parse(request.postData() ?? '{}');
+    expect(body).toMatchObject({
+      id: 1,
+      hide_scores: true
+    });
   });
 
   test('既存大会のアンケート通知を送信できる', async ({ page }) => {

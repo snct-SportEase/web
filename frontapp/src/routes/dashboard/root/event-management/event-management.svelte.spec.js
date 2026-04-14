@@ -124,6 +124,15 @@ describe('Event Management Page', () => {
     await expect.element(nameInput).toHaveValue('2025春季スポーツ大会');
   });
 
+  it('新規作成ではスコア非表示設定が初期値falseであること', async () => {
+    render(Page);
+
+    await page.getByRole('button', { name: '新規作成' }).click();
+
+    const hideScoresCheckbox = page.getByLabelText('スコアを非表示にする');
+    await expect.element(hideScoresCheckbox).not.toBeChecked();
+  });
+
   it('新規作成を保存するとPOSTで大会情報を送信すること', async () => {
     render(Page);
 
@@ -152,6 +161,26 @@ describe('Event Management Page', () => {
     }));
   });
 
+  it('スコア非表示を有効にして保存するとhide_scores=trueで送信すること', async () => {
+    render(Page);
+
+    await page.getByRole('button', { name: '新規作成' }).click();
+    await page.getByRole('spinbutton', { name: '年度' }).fill('2026');
+    await page.getByLabelText('開始日').fill('2026-10-01');
+    await page.getByLabelText('終了日').fill('2026-10-02');
+    await page.getByLabelText('スコアを非表示にする').click();
+    await page.getByRole('button', { name: '保存' }).click();
+
+    const saveCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/root/events' && options?.method === 'POST';
+    });
+
+    expect(saveCall).toBeTruthy();
+    expect(JSON.parse(saveCall[1].body)).toEqual(expect.objectContaining({
+      hide_scores: true
+    }));
+  });
+
   it('編集保存するとPUTで大会情報を送信すること', async () => {
     render(Page);
 
@@ -172,6 +201,24 @@ describe('Event Management Page', () => {
       id: 1,
       name: '2025春季スポーツ大会',
       status: 'active'
+    }));
+  });
+
+  it('編集時にスコア非表示を有効にして保存するとPUTで反映されること', async () => {
+    render(Page);
+
+    await page.getByText('2025春季スポーツ大会').click();
+    await page.getByLabelText('スコアを非表示にする').click();
+    await page.getByRole('button', { name: '保存' }).click();
+
+    const saveCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/root/events/1' && options?.method === 'PUT';
+    });
+
+    expect(saveCall).toBeTruthy();
+    expect(JSON.parse(saveCall[1].body)).toEqual(expect.objectContaining({
+      id: 1,
+      hide_scores: true
     }));
   });
 });
