@@ -26,7 +26,13 @@ const defaultEvents = () => ([
   }
 ]);
 
+const defaultSports = () => ([
+  { id: 1, name: 'バスケットボール' },
+  { id: 2, name: 'バレーボール' }
+]);
+
 let events = defaultEvents();
+let sports = defaultSports();
 
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -78,6 +84,7 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/__reset' && req.method === 'POST') {
     events = defaultEvents();
+    sports = defaultSports();
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -141,7 +148,28 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/events/active' && req.method === 'GET') {
     const activeEvent = events.find((event) => event.status === 'active') ?? events[0] ?? null;
-    sendJson(res, 200, activeEvent ? { id: activeEvent.id, name: activeEvent.name } : null);
+    sendJson(res, 200, activeEvent ? { event_id: activeEvent.id, id: activeEvent.id, name: activeEvent.name } : null);
+    return;
+  }
+
+  if (url.pathname === '/api/root/sports' && req.method === 'GET') {
+    sendJson(res, 200, sports);
+    return;
+  }
+
+  if (url.pathname === '/api/root/sports' && req.method === 'POST') {
+    const body = await readJson(req);
+    const nextSport = {
+      id: sports.length + 1,
+      name: body.name
+    };
+    sports = [...sports, nextSport];
+    sendJson(res, 201, nextSport);
+    return;
+  }
+
+  if (url.pathname === '/api/events/1/sports' && req.method === 'GET') {
+    sendJson(res, 200, []);
     return;
   }
 

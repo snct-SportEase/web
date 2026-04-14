@@ -4,25 +4,26 @@
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { marked } from 'marked';
     import SafeHtml from '$lib/components/SafeHtml.svelte';
-    let assignmentPreviewHtml = $derived(marked.parse(newAssignment.rules || ''));
 
-    let allSports = [];
-    let eventSports = [];
-    let newSportName = '';
+    let allSports = $state([]);
+    let eventSports = $state([]);
+    let newSportName = $state('');
 
-    let newAssignment = {
+    let newAssignment = $state({
         sport_id: null,
         description: '',
         rules: '',
         location: 'other',
         rules_type: 'markdown', // Add default rules_type
-    };
+    });
 
-    let currentActiveEvent = null;
-    let editingCapacity = null; // { event_id, sport_id } or null
-    let editingMinCapacity = null;
-    let editingMaxCapacity = null;
-    let isAssigning = false; // 割り当て処理中のフラグ
+    let assignmentPreviewHtml = $derived(marked.parse(newAssignment.rules || ''));
+
+    let currentActiveEvent = $state(null);
+    let editingCapacity = $state(null); // { event_id, sport_id } or null
+    let editingMinCapacity = $state(null);
+    let editingMaxCapacity = $state(null);
+    let isAssigning = $state(false); // 割り当て処理中のフラグ
 
     // 昼競技(noon_game)は /dashboard/root/noon-game で管理するため、通常競技の割り当て対象から除外する
     const allLocations = ['gym1', 'gym2', 'ground', 'other'];
