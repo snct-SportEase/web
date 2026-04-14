@@ -6,19 +6,19 @@ import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
 
-  let users = [];
-  let classes = []; // クラス一覧
-  let searchQuery = '';
-  let searchType = 'email'; // 'email' or 'display_name'
-  let selectedUser = null;
-  let newDisplayName = '';
+  let users = $state([]);
+  let classes = $state([]); // クラス一覧
+  let searchQuery = $state('');
+  let searchType = $state('email'); // 'email' or 'display_name'
+  let selectedUser = $state(null);
+  let newDisplayName = $state('');
   // ロール管理用
-  let newRoleName = '';
-  let selectedClassRep = ''; // クラス所属変更用
+  let newRoleName = $state('');
+  let selectedClassRep = $state(''); // クラス所属変更用
 
-  let showModal = false;
-  let isLoading = false;
-  let errorMessage = '';
+  let showModal = $state(false);
+  let isLoading = $state(false);
+  let errorMessage = $state('');
 
   // 指数バックオフ付きのフェッチ関数
   async function fetchWithBackoff(url, options = {}, maxRetries = 5) {

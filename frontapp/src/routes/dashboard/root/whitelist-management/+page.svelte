@@ -95,7 +95,7 @@
   let errorMessage = $state('');
   
   // 削除機能用の状態変数
-  let selectedEmails = new SvelteSet();
+  let selectedEmails = $state(new SvelteSet());
   let isDeleting = $state(false);
 
   async function addEmail() {

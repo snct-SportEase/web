@@ -4,13 +4,13 @@
   /** @type {import('./$types').PageData} */
   let { data } = $props();
 
-  let classes = [];
-  let originalClasses = []; // 保存前の状態を保持
-  let errorMessage = '';
-  let successMessage = '';
-  let isSaving = false;
-  let isUploading = false;
-  let csvFile = null;
+  let classes = $state([]);
+  let originalClasses = $state([]); // 保存前の状態を保持
+  let errorMessage = $state('');
+  let successMessage = $state('');
+  let isSaving = $state(false);
+  let isUploading = $state(false);
+  let csvFile = $state(null);
 
   onMount(() => {
     if (data.classes) {

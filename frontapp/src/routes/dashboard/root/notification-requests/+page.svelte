@@ -8,10 +8,10 @@
   let activeRequest = $state(data.activeRequest);
   let hasRequests = $derived(requests.length > 0);
 
-  let messageInput = '';
-  let isPostingMessage = false;
-  let isDeciding = false;
-  let errorMessage = data.error;
+  let messageInput = $state('');
+  let isPostingMessage = $state(false);
+  let isDeciding = $state(false);
+  let errorMessage = $state(data.error);
 
   function formatStatus(status) {
     switch (status) {
@@ -237,4 +237,3 @@
     </div>
   </section>
 </div>
-

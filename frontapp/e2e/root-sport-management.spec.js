@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+const mockBackendUrl = process.env.MOCK_BACKEND_URL ?? 'http://127.0.0.1:8081';
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('競技情報登録・管理 (root)', () => {
   test.beforeEach(async ({ page, context, request }) => {
-    await request.post('http://127.0.0.1:8081/__reset');
+    await request.post(`${mockBackendUrl}/__reset`);
 
     await context.addCookies([{
       name: 'session_token',
@@ -60,5 +62,46 @@ test.describe('競技情報登録・管理 (root)', () => {
 
     await expect.poll(() => dialogMessage).toBe('競技名を入力してください。');
     await expect(page.getByRole('list').getByText('綱引き')).not.toBeVisible();
+  });
+
+  test('競技未選択では大会へ割り当てボタンが無効', async ({ page }) => {
+    await expect(page.getByRole('button', { name: '大会に競技を割り当てる' })).toBeDisabled();
+    await expect(page.getByText('割り当て済み競技一覧 (0件)')).toBeVisible();
+  });
+
+  test('競技を大会へ割り当てできる', async ({ page }) => {
+    await page.getByLabel('割り当てる競技').selectOption('1');
+    await page.getByLabel('場所').selectOption('gym1');
+    await page.getByLabel('概要 (任意)').fill('屋内メイン競技');
+    await page.getByLabel('ルール詳細 (任意)').fill('# バスケットボール');
+
+    const assignRequest = page.waitForRequest((request) => {
+      if (request.url().endsWith('/api/admin/events/1/sports') && request.method() === 'POST') {
+        const body = JSON.parse(request.postData() ?? '{}');
+        return body.sport_id === 1 && body.location === 'gym1';
+      }
+
+      return false;
+    });
+
+    page.once('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+
+    await page.getByRole('button', { name: '大会に競技を割り当てる' }).click();
+
+    const request = await assignRequest;
+    const body = JSON.parse(request.postData() ?? '{}');
+    expect(body).toEqual(expect.objectContaining({
+      sport_id: 1,
+      location: 'gym1',
+      description: '屋内メイン競技',
+      rules: '# バスケットボール',
+      rules_type: 'markdown'
+    }));
+
+    await expect(page.getByText('割り当て済み競技一覧 (1件)')).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'バスケットボール' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'gym1' })).toBeVisible();
   });
 });

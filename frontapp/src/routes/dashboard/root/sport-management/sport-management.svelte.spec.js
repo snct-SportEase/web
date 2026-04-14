@@ -22,12 +22,14 @@ describe('Sport Management Page', () => {
   let fetchMock;
   let alertMock;
   let sports;
+  let assignedSports;
 
   beforeEach(() => {
     sports = [
       { id: 1, name: 'バスケットボール' },
       { id: 2, name: 'バレーボール' }
     ];
+    assignedSports = [];
 
     fetchMock = vi.fn((url, options = {}) => {
       if (url === '/api/root/sports') {
@@ -51,7 +53,25 @@ describe('Sport Management Page', () => {
       if (url === '/api/events/1/sports') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([])
+          json: () => Promise.resolve(assignedSports)
+        });
+      }
+
+      if (url === '/api/admin/events/1/sports' && options.method === 'POST') {
+        const body = JSON.parse(options.body);
+        const nextAssignedSport = {
+          event_id: 1,
+          sport_id: body.sport_id,
+          description: body.description ?? '',
+          rules: body.rules ?? '',
+          location: body.location ?? 'other',
+          rules_type: body.rules_type ?? 'markdown'
+        };
+        assignedSports = [...assignedSports, nextAssignedSport];
+
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(nextAssignedSport)
         });
       }
 
@@ -103,5 +123,43 @@ describe('Sport Management Page', () => {
     expect(JSON.parse(createCall[1].body)).toEqual({ name: '綱引き' });
     expect(alertMock).toHaveBeenCalledWith('新しい競技を登録しました。');
     await expect.element(page.getByRole('list').getByText('綱引き')).toBeInTheDocument();
+  });
+
+  it('競技未選択では大会へ割り当てボタンが無効であること', async () => {
+    render(Page);
+
+    await expect.element(page.getByRole('button', { name: '大会に競技を割り当てる' })).toBeDisabled();
+
+    const assignCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/admin/events/1/sports' && options?.method === 'POST';
+    });
+    expect(assignCall).toBeFalsy();
+  });
+
+  it('競技を大会に割り当てるとPOST送信して割り当て済み一覧に表示されること', async () => {
+    render(Page);
+
+    await page.getByLabelText('割り当てる競技').selectOptions('1');
+    await page.getByLabelText('場所').selectOptions('gym1');
+    await page.getByLabelText('概要 (任意)').fill('屋内メイン競技');
+    await page.getByLabelText('ルール詳細 (任意)').fill('# バスケットボール');
+    await page.getByRole('button', { name: '大会に競技を割り当てる' }).click();
+
+    const assignCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/admin/events/1/sports' && options?.method === 'POST';
+    });
+
+    expect(assignCall).toBeTruthy();
+    expect(JSON.parse(assignCall[1].body)).toEqual(expect.objectContaining({
+      sport_id: 1,
+      location: 'gym1',
+      description: '屋内メイン競技',
+      rules: '# バスケットボール',
+      rules_type: 'markdown'
+    }));
+    expect(alertMock).toHaveBeenCalledWith('競技を大会に割り当てました。');
+    await expect.element(page.getByText('割り当て済み競技一覧 (1件)')).toBeInTheDocument();
+    await expect.element(page.getByRole('cell', { name: 'バスケットボール' })).toBeInTheDocument();
+    await expect.element(page.getByRole('cell', { name: 'gym1' })).toBeInTheDocument();
   });
 });

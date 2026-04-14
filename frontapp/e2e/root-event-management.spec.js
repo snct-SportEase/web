@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+const mockBackendUrl = process.env.MOCK_BACKEND_URL ?? 'http://127.0.0.1:8081';
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('大会情報登録・管理 (root)', () => {
   test.beforeEach(async ({ page, context, request }) => {
-    await request.post('http://127.0.0.1:8081/__reset');
+    await request.post(`${mockBackendUrl}/__reset`);
 
     await context.addCookies([{
       name: 'session_token',
