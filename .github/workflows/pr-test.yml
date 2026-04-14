@@ -6,7 +6,6 @@ on:
       - main
   push:
     branches:
-      - main
       - ci/auto-test # For testing the workflow itself
 
 jobs:

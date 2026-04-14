@@ -1,4 +1,4 @@
-name: Deploy to Server
+name: Test and Deploy
 
 on:
   push:
@@ -6,8 +6,107 @@ on:
       - main
 
 jobs:
-  deploy:
+  backend-test:
+    name: Backend Go Tests
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          check-latest: true
+          cache-dependency-path: 'backapp/go.sum'
+
+      - name: Install dependencies
+        working-directory: ./backapp
+        run: go mod download
+
+      - name: Run unit tests
+        working-directory: ./backapp
+        run: |
+          go test -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
+
+      - name: Run race detector
+        working-directory: ./backapp
+        run: |
+          go test -race -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
+
+      - name: Generate coverage report
+        working-directory: ./backapp
+        run: |
+          go test -v -covermode=atomic -coverprofile=coverage.out \
+            -coverpkg=backapp/internal/handler,backapp/internal/repository,backapp/internal/websocket \
+            ./tests/handler/... ./tests/repository/... ./internal/websocket/...
+          go tool cover -func=coverage.out | tee coverage.txt
+
+      - name: Publish coverage summary
+        working-directory: ./backapp
+        run: |
+          {
+            echo "## Backend Coverage"
+            echo
+            echo '```text'
+            cat coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backapp/coverage.out
+            backapp/coverage.txt
+
+  frontend-test:
+    name: Frontend SvelteKit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontapp/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./frontapp
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        working-directory: ./frontapp
+        run: npx playwright install --with-deps
+
+      - name: Check Formatting & Lint
+        working-directory: ./frontapp
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run Vitest
+        working-directory: ./frontapp
+        run: npm run test
+        env:
+          CI: 'true'
+
+      - name: Run Playwright E2E
+        working-directory: ./frontapp
+        run: npm run test:e2e
+        env:
+          CI: 'true'
+
+  deploy:
+    name: Deploy to Server
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+
     steps:
       - name: Deploy using SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -16,18 +115,12 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT }}
-          # タイムアウト時間を設定（ビルドに時間がかかる場合は長めに）
-          timeout: 30m 
+          timeout: 30m
           script: |
-            # プロジェクトのディレクトリに移動
             cd $HOME/SportEase
-            
-            # 最新のコードを取得
+
             git fetch origin
             git merge origin/main
-            
-            # Dockerコンテナを再構築して起動
-            # --build をつけることでDockerfileの変更も反映されます
 
             docker compose -f docker-compose.production.yml build --no-cache
             docker compose -f docker-compose.production.yml up -d --build
