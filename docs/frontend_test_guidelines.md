@@ -161,7 +161,7 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 結果のCSV/PDF出力 | クラス別スコア集計の出力 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | DBダンプ出力 | データベース全体のエクスポート | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | 雨天時モード切替 | 競技中止・敗者復活戦追加の一括制御 | ○ | ○ | `rainy-mode.svelte.spec.js` / `root-rainy-mode.spec.js` で確認済み |
-| 雨天時定員設定 | 競技・クラスごとの雨天時定員設定 | ☓ | ☓ | |
+| 雨天時定員設定 | 競技・クラスごとの雨天時定員設定 | ○ | ○ | `sport-details-registration.svelte.spec.js` / `root-rainy-capacity-settings.spec.js` で確認済み |
 | 競技マスタ登録 | システム共通の競技種目登録 | ○ | ○ | `sport-management.svelte.spec.js` / `root-sport-management.spec.js` で確認済み |
 | 大会への競技割り当て | 競技の大会紐付け・ルール設定 | ○ | ○ | `sport-management.svelte.spec.js` / `root-sport-management.spec.js` で確認済み |
 | 通知作成・配信 | プッシュ通知の作成と送信 | ○ | ○ | `notification.svelte.spec.js` / `root-notification.spec.js` で確認済み |

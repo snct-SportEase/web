@@ -44,41 +44,41 @@
 
   marked.use({ extensions: [colorExtension] });
 
-  let sports = [];
-  let selectedEventId = null;
-  let selectedSportId = null;
-  let sportDetails = { description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null };
-  let capacityMode = 'bulk'; // 'bulk' or 'per-class'
-  let minCapacity = null;
-  let maxCapacity = null;
-  let classes = [];
-  let classCapacities = {}; // { classId: { min: number | null, max: number | null } }
+  let sports = $state([]);
+  let selectedEventId = $state(null);
+  let selectedSportId = $state(null);
+  let sportDetails = $state({ description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null });
+  let capacityMode = $state('bulk'); // 'bulk' or 'per-class'
+  let minCapacity = $state(null);
+  let maxCapacity = $state(null);
+  let classes = $state([]);
+  let classCapacities = $state({}); // { classId: { min: number | null, max: number | null } }
   
   // Rainy mode capacity settings
-  let rainyModeCapacityMode = 'bulk'; // 'bulk' or 'per-class'
-  let rainyModeMinCapacity = null;
-  let rainyModeMaxCapacity = null;
-  let rainyModeClassCapacities = {}; // { classId: { min: number | null, max: number | null } }
-  let tournaments = [];
-  let selectedTournamentId = null;
-  let selectedTournament = null;
-  let allMatchesForSport = []; // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合
-  let bulkStartTime = '';
-  let matchStartTimes = {};
-  let bulkRainyModeStartTime = '';
-  let matchRainyModeStartTimes = {};
-  let rulesTextarea;
-  let previewDiv;
+  let rainyModeCapacityMode = $state('bulk'); // 'bulk' or 'per-class'
+  let rainyModeMinCapacity = $state(null);
+  let rainyModeMaxCapacity = $state(null);
+  let rainyModeClassCapacities = $state({}); // { classId: { min: number | null, max: number | null } }
+  let tournaments = $state([]);
+  let selectedTournamentId = $state(null);
+  let selectedTournament = $state(null);
+  let allMatchesForSport = $state([]); // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合
+  let bulkStartTime = $state('');
+  let matchStartTimes = $state({});
+  let bulkRainyModeStartTime = $state('');
+  let matchRainyModeStartTimes = $state({});
+  let rulesTextarea = $state();
+  let previewDiv = $state();
   let markdownPreviewHtml = $derived(
     sportDetails.rules_type === 'markdown'
       ? marked.parse(sportDetails.rules || '')
       : ''
   );
-  let selectedPdfFile = null;
-  let pdfPreviewUrl = null;
-  let activeEventName = '';
-  let customColor = '#000000';
-  let isRainyMode = false;
+  let selectedPdfFile = $state(null);
+  let pdfPreviewUrl = $state(null);
+  let activeEventName = $state('');
+  let customColor = $state('#000000');
+  let isRainyMode = $state(false);
 
   onMount(async () => {
     // Fetch active event
