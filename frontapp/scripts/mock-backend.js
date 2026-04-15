@@ -577,6 +577,13 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (sportDetailsMatch && req.method === 'PUT') {
+    const body = await readJson(req);
+    // Mock successful update
+    sendJson(res, 200, { message: 'Sport details saved successfully' });
+    return;
+  }
+
   const sportTeamsMatch = url.pathname.match(/^\/api\/root\/sports\/(\d+)\/teams$/);
   if (sportTeamsMatch && req.method === 'GET') {
     const sportId = Number(sportTeamsMatch[1]);

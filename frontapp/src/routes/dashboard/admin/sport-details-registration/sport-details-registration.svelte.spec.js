@@ -1,4 +1,4 @@
-import { page } from '@vitest/browser/context';
+import { page, userEvent } from '@vitest/browser/context';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
@@ -170,5 +170,38 @@ describe('Sport Details Registration Page', () => {
       { sport_id: '1', class_id: '2', min_capacity: 5, max_capacity: 7 }
     ]);
     expect(alertMock).toHaveBeenCalledWith('すべてのクラスの雨天時定員設定を更新しました。');
+  });
+
+  it('競技の概要とルール(Markdown)を保存できる', async () => {
+    render(Page);
+
+    await expect.element(page.getByRole('option', { name: 'バスケットボール' })).toBeInTheDocument();
+    await page.getByLabelText('競技選択').selectOptions('1');
+
+    // 競技概要 (1番目のtextarea)
+    const textareas = page.getByRole('textbox');
+    await textareas.nth(0).fill('バスケットボールの概要です。');
+
+    // ルール形式をMarkdownに
+    await userEvent.click(page.getByLabelText('Markdown', { exact: true }));
+
+    // ルール詳細 (最後のtextarea)
+    await textareas.last().fill('# ルール\n- 5人制\n- ドリブル必須');
+
+    const saveButton = page.getByRole('button', { name: /^保存$/ });
+    await saveButton.click();
+
+    const saveCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/admin/events/1/sports/1/details' && options?.method === 'PUT';
+    });
+
+    expect(saveCall).toBeTruthy();
+    expect(JSON.parse(saveCall[1].body)).toEqual({
+      description: 'バスケットボールの概要です。',
+      rules_type: 'markdown',
+      rules: '# ルール\n- 5人制\n- ドリブル必須',
+      rules_pdf_url: null
+    });
+    expect(alertMock).toHaveBeenCalledWith('Sport details saved successfully');
   });
 });
