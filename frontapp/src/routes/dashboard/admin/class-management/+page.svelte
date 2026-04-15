@@ -1,4 +1,6 @@
 <script>
+	import { onMount } from 'svelte';
+
 	let { data } = $props();
 
 	const {
@@ -7,33 +9,41 @@
 		eventSports: initialEventSports = [],
 		allSports: initialAllSports = [],
 		selectedClassId: initialSelectedClassId = null,
-		error: initialError = null
+		error: initialError = null,
+		activeEventId: initialActiveEventId = null
 	} = data ?? {};
 
-	let classes = [...initialClasses];
-	let selectedClassId = initialSelectedClassId;
-	let classMembers = [...initialClassMembers];
-	let eventSports = [...initialEventSports];
-	let allSports = [...initialAllSports];
-	let selectedSportId = null;
-	let selectedMembers = [];
-	let assignedMembers = [];
+	let activeEventId = $state(initialActiveEventId);
+	let classes = $state([...initialClasses]);
+	const normalizedInitialSelectedClassId = (() => {
+		if (initialSelectedClassId === null || initialSelectedClassId === undefined || initialSelectedClassId === '') {
+			return null;
+		}
+		if (typeof initialSelectedClassId === 'number') {
+			return initialSelectedClassId;
+		}
+		const parsed = Number(initialSelectedClassId);
+		return Number.isNaN(parsed) ? null : parsed;
+	})();
 
-	let membersLoading = false;
-	let teamMembersLoading = false;
-	let sportsLoading = false;
-	let assignLoading = false;
+	let selectedClassId = $state(normalizedInitialSelectedClassId);
+	let classMembers = $state([...initialClassMembers]);
+	let eventSports = $state([...initialEventSports]);
+	let allSports = $state([...initialAllSports]);
+	let selectedSportId = $state(null);
+	let selectedMemberIds = $state([]);
+	let assignedMembers = $state([]);
 
-	let error = initialError;
-	let success = null;
+	let membersLoading = $state(false);
+	let teamMembersLoading = $state(false);
+	let sportsLoading = $state(false);
+	let assignLoading = $state(false);
+
+	let error = $state(initialError);
+	let success = $state(null);
 	const isAdmin = data.isAdmin || false;
 
-	let searchQuery = '';
-
-if (selectedClassId !== null && typeof selectedClassId !== 'number') {
-	const parsedInitialClassId = Number(selectedClassId);
-	selectedClassId = Number.isNaN(parsedInitialClassId) ? null : parsedInitialClassId;
-}
+	let searchQuery = $state('');
 
 	let selectedClass = $derived(
 		selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null
@@ -80,7 +90,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 				throw new Error(errorData.error || 'クラスメンバーの取得に失敗しました');
 			}
 			classMembers = await response.json();
-			selectedMembers = [];
+			selectedMemberIds = [];
 		} catch (err) {
 			console.error('Error loading class members:', err);
 			error = err.message || 'クラスメンバーの取得に失敗しました';
@@ -125,7 +135,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 			await loadClassMembers(selectedClassId);
 			selectedSportId = null;
 			assignedMembers = [];
-			selectedMembers = [];
+			selectedMemberIds = [];
 		}
 	}
 
@@ -138,16 +148,16 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 		}
 	}
 
-	function toggleMemberSelection(user) {
-		if (selectedMembers.find((m) => m.id === user.id)) {
-			selectedMembers = selectedMembers.filter((m) => m.id !== user.id);
+	function toggleMemberSelection(userId) {
+		if (selectedMemberIds.includes(userId)) {
+			selectedMemberIds = selectedMemberIds.filter((id) => id !== userId);
 		} else {
-			selectedMembers = [...selectedMembers, user];
+			selectedMemberIds = [...selectedMemberIds, userId];
 		}
 	}
 
 	async function assignMembers() {
-		if (!selectedClass || selectedSportId === null || selectedMembers.length === 0) {
+		if (!selectedClass || selectedSportId === null || selectedMemberIds.length === 0) {
 			error = 'クラス、競技、およびメンバーを選択してください';
 			return;
 		}
@@ -159,7 +169,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 		try {
 			const requestBody = {
 				sport_id: selectedSportId,
-				user_ids: selectedMembers.map((m) => m.id)
+				user_ids: selectedMemberIds
 			};
 
 			if (isAdmin && selectedClass) {
@@ -183,7 +193,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 			if (selectedSportId !== null) {
 				await loadTeamMembers(selectedSportId);
 			}
-			selectedMembers = [];
+			selectedMemberIds = [];
 		} catch (err) {
 			console.error('Error assigning members:', err);
 			error = err.message || 'メンバーの割り当てに失敗しました';
@@ -232,6 +242,29 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 			assignLoading = false;
 		}
 	}
+
+	onMount(async () => {
+		if (activeEventId && eventSports.length === 0) {
+			try {
+				const sportResp = await authorizedFetch(`/api/events/${activeEventId}/sports`);
+				if (sportResp.ok) {
+					const sportData = await sportResp.json();
+					eventSports = Array.isArray(sportData) ? sportData : [];
+				}
+			} catch (e) {
+				console.error('Failed to load event sports:', e);
+			}
+			try {
+				const allSportResp = await authorizedFetch('/api/admin/allsports');
+				if (allSportResp.ok) {
+					const allSportData = await allSportResp.json();
+					allSports = Array.isArray(allSportData) ? allSportData : [];
+				}
+			} catch (e) {
+				console.error('Failed to load all sports:', e);
+			}
+		}
+	});
 
 </script>
 
@@ -304,12 +337,12 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 								{#each filteredClassMembers as member (member.id)}
 									<tr class="hover:bg-gray-50">
 										<td class="px-6 py-4 whitespace-nowrap">
-											<input
-												type="checkbox"
-												checked={selectedMembers.some((m) => m.id === member.id)}
-												onchange={() => toggleMemberSelection(member)}
-												class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-											/>
+										<input
+											type="checkbox"
+											checked={selectedMemberIds.includes(member.id)}
+											onclick={() => toggleMemberSelection(member.id)}
+											class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+										/>
 										</td>
 										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 											{member.display_name || '未設定'}
@@ -341,7 +374,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 				</select>
 			</div>
 
-			{#if selectedSportId !== null && selectedMembers.length > 0}
+			{#if selectedSportId !== null && selectedMemberIds.length > 0}
 				<!-- Assign Button -->
 				<div class="bg-white p-6 rounded-lg shadow">
 					<button
@@ -349,7 +382,7 @@ if (selectedClassId !== null && typeof selectedClassId !== 'number') {
 						disabled={assignLoading}
 						class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
 					>
-						{assignLoading ? '割り当て中...' : `選択した${selectedMembers.length}名を割り当てる`}
+						{assignLoading ? '割り当て中...' : `選択した${selectedMemberIds.length}名を割り当てる`}
 					</button>
 				</div>
 			{/if}

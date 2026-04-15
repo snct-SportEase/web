@@ -102,7 +102,32 @@ const defaultDefaultGroups = () => ({
 
 let events = defaultEvents();
 let sports = defaultSports();
-let eventSports = [];
+let eventSports = [
+  {
+    id: 1,
+    event_id: 1,
+    sport_id: 1,
+    description: 'バスケットボールの説明',
+    rules: 'ルール内容',
+    location: '体育館',
+    rules_type: 'markdown',
+    rules_pdf_url: null,
+    min_capacity: null,
+    max_capacity: null
+  },
+  {
+    id: 2,
+    event_id: 1,
+    sport_id: 2,
+    description: 'バレーボールの説明',
+    rules: 'ルール内容',
+    location: '体育館',
+    rules_type: 'markdown',
+    rules_pdf_url: null,
+    min_capacity: null,
+    max_capacity: null
+  }
+];
 let notifications = [
   {
     id: 1,
@@ -128,6 +153,12 @@ let noonMatches = [];
 let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let rainyModeSettings = [];
+let classTeamMembers = [
+  { id: 'class-user-1', email: 'student1@sendai-nct.jp', display_name: '山田太郎', class_id: 1 },
+  { id: 'class-user-2', email: 'student2@sendai-nct.jp', display_name: '鈴木次郎', class_id: 1 },
+  { id: 'class-user-3', email: 'student3@sendai-nct.jp', display_name: '佐藤花子', class_id: 2 }
+];
+let teamAssignments = [];
 
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -211,6 +242,12 @@ createServer(async (req, res) => {
     noonPointsSummary = [];
     noonTemplateRuns = [];
     rainyModeSettings = [];
+    classTeamMembers = [
+      { id: 'class-user-1', email: 'student1@sendai-nct.jp', display_name: '山田太郎', class_id: 1 },
+      { id: 'class-user-2', email: 'student2@sendai-nct.jp', display_name: '鈴木次郎', class_id: 1 },
+      { id: 'class-user-3', email: 'student3@sendai-nct.jp', display_name: '佐藤花子', class_id: 2 }
+    ];
+    teamAssignments = [];
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -363,6 +400,7 @@ createServer(async (req, res) => {
   if (url.pathname === '/api/admin/events/1/sports' && req.method === 'POST') {
     const body = await readJson(req);
     const nextEventSport = {
+      id: eventSports.length + 1,
       event_id: 1,
       sport_id: body.sport_id,
       description: body.description ?? '',
@@ -381,6 +419,62 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/admin/class-team/managed-class' && req.method === 'GET') {
     sendJson(res, 200, classes);
+    return;
+  }
+
+  const classMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/classes\/(\d+)\/members$/);
+  if (classMembersMatch && req.method === 'GET') {
+    const classId = Number(classMembersMatch[1]);
+    sendJson(res, 200, classTeamMembers.filter((member) => member.class_id === classId));
+    return;
+  }
+
+  const teamMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/sports\/(\d+)\/members$/);
+  if (teamMembersMatch && req.method === 'GET') {
+    const sportId = Number(teamMembersMatch[1]);
+    const classId = Number(url.searchParams.get('class_id') ?? '1');
+    const assignedIds = teamAssignments
+      .filter((item) => item.sport_id === sportId && item.class_id === classId)
+      .map((item) => item.user_id);
+
+    sendJson(
+      res,
+      200,
+      classTeamMembers.filter((member) => member.class_id === classId && assignedIds.includes(member.id))
+    );
+    return;
+  }
+
+  if (url.pathname === '/api/admin/class-team/assign-members' && req.method === 'POST') {
+    const body = await readJson(req);
+    const classId = Number(body.class_id ?? 1);
+    const sportId = Number(body.sport_id);
+    const userIds = Array.isArray(body.user_ids) ? body.user_ids : [];
+
+    for (const userId of userIds) {
+      const exists = teamAssignments.some(
+        (item) => item.class_id === classId && item.sport_id === sportId && item.user_id === userId
+      );
+      if (!exists) {
+        teamAssignments.push({ class_id: classId, sport_id: sportId, user_id: userId });
+      }
+    }
+
+    sendJson(res, 200, { message: 'メンバーの割り当てが完了しました' });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/class-team/remove-member' && req.method === 'DELETE') {
+    const body = await readJson(req);
+    const classId = Number(body.class_id ?? 1);
+    const sportId = Number(body.sport_id);
+    const userId = body.user_id;
+
+    teamAssignments = teamAssignments.filter(
+      (item) => !(item.class_id === classId && item.sport_id === sportId && item.user_id === userId)
+    );
+
+    sendJson(res, 200, { message: 'メンバーを削除しました' });
     return;
   }
 

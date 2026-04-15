@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+const mockBackendUrl = process.env.MOCK_BACKEND_URL ?? 'http://127.0.0.1:8081';
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('ユーザー管理 (root)', () => {
-  test.beforeEach(async ({ page, context }) => {
+  test.beforeEach(async ({ page, context, request }) => {
+    await request.post(`${mockBackendUrl}/__reset`);
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/change-username');
     await expect(page.getByRole('heading', { name: 'ユーザー管理' })).toBeVisible();
@@ -44,7 +47,12 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('#newRoleInput')).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'PUT');
     await page.locator('#newRoleInput').fill('root');
-    await page.getByRole('button', { name: '追加' }).click();
+    
+    await Promise.all([
+      page.waitForEvent('dialog').then(dialog => dialog.accept()),
+      page.getByRole('button', { name: '追加' }).click()
+    ]);
+
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',
@@ -54,14 +62,15 @@ test.describe('ユーザー管理 (root)', () => {
   });
 
   test('ロールを削除できる', async ({ page }) => {
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
     await page.locator('tbody button').first().click({ force: true });
     await expect(page.locator('button[title="ロールを削除"]').first()).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'DELETE');
-    await page.locator('button[title="ロールを削除"]').first().click();
+    
+    await Promise.all([
+      page.waitForEvent('dialog').then(dialog => dialog.accept()),
+      page.locator('button[title="ロールを削除"]').first().click()
+    ]);
+
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',
@@ -70,14 +79,15 @@ test.describe('ユーザー管理 (root)', () => {
   });
 
   test('adminロールを削除できる', async ({ page }) => {
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
     await page.locator('tbody tr', { has: page.getByText('admin1@sendai-nct.jp') }).getByRole('button', { name: '管理' }).click({ force: true });
     await expect(page.locator('button[title="ロールを削除"]').first()).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'DELETE');
-    await page.locator('button[title="ロールを削除"]').first().click();
+
+    await Promise.all([
+      page.waitForEvent('dialog').then(dialog => dialog.accept()),
+      page.locator('button[title="ロールを削除"]').first().click()
+    ]);
+
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-2',

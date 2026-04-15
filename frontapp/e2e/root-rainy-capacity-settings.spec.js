@@ -5,6 +5,14 @@ const mockBackendUrl = process.env.MOCK_BACKEND_URL ?? 'http://127.0.0.1:8081';
 test.describe('雨天時定員設定 (root)', () => {
   test.beforeEach(async ({ page, context, request }) => {
     await request.post(`${mockBackendUrl}/__reset`);
+    await request.post(`${mockBackendUrl}/api/admin/events/1/sports`, {
+      data: {
+        sport_id: 1,
+        location: 'gym1',
+        description: 'バスケットボール',
+        rules: 'ルール'
+      }
+    });
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/admin/sport-details-registration');
   });
@@ -24,10 +32,14 @@ test.describe('雨天時定員設定 (root)', () => {
     await expect(page.getByRole('heading', { name: '競技詳細情報登録' })).toBeVisible();
     await expect(page.getByText('2025春季スポーツ大会')).toBeVisible();
 
-    await page.getByLabel('競技選択').selectOption('1');
+    await Promise.all([
+      page.waitForResponse(res => res.url().includes('/api/admin/events/1/sports/1/details')),
+      page.waitForResponse(res => res.url().includes('/api/root/events/1/rainy-mode/settings')),
+      page.getByLabel('競技選択').selectOption('1')
+    ]);
+
     await expect(page.getByText('現在の設定: 定員 未設定 〜 未設定')).toBeVisible();
     await expect(page.locator('#rainy-min-capacity')).toBeVisible();
-
 
     await page.locator('#rainy-min-capacity').fill('6');
     await page.locator('#rainy-max-capacity').fill('8');

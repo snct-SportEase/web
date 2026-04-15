@@ -146,9 +146,11 @@
                  const errorData = await response.json();
                  throw new Error(errorData.error || 'Failed to create sport');
             }
+            const newSport = await response.json();
             newSportName = '';
-            await fetchAllSports(); // Refresh the list
+            allSports = [...allSports, newSport]; // 即時反映（楽観的更新）
             alert('新しい競技を登録しました。');
+            fetchAllSports().catch(console.error); // バックグラウンドで最新化
         } catch (error) {
             console.error(error);
             alert(`登録エラー: ${error.message}`);
