@@ -15,8 +15,8 @@ test.describe('トーナメント生成・管理 (root)', () => {
   });
 
   test('トーナメントプレビューを生成して保存できる', async ({ page }) => {
-    page.on('dialog', async (dialog) => {
-      await dialog.accept();
+    page.on('dialog', (dialog) => {
+      void dialog.accept().catch(() => {});
     });
 
     const previewRequest = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/tournaments/generate-preview') && request.method() === 'POST');

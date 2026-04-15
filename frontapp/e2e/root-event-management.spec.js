@@ -166,13 +166,13 @@ test.describe('大会情報登録・管理 (root)', () => {
   });
 
   test('既存大会のアンケート通知を送信できる', async ({ page }) => {
-    page.on('dialog', async (dialog) => {
+    page.on('dialog', (dialog) => {
       if (dialog.type() === 'confirm') {
-        await dialog.accept();
+        void dialog.accept().catch(() => {});
         return;
       }
 
-      await dialog.dismiss();
+      void dialog.dismiss().catch(() => {});
     });
 
     await page.getByText('2025春季スポーツ大会').click();
@@ -185,5 +185,54 @@ test.describe('大会情報登録・管理 (root)', () => {
     await page.getByRole('button', { name: '通知を送信' }).click();
 
     await notifyRequest;
+  });
+
+  test('春季大会の得点CSVをインポートできる', async ({ page }) => {
+    page.once('dialog', (dialog) => {
+      void dialog.accept().catch(() => {});
+    });
+
+    const uploadRequest = page.waitForRequest((request) => {
+      return request.url().endsWith('/api/root/events/1/import-survey-scores') && request.method() === 'POST';
+    });
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'scores.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('class,score\n1A,100\n1B,90\n')
+    });
+
+    await uploadRequest;
+    await expect(page.locator('input[type="file"]')).toHaveValue('');
+  });
+
+  test('クラス別スコア集計をCSV出力できる', async ({ page }) => {
+    const exportRequest = page.waitForRequest((request) => {
+      return request.url().endsWith('/api/root/events/1/export/csv') && request.method() === 'GET';
+    });
+
+    await page.getByRole('button', { name: 'CSV出力' }).click();
+
+    await exportRequest;
+  });
+
+  test('クラス別スコア集計をPDF出力できる', async ({ page }) => {
+    const scoreRequest = page.waitForRequest((request) => {
+      return request.url().includes('/api/scores/class?event_id=1') && request.method() === 'GET';
+    });
+
+    await page.getByRole('button', { name: 'PDF出力' }).click();
+
+    await scoreRequest;
+  });
+
+  test('DBダンプを出力できる', async ({ page }) => {
+    const dumpRequest = page.waitForRequest((request) => {
+      return request.url().endsWith('/api/root/db/export') && request.method() === 'GET';
+    });
+
+    await page.getByRole('button', { name: 'DBダンプ出力' }).click();
+
+    await dumpRequest;
   });
 });

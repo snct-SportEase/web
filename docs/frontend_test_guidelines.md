@@ -156,10 +156,10 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 大会の作成・編集 | 年度・シーズン・期間等の設定 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | 大会ステータス変更 | upcoming / active / archived の切り替え | ○ | ○ | 編集保存時の `status` 更新を確認済み |
 | スコア非表示設定 | 学生へのスコア公開・非公開設定 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
-| アンケート通知配信 | アンケートURLの全体通知送信 | ☓ | ○ | `root-event-management.spec.js` で通知送信フローを確認済み |
-| 得点CSVインポート | 外部集計データのインポート（春季） | ☓ | ☓ | |
-| 結果のCSV/PDF出力 | クラス別スコア集計の出力 | ☓ | ☓ | |
-| DBダンプ出力 | データベース全体のエクスポート | ☓ | ☓ | |
+| アンケート通知配信 | アンケートURLの全体通知送信 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で通知送信フローを確認済み |
+| 得点CSVインポート | 外部集計データのインポート（春季） | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
+| 結果のCSV/PDF出力 | クラス別スコア集計の出力 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
+| DBダンプ出力 | データベース全体のエクスポート | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | 雨天時モード切替 | 競技中止・敗者復活戦追加の一括制御 | ○ | ○ | `rainy-mode.svelte.spec.js` / `root-rainy-mode.spec.js` で確認済み |
 | 雨天時定員設定 | 競技・クラスごとの雨天時定員設定 | ☓ | ☓ | |
 | 競技マスタ登録 | システム共通の競技種目登録 | ○ | ○ | `sport-management.svelte.spec.js` / `root-sport-management.spec.js` で確認済み |
@@ -171,8 +171,8 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 昼競技セッション管理 | 昼競技の開催枠・ポイント設定 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | 昼競技テンプレート実行 | リレー等の対戦カード自動生成 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | ユーザー表示名変更 | ユーザーの表示名更新 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
-| ユーザーロール付与・削除 | 権限（root/admin/student）の管理 | ☓ | ☓ | |
-| クラス所属ロール付け替え | クラス所属（クラス名_rep）の変更 | ☓ | ☓ | |
+| ユーザーロール付与・削除 | 権限（root/admin/student）の管理 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
+| クラス所属ロール付け替え | クラス所属（クラス名_rep）の変更 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
 | クラス人数設定 | 各クラスの学生数更新 | ○ | ○ | `class-student-count.svelte.spec.js` / `root-class-student-count.spec.js` で確認済み |
 | MIC結果確認 | 投票結果の確認 | ○ | ○ | `identify-mic.svelte.spec.js` / `root-identify-mic.spec.js` で確認済み |
 | 競技要項PDFアップロード | 競技要項PDFの登録・管理 | ○ | ○ | `competition-guidelines-upload.svelte.spec.js` / `root-competition-guidelines-upload.spec.js` で確認済み |

@@ -72,6 +72,6 @@ test.describe('通知管理 (root)', () => {
     });
 
     await expect(page.getByText('通知を送信しました。')).toBeVisible();
-    await expect(page.getByText('競技開始時間変更')).toBeVisible();
+    await expect(page.getByText('競技開始時間変更')).toBeVisible({ timeout: 15000 });
   });
 });

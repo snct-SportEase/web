@@ -3,6 +3,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
 
+const originalCreateElement = document.createElement.bind(document);
+
 // Mock activeEvent store
 vi.mock('$lib/stores/eventStore.js', () => ({
   activeEvent: {
@@ -27,8 +29,13 @@ describe('Event Management Page', () => {
   ];
 
   let fetchMock;
+  let createObjectURLMock;
+  let revokeObjectURLMock;
+  let anchorClickMock;
 
   beforeEach(() => {
+    vi.restoreAllMocks();
+
     fetchMock = vi.fn((url, options = {}) => {
       if (url === '/api/root/events') {
         if (options.method === 'POST') {
@@ -51,11 +58,79 @@ describe('Event Management Page', () => {
         });
       }
 
+      if (url === '/api/root/events/1/notify-survey' && options.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ message: 'Notification sent' })
+        });
+      }
+
+      if (url === '/api/root/events/1/import-survey-scores' && options.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ imported_classes_count: 2 })
+        });
+      }
+
+      if (url === '/api/root/events/1/export/csv') {
+        return Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['class,score\n1A,100\n1B,90\n'], { type: 'text/csv' }))
+        });
+      }
+
+      if (url === '/api/root/db/export') {
+        return Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['-- mock dump'], { type: 'application/sql' })),
+          headers: {
+            get: (name) => name === 'Content-Disposition' ? 'attachment; filename="mock_dump.sql"' : null
+          }
+        });
+      }
+
+      if (typeof url === 'string' && url.startsWith('/api/scores/class?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            {
+              class_name: '1A',
+              rank_overall: 1,
+              total_points_overall: 120,
+              total_points_current_event: 60
+            },
+            {
+              class_name: '1B',
+              rank_overall: 2,
+              total_points_overall: 100,
+              total_points_current_event: 50
+            }
+          ])
+        });
+      }
+
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
+    createObjectURLMock = vi.fn(() => 'blob:mock-export');
+    revokeObjectURLMock = vi.fn();
+    anchorClickMock = vi.fn();
+
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.stubGlobal('URL', {
+      createObjectURL: createObjectURLMock,
+      revokeObjectURL: revokeObjectURLMock
+    });
+
+    vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+      const element = originalCreateElement(tagName);
+      if (String(tagName).toLowerCase() === 'a') {
+        element.click = anchorClickMock;
+      }
+      return element;
+    });
   });
 
   it('初期表示で大会一覧が表示されること', async () => {
@@ -220,5 +295,95 @@ describe('Event Management Page', () => {
       id: 1,
       hide_scores: true
     }));
+  });
+
+  it('アンケート通知を送信すると全体通知APIを呼び出すこと', async () => {
+    render(Page);
+
+    await page.getByText('2025春季スポーツ大会').click();
+
+    const notifyButton = page.getByRole('button', { name: '通知を送信' });
+    await expect.element(notifyButton).toBeInTheDocument();
+    await notifyButton.click();
+
+    const notifyCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/root/events/1/notify-survey' && options?.method === 'POST';
+    });
+
+    expect(notifyCall).toBeTruthy();
+    expect(confirm).toHaveBeenCalledWith('アンケート通知を全ユーザーに送信します。よろしいですか？');
+    expect(alert).toHaveBeenCalledWith('アンケート通知を送信しました。');
+  });
+
+  it('春季大会の得点CSVをインポートできること', async () => {
+    const view = render(Page);
+
+    await expect.element(page.getByText('点数インポート(CSV)')).toBeInTheDocument();
+
+    const fileInput = view.container.querySelector('input[type="file"]');
+    expect(fileInput).toBeTruthy();
+
+    const file = new File(['class,score\n1A,100\n1B,90\n'], 'scores.csv', { type: 'text/csv' });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    Object.defineProperty(fileInput, 'files', {
+      value: dataTransfer.files,
+      configurable: true
+    });
+
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const uploadCall = fetchMock.mock.calls.find(([url, options]) => {
+        return url === '/api/root/events/1/import-survey-scores' && options?.method === 'POST';
+      });
+
+      expect(uploadCall).toBeTruthy();
+      expect(uploadCall[1].body).toBeInstanceOf(FormData);
+      expect(alert).toHaveBeenCalledWith('インポート成功: 2 クラス分の点数が反映されました。');
+      expect(fileInput.value).toBe('');
+    });
+  });
+
+  it('クラス別スコア集計をCSV出力できること', async () => {
+    render(Page);
+
+    await page.getByRole('button', { name: 'CSV出力' }).click();
+
+    await vi.waitFor(() => {
+      const exportCall = fetchMock.mock.calls.find(([url]) => url === '/api/root/events/1/export/csv');
+      expect(exportCall).toBeTruthy();
+      expect(createObjectURLMock).toHaveBeenCalled();
+      expect(anchorClickMock).toHaveBeenCalled();
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-export');
+    });
+  });
+
+  it('クラス別スコア集計をPDF出力できること', async () => {
+    render(Page);
+
+    await page.getByRole('button', { name: 'PDF出力' }).click();
+
+    await vi.waitFor(() => {
+      const scoreCall = fetchMock.mock.calls.find(([url]) => url === '/api/scores/class?event_id=1');
+      expect(scoreCall).toBeTruthy();
+      expect(alert).not.toHaveBeenCalled();
+    });
+  });
+
+  it('DBダンプを出力できること', async () => {
+    render(Page);
+
+    await page.getByRole('button', { name: 'DBダンプ出力' }).click();
+
+    await vi.waitFor(() => {
+      const dumpCall = fetchMock.mock.calls.find(([url]) => url === '/api/root/db/export');
+      expect(dumpCall).toBeTruthy();
+      expect(createObjectURLMock).toHaveBeenCalled();
+      expect(anchorClickMock).toHaveBeenCalled();
+      const anchor = document.createElement.mock.results.find((result) => result.value?.download === 'mock_dump.sql')?.value;
+      expect(anchor?.download).toBe('mock_dump.sql');
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-export');
+    });
   });
 });
