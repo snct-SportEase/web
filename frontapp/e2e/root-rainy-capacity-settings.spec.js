@@ -28,22 +28,17 @@ test.describe('雨天時定員設定 (root)', () => {
     await expect(page.getByText('現在の設定: 定員 未設定 〜 未設定')).toBeVisible();
     await expect(page.locator('#rainy-min-capacity')).toBeVisible();
 
-    await page.locator('#rainy-min-capacity').evaluate((input) => {
-      input.value = '6';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await page.locator('#rainy-max-capacity').evaluate((input) => {
-      input.value = '8';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
 
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
+    await page.locator('#rainy-min-capacity').fill('6');
+    await page.locator('#rainy-max-capacity').fill('8');
+    await expect(page.getByText('現在の設定: 定員 6 〜 8')).toBeVisible();
+
+    const dialogPromise = page.waitForEvent('dialog');
 
     await page.getByRole('button', { name: '雨天時定員設定を保存' }).click();
+    const dialog = await dialogPromise;
+    expect(dialog.message()).toBe('雨天時定員設定を更新しました。');
+    await dialog.accept();
 
     await expect.poll(() => saveRequests.length).toBe(2);
 
@@ -52,7 +47,5 @@ test.describe('雨天時定員設定 (root)', () => {
       { sport_id: '1', class_id: 1, min_capacity: 6, max_capacity: 8 },
       { sport_id: '1', class_id: 2, min_capacity: 6, max_capacity: 8 }
     ]);
-
-    await expect(page.getByText('現在の設定: 定員 6 〜 8')).toBeVisible();
   });
 });

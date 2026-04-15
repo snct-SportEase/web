@@ -389,6 +389,48 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/admin/statistics/attendance' && req.method === 'GET') {
+    sendJson(res, 200, { attendance_rate: 84.2 });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/participation' && req.method === 'GET') {
+    sendJson(res, 200, {
+      バスケットボール: 91,
+      バレーボール: 87
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/scores' && req.method === 'GET') {
+    sendJson(res, 200, {
+      '2025春季': [
+        { class_name: '1A', total_points_current_event: 12 },
+        { class_name: '1B', total_points_current_event: 10 }
+      ],
+      '2025秋季': [
+        { class_name: '1A', total_points_current_event: 15 },
+        { class_name: '1B', total_points_current_event: 13 }
+      ]
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/progress' && req.method === 'GET') {
+    sendJson(res, 200, {
+      バスケットボール: '進行中',
+      バレーボール: '準備中',
+      ドッジボール: '結果集計中'
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/events/active' && req.method === 'GET') {
+    const activeEvent = events.find((event) => event.status === 'active') ?? events[0] ?? null;
+    sendJson(res, 200, activeEvent ?? {});
+    return;
+  }
+
   const sportDetailsMatch = url.pathname.match(/^\/api\/admin\/events\/(\d+)\/sports\/(\d+)\/details$/);
   if (sportDetailsMatch && req.method === 'GET') {
     const eventId = Number(sportDetailsMatch[1]);
