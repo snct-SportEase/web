@@ -4,13 +4,13 @@
   let { data } = $props();
   let { classes, managedClass } = data;
 
-  let selectedClassId = null;
-  let classDetails = null;
+  let selectedClassId = $state(null);
+  let classDetails = $state(null);
 
-  let attendanceCount = 0;
-  let isLoading = false;
-  let errorMessage = '';
-  let successMessage = '';
+  let attendanceCount = $state(0);
+  let isLoading = $state(false);
+  let errorMessage = $state('');
+  let successMessage = $state('');
 
   onMount(() => {
     if (managedClass) {
@@ -122,7 +122,7 @@
         <select
           id="classSelector"
           class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          onchange={handleClassSelection}
+          oninput={handleClassSelection}
           bind:value={selectedClassId}
         >
           <option value={null}>-- クラスを選択してください --</option>
@@ -146,7 +146,7 @@
           <p>現在の出席ポイント: {classDetails.attendancePoints}ポイント</p>
         </div>
 
-        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(e); }}>
+        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} novalidate>
           <div class="mb-4">
             <label for="attendanceCount" class="block text-sm font-medium text-gray-700">出席人数</label>
             <input

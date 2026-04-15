@@ -21,7 +21,12 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('#displayNameInput')).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/users/display-name') && request.method() === 'PUT');
     await page.locator('#displayNameInput').fill('新しい表示名');
-    await page.getByRole('button', { name: '更新' }).click();
+    
+    await Promise.all([
+      page.waitForEvent('dialog').then(dialog => dialog.accept()),
+      page.getByRole('button', { name: '更新' }).click()
+    ]);
+
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',
@@ -34,7 +39,12 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('#newRoleInput')).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'PUT');
     await page.locator('#newRoleInput').fill('admin');
-    await page.getByRole('button', { name: '追加' }).click();
+    
+    await Promise.all([
+      page.waitForEvent('dialog').then(dialog => dialog.accept()),
+      page.getByRole('button', { name: '追加' }).click()
+    ]);
+
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',
@@ -66,16 +76,23 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('button[title="ロールを削除"]').first()).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'DELETE');
     
-    await Promise.all([
-      page.waitForEvent('dialog').then(dialog => dialog.accept()),
-      page.locator('button[title="ロールを削除"]').first().click()
-    ]);
+    // Deletion has two dialogs: 1. confirm, 2. alert
+    const dialogs = [];
+    page.on('dialog', async (dialog) => {
+      dialogs.push(dialog.message());
+      await dialog.accept();
+    });
+
+    await page.locator('button[title="ロールを削除"]').first().click();
 
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',
       role: 'student'
     });
+    
+    // Wait for the final alert to be processed (implicitly handled by the listener)
+    await expect.poll(() => dialogs.length).toBe(2);
   });
 
   test('adminロールを削除できる', async ({ page }) => {
@@ -83,10 +100,13 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('button[title="ロールを削除"]').first()).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'DELETE');
 
-    await Promise.all([
-      page.waitForEvent('dialog').then(dialog => dialog.accept()),
-      page.locator('button[title="ロールを削除"]').first().click()
-    ]);
+    const dialogs = [];
+    page.on('dialog', async (dialog) => {
+      dialogs.push(dialog.message());
+      await dialog.accept();
+    });
+
+    await page.locator('button[title="ロールを削除"]').first().click();
 
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
@@ -94,6 +114,7 @@ test.describe('ユーザー管理 (root)', () => {
       role: 'admin'
     });
     await expect(page.getByText('ロールなし')).toBeVisible();
+    await expect.poll(() => dialogs.length).toBe(2);
   });
 
   test('クラス所属ロールを付け替えできる', async ({ page }) => {
@@ -101,7 +122,12 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('#classRepSelect')).toBeVisible();
     await page.locator('#classRepSelect').selectOption('2');
     const addRequestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'PUT');
-    await page.getByRole('button', { name: '変更・保存' }).click();
+    
+    await Promise.all([
+      page.waitForEvent('dialog').then(dialog => dialog.accept()),
+      page.getByRole('button', { name: '変更・保存' }).click()
+    ]);
+
     const req = await addRequestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',

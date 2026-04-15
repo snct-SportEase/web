@@ -519,6 +519,41 @@ createServer(async (req, res) => {
     return;
   }
 
+  const attendanceClassDetailsMatch = url.pathname.match(/^\/api\/admin\/attendance\/class-details\/(\d+)$/);
+  if (attendanceClassDetailsMatch && req.method === 'GET') {
+    const classId = Number(attendanceClassDetailsMatch[1]);
+    const cls = classes.find(c => c.id === classId);
+    if (cls) {
+      sendJson(res, 200, {
+        id: cls.id,
+        name: cls.name,
+        studentCount: cls.student_count,
+        attendancePoints: 10 // Mock value
+      });
+    } else {
+      sendJson(res, 404, { error: 'Class not found' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/admin/attendance/register' && req.method === 'POST') {
+    const body = await readJson(req);
+    sendJson(res, 200, { message: '出席を正常に登録しました。' });
+    return;
+  }
+
+  const classNameMatch = url.pathname.match(/^\/api\/class\/name\/([^/]+)$/);
+  if (classNameMatch && req.method === 'GET') {
+    const className = decodeURIComponent(classNameMatch[1]);
+    const cls = classes.find(c => c.name === className);
+    if (cls) {
+      sendJson(res, 200, cls);
+    } else {
+      sendJson(res, 404, { error: 'Class not found' });
+    }
+    return;
+  }
+
   if (url.pathname === '/api/admin/events/active' && req.method === 'GET') {
     const activeEvent = events.find((event) => event.status === 'active') ?? events[0] ?? null;
     sendJson(res, 200, activeEvent ?? {});
