@@ -1,11 +1,24 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { createLogger } from 'vite';
 
 const backendUrl = process.env.PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080';
 
+const logger = createLogger();
+const originalError = logger.error;
+logger.error = (msg, options) => {
+	// Suppress harmless ECONNRESET and EPIPE errors from Vite's WebSocket proxy during tests
+	if (msg.includes('ws proxy') || msg.includes('EPIPE') || msg.includes('ECONNRESET')) {
+		return;
+	}
+
+	originalError(msg, options);
+};
+
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	customLogger: logger,
 	server: {
 		proxy: {
 			'/api': {
@@ -17,10 +30,6 @@ export default defineConfig({
 	},
 	ssr: {
 		noExternal: ['bracketry', 'marked', 'svelte-dnd-action', 'html2pdf.js']
-	},
-	optimizeDeps: {
-		// Disable pre-bundling during tests to avoid dependency scanning issues
-		disabled: process.env.VITEST === 'true'
 	},
 	test: {
 		expect: { requireAssertions: true },

@@ -189,7 +189,7 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 出席者数の登録 | クラスごとの出席数入力 | ○ | ○ | `attendance-management.svelte.spec.js` / `admin-attendance.spec.js` で確認済み |
 | 競技詳細の登録・更新 | ルール・定員・開始時間の設定 | ○ | ○ | `sport-details-registration.svelte.spec.js` / `admin-sport-details.spec.js` で確認済み |
 | 試合ステータスの更新 | 試合の進行状況変更 | ☓ | ☓ | |
-| 試合結果の入力 | トーナメントスコア・勝敗入力 | ☓ | ☓ | |
+| 試合結果の入力 | トーナメントスコア・勝敗入力 | ○ | ○ | `insert-matche-result.svelte.spec.js` / `admin-match-result.spec.js` で確認済み |
 | 昼競技結果の入力 | 昼競技の結果登録 | ☓ | ☓ | |
 | MIC投票 | MIC候補への投票 | ☓ | ☓ | |
 

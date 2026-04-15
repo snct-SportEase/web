@@ -6,9 +6,6 @@ const config = {
 	preprocess: vitePreprocess(),
 	kit: {
 		adapter: adapter(),
-		csrf: {
-			checkOrigin: false
-		},
 		csp: {
 			// mode: 'auto' でSvelteKitが生成するインラインスクリプト/スタイルに
 			// 自動でnonceを付与する

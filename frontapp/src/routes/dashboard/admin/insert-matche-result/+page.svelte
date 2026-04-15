@@ -1,22 +1,21 @@
 <script>
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import { page } from '$app/stores';
 	import InsertMatchResultModal from '$lib/components/InsertMatchResultModal.svelte';
 	import ConfirmMatchResultModal from '$lib/components/ConfirmMatchResultModal.svelte';
 
-	let { data } = $page;
+	let { data } = $props();
 	let user = $derived(data.user);
 	let isRoot = $derived(user?.roles?.some(role => role.name === 'root'));
 
-	let tournaments = [];
-	let selectedTournamentId = '';
-	let selectedMatch = null;
-	let activeEventId = null;
-	let showModal = false;
-	let showConfirmModal = false;
-	let scoresToSubmit = null;
-	let isRainyMode = false;
+	let tournaments = $state([]);
+	let selectedTournamentId = $state('');
+	let selectedMatch = $state(null);
+	let activeEventId = $state(null);
+	let showModal = $state(false);
+	let showConfirmModal = $state(false);
+	let scoresToSubmit = $state(null);
+	let isRainyMode = $state(false);
 
 	let ws;
 
@@ -95,7 +94,7 @@
 	}
 
 	function handleConfirm(event) {
-		scoresToSubmit = event.detail;
+		scoresToSubmit = event;
 		showConfirmModal = true;
 	}
 
@@ -108,7 +107,7 @@
 		if (!selectedMatch || !scoresToSubmit) return;
 
 		const { team1_score, team2_score } = scoresToSubmit;
-		const winnerId = event?.detail?.winnerId;
+		const winnerId = event?.winnerId;
 
 		const body = {
 			team1_score: team1_score,

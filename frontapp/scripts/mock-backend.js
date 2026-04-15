@@ -100,6 +100,33 @@ const defaultDefaultGroups = () => ({
   ]
 });
 
+function defaultTournaments() {
+  return [
+    {
+      id: 't1',
+      name: 'バスケットボール',
+      data: {
+        rounds: [{}],
+        matches: [
+          {
+            id: 'm1',
+            roundIndex: 0,
+            order: 0,
+            sides: [
+              { contestantId: 'c1', teamId: 1 },
+              { contestantId: 'c2', teamId: 2 }
+            ]
+          }
+        ],
+        contestants: {
+          c1: { players: [{ title: '1A' }] },
+          c2: { players: [{ title: '1B' }] }
+        }
+      }
+    }
+  ];
+}
+
 let events = defaultEvents();
 let sports = defaultSports();
 let eventSports = [
@@ -146,7 +173,7 @@ let whitelist = defaultWhitelist();
 let notificationRequests = defaultNotificationRequests();
 let users = defaultUsers();
 let defaultGroups = defaultDefaultGroups();
-let tournaments = [];
+let tournamentsList = defaultTournaments();
 let noonSession = null;
 let noonGroups = [];
 let noonMatches = [];
@@ -235,7 +262,7 @@ createServer(async (req, res) => {
     notificationRequests = defaultNotificationRequests();
     users = defaultUsers();
     defaultGroups = defaultDefaultGroups();
-    tournaments = [];
+    tournamentsList = defaultTournaments();
     noonSession = null;
     noonGroups = [];
     noonMatches = [];
@@ -479,7 +506,7 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/admin/events/1/tournaments' && req.method === 'GET') {
-    sendJson(res, 200, tournaments);
+    sendJson(res, 200, tournamentsList);
     return;
   }
 
@@ -581,6 +608,14 @@ createServer(async (req, res) => {
     const body = await readJson(req);
     // Mock successful update
     sendJson(res, 200, { message: 'Sport details saved successfully' });
+    return;
+  }
+
+  const matchResultMatch = url.pathname.match(/^\/api\/admin\/matches\/([^/]+)\/result$/);
+  if (matchResultMatch && req.method === 'PUT') {
+    const body = await readJson(req);
+    // 更新成功をシミュレート
+    sendJson(res, 200, { message: '試合結果を更新しました' });
     return;
   }
 
@@ -827,18 +862,16 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/root/events/1/tournaments' && req.method === 'GET') {
-    sendJson(res, 200, tournaments);
+    sendJson(res, 200, tournamentsList);
     return;
   }
 
   if (url.pathname === '/api/root/events/1/tournaments/generate-preview' && req.method === 'POST') {
-    tournaments = [];
     sendJson(res, 200, []);
     return;
   }
 
   if (url.pathname === '/api/root/events/1/tournaments/bulk-create' && req.method === 'POST') {
-    tournaments = [];
     sendJson(res, 200, { message: 'saved' });
     return;
   }

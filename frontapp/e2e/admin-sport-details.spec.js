@@ -38,21 +38,20 @@ test.describe('競技詳細登録 (admin/root)', () => {
       request.url().endsWith('/api/admin/events/1/sports/1/details') && request.method() === 'PUT'
     );
 
-    // ダイアログハンドリング (alert)
-    page.on('dialog', dialog => dialog.accept());
+    const dialogPromise = page.waitForEvent('dialog');
 
     await page.getByRole('button', { name: /^保存$/ }).click();
 
     const request = await updateRequest;
+    const dialog = await dialogPromise;
+    await dialog.accept();
+
     expect(JSON.parse(request.postData() ?? '{}')).toEqual({
       description: '新しいバスケットボールの概要',
       rules_type: 'markdown',
       rules: '# 新ルール\n- 3ポイントシュートあり',
       rules_pdf_url: null
     });
-
-    // 完了メッセージの確認（ダイアログが閉じられた後）
-    // handleSave 内で alert が呼ばれる
   });
 
   test('PDFによるルール登録ができる', async ({ page }) => {
@@ -77,11 +76,15 @@ test.describe('競技詳細登録 (admin/root)', () => {
       req.url().endsWith('/api/admin/events/1/sports/1/details') && req.method() === 'PUT'
     );
 
-    page.on('dialog', dialog => dialog.accept());
+    const dialogPromise = page.waitForEvent('dialog');
+
     await page.getByRole('button', { name: /^保存$/ }).click();
 
     await pdfUploadRequest;
     const req = await updateRequest;
+    const dialog = await dialogPromise;
+    await dialog.accept();
+
     const body = JSON.parse(req.postData() ?? '{}');
     expect(body.rules_type).toBe('pdf');
     expect(body.rules_pdf_url).toBe('https://example.com/guidelines.pdf');

@@ -2,7 +2,7 @@
 <script>
     let { showModal = $bindable(false), team1Score = 0, team2Score = 0, team1Name = 'Team 1', team2Name = 'Team 2', team1Id = null, team2Id = null, onconfirm, oncancel } = $props();
 
-    let selectedWinnerId = null;
+    let selectedWinnerId = $state(null);
 
     function confirm() {
         if (isTie) {
@@ -39,10 +39,10 @@
             <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <h3 class="text-lg leading-6 font-medium text-gray-900">試合結果確認</h3>
                 <div class="mt-4">
-                    <p>{team1Name}: {team1Score}</p>
-                    <p>{team2Name}: {team2Score}</p>
+                    <p data-testid="confirm-team1-score">{team1Name}: {team1Score}</p>
+                    <p data-testid="confirm-team2-score">{team2Name}: {team2Score}</p>
                     {#if isTie}
-                        <div class="mt-4">
+                        <div class="mt-4" data-testid="winner-selection">
                             <p class="font-bold">勝者を選択してください:</p>
                             <div class="flex items-center mt-2">
                                 <input type="radio" id="team1" name="winner" value={team1Id} bind:group={selectedWinnerId} class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
@@ -54,7 +54,7 @@
                             </div>
                         </div>
                     {:else}
-                        <p class="font-bold mt-4">勝者: {winnerName}</p>
+                        <p class="font-bold mt-4" data-testid="winner-name">勝者: {winnerName}</p>
                     {/if}
                 </div>
             </div>
