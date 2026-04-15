@@ -76,6 +76,7 @@
   };
 
   let errorMessage = '';
+  let isInteractive = false;
 
   let escapeHandler = null;
 
@@ -92,6 +93,7 @@
       }
     };
     window.addEventListener('keydown', escapeHandler);
+    isInteractive = true;
   });
 
   onDestroy(() => {
@@ -956,7 +958,7 @@
           <button
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('year-relay')}
-            disabled={creatingTemplate['year-relay']}>
+            disabled={!isInteractive || creatingTemplate['year-relay']}>
             {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
           </button>
         </div>
@@ -970,7 +972,7 @@
           <button
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('course-relay')}
-            disabled={creatingTemplate['course-relay']}>
+            disabled={!isInteractive || creatingTemplate['course-relay']}>
             {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
           </button>
         </div>
@@ -984,7 +986,7 @@
           <button
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('tug-of-war')}
-            disabled={creatingTemplate['tug-of-war']}>
+            disabled={!isInteractive || creatingTemplate['tug-of-war']}>
             {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
           </button>
         </div>
@@ -1213,7 +1215,7 @@
               <button
                 class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                 onclick={createTemplate}
-                disabled={creatingTemplate[selectedTemplateType]}>
+                disabled={!isInteractive || creatingTemplate[selectedTemplateType]}>
                 {creatingTemplate[selectedTemplateType] ? '作成中...' : 'テンプレートを作成'}
               </button>
             </div>
@@ -1270,7 +1272,7 @@
             </div>
             <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
               onclick={saveSession}
-              disabled={savingSession || loading}>
+              disabled={!isInteractive || savingSession || loading}>
               {savingSession ? '保存中...' : (session ? 'セッションを更新' : 'セッションを作成')}
             </button>
           </div>

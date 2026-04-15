@@ -7,6 +7,7 @@ test.describe('通知申請管理 (root)', () => {
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/notification-requests');
     await expect(page.getByRole('heading', { name: '通知申請管理' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'メッセージを送信' })).toBeEnabled();
   });
 
   test('申請一覧と詳細を表示できる', async ({ page }) => {
@@ -15,12 +16,15 @@ test.describe('通知申請管理 (root)', () => {
   });
 
   test('メッセージを送信できる', async ({ page }) => {
+    const messageInput = page.getByRole('textbox', { name: 'メッセージを送信' });
+    await messageInput.fill('了解しました。');
+    await expect(messageInput).toHaveValue('了解しました。');
+
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/notification-requests/1/messages') && request.method() === 'POST');
-    await page.getByRole('textbox', { name: 'メッセージを送信' }).pressSequentially('了解しました。');
     await page.getByRole('button', { name: 'メッセージを送信' }).click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({ message: '了解しました。' });
-    await expect(page.getByText('了解しました。')).toBeVisible();
+    await expect(page.getByText('了解しました。')).toBeVisible({ timeout: 15000 });
   });
 
   test('通知申請を承認できる', async ({ page }) => {

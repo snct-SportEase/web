@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
 
   let { data } = $page;
@@ -52,6 +53,11 @@
   let errorMessage = '';
   let isSubmitting = false;
   let isReloading = false;
+  let isInteractive = false;
+
+  onMount(() => {
+    isInteractive = true;
+  });
 
   function toggleRole(roleName) {
     selectedRoles = { ...selectedRoles, [roleName]: !selectedRoles[roleName] };
@@ -159,7 +165,7 @@
       type="button"
       class="inline-flex items-center px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50 disabled:opacity-50"
       onclick={refreshNotifications}
-      disabled={isReloading}
+      disabled={!isInteractive || isReloading}
     >
       {#if isReloading}
         再読込中...
@@ -249,7 +255,7 @@
       type="button"
       class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
       onclick={(e) => { e.preventDefault(); handleSubmit(e); }}
-      disabled={isSubmitting || availableRoles.length === 0}
+      disabled={!isInteractive || isSubmitting || availableRoles.length === 0}
     >
       {#if isSubmitting}
         送信中...

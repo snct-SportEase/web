@@ -17,6 +17,7 @@ test.describe('通知管理 (root)', () => {
 
     await page.goto('/dashboard/root/notification');
     await expect(page.getByText('大会開催のお知らせ')).toBeVisible();
+    await expect(page.getByRole('button', { name: '通知を送信' })).toBeEnabled();
   });
 
   test('送信済み通知一覧を表示できる', async ({ page }) => {
@@ -39,9 +40,16 @@ test.describe('通知管理 (root)', () => {
   });
 
   test('新しい通知を送信できる', async ({ page }) => {
-    await page.getByLabel('タイトル').fill('競技開始時間変更');
-    await page.getByLabel('本文').fill('バスケットボールの開始時刻が変更になりました。');
-    await page.getByRole('checkbox', { name: '管理者' }).check();
+    const titleInput = page.getByLabel('タイトル');
+    const bodyInput = page.getByLabel('本文');
+    const adminCheckbox = page.getByRole('checkbox', { name: '管理者' });
+
+    await titleInput.fill('競技開始時間変更');
+    await bodyInput.fill('バスケットボールの開始時刻が変更になりました。');
+    await adminCheckbox.click();
+    await expect(titleInput).toHaveValue('競技開始時間変更');
+    await expect(bodyInput).toHaveValue('バスケットボールの開始時刻が変更になりました。');
+    await expect(adminCheckbox).toBeChecked();
 
     const createRequest = page.waitForRequest((request) => {
       if (request.url().endsWith('/api/root/notifications') && request.method() === 'POST') {

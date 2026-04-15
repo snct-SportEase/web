@@ -7,17 +7,20 @@ test.describe('昼競技管理 (root)', () => {
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/noon-game');
     await expect(page.getByRole('heading', { name: '昼競技管理' })).toBeVisible();
-    // activeEvent.init() の完了を待つ（loading 中はボタンが disabled）
-    await expect(page.getByRole('button', { name: 'セッションを作成' })).toBeEnabled();
+    // activeEvent.init() とクライアント側の初期化完了を待つ
+    await expect(page.getByRole('button', { name: /セッションを(作成|更新)/ })).toBeEnabled({ timeout: 15000 });
   });
 
   test('昼競技セッションを作成できる', async ({ page }) => {
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
+    page.once('dialog', (dialog) => {
+      void dialog.accept().catch(() => {});
     });
 
+    const nameInput = page.locator('input[placeholder="例: 昼休み競技 2025"]');
+    await nameInput.fill('昼休み競技 2025');
+    await expect(nameInput).toHaveValue('昼休み競技 2025');
+
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/noon-game/session') && request.method() === 'POST');
-    await page.locator('input[placeholder="例: 昼休み競技 2025"]').pressSequentially('昼休み競技 2025');
     await page.getByRole('button', { name: 'セッションを作成' }).click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual(expect.objectContaining({

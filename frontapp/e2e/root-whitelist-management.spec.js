@@ -7,6 +7,7 @@ test.describe('ホワイトリスト管理 (root)', () => {
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/whitelist-management');
     await expect(page.getByRole('heading', { name: 'ホワイトリスト管理' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add' })).toBeEnabled();
   });
 
   test('ホワイトリスト一覧を表示できる', async ({ page }) => {
@@ -15,9 +16,13 @@ test.describe('ホワイトリスト管理 (root)', () => {
   });
 
   test('メールアドレスを追加できる', async ({ page }) => {
-    const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/whitelist') && request.method() === 'POST');
-    await page.getByLabel('メールアドレス').pressSequentially('new.user');
+    const emailInput = page.getByLabel('メールアドレス');
+    await emailInput.fill('new.user');
     await page.locator('#role').selectOption('admin');
+    await expect(emailInput).toHaveValue('new.user');
+    await expect(page.locator('#role')).toHaveValue('admin');
+
+    const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/whitelist') && request.method() === 'POST');
     await page.getByRole('button', { name: 'Add' }).click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
@@ -31,8 +36,12 @@ test.describe('ホワイトリスト管理 (root)', () => {
       await dialog.accept();
     });
 
+    const adminRow = page.locator('tr', { has: page.getByText('admin1@sendai-nct.jp') });
+    await adminRow.getByRole('checkbox').check();
+    await expect(adminRow.getByRole('checkbox')).toBeChecked();
+    await expect(page.getByRole('button', { name: '選択した項目を削除' })).toBeEnabled();
+
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/whitelist/bulk') && request.method() === 'DELETE');
-    await page.getByRole('checkbox').nth(1).check();
     await page.getByRole('button', { name: '選択した項目を削除' }).click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
