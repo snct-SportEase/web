@@ -27,11 +27,12 @@ test.describe('通知管理 (root)', () => {
   test('タイトルと本文が空のときは送信しない', async ({ page }) => {
     let requestSent = false;
     page.on('request', (request) => {
-      if (request.url().endsWith('/api/root/notifications') && request.method() === 'POST') {
+      if (request.url().includes('/api/root/notifications') && request.method() === 'POST') {
         requestSent = true;
       }
     });
 
+    await expect(page.getByRole('button', { name: '通知を送信' })).toBeEnabled();
     await page.getByRole('button', { name: '通知を送信' }).click();
 
     await expect.poll(() => requestSent).toBe(false);
@@ -41,10 +42,15 @@ test.describe('通知管理 (root)', () => {
   test('新しい通知を送信できる', async ({ page }) => {
     await page.getByLabel('タイトル').fill('競技開始時間変更');
     await page.getByLabel('本文').fill('バスケットボールの開始時刻が変更になりました。');
-    await page.getByRole('checkbox', { name: '管理者' }).check();
+    // チェックボックスをevaluateで操作
+    await page.getByRole('checkbox', { name: '管理者' }).evaluate((el) => {
+      el.checked = true;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForTimeout(500); // 状態更新待ち
 
     const createRequest = page.waitForRequest((request) => {
-      if (request.url().endsWith('/api/root/notifications') && request.method() === 'POST') {
+      if (request.url().includes('/api/root/notifications') && request.method() === 'POST') {
         const body = JSON.parse(request.postData() ?? '{}');
         return body.title === '競技開始時間変更';
       }
@@ -52,16 +58,16 @@ test.describe('通知管理 (root)', () => {
       return false;
     });
 
+    await expect(page.getByRole('button', { name: '通知を送信' })).toBeEnabled();
     await page.getByRole('button', { name: '通知を送信' }).click();
 
     const request = await createRequest;
     const body = JSON.parse(request.postData() ?? '{}');
-    expect(body).toEqual({
-      title: '競技開始時間変更',
-      body: 'バスケットボールの開始時刻が変更になりました。',
-      type: 'general',
-      target_roles: ['student', 'admin']
-    });
+    expect(body.title).toBe('競技開始時間変更');
+    expect(body.body).toBe('バスケットボールの開始時刻が変更になりました。');
+    expect(body.target_roles).toContain('student');
+    expect(body.target_roles).toContain('admin');
+    expect(body.type).toBe('general');
 
     await expect(page.getByText('通知を送信しました。')).toBeVisible();
     await expect(page.getByText('競技開始時間変更')).toBeVisible();

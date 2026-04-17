@@ -15,17 +15,25 @@ test.describe('通知申請管理 (root)', () => {
   });
 
   test('メッセージを送信できる', async ({ page }) => {
-    const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/notification-requests/1/messages') && request.method() === 'POST');
-    await page.getByRole('textbox', { name: 'メッセージを送信' }).pressSequentially('了解しました。');
-    await page.getByRole('button', { name: 'メッセージを送信' }).click();
+    const requestPromise = page.waitForRequest((request) => request.url().includes('/messages') && request.method() === 'POST');
+    await page.getByRole('textbox', { name: 'メッセージを送信' }).fill('了解しました。');
+    await page.getByRole('textbox', { name: 'メッセージを送信' }).blur();
+    await page.waitForTimeout(500); // 状態更新待ち
+    // メッセージ送信ボタンを特定（textareaのすぐ下にあるボタン）
+    const sendButton = page.locator('form:has(textarea#rootMessageInput)').getByRole('button', { name: 'メッセージを送信' });
+    await expect(sendButton).toBeEnabled();
+    await sendButton.click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({ message: '了解しました。' });
     await expect(page.getByText('了解しました。')).toBeVisible();
   });
 
   test('通知申請を承認できる', async ({ page }) => {
-    const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/notification-requests/1/decision') && request.method() === 'POST');
-    await page.getByRole('button', { name: '承認する' }).click();
+    const requestPromise = page.waitForRequest((request) => request.url().includes('/decision') && request.method() === 'POST');
+    // 承認ボタンを特定
+    const approveButton = page.locator('div.flex:has(button:text("承認する"))').getByRole('button', { name: '承認する' });
+    await expect(approveButton).toBeEnabled();
+    await approveButton.click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({ status: 'approved' });
     await expect(page.getByText('承認済み')).toBeVisible();

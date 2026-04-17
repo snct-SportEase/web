@@ -175,6 +175,7 @@ function getSessionToken(req) {
 
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+  console.log(`[Mock] ${req.method} ${url.pathname}`);
 
   if (url.pathname === '/health') {
     sendJson(res, 200, { ok: true });
@@ -660,6 +661,6 @@ createServer(async (req, res) => {
   sendJson(res, 404, {
     error: `Mock backend route not found: ${req.method} ${url.pathname}`
   });
-}).listen(port, '127.0.0.1', () => {
-  console.log(`Mock backend listening on http://127.0.0.1:${port}`);
+}).listen(port, () => {
+  console.log(`Mock backend listening on port ${port}`);
 });

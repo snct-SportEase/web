@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
 
   let { data } = $page;
-  let notifications = data.notifications ? [...data.notifications] : [];
+  let notifications = $state(data.notifications ? [...data.notifications] : []);
 
   const roleLabelMap = {
     student: '学生',
@@ -43,15 +43,15 @@
     { value: 'all_matches', label: '全ての試合' }
   ];
 
-  let title = '';
-  let body = '';
-  let selectedType = 'general';
-  let selectedRoles = createDefaultSelections(availableRoles);
+  let title = $state('');
+  let body = $state('');
+  let selectedType = $state('general');
+  let selectedRoles = $state(createDefaultSelections(availableRoles));
 
-  let message = '';
-  let errorMessage = '';
-  let isSubmitting = false;
-  let isReloading = false;
+  let message = $state('');
+  let errorMessage = $state('');
+  let isSubmitting = $state(false);
+  let isReloading = $state(false);
 
   function toggleRole(roleName) {
     selectedRoles = { ...selectedRoles, [roleName]: !selectedRoles[roleName] };

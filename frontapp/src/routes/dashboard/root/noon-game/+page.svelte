@@ -3,20 +3,20 @@
   import { get } from 'svelte/store';
   import { activeEvent } from '$lib/stores/eventStore.js';
 
-  let session = null;
-  let classes = [];
-  let groups = [];
-  let matches = [];
-  let pointsSummary = [];
-  let templateRuns = [];
-  let loading = false;
-  let savingSession = false;
-  let savingGroup = false;
-  let savingMatch = false;
-  let savingManualPoint = false;
-  let creatingTemplate = {};
-  let selectedTemplateType = null;
-  let templateConfigForm = {
+  let session = $state(null);
+  let classes = $state([]);
+  let groups = $state([]);
+  let matches = $state([]);
+  let pointsSummary = $state([]);
+  let templateRuns = $state([]);
+  let loading = $state(false);
+  let savingSession = $state(false);
+  let savingGroup = $state(false);
+  let savingMatch = $state(false);
+  let savingManualPoint = $state(false);
+  let creatingTemplate = $state({});
+  let selectedTemplateType = $state(null);
+  let templateConfigForm = $state({
     name: '',
     description: '',
     mode: 'group',
@@ -37,27 +37,25 @@
       overall: {1: 30, 2: 20, 3: 10, 4: 0, 5: 0, 6: 0}
     },
     groups: [] // グループ設定 [{group_name: string, class_names: string[]}]
-  };
+  });
 
-  let sessionForm = {
-    name: '',
-    description: '',
-    mode: 'mixed',
-    win_points: 0,
-    loss_points: 0,
-    draw_points: 0,
-    participation_points: 0,
-    allow_manual_points: true
-  };
+  let sessionFormName = $state('');
+  let sessionFormDescription = $state('');
+  let sessionFormMode = $state('mixed');
+  let sessionFormWinPoints = $state(0);
+  let sessionFormLossPoints = $state(0);
+  let sessionFormDrawPoints = $state(0);
+  let sessionFormParticipationPoints = $state(0);
+  let sessionFormAllowManualPoints = $state(true);
 
-  let groupForm = {
+  let groupForm = $state({
     id: null,
     name: '',
     description: '',
     class_ids: []
-  };
+  });
 
-  let matchForm = {
+  let matchForm = $state({
     id: null,
     title: '',
     scheduled_at: '',
@@ -67,24 +65,22 @@
     status: 'scheduled',
     allow_draw: false,
     participants: []
-  };
+  });
 
-  let manualPointForm = {
+  let manualPointForm = $state({
     class_id: null,
     points: 0,
     reason: ''
-  };
+  });
 
-  let errorMessage = '';
+  let errorMessage = $state('');
 
   let escapeHandler = null;
 
   onMount(async () => {
+    console.log('[NoonGame] onMount');
     await activeEvent.init();
-    const current = get(activeEvent);
-    if (current) {
-      await fetchSession(current.id);
-    }
+    console.log('[NoonGame] activeEvent init done', get(activeEvent));
 
     escapeHandler = (e) => {
       if (e.key === 'Escape' && selectedTemplateType) {
@@ -94,6 +90,15 @@
     window.addEventListener('keydown', escapeHandler);
   });
 
+  $effect(() => {
+    const current = $activeEvent;
+    console.log('[NoonGame] activeEvent changed (reactive):', current);
+    if (current && current.id) {
+      console.log('[NoonGame] fetching session for event:', current.id);
+      fetchSession(current.id);
+    }
+  });
+
   onDestroy(() => {
     if (escapeHandler) {
       window.removeEventListener('keydown', escapeHandler);
@@ -101,10 +106,12 @@
   });
 
   async function fetchSession(eventId) {
+    console.log('[NoonGame] fetchSession start', eventId);
     loading = true;
     errorMessage = '';
     try {
       const res = await fetch(`/api/root/events/${eventId}/noon-game/session`);
+      console.log('[NoonGame] fetchSession status', res.status);
       if (!res.ok) {
         const detail = await safeJson(res);
         throw new Error(detail?.error || '昼競技情報の取得に失敗しました');
@@ -122,7 +129,7 @@
         resetSessionForm();
       }
     } catch (err) {
-      console.error(err);
+      console.error('[NoonGame] fetchSession error', err);
       errorMessage = err.message;
     } finally {
       loading = false;
@@ -130,29 +137,25 @@
   }
 
   function populateSessionForm(s) {
-    sessionForm = {
-      name: s.name ?? '',
-      description: s.description ?? '',
-      mode: s.mode ?? 'mixed',
-      win_points: s.win_points ?? 0,
-      loss_points: s.loss_points ?? 0,
-      draw_points: s.draw_points ?? 0,
-      participation_points: s.participation_points ?? 0,
-      allow_manual_points: s.allow_manual_points ?? true
-    };
+    sessionFormName = s.name ?? '';
+    sessionFormDescription = s.description ?? '';
+    sessionFormMode = s.mode ?? 'mixed';
+    sessionFormWinPoints = s.win_points ?? 0;
+    sessionFormLossPoints = s.loss_points ?? 0;
+    sessionFormDrawPoints = s.draw_points ?? 0;
+    sessionFormParticipationPoints = s.participation_points ?? 0;
+    sessionFormAllowManualPoints = s.allow_manual_points ?? true;
   }
 
   function resetSessionForm() {
-    sessionForm = {
-      name: '',
-      description: '',
-      mode: 'mixed',
-      win_points: 0,
-      loss_points: 0,
-      draw_points: 0,
-      participation_points: 0,
-      allow_manual_points: true
-    };
+    sessionFormName = '';
+    sessionFormDescription = '';
+    sessionFormMode = 'mixed';
+    sessionFormWinPoints = 0;
+    sessionFormLossPoints = 0;
+    sessionFormDrawPoints = 0;
+    sessionFormParticipationPoints = 0;
+    sessionFormAllowManualPoints = true;
   }
 
   function resetGroupForm() {
@@ -182,28 +185,38 @@
   }
 
   async function saveSession() {
+    console.log('[NoonGame] saveSession triggered');
+    console.log('[NoonGame] sessionFormName value before payload:', sessionFormName);
     const current = get(activeEvent);
-    if (!current) return;
+    if (!current) {
+      console.warn('[NoonGame] saveSession: no active event');
+      return;
+    }
     
+    const payload = {
+      name: sessionFormName,
+      description: sessionFormDescription,
+      mode: sessionFormMode,
+      win_points: Number(sessionFormWinPoints),
+      loss_points: Number(sessionFormLossPoints),
+      draw_points: Number(sessionFormDrawPoints),
+      participation_points: Number(sessionFormParticipationPoints),
+      allow_manual_points: !!sessionFormAllowManualPoints
+    };
+    console.log('[NoonGame] payload to be sent:', payload);
+
     // 既にセッションが存在する場合は更新のみ
     if (session && session.id) {
-      // 既存セッションの更新
+      console.log('[NoonGame] updating session', session.id);
       savingSession = true;
       errorMessage = '';
       try {
-        const payload = {
-          ...sessionForm,
-          win_points: Number(sessionForm.win_points),
-          loss_points: Number(sessionForm.loss_points),
-          draw_points: Number(sessionForm.draw_points),
-          participation_points: Number(sessionForm.participation_points),
-          allow_manual_points: !!sessionForm.allow_manual_points
-        };
         const res = await fetch(`/api/root/events/${current.id}/noon-game/session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        console.log('[NoonGame] update session response', res.status);
         if (!res.ok) {
           const detail = await safeJson(res);
           throw new Error(detail?.error || '昼競技セッションの更新に失敗しました');
@@ -217,30 +230,24 @@
         populateSessionForm(session);
         alert('昼競技セッションを更新しました。');
       } catch (err) {
-        console.error(err);
+        console.error('[NoonGame] update session error', err);
         errorMessage = err.message;
         alert(err.message);
       } finally {
         savingSession = false;
       }
     } else {
+      console.log('[NoonGame] creating new session');
       // 新規セッション作成
       savingSession = true;
       errorMessage = '';
       try {
-        const payload = {
-          ...sessionForm,
-          win_points: Number(sessionForm.win_points),
-          loss_points: Number(sessionForm.loss_points),
-          draw_points: Number(sessionForm.draw_points),
-          participation_points: Number(sessionForm.participation_points),
-          allow_manual_points: !!sessionForm.allow_manual_points
-        };
         const res = await fetch(`/api/root/events/${current.id}/noon-game/session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        console.log('[NoonGame] create session response', res.status);
         if (!res.ok) {
           const detail = await safeJson(res);
           throw new Error(detail?.error || '昼競技セッションの作成に失敗しました');
@@ -254,7 +261,7 @@
         populateSessionForm(session);
         alert('昼競技セッションを作成しました。');
       } catch (err) {
-        console.error(err);
+        console.error('[NoonGame] create session error', err);
         errorMessage = err.message;
         alert(err.message);
       } finally {
@@ -1233,11 +1240,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 セッション名
-                <input class="mt-1 border rounded px-3 py-2" bind:value={sessionForm.name} placeholder="例: 昼休み競技 2025" />
+                <input class="mt-1 border rounded px-3 py-2" bind:value={sessionFormName} placeholder="例: 昼休み競技 2025" />
               </label>
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 モード
-                <select class="mt-1 border rounded px-3 py-2" bind:value={sessionForm.mode}>
+                <select class="mt-1 border rounded px-3 py-2" bind:value={sessionFormMode}>
                   <option value="mixed">クラス＆グループ混在</option>
                   <option value="class">クラス対抗のみ</option>
                   <option value="group">グループ対抗のみ</option>
@@ -1245,31 +1252,31 @@
               </label>
               <label class="flex flex-col text-sm font-medium text-gray-700 md:col-span-2">
                 説明
-                <textarea class="mt-1 border rounded px-3 py-2" bind:value={sessionForm.description} rows="3" placeholder="概要やメモを入力"></textarea>
+                <textarea class="mt-1 border rounded px-3 py-2" bind:value={sessionFormDescription} rows="3" placeholder="概要やメモを入力"></textarea>
               </label>
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 勝利ポイント
-                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionForm.win_points} />
+                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionFormWinPoints} />
               </label>
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 敗北ポイント
-                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionForm.loss_points} />
+                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionFormLossPoints} />
               </label>
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 引き分けポイント
-                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionForm.draw_points} />
+                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionFormDrawPoints} />
               </label>
               <label class="flex flex-col text-sm font-medium text-gray-700">
                 参加ポイント
-                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionForm.participation_points} />
+                <input type="number" class="mt-1 border rounded px-3 py-2" bind:value={sessionFormParticipationPoints} />
               </label>
               <label class="flex items-center space-x-2 text-sm font-medium text-gray-700">
-                <input type="checkbox" bind:checked={sessionForm.allow_manual_points} />
+                <input type="checkbox" bind:checked={sessionFormAllowManualPoints} />
                 <span>手動加点を許可</span>
               </label>
             </div>
             <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-              onclick={saveSession}
+              onclick={() => { console.log('[NoonGame] inline onclick fired'); saveSession(); }}
               disabled={savingSession || loading}>
               {savingSession ? '保存中...' : (session ? 'セッションを更新' : 'セッションを作成')}
             </button>
