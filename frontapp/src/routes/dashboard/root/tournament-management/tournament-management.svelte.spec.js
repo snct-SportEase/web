@@ -60,6 +60,42 @@ describe('Tournament Management Page', () => {
     await expect.element(page.getByRole('button', { name: 'トーナメントプレビューを生成' })).toBeInTheDocument();
   });
 
+  it('DBに保存済みのトーナメントを表示できる', async () => {
+    const savedTournaments = [
+      {
+        id: 1,
+        name: 'バスケットボール',
+        data: JSON.stringify({
+          rounds: [{ name: '決勝' }],
+          matches: [
+            {
+              roundIndex: 0,
+              order: 0,
+              sides: [{ contestantId: 'c0' }, { contestantId: 'c1' }]
+            }
+          ],
+          contestants: {
+            c0: { players: [{ title: '1年A組' }] },
+            c1: { players: [{ title: '2年B組' }] }
+          }
+        })
+      }
+    ];
+
+    fetchMock = vi.fn((url, options = {}) => {
+      if (url === '/api/root/events/1/tournaments' && !options.method) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(savedTournaments) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(Page);
+
+    await expect.element(page.getByRole('heading', { name: '生成済みトーナメント一覧' })).toBeInTheDocument();
+    await expect.element(page.getByText('バスケットボール')).toBeInTheDocument();
+  });
+
   it('トーナメントプレビューを生成できる', async () => {
     render(Page);
 

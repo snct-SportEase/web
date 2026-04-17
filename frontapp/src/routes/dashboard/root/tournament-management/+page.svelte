@@ -1,5 +1,5 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { browser } from '$app/environment';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
@@ -138,13 +138,12 @@
         }
     }
 
-    function renderAllBrackets() {
+    async function renderAllBrackets() {
         if (!browser) return;
-        setTimeout(() => {
-            allTournaments.forEach(tournament => {
-                renderBracket(tournament);
-            });
-        }, 0);
+        await tick();
+        allTournaments.forEach(tournament => {
+            renderBracket(tournament);
+        });
     }
 
     function renderBracket(tournament) {
