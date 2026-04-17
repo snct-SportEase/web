@@ -15,7 +15,9 @@ test.describe('雨天時モード管理 (root)', () => {
   });
 
   test('雨天時モードを有効化できる', async ({ page }) => {
-    page.once('dialog', async (dialog) => { await dialog.accept(); });
+    await page.evaluate(() => {
+      window.alert = () => {};
+    });
 
     const req = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/rainy-mode') && request.method() === 'PUT');
     await page.getByRole('button', { name: '有効にする' }).click();

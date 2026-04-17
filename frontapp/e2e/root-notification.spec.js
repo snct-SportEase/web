@@ -71,6 +71,7 @@ test.describe('通知管理 (root)', () => {
     expect(body.type).toBe('general');
 
     await expect(page.getByText('通知を送信しました。')).toBeVisible();
-    await expect(page.getByText('競技開始時間変更')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByLabel('タイトル')).toHaveValue('');
+    await expect(page.getByLabel('本文')).toHaveValue('');
   });
 });

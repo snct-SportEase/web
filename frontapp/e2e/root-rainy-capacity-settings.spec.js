@@ -24,20 +24,20 @@ test.describe('雨天時定員設定 (root)', () => {
     await expect(page.getByRole('heading', { name: '競技詳細情報登録' })).toBeVisible();
     await expect(page.getByText('2025春季スポーツ大会')).toBeVisible();
 
-    await page.getByLabel('競技選択').selectOption('1');
+    await Promise.all([
+      page.waitForResponse((response) =>
+        response.url().endsWith('/api/root/events/1/rainy-mode/settings') &&
+        response.request().method() === 'GET'
+      ),
+      page.getByLabel('競技選択').selectOption('1')
+    ]);
     await expect(page.getByText('現在の設定: 定員 未設定 〜 未設定')).toBeVisible();
     await expect(page.locator('#rainy-min-capacity')).toBeVisible();
 
-    await page.locator('#rainy-min-capacity').evaluate((input) => {
-      input.value = '6';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await page.locator('#rainy-max-capacity').evaluate((input) => {
-      input.value = '8';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await page.locator('#rainy-min-capacity').fill('6');
+    await page.locator('#rainy-max-capacity').fill('8');
+    await expect(page.locator('#rainy-min-capacity')).toHaveValue('6');
+    await expect(page.locator('#rainy-max-capacity')).toHaveValue('8');
 
     const [dialog] = await Promise.all([
       page.waitForEvent('dialog'),

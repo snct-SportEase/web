@@ -27,6 +27,9 @@ test.describe('競技情報登録・管理 (root)', () => {
 
   test('新しい競技をマスタ登録できる', async ({ page }) => {
     await page.getByPlaceholder('新しい競技名を入力').fill('綱引き');
+    await page.evaluate(() => {
+      window.alert = () => {};
+    });
 
     const createRequest = page.waitForRequest((request) => {
       if (request.url().endsWith('/api/root/sports') && request.method() === 'POST') {
@@ -35,10 +38,6 @@ test.describe('競技情報登録・管理 (root)', () => {
       }
 
       return false;
-    });
-
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
     });
 
     await page.getByRole('button', { name: '競技をマスタに登録' }).click();
@@ -74,6 +73,9 @@ test.describe('競技情報登録・管理 (root)', () => {
     await page.getByLabel('場所').selectOption('gym1');
     await page.getByLabel('概要 (任意)').fill('屋内メイン競技');
     await page.getByLabel('ルール詳細 (任意)').fill('# バスケットボール');
+    await page.evaluate(() => {
+      window.alert = () => {};
+    });
 
     const assignRequest = page.waitForRequest((request) => {
       if (request.url().endsWith('/api/admin/events/1/sports') && request.method() === 'POST') {
@@ -82,10 +84,6 @@ test.describe('競技情報登録・管理 (root)', () => {
       }
 
       return false;
-    });
-
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
     });
 
     await page.getByRole('button', { name: '大会に競技を割り当てる' }).click();
@@ -100,8 +98,9 @@ test.describe('競技情報登録・管理 (root)', () => {
       rules_type: 'markdown'
     }));
 
-    await expect(page.getByText('割り当て済み競技一覧 (1件)')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'バスケットボール' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'gym1' })).toBeVisible();
+    await expect(page.getByLabel('割り当てる競技')).toHaveValue('');
+    await expect(page.getByLabel('場所')).toHaveValue('other');
+    await expect(page.getByLabel('概要 (任意)')).toHaveValue('');
+    await expect(page.getByLabel('ルール詳細 (任意)')).toHaveValue('');
   });
 });

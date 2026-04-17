@@ -2,11 +2,18 @@ import { expect, test } from '@playwright/test';
 
 test.describe.configure({ mode: 'serial' });
 
+const mockBackendUrl = process.env.MOCK_BACKEND_URL ?? 'http://127.0.0.1:8081';
+
 test.describe('ユーザー管理 (root)', () => {
-  test.beforeEach(async ({ page, context }) => {
+  test.beforeEach(async ({ page, context, request }) => {
+    await request.post(`${mockBackendUrl}/__reset`);
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/change-username');
     await expect(page.getByRole('heading', { name: 'ユーザー管理' })).toBeVisible();
+    await page.evaluate(() => {
+      window.alert = () => {};
+      window.confirm = () => true;
+    });
   });
 
   test('ユーザー一覧を表示できる', async ({ page }) => {
@@ -40,7 +47,8 @@ test.describe('ユーザー管理 (root)', () => {
   });
 
   test('rootロールを追加できる', async ({ page }) => {
-    await page.locator('tbody tr', { has: page.getByText('student1@sendai-nct.jp') }).getByRole('button', { name: '管理' }).click({ force: true });
+    const targetRow = page.locator('tbody tr', { has: page.getByText('student1@sendai-nct.jp') });
+    await targetRow.getByRole('button', { name: '管理' }).click({ force: true });
     await expect(page.locator('#newRoleInput')).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'PUT');
     await page.locator('#newRoleInput').fill('root');
@@ -50,14 +58,10 @@ test.describe('ユーザー管理 (root)', () => {
       user_id: 'user-1',
       role: 'root'
     });
-    await expect(page.getByText('root')).toBeVisible();
+    await expect(page.locator('[aria-labelledby="modal-title"]').getByText('root', { exact: true })).toBeVisible();
   });
 
   test('ロールを削除できる', async ({ page }) => {
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
     await page.locator('tbody button').first().click({ force: true });
     await expect(page.locator('button[title="ロールを削除"]').first()).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'DELETE');
@@ -70,11 +74,8 @@ test.describe('ユーザー管理 (root)', () => {
   });
 
   test('adminロールを削除できる', async ({ page }) => {
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
-    await page.locator('tbody tr', { has: page.getByText('admin1@sendai-nct.jp') }).getByRole('button', { name: '管理' }).click({ force: true });
+    const targetRow = page.locator('tbody tr', { has: page.getByText('admin1@sendai-nct.jp') });
+    await targetRow.getByRole('button', { name: '管理' }).click({ force: true });
     await expect(page.locator('button[title="ロールを削除"]').first()).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'DELETE');
     await page.locator('button[title="ロールを削除"]').first().click();
@@ -83,7 +84,7 @@ test.describe('ユーザー管理 (root)', () => {
       user_id: 'user-2',
       role: 'admin'
     });
-    await expect(page.getByText('ロールなし')).toBeVisible();
+    await expect(page.locator('[aria-labelledby="modal-title"]').getByText('ロールなし')).toBeVisible();
   });
 
   test('クラス所属ロールを付け替えできる', async ({ page }) => {
