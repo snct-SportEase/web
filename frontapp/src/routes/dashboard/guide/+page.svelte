@@ -2,9 +2,9 @@
   import { onMount } from 'svelte';
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
 
-  let showPWAInstallGuide = false;
-  let activeEvent = null;
-  let competitionGuidelinesUrl = null;
+  let showPWAInstallGuide = $state(false);
+  let activeEvent = $state(null);
+  let competitionGuidelinesUrl = $state(null);
 
   onMount(async () => {
     try {

@@ -1,12 +1,12 @@
 <script>
-  let showModal = true;
-  let currentEvent = {
+  let showModal = $state(true);
+  let currentEvent = $state({
     name: '',
     year: new Date().getFullYear(),
     season: 'spring',
     start_date: '',
     end_date: '',
-  };
+  });
 
   async function handleSave() {
     try {

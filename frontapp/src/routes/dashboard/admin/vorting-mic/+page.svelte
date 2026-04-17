@@ -1,14 +1,14 @@
 <script>
   import { onMount } from 'svelte';
 
-  let eligibleClasses = [];
-  let selectedClass = '';
-  let reason = '';
-  let eventId = null;
+  let eligibleClasses = $state([]);
+  let selectedClass = $state('');
+  let reason = $state('');
+  let eventId = $state(null);
 
-  let hasVoted = false;
-  let votedForClassId = null;
-  let votedForClassName = '';
+  let hasVoted = $state(false);
+  let votedForClassId = $state(null);
+  let votedForClassName = $state('');
 
   onMount(async () => {
     // 1. Fetch active event first

@@ -15,9 +15,18 @@
     all_matches: '全ての試合'
   };
 
-  let { data, form } = $page;
-  let notifications = data.notifications ? [...data.notifications] : [];
-  let selectedFilters = data.user?.notification_filters || ['general'];
+  let data = $derived($page.data);
+  let form = $derived($page.form);
+  let notifications = $derived(data.notifications ? [...data.notifications] : []);
+  let initialSelectedFilters = $derived(data.user?.notification_filters || ['general']);
+  let selectedFilters = $state([]);
+  let selectedFiltersInitialized = $state(false);
+
+  $effect(() => {
+    if (selectedFiltersInitialized) return;
+    selectedFilters = [...initialSelectedFilters];
+    selectedFiltersInitialized = true;
+  });
 
   function formatDate(value) {
     if (!value) return '';

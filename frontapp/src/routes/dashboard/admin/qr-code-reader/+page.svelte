@@ -2,12 +2,12 @@
 	import { onMount } from 'svelte';
 	import { Html5Qrcode } from 'html5-qrcode';
 
-	let html5QrCode;
-	let errorMessage = '';
+	let html5QrCode = $state();
+	let errorMessage = $state('');
 
-	let verificationResult = null;
-	let remainingTime = null;
-	let countdownInterval = null;
+	let verificationResult = $state(null);
+	let remainingTime = $state(null);
+	let countdownInterval = $state(null);
 
 	onMount(() => {
 		Html5Qrcode.getCameras()

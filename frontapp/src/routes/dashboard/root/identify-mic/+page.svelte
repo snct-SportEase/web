@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
 
-  let micResult = null;
-  let error = null;
+  let micResult = $state(null);
+  let error = $state(null);
 
   onMount(async () => {
     try {

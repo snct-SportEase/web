@@ -2,19 +2,19 @@
 	import { onMount } from 'svelte';
 	import EditRoleModal from '../../../../lib/components/EditRoleModal.svelte';
 
-	let usersWithRoles = [];
-	let allUsers = [];
-	let filteredUsers = [];
-	let selectedUsers = [];
-	let emailSearch = '';
-	let role = '';
-	let showUserList = false;
+	let usersWithRoles = $state([]);
+	let allUsers = $state([]);
+	let filteredUsers = $state([]);
+	let selectedUsers = $state([]);
+	let emailSearch = $state('');
+	let role = $state('');
+	let showUserList = $state(false);
 
-	let showEditModal = false;
-	let selectedUserForEdit = null;
+	let showEditModal = $state(false);
+	let selectedUserForEdit = $state(null);
 
-	let sortColumn = '';
-	let sortAsc = true;
+	let sortColumn = $state('');
+	let sortAsc = $state(true);
 
 	const defaultRoles = ['root', 'admin', 'student'];
 

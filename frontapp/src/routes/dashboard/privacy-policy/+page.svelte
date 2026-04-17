@@ -1,6 +1,6 @@
 <script>
   // ページのタイトルを設定
-  let pageTitle = "プライバシーポリシー";
+  let pageTitle = $state("プライバシーポリシー");
 </script>
 
 <svelte:head>

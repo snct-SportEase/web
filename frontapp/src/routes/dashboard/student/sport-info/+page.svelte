@@ -3,14 +3,14 @@
   import { error } from '@sveltejs/kit';
   import RulesDisplayModal from '$lib/components/RulesDisplayModal.svelte';
 
-  let eventSports = [];
-  let allSports = [];
+  let eventSports = $state([]);
+  let allSports = $state([]);
 
-  let showRulesModal = false;
-  let selectedRulesType = '';
-  let selectedRulesContent = '';
-  let selectedRulesPdfUrl = '';
-  let selectedSportName = '';
+  let showRulesModal = $state(false);
+  let selectedRulesType = $state('');
+  let selectedRulesContent = $state('');
+  let selectedRulesPdfUrl = $state('');
+  let selectedSportName = $state('');
 
   onMount(async () => {
     const sessionToken = document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];

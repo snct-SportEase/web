@@ -5,16 +5,16 @@
     import { get } from 'svelte/store';
     import { dndzone } from 'svelte-dnd-action';
     
-    let createBracket = null;
+    let createBracket = $state(null);
 
-    let isGenerating = false;
-    let isSaving = false;
-    let isExporting = false;
-    let allTournaments = [];
-    let generatedTournamentsPreview = null;
+    let isGenerating = $state(false);
+    let isSaving = $state(false);
+    let isExporting = $state(false);
+    let allTournaments = $state([]);
+    let generatedTournamentsPreview = $state(null);
 
-    let editingTournamentId = null;
-    let teamsForEditing = [];
+    let editingTournamentId = $state(null);
+    let teamsForEditing = $state([]);
     const flipDurationMs = 300;
 
     onMount(async () => {

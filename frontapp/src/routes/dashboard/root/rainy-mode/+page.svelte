@@ -2,10 +2,10 @@
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
 
-  let selectedEventId = null;
-  let currentEvent = null;
-  let isRainyMode = false;
-  let loading = false;
+  let selectedEventId = $state(null);
+  let currentEvent = $state(null);
+  let isRainyMode = $state(false);
+  let loading = $state(false);
 
   onMount(async () => {
     console.log('rainy-mode page: onMount started');
@@ -154,5 +154,4 @@
     </div>
   {/if}
 </div>
-
 

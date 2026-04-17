@@ -4,9 +4,9 @@
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
 
-    let allTournaments = [];
-    let isLoading = false;
-    let isRainyMode = false;
+    let allTournaments = $state([]);
+    let isLoading = $state(false);
+    let isRainyMode = $state(false);
 
     onMount(async () => {
         await activeEvent.init();
@@ -141,4 +141,3 @@
         </div>
     {/if}
 </div>
-

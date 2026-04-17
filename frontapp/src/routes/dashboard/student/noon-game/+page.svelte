@@ -3,11 +3,11 @@
   import { activeEvent } from '$lib/stores/eventStore.js';
   import { get } from 'svelte/store';
 
-  let session = null;
-  let matches = [];
-  let pointsSummary = [];
-  let loading = false;
-  let errorMessage = '';
+  let session = $state(null);
+  let matches = $state([]);
+  let pointsSummary = $state([]);
+  let loading = $state(false);
+  let errorMessage = $state('');
 
   onMount(async () => {
     await activeEvent.init();

@@ -2,15 +2,15 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
-  let events = [];
-  let selectedEventId = null;
-  let selectedEvent = null;
-  let pdfFile = null;
-  let pdfPreviewUrl = null;
-  let existingPdfUrl = null;
-  let isUploading = false;
-  let message = '';
-  let errorMessage = '';
+  let events = $state([]);
+  let selectedEventId = $state(null);
+  let selectedEvent = $state(null);
+  let pdfFile = $state(null);
+  let pdfPreviewUrl = $state(null);
+  let existingPdfUrl = $state(null);
+  let isUploading = $state(false);
+  let message = $state('');
+  let errorMessage = $state('');
 
   onMount(async () => {
     await fetchEvents();
@@ -313,4 +313,3 @@
     </div>
   </section>
 </div>
-

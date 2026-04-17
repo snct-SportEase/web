@@ -5,16 +5,16 @@
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { dndzone } from 'svelte-dnd-action';
 
-  let session = null;
-  let matches = [];
-  let pointsSummary = [];
-  let loading = false;
-  let saving = {};
-  let errorMessage = '';
+  let session = $state(null);
+  let matches = $state([]);
+  let pointsSummary = $state([]);
+  let loading = $state(false);
+  let saving = $state({});
+  let errorMessage = $state('');
 
-  let resultForms = {};
-  let templateRunForms = {};
-  let templateRuns = [];
+  let resultForms = $state({});
+  let templateRunForms = $state({});
+  let templateRuns = $state([]);
 
   onMount(async () => {
     await activeEvent.init();

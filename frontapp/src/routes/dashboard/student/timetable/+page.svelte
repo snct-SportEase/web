@@ -3,8 +3,8 @@
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
 
-    let scheduleItems = [];
-    let isLoading = true;
+    let scheduleItems = $state([]);
+    let isLoading = $state(true);
 
     // ヘルパー：hh:mm 形式に変換
     // DBに "YYYY-MM-DD HH:MM:SS" 形式（スペース区切り）で保存されているため、

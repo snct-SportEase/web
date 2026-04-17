@@ -2,12 +2,12 @@
 	import { onMount, onDestroy } from 'svelte';
 	import Chart from 'chart.js/auto';
 
-	let attendanceRate = 0;
-	let participationRates = {};
-	let scoreTrends = {};
-	let eventProgress = {};
+	let attendanceRate = $state(0);
+	let participationRates = $state({});
+	let scoreTrends = $state({});
+	let eventProgress = $state({});
 
-	let hideScores = false;
+	let hideScores = $state(false);
 
 	let ws;
 

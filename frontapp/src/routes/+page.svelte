@@ -1,39 +1,36 @@
 <script>
-  import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
-  // URLパラメータからエラーメッセージをチェック
-  onMount(() => {
-    if (browser) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const error = urlParams.get('error');
-      
-      if (error) {
-        // エラーメッセージに基づいて適切なメッセージを表示
-        let errorMessage = '';
-        switch (error) {
-          case 'domain_not_allowed':
-            errorMessage = '許可されていないドメインです。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
-            break;
-          case 'email_not_whitelisted':
-            errorMessage = 'このメールアドレスはアクセスが許可されていません。管理者に連絡して、ホワイトリストへの追加を依頼してください。';
-            break;
-          case 'access_denied':
-            errorMessage = 'アクセスが拒否されました。詳しくは管理者にお問い合わせください。';
-            break;
-          default:
-            errorMessage = 'ログインに失敗しました。もう一度お試しください。';
-        }
-        
-        // アラートポップアップを表示
-        alert(errorMessage);
-        
-        // URLからエラーパラメータを削除
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.delete('error');
-        window.history.replaceState({}, '', newUrl);
-      }
+  let handledLoginError = $state(false);
+
+  $effect(() => {
+    if (!browser || handledLoginError) return;
+    handledLoginError = true;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    if (!error) return;
+
+    let errorMessage = '';
+    switch (error) {
+      case 'domain_not_allowed':
+        errorMessage = '許可されていないドメインです。@sendai-nct.jpまたは@sendai-nct.ac.jpのメールアドレスを使用してください。';
+        break;
+      case 'email_not_whitelisted':
+        errorMessage = 'このメールアドレスはアクセスが許可されていません。管理者に連絡して、ホワイトリストへの追加を依頼してください。';
+        break;
+      case 'access_denied':
+        errorMessage = 'アクセスが拒否されました。詳しくは管理者にお問い合わせください。';
+        break;
+      default:
+        errorMessage = 'ログインに失敗しました。もう一度お試しください。';
     }
+
+    alert(errorMessage);
+
+    const newUrl = new URL(window.location);
+    newUrl.searchParams.delete('error');
+    window.history.replaceState({}, '', newUrl);
   });
 </script>
 

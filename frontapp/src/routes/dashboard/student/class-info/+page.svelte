@@ -1,10 +1,10 @@
 <script>
   import { page } from '$app/stores';
 
-  let { data } = $page;
-  const classInfo = data.classInfo;
-  const className = data.className;
-  const progressEntries = data.progress ?? [];
+  let data = $derived($page.data);
+  let classInfo = $derived(data.classInfo);
+  let className = $derived(data.className);
+  let progressEntries = $derived(data.progress ?? []);
 
   const formatter = new Intl.NumberFormat('ja-JP');
 
