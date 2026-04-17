@@ -10,6 +10,92 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTournamentRepository_GetTournamentsByEventID(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	r := repository.NewTournamentRepository(db)
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_rainy_mode FROM events WHERE id = ?")).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, sport_id FROM tournaments WHERE event_id = ?")).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "sport_id"}).
+			AddRow(10, "Basketball Tournament", 1))
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT
+			m.id,
+			m.tournament_id,
+			m.round,
+			m.match_number_in_round,
+			m.team1_id,
+			m.team2_id,
+			m.team1_score,
+			m.team2_score,
+			CASE
+				WHEN m.team1_score > m.team2_score THEN m.team1_id
+				WHEN m.team2_score > m.team1_score THEN m.team2_id
+				ELSE NULL
+			END AS winner_team_id,
+			m.status,
+			m.next_match_id,
+			m.match_start_time,
+			m.is_bronze_match,
+			m.is_loser_bracket_match,
+			m.loser_bracket_round,
+			m.loser_bracket_block,
+			m.rainy_mode_start_time
+		FROM matches m
+		JOIN tournaments t ON m.tournament_id = t.id
+		WHERE t.event_id = ?
+		ORDER BY m.tournament_id, m.round, m.match_number_in_round
+	`)).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id",
+			"tournament_id",
+			"round",
+			"match_number_in_round",
+			"team1_id",
+			"team2_id",
+			"team1_score",
+			"team2_score",
+			"winner_team_id",
+			"status",
+			"next_match_id",
+			"match_start_time",
+			"is_bronze_match",
+			"is_loser_bracket_match",
+			"loser_bracket_round",
+			"loser_bracket_block",
+			"rainy_mode_start_time",
+		}).AddRow(100, 10, 0, 0, 1, 2, nil, nil, nil, "pending", nil, nil, false, false, nil, nil, nil))
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id
+		FROM teams t
+		JOIN classes c ON t.class_id = c.id
+		WHERE c.event_id = ?
+	`)).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).
+			AddRow(1, "Team A", 101, 1, 1).
+			AddRow(2, "Team B", 102, 1, 1))
+
+	tournaments, err := r.GetTournamentsByEventID(1)
+	assert.NoError(t, err)
+	assert.Len(t, tournaments, 1)
+	assert.Contains(t, string(tournaments[0].Data), "Team A")
+	assert.Contains(t, string(tournaments[0].Data), "Team B")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 	t.Run("Success - Update match and advance winner", func(t *testing.T) {
 		db, mock, err := sqlmock.New()
