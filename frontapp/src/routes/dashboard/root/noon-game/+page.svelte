@@ -1002,8 +1002,15 @@
 
     <!-- テンプレート設定モーダル -->
     {#if selectedTemplateType}
-      <div class="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] min-h-screen overflow-y-auto" onclick={closeTemplateConfig}>
-        <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-4 max-h-[90vh] overflow-y-auto" onclick={(e) => e.stopPropagation()}>
+      <div class="fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center z-[110] min-h-screen overflow-y-auto">
+        <button
+          type="button"
+          class="absolute inset-0 bg-black bg-opacity-50"
+          onclick={closeTemplateConfig}
+          aria-label="テンプレート設定モーダルを閉じる"></button>
+        <div
+          class="relative bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-4 max-h-[90vh] overflow-y-auto"
+          role="document">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-semibold text-gray-800">
               {#if selectedTemplateType === 'year-relay'}学年対抗リレー
@@ -1181,8 +1188,9 @@
                         </button>
                       </div>
                       <div class="flex flex-col space-y-2">
-                        <label class="text-sm font-medium text-gray-700">クラス名（カンマ区切り）</label>
+                        <label class="text-sm font-medium text-gray-700" for={`group-class-names-${index}`}>クラス名（カンマ区切り）</label>
                         <input
+                          id={`group-class-names-${index}`}
                           type="text"
                           class="border rounded px-2 py-1 text-sm"
                           value={group.class_names ? group.class_names.join(', ') : ''}

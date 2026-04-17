@@ -749,8 +749,9 @@
                               </div>
                               {#if needsPoints}
                                 <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                                  <label class="text-xs font-semibold text-yellow-800">点数（同順位のため必須）</label>
+                                  <label class="text-xs font-semibold text-yellow-800" for={`template-points-${formKey}-${index}`}>点数（同順位のため必須）</label>
                                   <input
+                                    id={`template-points-${formKey}-${index}`}
                                     type="number"
                                     class="border border-yellow-300 rounded px-2 py-1 text-sm w-full mt-1"
                                     value={participant.points ?? ''}
@@ -764,8 +765,9 @@
                         </ul>
                       </div>
                       <div class="space-y-2">
-                        <label class="text-sm font-semibold text-gray-700">備考</label>
+                        <label class="text-sm font-semibold text-gray-700" for={`template-note-${formKey}`}>備考</label>
                         <textarea
+                          id={`template-note-${formKey}`}
                           rows="2"
                           class="border rounded px-3 py-2 text-sm w-full"
                           bind:value={form.note}
