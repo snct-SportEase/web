@@ -7,12 +7,13 @@
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
 
+  let { children } = $props();
   let { data } = $page;
   let user = $derived(data.user);
 
-  let showEditDisplayNameModal = false;
-  let showPWANotification = false;
-  let isMobile = false;
+  let showEditDisplayNameModal = $state(false);
+  let showPWANotification = $state(false);
+  let isMobile = $state(false);
   
   onMount(() => {
     if (browser) {
@@ -161,7 +162,7 @@
   {/if}
 
   <main class="p-8 min-h-full">
-    <slot />
+    {@render children?.()}
   </main>
 
   <EditDisplayNameModal

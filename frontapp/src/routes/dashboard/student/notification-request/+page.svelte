@@ -9,14 +9,14 @@
   let activeRequest = $state(data.activeRequest);
   let hasRequests = $derived(requests.length > 0);
 
-  let showNewForm = false;
-  let newTitle = '';
-  let newBody = '';
-  let newTargetText = '';
-  let messageInput = '';
-  let isSubmitting = false;
-  let isPostingMessage = false;
-  let errorMessage = data.error;
+  let showNewForm = $state(false);
+  let newTitle = $state('');
+  let newBody = $state('');
+  let newTargetText = $state('');
+  let messageInput = $state('');
+  let isSubmitting = $state(false);
+  let isPostingMessage = $state(false);
+  let errorMessage = $state(data.error);
 
   function formatStatus(status) {
     switch (status) {
@@ -316,4 +316,3 @@
     </div>
   </section>
 </div>
-

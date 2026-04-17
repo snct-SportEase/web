@@ -1,8 +1,8 @@
 <script>
     let { selectedMatch, selectedTournament, showModal = $bindable(), onclose, onconfirm } = $props();
 
-    let team1Score = 0;
-    let team2Score = 0;
+    let team1Score = $state(0);
+    let team2Score = $state(0);
 
     // モーダルが開かれたときにスコアをリセット
     $effect(() => {

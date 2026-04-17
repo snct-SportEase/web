@@ -18,10 +18,6 @@ export default defineConfig({
 	ssr: {
 		noExternal: ['bracketry', 'marked', 'svelte-dnd-action', 'html2pdf.js']
 	},
-	optimizeDeps: {
-		// Disable pre-bundling during tests to avoid dependency scanning issues
-		disabled: process.env.VITEST === 'true'
-	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [

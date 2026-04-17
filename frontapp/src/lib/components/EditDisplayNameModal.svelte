@@ -4,10 +4,10 @@
 
   let { isOpen = false, currentDisplayName = '', userRoles = [], onClose = () => {}, onSave = async () => {} } = $props();
 
-  let newDisplayName = currentDisplayName;
-  let isLoading = false;
-  let errorMessage = '';
-  let displayNameInput;
+  let newDisplayName = $state(currentDisplayName);
+  let isLoading = $state(false);
+  let errorMessage = $state('');
+  let displayNameInput = $state();
 
   // モーダルが開かれるたびに現在の表示名をリセット
   $effect(() => {

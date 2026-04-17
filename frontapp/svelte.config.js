@@ -7,7 +7,7 @@ const config = {
 	kit: {
 		adapter: adapter(),
 		csrf: {
-			checkOrigin: false
+			trustedOrigins: ['*']
 		},
 		csp: {
 			// mode: 'auto' でSvelteKitが生成するインラインスクリプト/スタイルに

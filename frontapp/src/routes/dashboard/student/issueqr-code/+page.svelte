@@ -3,9 +3,9 @@
 	import QRCode from 'qrcode';
 	import { browser } from '$app/environment';
 
-	let teams = [];
-	let selectedTeamId = '';
-	let qrCodeData = null;
+	let teams = $state([]);
+	let selectedTeamId = $state('');
+	let qrCodeData = $state(null);
 
 	$effect(() => {
 		console.log('[QR Code] selectedTeamId変更:', selectedTeamId);
@@ -15,12 +15,12 @@
 	let selectedTeam = $derived(selectedTeamId && teams && Array.isArray(teams)
 		? teams.find((t) => `${t.event_id}-${t.sport_id}` === selectedTeamId)
 		: null);
-	let qrCodeImage = null;
+	let qrCodeImage = $state(null);
 	let expiresAt = null;
-	let remainingTime = null;
+	let remainingTime = $state(null);
 	let countdownInterval = null;
-	let loading = false;
-	let error = null;
+	let loading = $state(false);
+	let error = $state(null);
 	let activeEventId = null;
 
 	// クリーンアップ関数
