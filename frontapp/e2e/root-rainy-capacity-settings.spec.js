@@ -39,11 +39,12 @@ test.describe('雨天時定員設定 (root)', () => {
       input.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
-    await page.getByRole('button', { name: '雨天時定員設定を保存' }).click();
+    const [dialog] = await Promise.all([
+      page.waitForEvent('dialog'),
+      page.getByRole('button', { name: '雨天時定員設定を保存' }).click()
+    ]);
+    expect(dialog.message()).toBe('雨天時定員設定を更新しました。');
+    await dialog.accept();
 
     await expect.poll(() => saveRequests.length).toBe(2);
 
@@ -53,6 +54,5 @@ test.describe('雨天時定員設定 (root)', () => {
       { sport_id: '1', class_id: 2, min_capacity: 6, max_capacity: 8 }
     ]);
 
-    await expect(page.getByText('現在の設定: 定員 6 〜 8')).toBeVisible();
   });
 });

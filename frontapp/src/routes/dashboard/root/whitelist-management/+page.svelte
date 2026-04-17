@@ -97,7 +97,7 @@
   let isInteractive = $state(false);
   
   // 削除機能用の状態変数
-  let selectedEmails = $state(new SvelteSet());
+  const selectedEmails = new SvelteSet();
   let isDeleting = $state(false);
 
   onMount(() => {
@@ -164,22 +164,20 @@
 
   // チェックボックスのトグル
   function toggleEmail(email) {
-    const newSet = new SvelteSet(selectedEmails);
-    if (newSet.has(email)) {
-      newSet.delete(email);
+    if (selectedEmails.has(email)) {
+      selectedEmails.delete(email);
     } else {
-      newSet.add(email);
+      selectedEmails.add(email);
     }
-    selectedEmails = newSet; // リアクティブ更新
   }
 
   // すべて選択/解除
   function toggleAll() {
-    const newSet = new SvelteSet();
-    if (selectedEmails.size !== sortedWhitelist.length) {
-      sortedWhitelist.forEach(entry => newSet.add(entry.email));
+    const shouldSelectAll = selectedEmails.size !== sortedWhitelist.length;
+    selectedEmails.clear();
+    if (shouldSelectAll) {
+      sortedWhitelist.forEach(entry => selectedEmails.add(entry.email));
     }
-    selectedEmails = newSet; // リアクティブ更新
   }
 
   // 単一削除
@@ -208,7 +206,7 @@
       // Refresh whitelist
       const res = await fetch('/api/root/whitelist');
       whitelist = await res.json();
-      selectedEmails = new SvelteSet();
+      selectedEmails.clear();
     } catch (error) {
       errorMessage = error.message;
     } finally {
@@ -248,7 +246,7 @@
       // Refresh whitelist
       const res = await fetch('/api/root/whitelist');
       whitelist = await res.json();
-      selectedEmails = new SvelteSet();
+      selectedEmails.clear();
     } catch (error) {
       errorMessage = error.message;
     } finally {
