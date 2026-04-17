@@ -100,6 +100,48 @@ const defaultDefaultGroups = () => ({
   ]
 });
 
+const sampleTournamentData = () => ({
+  rounds: [
+    { name: '決勝' }
+  ],
+  matches: [
+    {
+      roundIndex: 0,
+      order: 0,
+      sides: [
+        { contestantId: 'c0', scores: [{ mainScore: 3 }], isWinner: true },
+        { contestantId: 'c1', scores: [{ mainScore: 1 }] }
+      ]
+    }
+  ],
+  contestants: {
+    c0: { players: [{ title: '1A' }] },
+    c1: { players: [{ title: '1B' }] }
+  }
+});
+
+const sampleTournamentPreview = () => ([
+  {
+    event_id: 1,
+    sport_id: 1,
+    sport_name: 'バスケットボール',
+    tournament_data: sampleTournamentData(),
+    shuffled_teams: [
+      { id: 1, name: '1A', class_id: 1, sport_id: 1, event_id: 1 },
+      { id: 2, name: '1B', class_id: 2, sport_id: 1, event_id: 1 }
+    ]
+  }
+]);
+
+const defaultTournaments = () => ([
+  {
+    id: 1,
+    name: 'バスケットボール',
+    sport_id: 1,
+    data: sampleTournamentData()
+  }
+]);
+
 let events = defaultEvents();
 let sports = defaultSports();
 let eventSports = [];
@@ -121,7 +163,7 @@ let whitelist = defaultWhitelist();
 let notificationRequests = defaultNotificationRequests();
 let users = defaultUsers();
 let defaultGroups = defaultDefaultGroups();
-let tournaments = [];
+let tournaments = defaultTournaments();
 let noonSession = null;
 let noonGroups = [];
 let noonMatches = [];
@@ -204,7 +246,7 @@ createServer(async (req, res) => {
     notificationRequests = defaultNotificationRequests();
     users = defaultUsers();
     defaultGroups = defaultDefaultGroups();
-    tournaments = [];
+    tournaments = defaultTournaments();
     noonSession = null;
     noonGroups = [];
     noonMatches = [];
@@ -654,14 +696,32 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/root/events/1/tournaments/generate-preview' && req.method === 'POST') {
-    tournaments = [];
-    sendJson(res, 200, []);
+    sendJson(res, 200, sampleTournamentPreview());
     return;
   }
 
   if (url.pathname === '/api/root/events/1/tournaments/bulk-create' && req.method === 'POST') {
-    tournaments = [];
+    const body = await readJson(req);
+    tournaments = body.map((tournament, index) => ({
+      id: index + 1,
+      name: tournament.sport_name,
+      sport_id: tournament.sport_id,
+      data: tournament.tournament_data
+    }));
     sendJson(res, 200, { message: 'saved' });
+    return;
+  }
+
+  if (url.pathname === '/api/root/events/1/tournaments/export/excel' && req.method === 'GET') {
+    sendResponse(
+      res,
+      200,
+      Buffer.from('mock-excel'),
+      {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="event_1_tournaments.xlsx"'
+      }
+    );
     return;
   }
 

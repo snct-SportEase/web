@@ -262,6 +262,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.POST("/:id/tournaments/generate-all", tournHandler.GenerateAllTournamentsHandler)
 				rootEvents.POST("/:id/tournaments/generate-preview", tournHandler.GenerateAllTournamentsPreviewHandler)
 				rootEvents.POST("/:id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)
+				rootEvents.GET("/:id/tournaments/export/excel", tournHandler.ExportTournamentsExcelHandler)
 				rootEvents.GET("/:id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				rootEvents.GET("/:id/noon-game/session", noonHandler.GetSession)
 				rootEvents.POST("/:id/noon-game/session", noonHandler.UpsertSession)

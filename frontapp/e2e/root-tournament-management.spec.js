@@ -28,4 +28,12 @@ test.describe('トーナメント生成・管理 (root)', () => {
     await page.getByRole('button', { name: 'プレビューをDBに保存' }).click();
     await saveRequest;
   });
+
+  test('保存済みトーナメントをExcelエクスポートできる', async ({ page }) => {
+    await expect(page.getByRole('button', { name: '保存済みトーナメントをExcel出力' })).toBeVisible();
+
+    const exportRequest = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/tournaments/export/excel') && request.method() === 'GET');
+    await page.getByRole('button', { name: '保存済みトーナメントをExcel出力' }).click();
+    await exportRequest;
+  });
 });
