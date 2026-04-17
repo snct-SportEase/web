@@ -257,9 +257,10 @@ func (r *tournamentRepository) getMatchesByEventID(eventID int) (map[int][]*mode
 
 func (r *tournamentRepository) getTeamsByEventID(eventID int) (map[int]*models.Team, error) {
 	rows, err := r.db.Query(`
-		SELECT id, name, class_id, sport_id, event_id
-		FROM teams
-		WHERE event_id = ?
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id
+		FROM teams t
+		JOIN classes c ON t.class_id = c.id
+		WHERE c.event_id = ?
 	`, eventID)
 	if err != nil {
 		return nil, err

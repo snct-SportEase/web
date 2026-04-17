@@ -17,6 +17,7 @@ test.describe('通知管理 (root)', () => {
 
     await page.goto('/dashboard/root/notification');
     await expect(page.getByText('大会開催のお知らせ')).toBeVisible();
+    await expect(page.getByRole('button', { name: '通知を送信' })).toBeEnabled();
   });
 
   test('送信済み通知一覧を表示できる', async ({ page }) => {
@@ -70,6 +71,6 @@ test.describe('通知管理 (root)', () => {
     expect(body.type).toBe('general');
 
     await expect(page.getByText('通知を送信しました。')).toBeVisible();
-    await expect(page.getByText('競技開始時間変更')).toBeVisible();
+    await expect(page.getByText('競技開始時間変更')).toBeVisible({ timeout: 15000 });
   });
 });

@@ -5,16 +5,16 @@
 
 	let { classes: initialClasses = [] } = data ?? {};
 
-	let classes = [...initialClasses];
-	let allSports = [];
-	let selectedClassId = null;
-	let selectedSportId = null;
-	let confirmedMembers = [];
-	let confirmedCount = 0;
-	let minCapacity = null;
-	let capacityOK = true;
-	let loading = false;
-	let error = null;
+	let classes = $state([...initialClasses]);
+	let allSports = $state([]);
+	let selectedClassId = $state(null);
+	let selectedSportId = $state(null);
+	let confirmedMembers = $state([]);
+	let confirmedCount = $state(0);
+	let minCapacity = $state(null);
+	let capacityOK = $state(true);
+	let loading = $state(false);
+	let error = $state(null);
 
 	let selectedClass = $derived(selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null);
 
@@ -224,4 +224,3 @@
 		background-color: #f3f4f6;
 	}
 </style>
-

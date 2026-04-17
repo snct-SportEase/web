@@ -10,30 +10,33 @@
 		error: initialError = null
 	} = data ?? {};
 
-	let classes = [...initialClasses];
-	let selectedClassId = initialSelectedClassId;
-	let classMembers = [...initialClassMembers];
-	let eventSports = [...initialEventSports];
-	let allSports = [...initialAllSports];
-	let selectedSportId = null;
-	let selectedMembers = [];
-	let assignedMembers = [];
+	const normalizedInitialSelectedClassId =
+		initialSelectedClassId !== null && typeof initialSelectedClassId !== 'number'
+			? (() => {
+					const parsedInitialClassId = Number(initialSelectedClassId);
+					return Number.isNaN(parsedInitialClassId) ? null : parsedInitialClassId;
+				})()
+			: initialSelectedClassId;
 
-	let membersLoading = false;
-	let teamMembersLoading = false;
-	let sportsLoading = false;
-	let assignLoading = false;
+	let classes = $state([...initialClasses]);
+	let selectedClassId = $state(normalizedInitialSelectedClassId);
+	let classMembers = $state([...initialClassMembers]);
+	let eventSports = $state([...initialEventSports]);
+	let allSports = $state([...initialAllSports]);
+	let selectedSportId = $state(null);
+	let selectedMembers = $state([]);
+	let assignedMembers = $state([]);
 
-	let error = initialError;
-	let success = null;
+	let membersLoading = $state(false);
+	let teamMembersLoading = $state(false);
+	let sportsLoading = $state(false);
+	let assignLoading = $state(false);
+
+	let error = $state(initialError);
+	let success = $state(null);
 	const isAdmin = data.isAdmin || false;
 
-	let searchQuery = '';
-
-if (selectedClassId !== null && typeof selectedClassId !== 'number') {
-	const parsedInitialClassId = Number(selectedClassId);
-	selectedClassId = Number.isNaN(parsedInitialClassId) ? null : parsedInitialClassId;
-}
+	let searchQuery = $state('');
 
 	let selectedClass = $derived(
 		selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null

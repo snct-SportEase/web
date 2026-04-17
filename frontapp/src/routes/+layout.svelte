@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
+  let { children } = $props();
   let data = $derived($page.data);
 
   onMount(() => {
@@ -138,6 +139,6 @@
     <Sidebar user={data.user} />
   {/if}
   <main class="main-content">
-    <slot />
+    {@render children?.()}
   </main>
 </div>

@@ -3,13 +3,13 @@
     import { page } from '$app/stores';
     
     let eventId = $page.params.eventId;
-    let activeTab = 'scores';
+    let activeTab = $state('scores');
     
-    let eventData = null;
-    let scores = [];
-    let tournaments = [];
-    let loading = true;
-    let error = null;
+    let eventData = $state(null);
+    let scores = $state([]);
+    let tournaments = $state([]);
+    let loading = $state(true);
+    let error = $state(null);
 
     onMount(async () => {
         try {

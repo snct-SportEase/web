@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { SvelteSet } from 'svelte/reactivity';
 
@@ -93,10 +94,15 @@
   let csvFile = $state(null);
   let message = $state('');
   let errorMessage = $state('');
+  let isInteractive = $state(false);
   
   // 削除機能用の状態変数
   let selectedEmails = $state(new SvelteSet());
   let isDeleting = $state(false);
+
+  onMount(() => {
+    isInteractive = true;
+  });
 
   async function addEmail() {
     errorMessage = '';
@@ -279,6 +285,7 @@
 						id="email_local"
 						bind:value={newEmailLocal}
 						required
+						disabled={!isInteractive}
 						class="block w-2/3 rounded-l-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm placeholder-gray-400"
 						placeholder="taro.yamada"
 					/>
@@ -286,6 +293,7 @@
 					<select
 						id="email_domain"
 						bind:value={newEmailDomain}
+						disabled={!isInteractive}
 						class="block w-1/3 rounded-r-lg border-l-0 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-gray-50 text-gray-700 font-medium"
 					>
 						{#each allowedDomains as domain (domain)}
@@ -296,13 +304,13 @@
 			</div>
       <div>
         <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
-        <select id="role" bind:value={newRole} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+        <select id="role" bind:value={newRole} disabled={!isInteractive} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
           <option value="student">Student</option>
           <option value="admin">Admin</option>
           <option value="root">Root</option>
         </select>
       </div>
-      <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Add</button>
+      <button type="submit" disabled={!isInteractive} class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed">Add</button>
     </form>
   </div>
 
@@ -314,7 +322,7 @@
         <label for="csvfile" class="block text-sm font-medium text-gray-700">CSV File (email,role)</label>
         <input type="file" id="csvfile" onchange={(e) => csvFile = e.target.files[0]} accept=".csv" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
       </div>
-      <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Upload</button>
+      <button type="submit" disabled={!isInteractive} class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed">Upload</button>
     </form>
   </div>
 
@@ -356,7 +364,7 @@
 				</div>
 				<button
 					onclick={deleteSelectedEmails}
-					disabled={selectedEmails.size === 0 || isDeleting}
+					disabled={!isInteractive || selectedEmails.size === 0 || isDeleting}
 					class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
 				>
 					{isDeleting ? '削除中...' : '選択した項目を削除'}
@@ -373,6 +381,7 @@
 							<input
 								type="checkbox"
 								checked={sortedWhitelist && sortedWhitelist.length > 0 && selectedEmails.size === sortedWhitelist.length}
+								disabled={!isInteractive || isDeleting}
 								onchange={toggleAll}
 								class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
 							/>
@@ -430,6 +439,7 @@
 									<input
 										type="checkbox"
 										checked={selectedEmails.has(entry.email)}
+										disabled={!isInteractive || isDeleting}
 										onchange={() => toggleEmail(entry.email)}
 										class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
 									/>

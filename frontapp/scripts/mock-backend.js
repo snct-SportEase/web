@@ -100,6 +100,48 @@ const defaultDefaultGroups = () => ({
   ]
 });
 
+const sampleTournamentData = () => ({
+  rounds: [
+    { name: '決勝' }
+  ],
+  matches: [
+    {
+      roundIndex: 0,
+      order: 0,
+      sides: [
+        { contestantId: 'c0', scores: [{ mainScore: 3 }], isWinner: true },
+        { contestantId: 'c1', scores: [{ mainScore: 1 }] }
+      ]
+    }
+  ],
+  contestants: {
+    c0: { players: [{ title: '1A' }] },
+    c1: { players: [{ title: '1B' }] }
+  }
+});
+
+const sampleTournamentPreview = () => ([
+  {
+    event_id: 1,
+    sport_id: 1,
+    sport_name: 'バスケットボール',
+    tournament_data: sampleTournamentData(),
+    shuffled_teams: [
+      { id: 1, name: '1A', class_id: 1, sport_id: 1, event_id: 1 },
+      { id: 2, name: '1B', class_id: 2, sport_id: 1, event_id: 1 }
+    ]
+  }
+]);
+
+const defaultTournaments = () => ([
+  {
+    id: 1,
+    name: 'バスケットボール',
+    sport_id: 1,
+    data: sampleTournamentData()
+  }
+]);
+
 let events = defaultEvents();
 let sports = defaultSports();
 let eventSports = [];
@@ -121,12 +163,13 @@ let whitelist = defaultWhitelist();
 let notificationRequests = defaultNotificationRequests();
 let users = defaultUsers();
 let defaultGroups = defaultDefaultGroups();
-let tournaments = [];
+let tournaments = defaultTournaments();
 let noonSession = null;
 let noonGroups = [];
 let noonMatches = [];
 let noonPointsSummary = [];
 let noonTemplateRuns = [];
+let rainyModeSettings = [];
 
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -204,12 +247,13 @@ createServer(async (req, res) => {
     notificationRequests = defaultNotificationRequests();
     users = defaultUsers();
     defaultGroups = defaultDefaultGroups();
-    tournaments = [];
+    tournaments = defaultTournaments();
     noonSession = null;
     noonGroups = [];
     noonMatches = [];
     noonPointsSummary = [];
     noonTemplateRuns = [];
+    rainyModeSettings = [];
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -318,11 +362,27 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/events/active' && req.method === 'GET') {
     const activeEvent = events.find((event) => event.status === 'active') ?? events[0] ?? null;
-    sendJson(res, 200, activeEvent ? { event_id: activeEvent.id, id: activeEvent.id, name: activeEvent.name } : null);
+    sendJson(
+      res,
+      200,
+      activeEvent
+        ? {
+            event_id: activeEvent.id,
+            event_name: activeEvent.name,
+            id: activeEvent.id,
+            name: activeEvent.name
+          }
+        : null
+    );
     return;
   }
 
   if (url.pathname === '/api/root/sports' && req.method === 'GET') {
+    sendJson(res, 200, sports);
+    return;
+  }
+
+  if (url.pathname === '/api/admin/allsports' && req.method === 'GET') {
     sendJson(res, 200, sports);
     return;
   }
@@ -352,12 +412,90 @@ createServer(async (req, res) => {
       rules: body.rules ?? '',
       location: body.location ?? 'other',
       rules_type: body.rules_type ?? 'markdown',
+      rules_pdf_url: null,
       min_capacity: null,
       max_capacity: null
     };
 
     eventSports = [...eventSports, nextEventSport];
     sendJson(res, 201, nextEventSport);
+    return;
+  }
+
+  if (url.pathname === '/api/admin/class-team/managed-class' && req.method === 'GET') {
+    sendJson(res, 200, classes);
+    return;
+  }
+
+  if (url.pathname === '/api/admin/events/1/tournaments' && req.method === 'GET') {
+    sendJson(res, 200, tournaments);
+    return;
+  }
+
+  const sportDetailsMatch = url.pathname.match(/^\/api\/admin\/events\/(\d+)\/sports\/(\d+)\/details$/);
+  if (sportDetailsMatch && req.method === 'GET') {
+    const eventId = Number(sportDetailsMatch[1]);
+    const sportId = Number(sportDetailsMatch[2]);
+    const detail = eventSports.find((item) => item.event_id === eventId && item.sport_id === sportId);
+
+    sendJson(res, 200, detail ?? {
+      description: '',
+      rules: '',
+      rules_type: 'markdown',
+      rules_pdf_url: null,
+      min_capacity: null,
+      max_capacity: null
+    });
+    return;
+  }
+
+  const sportTeamsMatch = url.pathname.match(/^\/api\/root\/sports\/(\d+)\/teams$/);
+  if (sportTeamsMatch && req.method === 'GET') {
+    const sportId = Number(sportTeamsMatch[1]);
+    const teams = classes.map((cls) => ({
+      id: sportId * 100 + cls.id,
+      event_id: 1,
+      sport_id: sportId,
+      class_id: cls.id,
+      min_capacity: null,
+      max_capacity: null
+    }));
+    sendJson(res, 200, teams);
+    return;
+  }
+
+  const rainyModeSettingsMatch = url.pathname.match(/^\/api\/root\/events\/(\d+)\/rainy-mode\/settings(?:\/(\d+)\/(\d+))?$/);
+  if (rainyModeSettingsMatch && req.method === 'GET') {
+    const eventId = Number(rainyModeSettingsMatch[1]);
+    sendJson(res, 200, rainyModeSettings.filter((item) => item.event_id === eventId));
+    return;
+  }
+
+  if (rainyModeSettingsMatch && (req.method === 'POST' || req.method === 'PUT')) {
+    const eventId = Number(rainyModeSettingsMatch[1]);
+    const body = await readJson(req);
+    const nextSetting = {
+      event_id: eventId,
+      sport_id: Number(body.sport_id),
+      class_id: Number(body.class_id),
+      min_capacity: body.min_capacity ?? null,
+      max_capacity: body.max_capacity ?? null,
+      match_start_time: body.match_start_time ?? ''
+    };
+
+    rainyModeSettings = [
+      ...rainyModeSettings.filter(
+        (item) =>
+          !(
+            item.event_id === nextSetting.event_id &&
+            item.sport_id === nextSetting.sport_id &&
+            item.class_id === nextSetting.class_id
+          )
+      ),
+      nextSetting
+    ];
+
+    sendJson(res, 200, nextSetting);
     return;
   }
 
@@ -559,14 +697,32 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/root/events/1/tournaments/generate-preview' && req.method === 'POST') {
-    tournaments = [];
-    sendJson(res, 200, []);
+    sendJson(res, 200, sampleTournamentPreview());
     return;
   }
 
   if (url.pathname === '/api/root/events/1/tournaments/bulk-create' && req.method === 'POST') {
-    tournaments = [];
+    const body = await readJson(req);
+    tournaments = body.map((tournament, index) => ({
+      id: index + 1,
+      name: tournament.sport_name,
+      sport_id: tournament.sport_id,
+      data: tournament.tournament_data
+    }));
     sendJson(res, 200, { message: 'saved' });
+    return;
+  }
+
+  if (url.pathname === '/api/root/events/1/tournaments/export/excel' && req.method === 'GET') {
+    sendResponse(
+      res,
+      200,
+      Buffer.from('mock-excel'),
+      {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="event_1_tournaments.xlsx"'
+      }
+    );
     return;
   }
 

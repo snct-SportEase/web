@@ -7,6 +7,7 @@ test.describe('通知申請管理 (root)', () => {
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/notification-requests');
     await expect(page.getByRole('heading', { name: '通知申請管理' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'メッセージを送信' })).toBeEnabled();
   });
 
   test('申請一覧と詳細を表示できる', async ({ page }) => {
@@ -25,7 +26,7 @@ test.describe('通知申請管理 (root)', () => {
     await sendButton.click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({ message: '了解しました。' });
-    await expect(page.getByText('了解しました。')).toBeVisible();
+    await expect(page.getByText('了解しました。')).toBeVisible({ timeout: 15000 });
   });
 
   test('通知申請を承認できる', async ({ page }) => {

@@ -7,16 +7,16 @@
 
   let { user } = $props();
 
-  let isSubscribed = false;
-  let isLoading = false;
-  let permissionStatus = 'default';
-  let isSupported = false;
-  let errorMessage = '';
-  let subscriptionCount = 0;
-  let debugInfo = null;
-  let showDebugDetails = false;
-  let isIOS = false;
-  let isPWA = false;
+  let isSubscribed = $state(false);
+  let isLoading = $state(false);
+  let permissionStatus = $state('default');
+  let isSupported = $state(false);
+  let errorMessage = $state('');
+  let subscriptionCount = $state(0);
+  let debugInfo = $state(null);
+  let showDebugDetails = $state(false);
+  let isIOS = $state(false);
+  let isPWA = $state(false);
 
   let canEnableNotifications = $derived(userHasPushEligibleRole(user));
   let vapidKeySet = $derived(browser ? (publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '') !== '' : false);
@@ -394,4 +394,3 @@
     </details>
   {/if}
 </div>
-

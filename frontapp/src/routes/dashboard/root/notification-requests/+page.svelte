@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto, invalidateAll } from '$app/navigation';
 
@@ -11,7 +12,12 @@
   let messageInput = $state('');
   let isPostingMessage = $state(false);
   let isDeciding = $state(false);
+  let isInteractive = $state(false);
   let errorMessage = $state(data.error);
+
+  onMount(() => {
+    isInteractive = true;
+  });
 
   function formatStatus(status) {
     switch (status) {
@@ -209,7 +215,7 @@
               <button
                 type="submit"
                 class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 disabled:bg-indigo-300"
-                disabled={isPostingMessage}
+                disabled={!isInteractive || isPostingMessage}
               >
                 {isPostingMessage ? '送信中...' : 'メッセージを送信'}
               </button>
@@ -220,14 +226,14 @@
             <button
               class="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               onclick={() => decide('rejected')}
-              disabled={isDeciding || activeRequest.status !== 'pending'}
+              disabled={!isInteractive || isDeciding || activeRequest.status !== 'pending'}
             >
               否認する
             </button>
             <button
               class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 disabled:bg-indigo-300"
               onclick={() => decide('approved')}
-              disabled={isDeciding || activeRequest.status !== 'pending'}
+              disabled={!isInteractive || isDeciding || activeRequest.status !== 'pending'}
             >
               承認する
             </button>

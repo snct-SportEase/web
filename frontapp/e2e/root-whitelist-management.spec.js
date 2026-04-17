@@ -7,6 +7,7 @@ test.describe('ホワイトリスト管理 (root)', () => {
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/whitelist-management');
     await expect(page.getByRole('heading', { name: 'ホワイトリスト管理' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add' })).toBeEnabled();
   });
 
   test('ホワイトリスト一覧を表示できる', async ({ page }) => {

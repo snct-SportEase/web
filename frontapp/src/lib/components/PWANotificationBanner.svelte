@@ -5,7 +5,7 @@
 
   let { show = false, onClose = () => {} } = $props();
 
-  let isVisible = false;
+  let isVisible = $state(false);
 
   onMount(() => {
     if (browser && show) {

@@ -15,8 +15,8 @@ test.describe('トーナメント生成・管理 (root)', () => {
   });
 
   test('トーナメントプレビューを生成して保存できる', async ({ page }) => {
-    page.on('dialog', async (dialog) => {
-      await dialog.accept();
+    page.on('dialog', (dialog) => {
+      void dialog.accept().catch(() => {});
     });
 
     const previewRequest = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/tournaments/generate-preview') && request.method() === 'POST');
@@ -27,5 +27,13 @@ test.describe('トーナメント生成・管理 (root)', () => {
     const saveRequest = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/tournaments/bulk-create') && request.method() === 'POST');
     await page.getByRole('button', { name: 'プレビューをDBに保存' }).click();
     await saveRequest;
+  });
+
+  test('保存済みトーナメントをExcelエクスポートできる', async ({ page }) => {
+    await expect(page.getByRole('button', { name: '保存済みトーナメントをExcel出力' })).toBeVisible();
+
+    const exportRequest = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/tournaments/export/excel') && request.method() === 'GET');
+    await page.getByRole('button', { name: '保存済みトーナメントをExcel出力' }).click();
+    await exportRequest;
   });
 });

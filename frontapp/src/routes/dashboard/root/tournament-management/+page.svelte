@@ -1,5 +1,5 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { browser } from '$app/environment';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
@@ -9,6 +9,7 @@
 
     let isGenerating = false;
     let isSaving = false;
+    let isExporting = false;
     let allTournaments = [];
     let generatedTournamentsPreview = null;
 
@@ -56,7 +57,11 @@
                     data: t.tournament_data,
                 }));
                 alert('トーナメントのプレビューが生成されました。内容を確認して保存してください。');
-                renderAllBrackets();
+                try {
+                    await renderAllBrackets();
+                } catch (renderError) {
+                    console.error('Error rendering tournament preview:', renderError);
+                }
             } else {
                 const result = await response.json();
                 alert(`エラー: ${result.error || '不明なエラー'}`);
@@ -127,7 +132,11 @@
                 });
 
                 generatedTournamentsPreview = null; // Ensure preview is cleared
-                renderAllBrackets();
+                try {
+                    await renderAllBrackets();
+                } catch (renderError) {
+                    console.error('Error rendering tournaments:', renderError);
+                }
             } else {
                 console.error('Failed to fetch tournaments');
                 allTournaments = [];
@@ -138,13 +147,51 @@
         }
     }
 
-    function renderAllBrackets() {
+    async function exportSavedTournamentsToExcel() {
         if (!browser) return;
-        setTimeout(() => {
-            allTournaments.forEach(tournament => {
-                renderBracket(tournament);
-            });
-        }, 0);
+        const currentEvent = get(activeEvent);
+        if (!currentEvent) {
+            alert('アクティブな大会が設定されていません。');
+            return;
+        }
+
+        isExporting = true;
+        try {
+            const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/export/excel`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                throw new Error((errorData && errorData.error) || 'Excelのダウンロードに失敗しました');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `event_${currentEvent.id}_tournaments.xlsx`;
+            if (contentDisposition && contentDisposition.includes('filename=')) {
+                filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+            }
+            anchor.download = filename;
+
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            alert(error.message || 'Excelのダウンロードに失敗しました');
+        } finally {
+            isExporting = false;
+        }
+    }
+
+    async function renderAllBrackets() {
+        if (!browser) return;
+        await tick();
+        allTournaments.forEach(tournament => {
+            renderBracket(tournament);
+        });
     }
 
     function renderBracket(tournament) {
@@ -316,7 +363,14 @@
 
     <div class="mt-16">
         {#if allTournaments && allTournaments.length > 0}
-            <h2 class="text-xl font-semibold">{generatedTournamentsPreview ? 'プレビュー中のトーナメント' : '生成済みトーナメント一覧'}</h2>
+            <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-xl font-semibold">{generatedTournamentsPreview ? 'プレビュー中のトーナメント' : '生成済みトーナメント一覧'}</h2>
+                {#if !generatedTournamentsPreview}
+                    <button onclick={exportSavedTournamentsToExcel} class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500" disabled={isExporting}>
+                        {isExporting ? 'Excel出力中...' : '保存済みトーナメントをExcel出力'}
+                    </button>
+                {/if}
+            </div>
             {#each allTournaments as tournament (tournament.id)}
                 <div class="p-4 border rounded-lg mb-8">
                     <div class="flex justify-between items-center mb-2">

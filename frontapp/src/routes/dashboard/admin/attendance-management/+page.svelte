@@ -4,13 +4,13 @@
   let { data } = $props();
   let { classes, managedClass } = data;
 
-  let selectedClassId = null;
-  let classDetails = null;
+  let selectedClassId = $state(null);
+  let classDetails = $state(null);
 
-  let attendanceCount = 0;
-  let isLoading = false;
-  let errorMessage = '';
-  let successMessage = '';
+  let attendanceCount = $state(0);
+  let isLoading = $state(false);
+  let errorMessage = $state('');
+  let successMessage = $state('');
 
   onMount(() => {
     if (managedClass) {
