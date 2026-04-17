@@ -1,6 +1,4 @@
 <script>
-  import { browser } from '$app/environment';
-
   /** @type {Array<{id: number, name: string}>} */
   let { classes = [] } = $props();
 

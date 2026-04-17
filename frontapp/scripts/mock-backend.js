@@ -529,7 +529,7 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/root/notification-requests' && req.method === 'GET') {
     sendJson(res, 200, {
-      requests: notificationRequests.map(({ messages, ...request }) => request)
+      requests: notificationRequests.map(({ ...request }) => request)
     });
     return;
   }
