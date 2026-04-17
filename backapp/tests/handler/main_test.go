@@ -490,8 +490,8 @@ func (m *MockUserRepository) GetUserByEmail(email string) (*models.User, error) 
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserRepository) CreateUser(user *models.User) error {
-	args := m.Called(user)
+func (m *MockUserRepository) CreateUser(user *models.User, role string) error {
+	args := m.Called(user, role)
 	return args.Error(0)
 }
 
@@ -511,16 +511,6 @@ func (m *MockUserRepository) GetUserWithRoles(userID string) (*models.User, erro
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*models.User), args.Error(1)
-}
-
-func (m *MockUserRepository) IsEmailWhitelisted(email string) (bool, error) {
-	args := m.Called(email)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockUserRepository) GetRoleByEmail(email string) (string, error) {
-	args := m.Called(email)
-	return args.String(0), args.Error(1)
 }
 
 func (m *MockUserRepository) AddUserRoleIfNotExists(userID string, roleName string) error {

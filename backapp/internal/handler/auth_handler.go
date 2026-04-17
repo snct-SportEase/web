@@ -121,18 +121,6 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// ホワイトリストチェック
-	isWhitelisted, err := h.userRepo.IsEmailWhitelisted(userInfo.Email)
-	if err != nil {
-		log.Printf("IsEmailWhitelisted error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
-		return
-	}
-	if !isWhitelisted {
-		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
-		return
-	}
-
 	user, err := h.userRepo.GetUserByEmail(userInfo.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user by email"})
@@ -140,32 +128,23 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	}
 
 	if user == nil {
-		// User does not exist, create a new one
+		// 新規ユーザー: InitRootUserと一致する場合はrootロール、それ以外はstudent
+		role := "student"
+		if h.cfg != nil && h.cfg.InitRootUser == userInfo.Email {
+			role = "root"
+		}
+
 		newUser := &models.User{
 			ID:                uuid.New().String(),
 			Email:             userInfo.Email,
 			IsProfileComplete: false,
 		}
-		if err := h.userRepo.CreateUser(newUser); err != nil {
-			if err.Error() == "email not in whitelist" {
-				c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=email_not_whitelisted")
-				return
-			}
+		if err := h.userRepo.CreateUser(newUser, role); err != nil {
 			log.Printf("CreateUser error: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 			return
 		}
-		user = newUser // Continue with the newly created user
-	} else {
-		// User exists, sync role from whitelist
-		whitelistRole, err := h.userRepo.GetRoleByEmail(user.Email)
-		if err == nil {
-			// Add role from whitelist if it doesn't exist
-			if err := h.userRepo.AddUserRoleIfNotExists(user.ID, whitelistRole); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add user role"})
-				return
-			}
-		}
+		user = newUser
 	}
 
 	// Create session
@@ -430,6 +409,55 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
+}
+
+type PromoteUserRequest struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"` // "admin" or "root"
+}
+
+// PromoteUserByRoot はroot権限でユーザーをadminまたはrootに昇格させる
+func (h *AuthHandler) PromoteUserByRoot(c *gin.Context) {
+	var req PromoteUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Role != "admin" && req.Role != "root" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "昇格できるロールは 'admin' または 'root' のみです"})
+		return
+	}
+
+	if err := h.userRepo.AddUserRoleIfNotExists(req.UserID, req.Role); err != nil {
+		log.Printf("PromoteUserByRoot error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to promote user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User promoted successfully"})
+}
+
+// DemoteUserByRoot はroot権限でユーザーからadminまたはrootロールを剥奪する
+func (h *AuthHandler) DemoteUserByRoot(c *gin.Context) {
+	var req PromoteUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Role != "admin" && req.Role != "root" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "降格できるロールは 'admin' または 'root' のみです"})
+		return
+	}
+
+	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role); err != nil {
+		log.Printf("DemoteUserByRoot error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to demote user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User demoted successfully"})
 }
 
 // isClassManagedRole returns true for class-managed roles that should not be

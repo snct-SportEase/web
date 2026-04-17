@@ -104,14 +104,14 @@
         <a href="/dashboard/root/noon-game" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/root/noon-game')}>
           昼競技管理
         </a>
-        <a href="/dashboard/root/whitelist-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/root/whitelist-management')}>
-          ホワイトリスト
-        </a>
         <a href="/dashboard/root/class-student-count" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/root/class-student-count')}>
           各クラス人数設定
         </a>
         <a href="/dashboard/root/change-username" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/root/change-username')}>
           ユーザー管理
+        </a>
+        <a href="/dashboard/root/user-promotion" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/root/user-promotion')}>
+          権限管理
         </a>
         <a href="/dashboard/root/identify-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/root/identify-mic')}>
           MIC確認

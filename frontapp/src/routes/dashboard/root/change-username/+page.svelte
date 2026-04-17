@@ -3,8 +3,7 @@ import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { fade, fly } from 'svelte/transition';
   import { invalidateAll } from '$app/navigation';
-  import { page } from '$app/stores';
-  import { get } from 'svelte/store';
+  import { page } from '$app/state';
 
   let users = $state([]);
   let classes = $state([]); // クラス一覧
@@ -129,7 +128,7 @@ import { onMount } from 'svelte';
   }
 
   async function checkAndInvalidateIfSelf(targetUserId) {
-    const currentUser = get(page).data?.user;
+    const currentUser = page.data?.user;
     if (currentUser && currentUser.id === targetUserId) {
       await invalidateAll();
     }
@@ -506,7 +505,35 @@ import { onMount } from 'svelte';
           </div>
         </section>
 
-        <!-- セクション2: クラス所属ロール変更 -->
+        <!-- セクション2: 権限ロール昇格・降格 -->
+        <section class="bg-amber-50 p-4 rounded-md border border-amber-100">
+          <h4 class="text-md font-bold text-amber-900 mb-2">権限ロールの昇格・降格</h4>
+          <p class="text-xs text-amber-700 mb-3">
+            ユーザーに admin または root 権限を付与・剥奪できます。
+          </p>
+          <div class="flex flex-wrap gap-2">
+            {#each ['admin', 'root'] as privilegeRole}
+              {@const hasRole = selectedUser.roles?.some(r => r.name === privilegeRole)}
+              {#if hasRole}
+                <button
+                  class="rounded-md bg-red-100 border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-200 transition-colors"
+                  onclick={() => handleDemote(privilegeRole)}
+                >
+                  {privilegeRole} を剥奪
+                </button>
+              {:else}
+                <button
+                  class="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700 transition-colors"
+                  onclick={() => handlePromote(privilegeRole)}
+                >
+                  {privilegeRole} に昇格
+                </button>
+              {/if}
+            {/each}
+          </div>
+        </section>
+
+        <!-- セクション4: クラス所属ロール変更 -->
         <section class="bg-blue-50 p-4 rounded-md border border-blue-100">
           <h4 class="text-md font-bold text-blue-900 mb-2">クラス所属の変更</h4>
           <p class="text-xs text-blue-700 mb-3">
@@ -538,7 +565,7 @@ import { onMount } from 'svelte';
           </div>
         </section>
 
-        <!-- セクション3: その他のロール管理 -->
+        <!-- セクション5: その他のロール管理 -->
         <section>
           <h4 class="text-md font-bold text-gray-800 mb-3 pb-1 border-b">その他のロール管理</h4>
           

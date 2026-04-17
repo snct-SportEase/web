@@ -39,11 +39,6 @@ func main() {
 	middleware.InitSessionStore(cfg.RedisAddr)
 	log.Println("Redis session store initialized.")
 
-	// 初期ルートユーザーを登録
-	if err := initializeRootUser(db, cfg); err != nil {
-		log.Printf("Warning: Failed to initialize root user: %v", err)
-	}
-
 	// 初期イベントを作成
 	eventID, err := initializeEvent(db, cfg)
 	if err != nil {
@@ -64,35 +59,6 @@ func main() {
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
-}
-
-// initializeRootUser は初期ルートユーザーをwhitelisted_emailsテーブルに登録する
-func initializeRootUser(db *sql.DB, cfg *config.Config) error {
-	if cfg.InitRootUser == "" {
-		log.Println("INIT_ROOT_USER is not set, skipping root user initialization")
-		return nil
-	}
-
-	whitelistRepo := repository.NewWhitelistRepository(db)
-
-	// 既に登録されているかチェック
-	isWhitelisted, err := whitelistRepo.IsEmailWhitelisted(cfg.InitRootUser)
-	if err != nil {
-		return err
-	}
-
-	if isWhitelisted {
-		log.Printf("Root user %s is already whitelisted", cfg.InitRootUser)
-		return nil
-	}
-
-	// ルートユーザーを登録 (event_id は NULL)
-	if err := whitelistRepo.AddWhitelistedEmail(cfg.InitRootUser, "root", nil); err != nil {
-		return err
-	}
-
-	log.Printf("Successfully initialized root user: %s", cfg.InitRootUser)
-	return nil
 }
 
 // initializeEvent は初期イベントと関連クラスを登録する

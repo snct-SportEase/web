@@ -11,12 +11,10 @@ import (
 type UserRepository interface {
 	FindUsers(query string, searchType string) ([]*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
-	CreateUser(user *models.User) error
+	CreateUser(user *models.User, role string) error
 	UpdateUser(user *models.User) error
 	UpdateUserDisplayName(userID string, displayName string) error
 	GetUserWithRoles(userID string) (*models.User, error)
-	IsEmailWhitelisted(email string) (bool, error)
-	GetRoleByEmail(email string) (string, error)
 	AddUserRoleIfNotExists(userID string, roleName string) error
 	UpdateUserRole(userID string, roleName string, eventID *int) error
 	DeleteUserRole(userID string, roleName string) error
@@ -252,7 +250,7 @@ func (r *userRepository) GetUserByEmail(email string) (*models.User, error) {
 	return user, nil
 }
 
-func (r *userRepository) CreateUser(user *models.User) error {
+func (r *userRepository) CreateUser(user *models.User, role string) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -271,26 +269,13 @@ func (r *userRepository) CreateUser(user *models.User) error {
 		return err
 	}
 
-	// emailに基づいてwhitelisted_emailsからroleを取得
-	// event_id IS NULL を優先し、なければ event_id が設定されているエントリも使用
-	var roleName string
-	err = r.db.QueryRow("SELECT role FROM whitelisted_emails WHERE email = ? ORDER BY event_id IS NULL DESC LIMIT 1", user.Email).Scan(&roleName)
-	if err != nil {
-		// ホワイトリストにない場合はエラーを返す
-		if err == sql.ErrNoRows {
-			return errors.New("email not in whitelist")
-		} else {
-			return err // その他のDBエラー
-		}
-	}
-
 	// role名からrolesテーブルのIDを取得
 	var roleID int64
-	err = r.db.QueryRow("SELECT id FROM roles WHERE name = ?", roleName).Scan(&roleID)
+	err = r.db.QueryRow("SELECT id FROM roles WHERE name = ?", role).Scan(&roleID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// Role does not exist, so create it
-			result, err := tx.Exec("INSERT INTO roles (name) VALUES (?)", roleName)
+			result, err := tx.Exec("INSERT INTO roles (name) VALUES (?)", role)
 			if err != nil {
 				return err
 			}
@@ -299,7 +284,6 @@ func (r *userRepository) CreateUser(user *models.User) error {
 				return err
 			}
 		} else {
-			// Another database error occurred
 			return err
 		}
 	}
@@ -310,7 +294,6 @@ func (r *userRepository) CreateUser(user *models.User) error {
 		return err
 	}
 
-	// トランザクションをコミット
 	return tx.Commit()
 }
 

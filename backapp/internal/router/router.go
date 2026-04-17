@@ -32,16 +32,13 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	authHandler := handler.NewAuthHandler(cfg, userRepo, eventRepo, classRepo)
 
-	whitelistRepo := repository.NewWhitelistRepository(db)
-	whitelistHandler := handler.NewWhitelistHandler(whitelistRepo, eventRepo)
-
 	sportRepo := repository.NewSportRepository(db)
 	sportHandler := handler.NewSportHandler(sportRepo, classRepo, teamRepo, eventRepo, tournRepo)
 
 	statisticsHandler := handler.NewStatisticsHandler(classRepo, eventRepo, sportRepo, tournRepo)
 
 	notificationRepo := repository.NewNotificationRepository(db)
-	eventHandler := handler.NewEventHandler(eventRepo, whitelistRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+	eventHandler := handler.NewEventHandler(eventRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
 
 	rainyModeRepo := repository.NewRainyModeRepository(db)
 	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)
@@ -239,14 +236,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		root := api.Group("/root")
 		{
 			root.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("root"))
-			whitelist := root.Group("/whitelist")
-			{
-				whitelist.GET("", whitelistHandler.GetWhitelistHandler)
-				whitelist.POST("", whitelistHandler.AddWhitelistedEmailHandler)
-				whitelist.POST("/csv", whitelistHandler.BulkAddWhitelistedEmailsHandler)
-				whitelist.DELETE("", whitelistHandler.DeleteWhitelistedEmailHandler)
-				whitelist.DELETE("/bulk", whitelistHandler.DeleteWhitelistedEmailsHandler)
-			}
 			// Event management routes that require 'root' role
 			rootEvents := root.Group("/events")
 			{
@@ -324,6 +313,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				rootUsers.GET("", authHandler.FindUsersHandler)
 				rootUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByAdmin)
+				rootUsers.PUT("/promote", authHandler.PromoteUserByRoot)
+				rootUsers.DELETE("/promote", authHandler.DemoteUserByRoot)
 			}
 
 			rootNotificationRequests := root.Group("/notification-requests")

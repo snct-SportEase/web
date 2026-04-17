@@ -18,7 +18,6 @@ import (
 
 type EventHandler struct {
 	eventRepo        repository.EventRepository
-	whitelistRepo    repository.WhitelistRepository
 	tournamentRepo   repository.TournamentRepository
 	classRepo        repository.ClassRepository
 	notificationRepo repository.NotificationRepository
@@ -27,10 +26,9 @@ type EventHandler struct {
 	vapidPrivateKey  string
 }
 
-func NewEventHandler(eventRepo repository.EventRepository, whitelistRepo repository.WhitelistRepository, tournamentRepo repository.TournamentRepository, classRepo repository.ClassRepository, notificationRepo repository.NotificationRepository, userRepo repository.UserRepository, vapidPublicKey string, vapidPrivateKey string) *EventHandler {
+func NewEventHandler(eventRepo repository.EventRepository, tournamentRepo repository.TournamentRepository, classRepo repository.ClassRepository, notificationRepo repository.NotificationRepository, userRepo repository.UserRepository, vapidPublicKey string, vapidPrivateKey string) *EventHandler {
 	return &EventHandler{
 		eventRepo:        eventRepo,
-		whitelistRepo:    whitelistRepo,
 		tournamentRepo:   tournamentRepo,
 		classRepo:        classRepo,
 		notificationRepo: notificationRepo,
@@ -252,16 +250,6 @@ func (h *EventHandler) SetActiveEvent(c *gin.Context) {
 		// DB更新に失敗した場合、500 Internal Server Errorを返す
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set active event"})
 		return
-	}
-
-	// If a new event is being activated (not cleared), update the whitelist
-	if req.EventID != nil {
-		if err := h.whitelistRepo.UpdateNullEventIDs(*req.EventID); err != nil {
-			// このエラーはクリティカルではないので、ログには残すがクライアントには成功を返す
-			// c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update whitelist event IDs"})
-			// return
-			// TODO: Add proper logging here
-		}
 	}
 
 	// 4. 成功レスポンスを返す
