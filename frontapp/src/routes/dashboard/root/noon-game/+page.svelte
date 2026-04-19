@@ -77,6 +77,9 @@
   let errorMessage = $state('');
   let isInteractive = $state(false);
 
+  const modeLabels = { mixed: 'クラス＆グループ混在', class: 'クラス対抗のみ', group: 'グループ対抗のみ' };
+  const templateKeyLabels = { year_relay: '学年対抗リレー', course_relay: 'コース対抗リレー', tug_of_war: '綱引き' };
+
   let escapeHandler = null;
 
   onMount(async () => {
@@ -1239,6 +1242,122 @@
           </div>
         </div>
       </div>
+    {/if}
+
+    <!-- 現在の昼競技設定 -->
+    {#if session}
+    <section class="bg-white shadow rounded-lg p-6 space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">現在の昼競技設定</h2>
+
+      <!-- セッション情報サマリー -->
+      <div class="border rounded-lg p-4 bg-gray-50 space-y-3">
+        <div class="flex justify-between items-start flex-wrap gap-2">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">{session.name}</h3>
+            {#if session.description}
+              <p class="text-sm text-gray-600 mt-1">{session.description}</p>
+            {/if}
+          </div>
+          <div class="flex flex-wrap gap-1">
+            {#if templateRuns.length > 0}
+              {#each templateRuns as run (run.id ?? run.template_key)}
+                <span class="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded font-medium">
+                  テンプレート: {templateKeyLabels[run.template_key] ?? run.template_key}
+                </span>
+              {/each}
+            {:else}
+              <span class="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded">手動設定</span>
+            {/if}
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+          <div class="bg-white rounded px-3 py-2 border">
+            <span class="text-gray-500 block text-xs">モード</span>
+            <span class="font-medium">{modeLabels[session.mode] ?? session.mode}</span>
+          </div>
+          <div class="bg-white rounded px-3 py-2 border">
+            <span class="text-gray-500 block text-xs">勝利 / 敗北 / 引分</span>
+            <span class="font-medium">{session.win_points}pt / {session.loss_points}pt / {session.draw_points}pt</span>
+          </div>
+          <div class="bg-white rounded px-3 py-2 border">
+            <span class="text-gray-500 block text-xs">参加ポイント</span>
+            <span class="font-medium">{session.participation_points}pt</span>
+          </div>
+          <div class="bg-white rounded px-3 py-2 border">
+            <span class="text-gray-500 block text-xs">手動加点</span>
+            <span class="font-medium">{session.allow_manual_points ? '許可' : '不許可'}</span>
+          </div>
+          <div class="bg-white rounded px-3 py-2 border">
+            <span class="text-gray-500 block text-xs">グループ数</span>
+            <span class="font-medium">{groups.length}グループ</span>
+          </div>
+          <div class="bg-white rounded px-3 py-2 border">
+            <span class="text-gray-500 block text-xs">試合数</span>
+            <span class="font-medium">{matches.length}試合</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- グループ設定（テンプレート後も編集可） -->
+      <div class="border rounded-lg p-4 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-800">グループ設定</h3>
+          <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" onclick={resetGroupForm}>
+            フォームをリセット
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-3">
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              グループ名
+              <input class="mt-1 border rounded px-3 py-2" bind:value={groupForm.name} placeholder="例: 1年Aコース" />
+            </label>
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              説明
+              <textarea class="mt-1 border rounded px-3 py-2" rows="3" bind:value={groupForm.description}></textarea>
+            </label>
+            <label class="flex flex-col text-sm font-medium text-gray-700">
+              所属クラス（複数選択可）
+              <select multiple size="6" class="mt-1 border rounded px-3 py-2" bind:value={groupForm.class_ids}>
+                {#each classes as cls (cls.id)}
+                  <option value={cls.id}>{cls.name}</option>
+                {/each}
+              </select>
+            </label>
+            <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+              onclick={submitGroup}
+              disabled={savingGroup}>
+              {groupForm.id ? (savingGroup ? '更新中...' : 'グループを更新') : (savingGroup ? '登録中...' : 'グループを登録')}
+            </button>
+          </div>
+          <div class="space-y-4">
+            {#if groups.length === 0}
+              <p class="text-gray-500">登録済みグループはありません。</p>
+            {:else}
+              <ul class="space-y-3">
+                {#each groups as group (group.id)}
+                  <li class="border rounded px-3 py-2">
+                    <div class="flex justify-between items-center">
+                      <div>
+                        <p class="font-semibold text-gray-800">{group.name}</p>
+                        <p class="text-xs text-gray-500">{group.description}</p>
+                      </div>
+                      <div class="space-x-2">
+                        <button class="px-3 py-1 text-sm border rounded hover:bg-gray-100" onclick={() => startEditGroup(group)}>編集</button>
+                        <button class="px-3 py-1 text-sm border rounded text-red-600 hover:bg-red-50" onclick={() => deleteGroup(group.id)}>削除</button>
+                      </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">
+                      メンバー: {group.members?.map(m => m.class?.name ?? `クラスID ${m.class_id}`).join('、') || '未設定'}
+                    </p>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
+        </div>
+      </div>
+    </section>
     {/if}
 
     <!-- テンプレートを使用しない場合の設定 -->
