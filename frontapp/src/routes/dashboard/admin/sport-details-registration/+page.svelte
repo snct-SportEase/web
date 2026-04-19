@@ -277,8 +277,6 @@
       } else if (selectedEventId) {
         await fetchClassCapacities();
       }
-      await fetchRainyModeSettings();
-
       // 雨天時モードの状態を更新（スポーツ変更時に再確認）
       await fetchActiveEventDetails();
       // トーナメントデータを再取得（雨天時モードが有効になった場合、敗者戦トーナメントの対戦相手が反映される）
@@ -1275,10 +1273,11 @@
             <div class="flex items-center gap-4">
               <div class="flex items-center gap-2">
                 <label for="rainy-min-capacity" class="text-sm font-medium text-gray-700">最低定員</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   id="rainy-min-capacity"
-                  bind:value={rainyModeMinCapacity}
+                  value={rainyModeMinCapacity ?? ''}
+                  oninput={(e) => { rainyModeMinCapacity = e.target.value === '' ? null : Number(e.target.value); }}
                   placeholder="未設定"
                   min="0"
                   class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
@@ -1287,10 +1286,11 @@
               <span class="text-gray-500">〜</span>
               <div class="flex items-center gap-2">
                 <label for="rainy-max-capacity" class="text-sm font-medium text-gray-700">最高定員</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   id="rainy-max-capacity"
-                  bind:value={rainyModeMaxCapacity}
+                  value={rainyModeMaxCapacity ?? ''}
+                  oninput={(e) => { rainyModeMaxCapacity = e.target.value === '' ? null : Number(e.target.value); }}
                   placeholder="未設定"
                   min="0"
                   class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"

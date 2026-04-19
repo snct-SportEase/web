@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { get } from 'svelte/store';
+  import { browser } from '$app/environment';
   import { activeEvent } from '$lib/stores/eventStore.js';
 
   let session = $state(null);
@@ -93,6 +94,7 @@
   });
 
   $effect(() => {
+    if (!browser) return;
     const current = $activeEvent;
     console.log('[NoonGame] activeEvent changed (reactive):', current);
     if (current && current.id) {
