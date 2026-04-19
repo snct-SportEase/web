@@ -1130,10 +1130,42 @@ func (h *NoonGameHandler) SaveGroup(c *gin.Context) {
 		return
 	}
 
+	var existingGroup *models.NoonGameGroupWithMembers
+	if groupID != 0 {
+		existingGroup, err = h.noonRepo.GetGroupWithMembers(sessionID, groupID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game group"})
+			return
+		}
+		if existingGroup == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Noon game group not found"})
+			return
+		}
+	}
+
+	groupName := req.Name
+	if existingGroup != nil {
+		currentName := strings.TrimSpace(existingGroup.Name)
+		requestedName := strings.TrimSpace(req.Name)
+		currentAutoName, err := h.deriveAutoGroupNameFromMembers(existingGroup.Members)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to derive current group label"})
+			return
+		}
+		nextAutoName, err := h.deriveAutoGroupNameFromClassIDs(req.ClassIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to derive updated group label"})
+			return
+		}
+		if currentAutoName != "" && currentName == currentAutoName && requestedName == currentName && nextAutoName != "" {
+			groupName = nextAutoName
+		}
+	}
+
 	group := &models.NoonGameGroup{
 		ID:          groupID,
 		SessionID:   sessionID,
-		Name:        req.Name,
+		Name:        groupName,
 		Description: req.Description,
 	}
 
@@ -1143,7 +1175,161 @@ func (h *NoonGameHandler) SaveGroup(c *gin.Context) {
 		return
 	}
 
+	if existingGroup != nil {
+		oldName := strings.TrimSpace(existingGroup.Name)
+		newName := strings.TrimSpace(updated.Name)
+		if oldName != "" && newName != "" && oldName != newName {
+			if err := h.syncGroupEntryDisplayNames(sessionID, updated.ID, oldName, newName); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update group labels"})
+				return
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"group": updated})
+}
+
+func (h *NoonGameHandler) deriveAutoGroupNameFromMembers(members []*models.NoonGameGroupMember) (string, error) {
+	classNames := make([]string, 0, len(members))
+	for _, member := range members {
+		if member == nil {
+			continue
+		}
+		if member.Class != nil && strings.TrimSpace(member.Class.Name) != "" {
+			classNames = append(classNames, member.Class.Name)
+			continue
+		}
+		classObj, err := h.classRepo.GetClassByID(member.ClassID)
+		if err != nil {
+			return "", err
+		}
+		if classObj != nil && strings.TrimSpace(classObj.Name) != "" {
+			classNames = append(classNames, classObj.Name)
+		}
+	}
+	return deriveAutoGroupNameFromClassNames(classNames), nil
+}
+
+func (h *NoonGameHandler) deriveAutoGroupNameFromClassIDs(classIDs []int) (string, error) {
+	classNames := make([]string, 0, len(classIDs))
+	for _, classID := range classIDs {
+		classObj, err := h.classRepo.GetClassByID(classID)
+		if err != nil {
+			return "", err
+		}
+		if classObj != nil && strings.TrimSpace(classObj.Name) != "" {
+			classNames = append(classNames, classObj.Name)
+		}
+	}
+	return deriveAutoGroupNameFromClassNames(classNames), nil
+}
+
+func deriveAutoGroupNameFromClassNames(classNames []string) string {
+	if len(classNames) == 0 {
+		return ""
+	}
+
+	trimmedNames := make([]string, 0, len(classNames))
+	for _, className := range classNames {
+		name := strings.TrimSpace(className)
+		if name != "" {
+			trimmedNames = append(trimmedNames, name)
+		}
+	}
+	if len(trimmedNames) == 0 {
+		return ""
+	}
+	if len(trimmedNames) == 1 && trimmedNames[0] == "専教" {
+		return "専攻科・教員"
+	}
+
+	firstYearName := ""
+	for _, name := range trimmedNames {
+		if len(name) == 3 && strings.HasPrefix(name, "1-") && name[2] >= '0' && name[2] <= '9' {
+			firstYearName = name
+			break
+		}
+	}
+	if firstYearName == "" {
+		return ""
+	}
+
+	coursePrefix := ""
+	for _, name := range trimmedNames {
+		if len(name) < 3 {
+			continue
+		}
+		suffix := name[len(name)-1]
+		if suffix < '2' || suffix > '5' {
+			continue
+		}
+		prefix := name[:len(name)-1]
+		if prefix == "" {
+			continue
+		}
+		isUpperAlpha := true
+		for _, ch := range prefix {
+			if ch < 'A' || ch > 'Z' {
+				isUpperAlpha = false
+				break
+			}
+		}
+		if !isUpperAlpha {
+			continue
+		}
+		if coursePrefix == "" {
+			coursePrefix = prefix
+			continue
+		}
+		if coursePrefix != prefix {
+			return ""
+		}
+	}
+	if coursePrefix == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("%s & %sコース", firstYearName, coursePrefix)
+}
+
+func (h *NoonGameHandler) syncGroupEntryDisplayNames(sessionID int, groupID int, oldName, newName string) error {
+	matches, err := h.noonRepo.GetMatchesWithResults(sessionID)
+	if err != nil {
+		return err
+	}
+
+	oldName = strings.TrimSpace(oldName)
+	newName = strings.TrimSpace(newName)
+	if oldName == "" || newName == "" || oldName == newName {
+		return nil
+	}
+
+	for _, match := range matches {
+		if match == nil || match.NoonGameMatch == nil || len(match.Entries) == 0 {
+			continue
+		}
+
+		changed := false
+		for _, entry := range match.Entries {
+			if entry == nil || strings.ToLower(strings.TrimSpace(entry.SideType)) != "group" || entry.GroupID == nil || *entry.GroupID != groupID || entry.DisplayName == nil {
+				continue
+			}
+			if strings.TrimSpace(*entry.DisplayName) != oldName {
+				continue
+			}
+			displayName := newName
+			entry.DisplayName = &displayName
+			changed = true
+		}
+
+		if changed {
+			if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (h *NoonGameHandler) DeleteGroup(c *gin.Context) {

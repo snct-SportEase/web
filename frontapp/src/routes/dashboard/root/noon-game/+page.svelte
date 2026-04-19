@@ -183,6 +183,41 @@
     return Array.from(new Set(normalized));
   }
 
+  function getClassNamesForGroupClassIds(classIds) {
+    return normalizeGroupClassIds(classIds)
+      .map((id) => classes.find((cls) => cls.id === id)?.name ?? null)
+      .filter(Boolean);
+  }
+
+  function deriveAutoGroupNameFromClassNames(classNames) {
+    if (!Array.isArray(classNames) || classNames.length === 0) return '';
+
+    const trimmedNames = classNames
+      .map((name) => String(name).trim())
+      .filter(Boolean);
+
+    if (trimmedNames.length === 1 && trimmedNames[0] === '専教') {
+      return '専攻科・教員';
+    }
+
+    const firstYearName = trimmedNames.find((name) => /^1-\d+$/.test(name));
+    const coursePrefixes = Array.from(new Set(
+      trimmedNames
+        .map((name) => name.match(/^([A-Z]{2,})[2-5]$/)?.[1] ?? null)
+        .filter(Boolean)
+    ));
+
+    if (firstYearName && coursePrefixes.length === 1) {
+      return `${firstYearName} & ${coursePrefixes[0]}コース`;
+    }
+
+    return '';
+  }
+
+  function deriveAutoGroupNameFromClassIds(classIds) {
+    return deriveAutoGroupNameFromClassNames(getClassNamesForGroupClassIds(classIds));
+  }
+
   function isGroupClassSelected(classId) {
     return normalizeGroupClassIds(groupForm.class_ids).includes(classId);
   }
@@ -192,10 +227,15 @@
     const nextClassIds = normalized.includes(classId)
       ? normalized.filter((id) => id !== classId)
       : [...normalized, classId];
+    const previousAutoName = deriveAutoGroupNameFromClassIds(normalized);
+    const nextAutoName = deriveAutoGroupNameFromClassIds(nextClassIds);
+    const currentName = (groupForm.name ?? '').trim();
+    const shouldSyncName = currentName === '' || (previousAutoName !== '' && currentName === previousAutoName);
 
     groupForm = {
       ...groupForm,
-      class_ids: nextClassIds
+      class_ids: nextClassIds,
+      name: shouldSyncName && nextAutoName ? nextAutoName : groupForm.name
     };
   }
 

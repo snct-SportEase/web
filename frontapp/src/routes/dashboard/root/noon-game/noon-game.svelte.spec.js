@@ -26,7 +26,10 @@ describe('Noon Game Page', () => {
   let groups;
   const classes = [
     { id: 1, name: '1A' },
-    { id: 2, name: '1B' }
+    { id: 2, name: '1B' },
+    { id: 3, name: '1-1' },
+    { id: 4, name: '1-2' },
+    { id: 5, name: 'IE2' }
   ];
 
   beforeEach(() => {
@@ -172,6 +175,44 @@ describe('Noon Game Page', () => {
     expect(updateCall).toBeTruthy();
     expect(JSON.parse(updateCall[1].body)).toEqual(expect.objectContaining({
       class_ids: [2]
+    }));
+  });
+
+  it('自動命名グループは所属クラスの変更に合わせて名前も更新される', async () => {
+    session = {
+      id: 1,
+      name: '昼休み競技 2025',
+      mode: 'mixed'
+    };
+    groups = [
+      {
+        id: 10,
+        name: '1-1 & IEコース',
+        description: '既存グループ',
+        members: [
+          { id: 1, group_id: 10, class_id: 3, weight: 1, class: classes[2] },
+          { id: 2, group_id: 10, class_id: 5, weight: 1, class: classes[4] }
+        ]
+      }
+    ];
+
+    render(Page);
+
+    await expect.element(page.getByText('1-1 & IEコース')).toBeInTheDocument();
+    await page.getByRole('button', { name: '編集' }).click();
+    await expect.element(page.getByLabelText('グループ名')).toHaveValue('1-1 & IEコース');
+
+    await page.getByRole('button', { name: '1-2' }).click();
+    await page.getByRole('button', { name: '1-1' }).click();
+
+    await expect.element(page.getByLabelText('グループ名')).toHaveValue('1-2 & IEコース');
+    await page.getByRole('button', { name: 'グループを更新' }).click();
+
+    const updateCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/noon-game/sessions/1/groups/10' && options?.method === 'PUT');
+    expect(updateCall).toBeTruthy();
+    expect(JSON.parse(updateCall[1].body)).toEqual(expect.objectContaining({
+      name: '1-2 & IEコース',
+      class_ids: [5, 4]
     }));
   });
 });
