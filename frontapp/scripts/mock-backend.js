@@ -31,11 +31,6 @@ const defaultSports = () => ([
   { id: 2, name: 'バレーボール' }
 ]);
 
-const defaultWhitelist = () => ([
-  { id: 1, email: 'student1@sendai-nct.jp', role: 'student' },
-  { id: 2, email: 'admin1@sendai-nct.jp', role: 'admin' }
-]);
-
 const defaultNotificationRequests = () => ([
   {
     id: 1,
@@ -159,7 +154,6 @@ let classes = [
   { id: 1, name: '1A', student_count: 40 },
   { id: 2, name: '1B', student_count: 38 }
 ];
-let whitelist = defaultWhitelist();
 let notificationRequests = defaultNotificationRequests();
 let users = defaultUsers();
 let defaultGroups = defaultDefaultGroups();
@@ -243,7 +237,6 @@ createServer(async (req, res) => {
       { id: 1, name: '1A', student_count: 40 },
       { id: 2, name: '1B', student_count: 38 }
     ];
-    whitelist = defaultWhitelist();
     notificationRequests = defaultNotificationRequests();
     users = defaultUsers();
     defaultGroups = defaultDefaultGroups();
@@ -571,46 +564,6 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/classes' && req.method === 'GET') {
     sendJson(res, 200, classes);
-    return;
-  }
-
-  if (url.pathname === '/api/root/whitelist' && req.method === 'GET') {
-    sendJson(res, 200, whitelist);
-    return;
-  }
-
-  if (url.pathname === '/api/root/whitelist' && req.method === 'POST') {
-    const body = await readJson(req);
-    const nextEntry = {
-      id: whitelist.length + 1,
-      email: body.email,
-      role: body.role
-    };
-    whitelist = [...whitelist, nextEntry];
-    sendJson(res, 201, nextEntry);
-    return;
-  }
-
-  if (url.pathname === '/api/root/whitelist' && req.method === 'DELETE') {
-    const body = await readJson(req);
-    whitelist = whitelist.filter((entry) => entry.email !== body.email);
-    sendJson(res, 200, { ok: true });
-    return;
-  }
-
-  if (url.pathname === '/api/root/whitelist/bulk' && req.method === 'DELETE') {
-    const body = await readJson(req);
-    whitelist = whitelist.filter((entry) => !body.emails.includes(entry.email));
-    sendJson(res, 200, { ok: true });
-    return;
-  }
-
-  if (url.pathname === '/api/root/whitelist/csv' && req.method === 'POST') {
-    whitelist = [
-      ...whitelist,
-      { id: whitelist.length + 1, email: 'csv-imported@sendai-nct.jp', role: 'student' }
-    ];
-    sendJson(res, 200, { ok: true });
     return;
   }
 
