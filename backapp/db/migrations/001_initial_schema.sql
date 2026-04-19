@@ -2,14 +2,6 @@
 SET NAMES utf8mb4;
 SET time_zone = '+09:00'; -- 必要に応じて日本のタイムゾーンに設定
 
--- ログインを許可するメールアドレスのホワイトリスト
-CREATE TABLE whitelisted_emails (
-    email VARCHAR(255) NOT NULL,
-    role ENUM('root', 'admin', 'student') NOT NULL,
-    event_id INT NULL,
-    UNIQUE KEY uk_email_event (email, event_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- ロール（役割）マスタテーブル
 CREATE TABLE roles (
     id INT PRIMARY KEY AUTO_INCREMENT,

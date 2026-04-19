@@ -165,45 +165,6 @@ func (m *MockEventRepository) PublishSurvey(eventID int) error {
 	return args.Error(0)
 }
 
-type MockWhitelistRepository struct {
-	mock.Mock
-}
-
-func (m *MockWhitelistRepository) IsEmailWhitelisted(email string) (bool, error) {
-	args := m.Called(email)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockWhitelistRepository) AddWhitelistedEmail(email, role string, eventID *int) error {
-	args := m.Called(email, role, eventID)
-	return args.Error(0)
-}
-
-func (m *MockWhitelistRepository) GetAllWhitelistedEmails() ([]repository.WhitelistEntry, error) {
-	args := m.Called()
-	return args.Get(0).([]repository.WhitelistEntry), args.Error(1)
-}
-
-func (m *MockWhitelistRepository) AddWhitelistedEmails(entries []repository.WhitelistEntry) error {
-	args := m.Called(entries)
-	return args.Error(0)
-}
-
-func (m *MockWhitelistRepository) UpdateNullEventIDs(eventID int) error {
-	args := m.Called(eventID)
-	return args.Error(0)
-}
-
-func (m *MockWhitelistRepository) DeleteWhitelistedEmail(email string) error {
-	args := m.Called(email)
-	return args.Error(0)
-}
-
-func (m *MockWhitelistRepository) DeleteWhitelistedEmails(emails []string) error {
-	args := m.Called(emails)
-	return args.Error(0)
-}
-
 type MockTeamRepository struct {
 	mock.Mock
 }
