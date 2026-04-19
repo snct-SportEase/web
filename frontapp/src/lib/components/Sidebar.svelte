@@ -130,7 +130,7 @@
           統計ダッシュボード
         </a>
         <a href="/dashboard/admin/class-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/admin/class-management')}>
-          クラス・チーム割り当て
+          クラス競技割り当て・管理
         </a>
         <a href="/dashboard/admin/role-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/admin/role-management')}>
           ロール割り当て・管理
