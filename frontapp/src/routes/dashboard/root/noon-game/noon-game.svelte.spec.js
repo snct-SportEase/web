@@ -23,6 +23,7 @@ vi.mock('$lib/stores/eventStore.js', () => ({
 describe('Noon Game Page', () => {
   let fetchMock;
   let session;
+  let groups;
   const classes = [
     { id: 1, name: '1A' },
     { id: 2, name: '1B' }
@@ -30,6 +31,7 @@ describe('Noon Game Page', () => {
 
   beforeEach(() => {
     session = null;
+    groups = [];
 
     fetchMock = vi.fn((url, options = {}) => {
       if (url === '/api/root/events/1/noon-game/session' && !options.method) {
@@ -38,7 +40,7 @@ describe('Noon Game Page', () => {
           json: () => Promise.resolve({
             session,
             classes,
-            groups: [],
+            groups,
             matches: [],
             points_summary: [],
             template_runs: []
@@ -54,11 +56,32 @@ describe('Noon Game Page', () => {
           json: () => Promise.resolve({
             session,
             classes,
-            groups: [],
+            groups,
             matches: [],
             points_summary: [],
             template_runs: []
           })
+        });
+      }
+
+      if (url === '/api/root/noon-game/sessions/1/groups/10' && options.method === 'PUT') {
+        const body = JSON.parse(options.body);
+        const updatedGroup = {
+          id: 10,
+          name: body.name,
+          description: body.description,
+          members: body.class_ids.map((classId, index) => ({
+            id: index + 1,
+            group_id: 10,
+            class_id: classId,
+            weight: 1,
+            class: classes.find((cls) => cls.id === classId)
+          }))
+        };
+        groups = groups.map((group) => (group.id === 10 ? updatedGroup : group));
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ group: updatedGroup })
         });
       }
 
@@ -112,5 +135,43 @@ describe('Noon Game Page', () => {
 
     const createCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/events/1/noon-game/templates/course-relay/run' && options?.method === 'POST');
     expect(createCall).toBeTruthy();
+  });
+
+  it('グループ編集でクラスをクリックで複数選択と解除できる', async () => {
+    session = {
+      id: 1,
+      name: '昼休み競技 2025',
+      mode: 'mixed'
+    };
+    groups = [
+      {
+        id: 10,
+        name: '機械系',
+        description: '既存グループ',
+        members: [
+          { id: 1, group_id: 10, class_id: 1, weight: 1, class: classes[0] }
+        ]
+      }
+    ];
+
+    render(Page);
+
+    await expect.element(page.getByRole('heading', { name: '現在の昼競技設定' })).toBeInTheDocument();
+    await expect.element(page.getByText('機械系')).toBeInTheDocument();
+    await page.getByRole('button', { name: '編集' }).click();
+
+    const class1Button = page.getByRole('button', { name: '1A' });
+    const class2Button = page.getByRole('button', { name: '1B' });
+
+    await class2Button.click();
+    await class1Button.click();
+
+    await page.getByRole('button', { name: 'グループを更新' }).click();
+
+    const updateCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/noon-game/sessions/1/groups/10' && options?.method === 'PUT');
+    expect(updateCall).toBeTruthy();
+    expect(JSON.parse(updateCall[1].body)).toEqual(expect.objectContaining({
+      class_ids: [2]
+    }));
   });
 });

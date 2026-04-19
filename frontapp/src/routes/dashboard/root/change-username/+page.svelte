@@ -226,22 +226,28 @@ import { onMount } from 'svelte';
     }
 
     try {
+      const roleToAdd = newRoleName.trim();
       const response = await fetchWithBackoff('/api/admin/users/role', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: selectedUser.id,
-          role: newRoleName
+          role: roleToAdd
         }),
       });
 
       if (response.ok) {
+        if (!(selectedUser.roles ?? []).some((role) => role.name === roleToAdd)) {
+          updateLocalUser({
+            ...selectedUser,
+            roles: [...(selectedUser.roles ?? []), { id: `local-${roleToAdd}`, name: roleToAdd }]
+          });
+        }
         alert('ロールを追加しました');
         newRoleName = '';
         await fetchUsers(searchQuery, searchType);
         await checkAndInvalidateIfSelf(selectedUser.id);
-        const updatedUser = users.find(u => u.id === selectedUser.id);
-        if (updatedUser) selectedUser = updatedUser; 
+        syncSelectedUserFromUsers(selectedUser.id);
       } else {
         const err = await response.json();
         alert(`追加失敗: ${err.error}`);
@@ -267,11 +273,14 @@ import { onMount } from 'svelte';
       });
 
       if (response.ok) {
+        updateLocalUser({
+          ...selectedUser,
+          roles: (selectedUser.roles ?? []).filter((role) => role.name !== roleName)
+        });
         alert('ロールを削除しました');
         await fetchUsers(searchQuery, searchType);
         await checkAndInvalidateIfSelf(selectedUser.id);
-        const updatedUser = users.find(u => u.id === selectedUser.id);
-        if (updatedUser) selectedUser = updatedUser;
+        syncSelectedUserFromUsers(selectedUser.id);
       } else {
         const err = await response.json();
         alert(`削除失敗: ${err.error}`);
@@ -290,6 +299,13 @@ import { onMount } from 'svelte';
     }
     // selectedUserも更新
     selectedUser = updatedUser;
+  }
+
+  function syncSelectedUserFromUsers(userId) {
+    const updatedUser = users.find((user) => user.id === userId);
+    if (updatedUser) {
+      selectedUser = updatedUser;
+    }
   }
 
   async function handlePromote(role) {

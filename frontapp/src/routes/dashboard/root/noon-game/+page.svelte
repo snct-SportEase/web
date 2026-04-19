@@ -174,6 +174,31 @@
     };
   }
 
+  function normalizeGroupClassIds(classIds) {
+    if (!Array.isArray(classIds)) return [];
+    const normalized = classIds
+      .filter((id) => id !== null && id !== undefined && id !== '')
+      .map((id) => Number(id))
+      .filter((id) => !Number.isNaN(id));
+    return Array.from(new Set(normalized));
+  }
+
+  function isGroupClassSelected(classId) {
+    return normalizeGroupClassIds(groupForm.class_ids).includes(classId);
+  }
+
+  function toggleGroupClassSelection(classId) {
+    const normalized = normalizeGroupClassIds(groupForm.class_ids);
+    const nextClassIds = normalized.includes(classId)
+      ? normalized.filter((id) => id !== classId)
+      : [...normalized, classId];
+
+    groupForm = {
+      ...groupForm,
+      class_ids: nextClassIds
+    };
+  }
+
   function resetMatchForm() {
     matchForm = {
       id: null,
@@ -282,7 +307,7 @@
       id: group.id,
       name: group.name,
       description: group.description ?? '',
-    class_ids: group.members?.map(m => m.class_id) ?? []
+      class_ids: normalizeGroupClassIds(group.members?.map((m) => m.class_id) ?? [])
     };
   }
 
@@ -304,9 +329,7 @@
         body: JSON.stringify({
           name: groupForm.name,
           description: groupForm.description,
-          class_ids: groupForm.class_ids
-            .filter((id) => id !== null && id !== undefined && id !== '')
-            .map((id) => Number(id))
+          class_ids: normalizeGroupClassIds(groupForm.class_ids)
         })
       });
       if (!res.ok) {
@@ -1318,11 +1341,33 @@
             </label>
             <label class="flex flex-col text-sm font-medium text-gray-700">
               所属クラス（複数選択可）
-              <select multiple size="6" class="mt-1 border rounded px-3 py-2" bind:value={groupForm.class_ids}>
-                {#each classes as cls (cls.id)}
-                  <option value={cls.id}>{cls.name}</option>
-                {/each}
-              </select>
+              <div class="mt-1 rounded border p-2">
+                {#if classes.length === 0}
+                  <p class="text-sm text-gray-500">選択できるクラスがありません。</p>
+                {:else}
+                  <div class="flex flex-wrap gap-2">
+                    {#each classes as cls (cls.id)}
+                      {@const selected = isGroupClassSelected(cls.id)}
+                      <button
+                        type="button"
+                        aria-label={cls.name}
+                        class={`rounded-full border px-3 py-1 text-sm transition ${
+                          selected
+                            ? 'border-indigo-600 bg-indigo-600 text-white'
+                            : 'border-gray-300 bg-white text-gray-700 hover:border-indigo-400 hover:text-indigo-700'
+                        }`}
+                        aria-pressed={selected}
+                        onclick={() => toggleGroupClassSelection(cls.id)}
+                      >
+                        {cls.name}
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+              <span class="mt-2 text-xs text-gray-500">
+                クリックで選択、もう一度クリックで解除できます。
+              </span>
             </label>
             <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
               onclick={submitGroup}

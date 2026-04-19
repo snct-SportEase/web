@@ -165,6 +165,45 @@ let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let rainyModeSettings = [];
 
+function buildNoonGroupMembers(groupId, classIds = []) {
+  return classIds
+    .map((classId, index) => {
+      const cls = classes.find((item) => item.id === classId);
+      if (!cls) return null;
+      return {
+        id: index + 1,
+        group_id: groupId,
+        class_id: classId,
+        weight: 1,
+        class: cls
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeNoonGroup(group, classIds = []) {
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description ?? null,
+    members: buildNoonGroupMembers(group.id, classIds)
+  };
+}
+
+function templateGroupsToNoonGroups(templateGroups = []) {
+  return templateGroups.map((group, index) => {
+    const classIds = (group.class_names ?? [])
+      .map((className) => classes.find((cls) => cls.name === className)?.id ?? null)
+      .filter((classId) => classId !== null);
+
+    return normalizeNoonGroup({
+      id: index + 1,
+      name: group.group_name,
+      description: null
+    }, classIds);
+  });
+}
+
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
@@ -743,6 +782,7 @@ createServer(async (req, res) => {
       id: 1,
       ...body.session
     };
+    noonGroups = templateGroupsToNoonGroups(body.session?.groups ?? []);
     noonTemplateRuns = [{ id: 1, template_key: rootTemplateRunMatch[1].replace(/-/g, '_') }];
     sendJson(res, 200, { ok: true });
     return;
@@ -755,8 +795,49 @@ createServer(async (req, res) => {
       id: 1,
       ...body.session
     };
+    noonGroups = templateGroupsToNoonGroups(body.session?.groups ?? []);
     noonTemplateRuns = [{ id: 1, template_key: adminTemplateRunMatch[1].replace(/-/g, '_') }];
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  const noonGroupMatch = url.pathname.match(/^\/api\/root\/noon-game\/sessions\/(\d+)\/groups(?:\/(\d+))?$/);
+  if (noonGroupMatch && (req.method === 'POST' || req.method === 'PUT')) {
+    const body = await readJson(req);
+    const requestedSessionId = Number(noonGroupMatch[1]);
+    const requestedGroupId = noonGroupMatch[2] ? Number(noonGroupMatch[2]) : null;
+    const classIds = (body.class_ids ?? []).map((classId) => Number(classId)).filter((classId) => !Number.isNaN(classId));
+
+    if (!noonSession || noonSession.id !== requestedSessionId) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+
+    if (req.method === 'POST') {
+      const nextId = noonGroups.reduce((maxId, group) => Math.max(maxId, group.id ?? 0), 0) + 1;
+      const nextGroup = normalizeNoonGroup({
+        id: nextId,
+        name: body.name,
+        description: body.description ?? null
+      }, classIds);
+      noonGroups = [...noonGroups, nextGroup];
+      sendJson(res, 200, { group: nextGroup });
+      return;
+    }
+
+    const existingGroup = noonGroups.find((group) => group.id === requestedGroupId);
+    if (!existingGroup) {
+      sendJson(res, 404, { error: 'Noon game group not found' });
+      return;
+    }
+
+    const updatedGroup = normalizeNoonGroup({
+      id: requestedGroupId,
+      name: body.name,
+      description: body.description ?? null
+    }, classIds);
+    noonGroups = noonGroups.map((group) => group.id === requestedGroupId ? updatedGroup : group);
+    sendJson(res, 200, { group: updatedGroup });
     return;
   }
 
