@@ -24,7 +24,7 @@
         errorMessage = `ユーザーの取得に失敗しました: ${res.status}`;
         users = [];
       }
-    } catch (e) {
+    } catch {
       errorMessage = 'ユーザーの取得中にエラーが発生しました';
       users = [];
     } finally {
@@ -54,7 +54,7 @@
         const err = await res.json();
         alert(`昇格失敗: ${err.error}`);
       }
-    } catch (e) {
+    } catch {
       alert('エラーが発生しました');
     }
   }
@@ -73,7 +73,7 @@
         const err = await res.json();
         alert(`降格失敗: ${err.error}`);
       }
-    } catch (e) {
+    } catch {
       alert('エラーが発生しました');
     }
   }
@@ -173,7 +173,7 @@
             <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
               <td class="px-4 py-3 text-sm font-medium text-gray-900">{user.email}</td>
               <td class="px-4 py-3 text-sm text-gray-600">
-                {user.display_name || <span class="text-gray-400 italic">未設定</span>}
+                {#if user.display_name}{user.display_name}{:else}<span class="text-gray-400 italic">未設定</span>{/if}
               </td>
               <td class="px-4 py-3">
                 <div class="flex flex-wrap gap-1">
@@ -190,7 +190,7 @@
                   {/if}
                 </div>
               </td>
-              {#each privilegeRoles as role}
+              {#each privilegeRoles as role (role)}
                 <td class="px-4 py-3 text-center">
                   {#if hasRole(user, role)}
                     <button

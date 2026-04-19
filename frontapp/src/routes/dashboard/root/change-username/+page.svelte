@@ -292,6 +292,50 @@ import { onMount } from 'svelte';
     selectedUser = updatedUser;
   }
 
+  async function handlePromote(role) {
+    if (!selectedUser) return;
+    if (!confirm(`${selectedUser.email} を ${role} に昇格しますか？`)) return;
+    try {
+      const res = await fetchWithBackoff('/api/root/users/promote', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: selectedUser.id, role }),
+      });
+      if (res.ok) {
+        const updatedRoles = [...(selectedUser.roles ?? []), { name: role }];
+        updateLocalUser({ ...selectedUser, roles: updatedRoles });
+        await checkAndInvalidateIfSelf(selectedUser.id);
+      } else {
+        const err = await res.json();
+        alert(`昇格失敗: ${err.error}`);
+      }
+    } catch {
+      alert('エラーが発生しました');
+    }
+  }
+
+  async function handleDemote(role) {
+    if (!selectedUser) return;
+    if (!confirm(`${selectedUser.email} から ${role} ロールを剥奪しますか？`)) return;
+    try {
+      const res = await fetchWithBackoff('/api/root/users/promote', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: selectedUser.id, role }),
+      });
+      if (res.ok) {
+        const updatedRoles = (selectedUser.roles ?? []).filter(r => r.name !== role);
+        updateLocalUser({ ...selectedUser, roles: updatedRoles });
+        await checkAndInvalidateIfSelf(selectedUser.id);
+      } else {
+        const err = await res.json();
+        alert(`降格失敗: ${err.error}`);
+      }
+    } catch {
+      alert('エラーが発生しました');
+    }
+  }
+
   onMount(async () => {
     await Promise.all([fetchUsers(), fetchClasses()]);
   });
@@ -512,7 +556,7 @@ import { onMount } from 'svelte';
             ユーザーに admin または root 権限を付与・剥奪できます。
           </p>
           <div class="flex flex-wrap gap-2">
-            {#each ['admin', 'root'] as privilegeRole}
+            {#each ['admin', 'root'] as privilegeRole (privilegeRole)}
               {@const hasRole = selectedUser.roles?.some(r => r.name === privilegeRole)}
               {#if hasRole}
                 <button
