@@ -282,7 +282,7 @@
       id: group.id,
       name: group.name,
       description: group.description ?? '',
-    class_ids: group.members?.map(m => String(m.class_id)) ?? []
+    class_ids: group.members?.map(m => m.class_id) ?? []
     };
   }
 
@@ -1412,73 +1412,6 @@
               {savingSession ? '保存中...' : (session ? 'セッションを更新' : 'セッションを作成')}
             </button>
           </div>
-
-          <!-- グループ管理 -->
-          {#if session}
-          <div class="border rounded-lg p-4 space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-gray-800 border-b pb-2 flex-1">グループ管理</h3>
-              <button class="px-3 py-1 border rounded text-sm text-gray-600 hover:bg-gray-100" onclick={resetGroupForm}>
-                フォームをリセット
-              </button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div class="space-y-3">
-                <label class="flex flex-col text-sm font-medium text-gray-700">
-                  グループ名
-                  <input class="mt-1 border rounded px-3 py-2" bind:value={groupForm.name} placeholder="例: 1年Aコース" />
-                </label>
-                <label class="flex flex-col text-sm font-medium text-gray-700">
-                  説明
-                  <textarea class="mt-1 border rounded px-3 py-2" rows="3" bind:value={groupForm.description}></textarea>
-                </label>
-                <label class="flex flex-col text-sm font-medium text-gray-700">
-                  所属クラス（複数選択可）
-                  <select multiple size="6" class="mt-1 border rounded px-3 py-2" bind:value={groupForm.class_ids}>
-                    {#each classes as cls (cls.id)}
-                      <option value={cls.id}>{cls.name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                  onclick={submitGroup}
-                  disabled={savingGroup}>
-                  {groupForm.id ? (savingGroup ? '更新中...' : 'グループを更新') : (savingGroup ? '登録中...' : 'グループを登録')}
-                </button>
-              </div>
-              <div class="space-y-4">
-                {#if groups.length === 0}
-                  <p class="text-gray-500">登録済みグループはありません。</p>
-                {:else}
-                  <ul class="space-y-3">
-                    {#each groups as group (group.id)}
-                      <li class="border rounded px-3 py-2">
-                        <div class="flex justify-between items-center">
-                          <div>
-                            <p class="font-semibold text-gray-800">{group.name}</p>
-                            <p class="text-xs text-gray-500">{group.description}</p>
-                          </div>
-                          <div class="space-x-2">
-                            <button class="px-3 py-1 text-sm border rounded hover:bg-gray-100" onclick={() => startEditGroup(group)}>編集</button>
-                            <button class="px-3 py-1 text-sm border rounded text-red-600 hover:bg-red-50" onclick={() => deleteGroup(group.id)}>削除</button>
-                          </div>
-                        </div>
-                        <p class="text-sm text-gray-600 mt-2">
-                          メンバー: {group.members?.map(m => m.class?.name ?? `クラスID ${m.class_id}`).join('、') || '未設定'}
-                        </p>
-                      </li>
-                    {/each}
-                  </ul>
-                {/if}
-              </div>
-            </div>
-          </div>
-          {:else}
-          <div class="border rounded-lg p-4 space-y-4">
-            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">グループ管理</h3>
-            <p class="text-gray-500">セッションを作成すると、グループ管理が利用できます。</p>
-          </div>
-          {/if}
 
           <!-- 試合設定 -->
           {#if session}
