@@ -55,27 +55,15 @@
   }
 
   async function handleSaveDisplayName(newDisplayName) {
-    let sessionToken = null;
-    if (browser) {
-      const cookies = document.cookie.split('; ');
-      const sessionCookie = cookies.find(row => row.startsWith('session_token='));
-      sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
-    }
-
-    if (!sessionToken) {
-      throw new Error('セッションが見つかりません。再度ログインしてください。');
-    }
-
     const response = await fetch('/api/user/profile', {
       method: 'PUT',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': `session_token=${sessionToken}`,
       },
-      body: JSON.stringify({ 
-        display_name: newDisplayName, 
-        class_id: user?.class_id || 0 
+      body: JSON.stringify({
+        display_name: newDisplayName,
+        class_id: user?.class_id || 0
       }),
     });
 
@@ -89,27 +77,15 @@
 
   async function handleLogout() {
     try {
-      let sessionToken = null;
-      if (browser) {
-        const cookies = document.cookie.split('; ');
-        const sessionCookie = cookies.find(row => row.startsWith('session_token='));
-        sessionToken = sessionCookie ? sessionCookie.split('=')[1] : null;
-      }
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (sessionToken) {
-        const response = await fetch('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cookie': `session_token=${sessionToken}`,
-          },
-        });
-
-        if (response.ok) {
-          window.location.href = '/';
-        }
-      } else {
+      if (response.ok) {
         window.location.href = '/';
       }
     } catch {

@@ -47,20 +47,8 @@
 			activeEventId = eventData.event_id;
 			console.log('[QR Code] activeEventId:', activeEventId);
 
-			// Get user teams
-			const sessionToken = document.cookie
-				.split('; ')
-				.find((row) => row.startsWith('session_token='))
-				?.split('=')[1];
-			console.log('[QR Code] sessionToken:', sessionToken ? '存在' : 'なし');
-			
-			const headers = {
-				'Content-Type': 'application/json',
-				Cookie: `session_token=${sessionToken}`
-			};
-
 			console.log('[QR Code] チーム情報を取得中...');
-			const teamsResponse = await fetch('/api/qrcode/teams', { headers });
+			const teamsResponse = await fetch('/api/qrcode/teams', { credentials: 'include' });
 			console.log('[QR Code] teamsResponse status:', teamsResponse.status, teamsResponse.ok);
 			
 			if (!teamsResponse.ok) {
@@ -162,18 +150,10 @@
 		remainingTime = null;
 
 		try {
-			const sessionToken = document.cookie
-				.split('; ')
-				.find((row) => row.startsWith('session_token='))
-				?.split('=')[1];
-			const headers = {
-				'Content-Type': 'application/json',
-				Cookie: `session_token=${sessionToken}`
-			};
-
 			const response = await fetch('/api/qrcode/generate', {
 				method: 'POST',
-				headers,
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					event_id: selectedTeam.event_id,
 					sport_id: selectedTeam.sport_id

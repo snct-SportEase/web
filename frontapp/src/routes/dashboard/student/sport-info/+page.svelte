@@ -13,15 +13,9 @@
   let selectedSportName = $state('');
 
   onMount(async () => {
-    const sessionToken = document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];
-    const headers = {
-      'Content-Type': 'application/json',
-      'Cookie': `session_token=${sessionToken}`,
-    };
-
     try {
       // Fetch the active event
-      const eventRes = await fetch(`/api/events/active`, { headers });
+      const eventRes = await fetch(`/api/events/active`, { credentials: 'include' });
       if (!eventRes.ok) {
         const errorBody = await eventRes.text();
         console.error(`Failed to load active event: ${eventRes.status} ${errorBody}`);
@@ -38,7 +32,7 @@
       }
 
       // Fetch sports for the active event
-      const sportsRes = await fetch(`/api/events/${activeEventId}/sports`, { headers });
+      const sportsRes = await fetch(`/api/events/${activeEventId}/sports`, { credentials: 'include' });
       if (!sportsRes.ok) {
         const errorBody = await sportsRes.text();
         console.error(`Failed to load sports: ${sportsRes.status} ${errorBody}`);
@@ -47,7 +41,7 @@
       eventSports = await sportsRes.json();
 
       // Fetch all sports to get their names
-      const allSportsRes = await fetch(`/api/admin/allsports`, { headers });
+      const allSportsRes = await fetch(`/api/admin/allsports`, { credentials: 'include' });
       if (!allSportsRes.ok) {
         const errorBody = await allSportsRes.text();
         console.error(`Failed to load all sports: ${allSportsRes.status} ${errorBody}`);
