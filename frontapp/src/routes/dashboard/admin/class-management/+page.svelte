@@ -4,9 +4,11 @@
 	const {
 		classes: initialClasses = [],
 		classMembers: initialClassMembers = [],
-		eventSports: initialEventSports = [],
 		allSports: initialAllSports = [],
+		availableSports: initialAvailableSports = [],
 		selectedClassId: initialSelectedClassId = null,
+		noonSessionName: initialNoonSessionName = null,
+		noonSessionSportMatched: initialNoonSessionSportMatched = false,
 		error: initialError = null
 	} = data ?? {};
 
@@ -21,8 +23,8 @@
 	let classes = $state([...initialClasses]);
 	let selectedClassId = $state(normalizedInitialSelectedClassId);
 	let classMembers = $state([...initialClassMembers]);
-	let eventSports = $state([...initialEventSports]);
 	let allSports = $state([...initialAllSports]);
+	let availableSports = $state([...initialAvailableSports]);
 	let selectedSportId = $state(null);
 	let selectedMembers = $state([]);
 	let assignedMembers = $state([]);
@@ -35,6 +37,8 @@
 	let error = $state(initialError);
 	let success = $state(null);
 	const isAdmin = data.isAdmin || false;
+	const noonSessionName = initialNoonSessionName;
+	const noonSessionSportMatched = initialNoonSessionSportMatched;
 
 	let searchQuery = $state('');
 
@@ -336,12 +340,17 @@
 					disabled={sportsLoading || membersLoading || assignLoading}
 				>
 					<option value=''>競技を選択してください</option>
-					{#each eventSports as eventSport (eventSport.id)}
-						<option value={eventSport.sport_id} selected={selectedSportId === eventSport.sport_id}>
-							{getSportName(eventSport.sport_id)}
+					{#each availableSports as sport (sport.id)}
+						<option value={sport.id} selected={selectedSportId === sport.id}>
+							{sport.name}
 						</option>
 					{/each}
 				</select>
+				{#if noonSessionName && !noonSessionSportMatched}
+					<p class="mt-2 text-sm text-amber-700">
+						昼競技セッション「{noonSessionName}」は競技マスタに同名の競技がないため、割り当て候補に表示できません。
+					</p>
+				{/if}
 			</div>
 
 			{#if selectedSportId !== null && selectedMembers.length > 0}

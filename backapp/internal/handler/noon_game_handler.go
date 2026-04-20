@@ -19,6 +19,7 @@ type NoonGameHandler struct {
 	noonRepo  repository.NoonGameRepository
 	classRepo repository.ClassRepository
 	eventRepo repository.EventRepository
+	sportRepo repository.SportRepository
 }
 
 func NewNoonGameHandler(noonRepo repository.NoonGameRepository, classRepo repository.ClassRepository, eventRepo repository.EventRepository) *NoonGameHandler {
@@ -27,6 +28,56 @@ func NewNoonGameHandler(noonRepo repository.NoonGameRepository, classRepo reposi
 		classRepo: classRepo,
 		eventRepo: eventRepo,
 	}
+}
+
+// WithSportSync enables syncing the noon-game session with sports/event_sports data.
+func (h *NoonGameHandler) WithSportSync(sportRepo repository.SportRepository) *NoonGameHandler {
+	h.sportRepo = sportRepo
+	return h
+}
+
+func (h *NoonGameHandler) syncNoonGameSport(eventID int, sessionName string) error {
+	if h == nil || h.sportRepo == nil {
+		return nil
+	}
+
+	trimmedName := strings.TrimSpace(sessionName)
+	if trimmedName == "" {
+		return nil
+	}
+
+	sport, err := h.sportRepo.GetSportByName(trimmedName)
+	if err != nil {
+		return fmt.Errorf("failed to get sport by name: %w", err)
+	}
+	if sport == nil {
+		sportID, err := h.sportRepo.CreateSport(&models.Sport{Name: trimmedName})
+		if err != nil {
+			return fmt.Errorf("failed to create sport for noon game session: %w", err)
+		}
+		sport = &models.Sport{ID: int(sportID), Name: trimmedName}
+	}
+
+	eventSports, err := h.sportRepo.GetSportsByEventID(eventID)
+	if err != nil {
+		return fmt.Errorf("failed to get event sports: %w", err)
+	}
+	for _, eventSport := range eventSports {
+		if eventSport.Location == "noon_game" {
+			return nil
+		}
+	}
+
+	if err := h.sportRepo.AssignSportToEvent(&models.EventSport{
+		EventID:   eventID,
+		SportID:   sport.ID,
+		Location:  "noon_game",
+		RulesType: "markdown",
+	}); err != nil {
+		return fmt.Errorf("failed to assign noon game sport to event: %w", err)
+	}
+
+	return nil
 }
 
 // CreateYearRelayRun は学年対抗リレー(テンプレート)の run を作成し、A/B/総合ボーナス用の試合を生成します。
@@ -95,6 +146,10 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
+			return
+		}
+		if err := h.syncNoonGameSport(eventID, session.Name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync noon game sport"})
 			return
 		}
 	} else {
@@ -382,6 +437,10 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 			return
 		}
+		if err := h.syncNoonGameSport(eventID, session.Name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync noon game sport"})
+			return
+		}
 	} else {
 		// 既にセッションが存在する場合は、そのセッションを使用（1つのイベントにつき1つのセッションのみ）
 		// セッション設定の更新は行わない（テンプレート作成時は既存セッションを使用）
@@ -652,6 +711,10 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
+			return
+		}
+		if err := h.syncNoonGameSport(eventID, session.Name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync noon game sport"})
 			return
 		}
 	} else {
@@ -1028,6 +1091,12 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 		return
 	}
 
+	if err := h.syncNoonGameSport(eventID, session.Name); err != nil {
+		log.Printf("ERROR: GetSession failed to sync noon game sport: event_id=%d, session_name=%q, error=%v", eventID, session.Name, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync noon game sport"})
+		return
+	}
+
 	payload, err := h.buildSessionPayload(session)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload"})
@@ -1085,6 +1154,12 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 	updated, err := h.noonRepo.UpsertSession(session)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save noon game session"})
+		return
+	}
+
+	if err := h.syncNoonGameSport(eventID, updated.Name); err != nil {
+		log.Printf("ERROR: UpsertSession failed to sync noon game sport: event_id=%d, session_name=%q, error=%v", eventID, updated.Name, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync noon game sport"})
 		return
 	}
 

@@ -35,7 +35,10 @@ export async function load({ fetch, locals, request }) {
 	let classMembers = [];
 	let eventSports = [];
 	let allSports = [];
+	let availableSports = [];
 	let selectedClassId = null;
+	let noonSessionName = null;
+	let noonSessionSportMatched = false;
 	let error = null;
 
 	try {
@@ -92,6 +95,15 @@ export async function load({ fetch, locals, request }) {
 				const allSportPayload = await allSportRes.json();
 				allSports = Array.isArray(allSportPayload) ? allSportPayload : [];
 			}
+
+			const noonSessionRes = await fetch(
+				`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`,
+				{ headers }
+			);
+			if (noonSessionRes.ok) {
+				const noonSessionPayload = await noonSessionRes.json();
+				noonSessionName = noonSessionPayload?.session?.name?.trim() || null;
+			}
 		}
 	} catch (err) {
 		console.error('Failed to load class management data:', err);
@@ -102,6 +114,30 @@ export async function load({ fetch, locals, request }) {
 	classMembers = Array.isArray(classMembers) ? classMembers : [];
 	eventSports = Array.isArray(eventSports) ? eventSports : [];
 	allSports = Array.isArray(allSports) ? allSports : [];
+	availableSports = [];
+
+	const assignedSportIds = new Set(
+		eventSports
+			.map((eventSport) => Number(eventSport?.sport_id))
+			.filter((sportId) => !Number.isNaN(sportId))
+	);
+	const availableSportMap = new Map();
+
+	for (const sport of allSports) {
+		if (assignedSportIds.has(sport.id)) {
+			availableSportMap.set(sport.id, sport);
+		}
+	}
+
+	if (noonSessionName) {
+		const matchedNoonSport = allSports.find((sport) => sport.name === noonSessionName);
+		if (matchedNoonSport) {
+			availableSportMap.set(matchedNoonSport.id, matchedNoonSport);
+			noonSessionSportMatched = true;
+		}
+	}
+
+	availableSports = Array.from(availableSportMap.values());
 
 	if (selectedClassId != null && typeof selectedClassId !== 'number') {
 		const parsed = Number(selectedClassId);
@@ -116,7 +152,10 @@ export async function load({ fetch, locals, request }) {
 		classMembers,
 		eventSports,
 		allSports,
+		availableSports,
 		selectedClassId,
+		noonSessionName,
+		noonSessionSportMatched,
 		error
 	};
 }

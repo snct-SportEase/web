@@ -45,7 +45,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo, eventRepo, hubManager)
 	noonRepo := repository.NewNoonGameRepository(db)
-	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo)
+	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo).WithSportSync(sportRepo)
 
 	roleRepo := repository.NewRoleRepository(db)
 	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)

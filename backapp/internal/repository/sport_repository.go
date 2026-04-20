@@ -11,6 +11,7 @@ import (
 type SportRepository interface {
 	GetAllSports() ([]*models.Sport, error)
 	GetSportByID(sportID int) (*models.Sport, error)
+	GetSportByName(name string) (*models.Sport, error)
 	CreateSport(sport *models.Sport) (int64, error)
 	GetSportsByEventID(eventID int) ([]*models.EventSport, error)
 	AssignSportToEvent(eventSport *models.EventSport) error
@@ -71,6 +72,20 @@ func (r *sportRepository) GetSportByID(sportID int) (*models.Sport, error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New("sport not found")
+		}
+		return nil, err
+	}
+	return sport, nil
+}
+
+// GetSportByName retrieves a sport by its exact name.
+func (r *sportRepository) GetSportByName(name string) (*models.Sport, error) {
+	query := "SELECT id, name FROM sports WHERE name = ?"
+	sport := &models.Sport{}
+	err := r.db.QueryRow(query, name).Scan(&sport.ID, &sport.Name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
 		}
 		return nil, err
 	}

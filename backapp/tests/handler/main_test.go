@@ -387,6 +387,14 @@ func (m *MockSportRepository) GetSportByID(sportID int) (*models.Sport, error) {
 	return args.Get(0).(*models.Sport), args.Error(1)
 }
 
+func (m *MockSportRepository) GetSportByName(name string) (*models.Sport, error) {
+	args := m.Called(name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Sport), args.Error(1)
+}
+
 func (m *MockSportRepository) CreateSport(sport *models.Sport) (int64, error) {
 	args := m.Called(sport)
 	return args.Get(0).(int64), args.Error(1)
