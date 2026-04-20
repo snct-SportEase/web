@@ -245,9 +245,7 @@ import { onMount } from 'svelte';
         }
         alert('ロールを追加しました');
         newRoleName = '';
-        await fetchUsers(searchQuery, searchType);
         await checkAndInvalidateIfSelf(selectedUser.id);
-        syncSelectedUserFromUsers(selectedUser.id);
       } else {
         const err = await response.json();
         alert(`追加失敗: ${err.error}`);
@@ -278,9 +276,7 @@ import { onMount } from 'svelte';
           roles: (selectedUser.roles ?? []).filter((role) => role.name !== roleName)
         });
         alert('ロールを削除しました');
-        await fetchUsers(searchQuery, searchType);
         await checkAndInvalidateIfSelf(selectedUser.id);
-        syncSelectedUserFromUsers(selectedUser.id);
       } else {
         const err = await response.json();
         alert(`削除失敗: ${err.error}`);
