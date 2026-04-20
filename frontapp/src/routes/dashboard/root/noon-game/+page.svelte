@@ -791,7 +791,7 @@
       // 既存のセッションがあれば、その設定を使用
       if (session) {
         templateConfigForm = {
-          name: session.name || `${templateNames[templateType]}_${current.id}`,
+          name: session.name || templateNames[templateType],
           description: session.description || '',
           mode: session.mode || 'group',
           win_points: session.win_points || 0,
@@ -806,7 +806,7 @@
       } else {
         // セッションがない場合はデフォルト値を設定
         templateConfigForm = {
-          name: `${templateNames[templateType]}_${current.id}`,
+          name: templateNames[templateType],
           description: '',
           mode: 'group',
           win_points: 0,
@@ -824,7 +824,7 @@
       // エラー時は空のグループ設定を使用
       if (session) {
         templateConfigForm = {
-          name: session.name || `${templateNames[templateType]}_${current.id}`,
+          name: session.name || templateNames[templateType],
           description: session.description || '',
           mode: session.mode || 'group',
           win_points: session.win_points || 0,
@@ -838,7 +838,7 @@
         };
       } else {
         templateConfigForm = {
-          name: `${templateNames[templateType]}_${current.id}`,
+          name: templateNames[templateType],
           description: '',
           mode: 'group',
           win_points: 0,
@@ -1095,7 +1095,7 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label class="flex flex-col text-sm font-medium text-gray-700 md:col-span-2">
                   セッション名
-                  <input class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.name} placeholder="例: 学年対抗リレー_1" />
+                  <input class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.name} placeholder="例: 学年対抗リレー" />
                 </label>
                 <label class="flex flex-col text-sm font-medium text-gray-700 md:col-span-2">
                   説明

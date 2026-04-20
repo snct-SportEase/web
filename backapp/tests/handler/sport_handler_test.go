@@ -915,6 +915,12 @@ func TestSportHandler_GetAllSportsHandler(t *testing.T) {
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
 		sports := []*models.Sport{{ID: 1, Name: "Soccer"}, {ID: 2, Name: "Basketball"}}
+		for _, name := range []string{"学年対抗リレー", "コース対抗リレー", "綱引き"} {
+			mockSportRepo.On("GetSportByName", name).Return(nil, nil).Once()
+			mockSportRepo.On("CreateSport", mock.MatchedBy(func(sport *models.Sport) bool {
+				return sport != nil && sport.Name == name
+			})).Return(int64(10), nil).Once()
+		}
 		mockSportRepo.On("GetAllSports").Return(sports, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -933,6 +939,12 @@ func TestSportHandler_GetAllSportsHandler(t *testing.T) {
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
+		for _, name := range []string{"学年対抗リレー", "コース対抗リレー", "綱引き"} {
+			mockSportRepo.On("GetSportByName", name).Return(nil, nil).Once()
+			mockSportRepo.On("CreateSport", mock.MatchedBy(func(sport *models.Sport) bool {
+				return sport != nil && sport.Name == name
+			})).Return(int64(10), nil).Once()
+		}
 		mockSportRepo.On("GetAllSports").Return(nil, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -948,6 +960,12 @@ func TestSportHandler_GetAllSportsHandler(t *testing.T) {
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
+		for _, name := range []string{"学年対抗リレー", "コース対抗リレー", "綱引き"} {
+			mockSportRepo.On("GetSportByName", name).Return(nil, nil).Once()
+			mockSportRepo.On("CreateSport", mock.MatchedBy(func(sport *models.Sport) bool {
+				return sport != nil && sport.Name == name
+			})).Return(int64(10), nil).Once()
+		}
 		mockSportRepo.On("GetAllSports").Return(nil, assert.AnError).Once()
 
 		w := httptest.NewRecorder()

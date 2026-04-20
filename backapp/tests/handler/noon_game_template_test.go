@@ -376,7 +376,7 @@ func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 		session := &models.NoonGameSession{
 			ID:      sessionID,
 			EventID: eventID,
-			Name:    "学年対抗リレー_1",
+			Name:    "学年対抗リレー",
 			Mode:    "group",
 		}
 		mockNoonRepo.On("UpsertSession", mock.AnythingOfType("*models.NoonGameSession")).Return(session, nil).Once()

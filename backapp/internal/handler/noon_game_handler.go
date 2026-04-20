@@ -22,6 +22,12 @@ type NoonGameHandler struct {
 	sportRepo repository.SportRepository
 }
 
+const (
+	defaultYearRelaySessionName   = "学年対抗リレー"
+	defaultCourseRelaySessionName = "コース対抗リレー"
+	defaultTugOfWarSessionName    = "綱引き"
+)
+
 func NewNoonGameHandler(noonRepo repository.NoonGameRepository, classRepo repository.ClassRepository, eventRepo repository.EventRepository) *NoonGameHandler {
 	return &NoonGameHandler{
 		noonRepo:  noonRepo,
@@ -112,7 +118,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	}
 	if session == nil {
 		// セッションが存在しない場合はリクエストから設定を取得、またはデフォルト値を使用
-		sessionName := fmt.Sprintf("学年対抗リレー_%d", eventID)
+		sessionName := defaultYearRelaySessionName
 		if req.Session != nil && req.Session.Name != "" {
 			sessionName = req.Session.Name
 		}
@@ -401,7 +407,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 	}
 	if session == nil {
 		// セッションが存在しない場合はリクエストから設定を取得、またはデフォルト値を使用
-		sessionName := fmt.Sprintf("コース対抗リレー_%d", eventID)
+		sessionName := defaultCourseRelaySessionName
 		if req.Session != nil && req.Session.Name != "" {
 			sessionName = req.Session.Name
 		}
@@ -677,7 +683,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 	}
 	if session == nil {
 		// セッションが存在しない場合はリクエストから設定を取得、またはデフォルト値を使用
-		sessionName := fmt.Sprintf("綱引き_%d", eventID)
+		sessionName := defaultTugOfWarSessionName
 		if req.Session != nil && req.Session.Name != "" {
 			sessionName = req.Session.Name
 		}

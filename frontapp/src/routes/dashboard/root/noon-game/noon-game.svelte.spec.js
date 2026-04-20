@@ -138,6 +138,11 @@ describe('Noon Game Page', () => {
 
     const createCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/events/1/noon-game/templates/course-relay/run' && options?.method === 'POST');
     expect(createCall).toBeTruthy();
+    expect(JSON.parse(createCall[1].body)).toEqual(expect.objectContaining({
+      session: expect.objectContaining({
+        name: 'コース対抗リレー'
+      })
+    }));
   });
 
   it('グループ編集でクラスをクリックで複数選択と解除できる', async () => {

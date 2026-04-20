@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,12 @@ type SportHandler struct {
 	tournRepo repository.TournamentRepository
 }
 
+var defaultNoonGameSportNames = []string{
+	defaultYearRelaySessionName,
+	defaultCourseRelaySessionName,
+	defaultTugOfWarSessionName,
+}
+
 // NewSportHandler creates a new instance of SportHandler.
 func NewSportHandler(sportRepo repository.SportRepository, classRepo repository.ClassRepository, teamRepo repository.TeamRepository, eventRepo repository.EventRepository, tournRepo repository.TournamentRepository) *SportHandler {
 	return &SportHandler{
@@ -31,9 +38,41 @@ func NewSportHandler(sportRepo repository.SportRepository, classRepo repository.
 	}
 }
 
+func (h *SportHandler) ensureDefaultNoonGameSports() error {
+	if h == nil || h.sportRepo == nil {
+		return nil
+	}
+
+	for _, name := range defaultNoonGameSportNames {
+		trimmedName := strings.TrimSpace(name)
+		if trimmedName == "" {
+			continue
+		}
+
+		sport, err := h.sportRepo.GetSportByName(trimmedName)
+		if err != nil {
+			return err
+		}
+		if sport != nil {
+			continue
+		}
+
+		if _, err := h.sportRepo.CreateSport(&models.Sport{Name: trimmedName}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // GetAllSportsHandler handles the request to get all sports.
 func (h *SportHandler) GetAllSportsHandler(c *gin.Context) {
 	cacheKey := "all_sports"
+
+	if err := h.ensureDefaultNoonGameSports(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize default sports"})
+		return
+	}
 
 	// 1. Try to get from cache
 	if val, found := repository.GlobalCache.Get(cacheKey); found {
