@@ -76,9 +76,13 @@ adminアカウントは大会当日の運営補助を主な役割とし、試合
 \subsection*{権限の種類}
 \begin{itemize}
   \item \textbf{root} ── 最上位権限。大会設定・システム管理・ユーザー管理など全機能にアクセス可能。
-  \item \textbf{admin} ── 本書が対象とする権限。試合進行・結果入力など大会運営補助が可能。
-  \item \textbf{student} ── エントリー・観戦・通知受信のみ。
+  \item \textbf{admin} ── 本書が対象とする権限。大会運営機能に加え、student向け機能にもアクセス可能。
+  \item \textbf{student} ── マイページ・競技情報・トーナメント・通知などの参加者向け機能を利用できる基本権限。
 \end{itemize}
+
+基本権限である \code{root} / \code{admin} / \code{student} の付与・剥奪は
+root専用の「権限管理」画面で行う。
+一方、adminの「ロール管理」画面では審判ロールなどの任意ロールのみを扱う。
 
 adminダッシュボードは \code{/dashboard/admin/} 以下の各ページから操作する。
 admin権限を持たないアカウントでアクセスしようとした場合は、自動的に \code{/dashboard} へリダイレクトされる。
@@ -106,7 +110,7 @@ admin権限を持たないアカウントでアクセスしようとした場合
   optarr/.style={->, dashed, >=Stealth}
 ]
 \node[main] (s1) {① ログイン・ダッシュボード確認　→ 第\ref{sec:dashboard}章};
-\node[main, below of=s1] (s2) {② ロール管理（事前準備）　→ 第\ref{sec:role}章};
+\node[main, below of=s1] (s2) {② ロール確認・事前準備　→ 第\ref{sec:role}章};
 \node[main, below of=s2] (s3) {③ 出席者数の登録　→ 第\ref{sec:attendance}章};
 \node[main, below of=s3] (s4) {④ 試合ステータス更新・結果入力　→ 第\ref{sec:match}章};
 \node[main, below of=s4] (s5) {⑤ 昼競技結果入力　→ 第\ref{sec:noon}章};
@@ -229,10 +233,13 @@ QRコードスキャンによって参加が確認されたメンバーの一覧
 \subsection{ロールの付与}
 
 対象ユーザーを検索し、任意のロールを付与する。
+この画面では \code{root} / \code{admin} / \code{student} の基本権限は操作できない。
 
 \subsection{ロールの削除}
 
 付与済みのロールを削除する。
+なお、\code{クラス名\_rep} や \code{クラス名\_競技名} のようなクラス管理ロールは
+この画面では削除できない。
 
 \newpage
 
@@ -463,7 +470,7 @@ QRコードスキャン & 学生のQRコードを読み取り参加を確認 \\
 \midrule
 昼競技結果の入力 & 昼競技（年リレー・コースリレー・綱引き等）の結果を登録 \\
 \midrule
-MIC投票 & Most Improved Classの候補に投票 \\
+MIC投票 & Most Impressive Classの候補クラスに投票 \\
 \bottomrule
 \end{longtable}
 

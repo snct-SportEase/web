@@ -166,12 +166,11 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 大会への競技割り当て | 競技の大会紐付け・ルール設定 | ○ | ○ | `sport-management.svelte.spec.js` / `root-sport-management.spec.js` で確認済み |
 | 通知作成・配信 | プッシュ通知の作成と送信 | ○ | ○ | `notification.svelte.spec.js` / `root-notification.spec.js` で確認済み |
 | 通知申請の承認・否認 | 学生からの通知申請の審査 | ○ | ○ | `notification-requests.svelte.spec.js` / `root-notification-requests.spec.js` で確認済み |
-| ホワイトリスト管理 | ログイン許可メールの管理 | ○ | ○ | `whitelist-management.svelte.spec.js` / `root-whitelist-management.spec.js` で確認済み |
+| 権限管理 | `admin` / `root` 権限の付与・剥奪 | ☓ | ☓ | `user-promotion` 画面の自動テストは未整備 |
 | トーナメント自動生成 | ブラケットの自動生成と確定 | ○ | ○ | `tournament-management.svelte.spec.js` / `root-tournament-management.spec.js` で確認済み |
 | 昼競技セッション管理 | 昼競技の開催枠・ポイント設定 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | 昼競技テンプレート実行 | リレー等の対戦カード自動生成 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | ユーザー表示名変更 | ユーザーの表示名更新 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
-| ユーザーロール付与・削除 | 権限（root/admin/student）の管理 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
 | クラス所属ロール付け替え | クラス所属（クラス名_rep）の変更 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
 | クラス人数設定 | 各クラスの学生数更新 | ○ | ○ | `class-student-count.svelte.spec.js` / `root-class-student-count.spec.js` で確認済み |
 | MIC結果確認 | 投票結果の確認 | ○ | ○ | `identify-mic.svelte.spec.js` / `root-identify-mic.spec.js` で確認済み |
