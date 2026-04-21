@@ -17,9 +17,9 @@ const config = {
 				'default-src': ['self'],
 				// script-src は mode:'auto' により 'nonce-{random}' が自動付与される
 				'script-src': ['self'],
-				// style-src も nonce のみ。インラインスタイルは <style> ブロックへ移行済み。
-				// マークダウンの色付けは data-mk-color 属性 + JS 適用で実現。
-				'style-src': ['self'],
+				// bracketry が描画時に <style> 注入と element.style 更新を行うため、
+				// トーナメント表の描画ページでは inline style の許可が必要。
+				'style-src': ['self', 'unsafe-inline'],
 				// 画像: アップロード画像(同一オリジン) + data URI (Chart.js等)
 				'img-src': ['self', 'data:', 'blob:'],
 				// WebSocket接続は同一オリジン (wss/ws)
