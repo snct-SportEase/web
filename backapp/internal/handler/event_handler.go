@@ -209,7 +209,7 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		return
 	}
 	if event_id == 0 {
-		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil})
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false})
 		return
 	}
 
@@ -220,7 +220,7 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		return
 	}
 	if event == nil {
-		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil})
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false})
 		return
 	}
 
@@ -230,6 +230,7 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		"competition_guidelines_pdf_url": event.CompetitionGuidelinesPdfUrl,
 		"survey_url":                     event.SurveyUrl,
 		"is_survey_published":            event.IsSurveyPublished,
+		"hide_scores":                    event.HideScores,
 	})
 }
 

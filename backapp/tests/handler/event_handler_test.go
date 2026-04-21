@@ -428,6 +428,7 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 			Year:                        2025,
 			Season:                      "spring",
 			CompetitionGuidelinesPdfUrl: &pdfUrl,
+			HideScores:                  true,
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
@@ -445,6 +446,7 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		assert.Equal(t, float64(eventID), response["event_id"])
 		assert.Equal(t, event.Name, response["event_name"])
 		assert.Equal(t, pdfUrl, response["competition_guidelines_pdf_url"])
+		assert.Equal(t, true, response["hide_scores"])
 		mockEventRepo.AssertExpectations(t)
 	})
 
@@ -482,6 +484,7 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		assert.Equal(t, float64(eventID), response["event_id"])
 		assert.Equal(t, event.Name, response["event_name"])
 		assert.Nil(t, response["competition_guidelines_pdf_url"])
+		assert.Equal(t, false, response["hide_scores"])
 		mockEventRepo.AssertExpectations(t)
 	})
 
@@ -508,6 +511,7 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		assert.Nil(t, response["event_id"])
 		assert.Nil(t, response["event_name"])
 		assert.Nil(t, response["competition_guidelines_pdf_url"])
+		assert.Equal(t, false, response["hide_scores"])
 		mockEventRepo.AssertExpectations(t)
 		mockEventRepo.AssertNotCalled(t, "GetEventByID", mock.Anything)
 	})

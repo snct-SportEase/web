@@ -2,7 +2,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import Chart from 'chart.js/auto';
 
-	let attendanceRate = $state(0);
+	let attendanceRate = $state(null);
+	let attendanceError = $state('');
 	let participationRates = $state({});
 	let scoreTrends = $state({});
 	let eventProgress = $state({});
@@ -13,25 +14,55 @@
 
 	onMount(async () => {
 		const token = localStorage.getItem('token');
-		const headers = { 'Authorization': `Bearer ${token}` };
+		const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
 		try {
-			const res1 = await fetch('/api/admin/statistics/attendance', { headers });
-			const data1 = await res1.json();
-			attendanceRate = data1.attendance_rate;
+			const [attendance, participation, scores, progress, activeEvent] = await Promise.allSettled([
+				fetchJson('/api/admin/statistics/attendance', { headers }),
+				fetchJson('/api/admin/statistics/participation', { headers }),
+				fetchJson('/api/admin/statistics/scores', { headers }),
+				fetchJson('/api/admin/statistics/progress', { headers }),
+				fetchJson('/api/events/active', { headers })
+			]);
 
-			const res2 = await fetch('/api/admin/statistics/participation', { headers });
-			participationRates = await res2.json();
+			if (attendance.status === 'fulfilled') {
+				const rate = Number(attendance.value.attendance_rate);
+				if (Number.isFinite(rate)) {
+					attendanceRate = rate;
+					attendanceError = '';
+				} else {
+					attendanceRate = null;
+					attendanceError = '出席率を取得できませんでした。';
+				}
+			} else {
+				console.error(attendance.reason);
+				attendanceRate = null;
+				attendanceError = '出席率を取得できませんでした。';
+			}
 
-			const res3 = await fetch('/api/admin/statistics/scores', { headers });
-			scoreTrends = await res3.json();
+			if (participation.status === 'fulfilled') {
+				participationRates = participation.value;
+			} else {
+				console.error(participation.reason);
+			}
 
-			const res4 = await fetch('/api/admin/statistics/progress', { headers });
-			eventProgress = await res4.json();
+			if (scores.status === 'fulfilled' && !scores.value.message) {
+				scoreTrends = scores.value;
+			} else if (scores.status === 'rejected') {
+				console.error(scores.reason);
+			}
 
-			const res5 = await fetch('/api/admin/events/active', { headers });
-			const activeEvent = await res5.json();
-			hideScores = activeEvent.hide_scores;
+			if (progress.status === 'fulfilled') {
+				eventProgress = progress.value;
+			} else {
+				console.error(progress.reason);
+			}
+
+			if (activeEvent.status === 'fulfilled') {
+				hideScores = Boolean(activeEvent.value.hide_scores);
+			} else {
+				console.error(activeEvent.reason);
+			}
 
 			// グラフを描画
 			setTimeout(() => {
@@ -98,6 +129,7 @@
 		// スコア推移のグラフ、クラスごとに
 		const classScores = {};
 		Object.keys(scoreTrends).forEach(event => {
+			if (!Array.isArray(scoreTrends[event])) return;
 			scoreTrends[event].forEach(score => {
 				if (!classScores[score.class_name]) classScores[score.class_name] = [];
 				classScores[score.class_name].push({ event, score: score.total_points_current_event });
@@ -151,6 +183,14 @@
 		return colors[Math.floor(Math.random() * colors.length)];
 	}
 
+	async function fetchJson(url, options) {
+		const response = await fetch(url, options);
+		if (!response.ok) {
+			throw new Error(`${url} failed with status ${response.status}`);
+		}
+		return response.json();
+	}
+
 </script>
 
 <div class="min-h-screen bg-gray-50 p-6">
@@ -160,7 +200,11 @@
 		<!-- 全体出席率 -->
 		<div class="bg-white rounded-lg shadow-md p-6 mb-6">
 			<h2 class="text-xl font-semibold text-gray-800 mb-4">全体出席率</h2>
-			<div class="text-4xl font-bold text-blue-600">{attendanceRate.toFixed(2)}%</div>
+			{#if attendanceRate !== null}
+				<div class="text-4xl font-bold text-blue-600">{attendanceRate.toFixed(2)}%</div>
+			{:else}
+				<div class="text-base font-medium text-gray-600">{attendanceError || '出席率を読み込み中です。'}</div>
+			{/if}
 		</div>
 
 		<!-- グリッドレイアウト -->
