@@ -1,6 +1,7 @@
 <script>
   import { page } from '$app/stores';
   import { enhance } from '$app/forms';
+  import { markNotificationsSeen } from '$lib/stores/notificationBadgeStore.js';
 
   const roleLabels = {
     student: '学生',
@@ -26,6 +27,10 @@
     if (selectedFiltersInitialized) return;
     selectedFilters = [...initialSelectedFilters];
     selectedFiltersInitialized = true;
+  });
+
+  $effect(() => {
+    markNotificationsSeen(data.user, notifications);
   });
 
   function formatDate(value) {

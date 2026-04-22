@@ -3,6 +3,8 @@
   import { goto } from '$app/navigation';
   import { invalidateAll } from '$app/navigation';
   import { browser } from '$app/environment';
+  import { onMount } from 'svelte';
+  import { notificationBadgeCount, refreshNotificationBadge } from '$lib/stores/notificationBadgeStore.js';
 
   /** @type {import('@sveltejs/kit').MaybePromise<import('../../routes/$types').LayoutData>} */
   let { user } = $props();
@@ -14,6 +16,40 @@
   const isStudent = hasRole('student');
   const isAdmin = hasRole('admin');
   const isRoot = hasRole('root');
+  const canSeeNotifications = isStudent || isAdmin || isRoot;
+
+  onMount(() => {
+    if (!canSeeNotifications) return;
+
+    const refreshBadge = () => {
+      refreshNotificationBadge(user, { initializeSeen: true }).catch((error) => {
+        console.error('[notification-badge] Failed to refresh:', error);
+      });
+    };
+
+    refreshBadge();
+
+    const interval = setInterval(refreshBadge, 60 * 1000);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) refreshBadge();
+    };
+    const handleServiceWorkerMessage = (event) => {
+      if (event.data?.type === 'sportease:new-notification') {
+        refreshBadge();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', refreshBadge);
+    navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', refreshBadge);
+      navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
+    };
+  });
 
   function closeSidebar(event) {
     if (event) {
@@ -188,8 +224,16 @@
         <a href="/dashboard/student/noon-game" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/student/noon-game')}>
           昼競技結果
         </a>
-        <a href="/dashboard/student/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/student/notification')}>
-          通知
+        <a href="/dashboard/student/notification" class="flex items-center justify-between px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/student/notification')}>
+          <span>通知</span>
+          {#if $notificationBadgeCount > 0}
+            <span
+              class="ml-3 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold leading-none text-white shadow"
+              aria-label={`未読通知 ${$notificationBadgeCount} 件`}
+            >
+              {$notificationBadgeCount > 99 ? '99+' : $notificationBadgeCount}
+            </span>
+          {/if}
         </a>
         <a href="/dashboard/student/notification-request" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={(e) => handleLinkClick(e, '/dashboard/student/notification-request')}>
           通知申請

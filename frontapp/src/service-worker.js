@@ -164,6 +164,13 @@ self.addEventListener('push', (event) => {
 	};
 
 	event.waitUntil(self.registration.showNotification(title, options));
+	event.waitUntil(
+		self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+			for (const client of clientList) {
+				client.postMessage({ type: 'sportease:new-notification' });
+			}
+		})
+	);
 });
 
 self.addEventListener('notificationclick', (event) => {
