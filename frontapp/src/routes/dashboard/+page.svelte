@@ -14,6 +14,9 @@
   let showPWAInstallGuide = $state(false);
   let activeEvent = $state(null);
   let competitionGuidelinesUrl = $state(null);
+  let relayMatches = $state([]);
+  let relayInfoLoading = $state(false);
+  let relayInfoError = $state('');
 
   onMount(async () => {
     try {
@@ -29,6 +32,9 @@
           };
           if (data.competition_guidelines_pdf_url) {
             competitionGuidelinesUrl = data.competition_guidelines_pdf_url;
+          }
+          if (isStudent) {
+            await fetchRelayInfo(data.event_id);
           }
         }
       }
@@ -98,6 +104,79 @@
     return assignments
       .map((assignment) => `${assignment.sport_name}（${assignment.team_name}）`)
       .join(' / ');
+  }
+
+  async function fetchRelayInfo(eventId) {
+    relayInfoLoading = true;
+    relayInfoError = '';
+    try {
+      const response = await fetch(`/api/student/events/${eventId}/noon-game/session`);
+      if (!response.ok) {
+        const detail = await safeJson(response);
+        throw new Error(detail?.error || 'リレー情報を取得できませんでした。');
+      }
+
+      const payload = await response.json();
+      relayMatches = (payload.matches || []).filter(isRelayMatch);
+    } catch (error) {
+      console.error('Failed to fetch relay info:', error);
+      relayInfoError = error.message || 'リレー情報を取得できませんでした。';
+      relayMatches = [];
+    } finally {
+      relayInfoLoading = false;
+    }
+  }
+
+  async function safeJson(response) {
+    try {
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  function isRelayMatch(match) {
+    const title = match?.title || '';
+    return title.includes('リレー');
+  }
+
+  function formatDateTime(value) {
+    if (!value) return '日時未定';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '日時未定';
+    return new Intl.DateTimeFormat('ja-JP', {
+      month: 'numeric',
+      day: 'numeric',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  }
+
+  function formatStatus(status) {
+    const labels = {
+      scheduled: '予定',
+      in_progress: '進行中',
+      finished: '終了',
+      cancelled: '中止'
+    };
+    return labels[status] || status || '未定';
+  }
+
+  function entryName(entry) {
+    return entry?.resolved_name || entry?.display_name || '参加者未定';
+  }
+
+  function resultEntries(match) {
+    return [...(match?.result?.details || [])].sort(
+      (a, b) => (a.rank || 999) - (b.rank || 999)
+    );
+  }
+
+  function resultEntryName(detail, match) {
+    if (detail?.entry_resolved_name) return detail.entry_resolved_name;
+    const entry = match?.entries?.find((item) => String(item.id) === String(detail?.entry_id));
+    return entryName(entry);
   }
 </script>
 
@@ -232,6 +311,100 @@
       </div>
     {/if}
   </section>
+
+  {#if isStudent}
+    <section class="space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-semibold text-gray-900">リレー情報</h2>
+        <a href="/dashboard/student/noon-game" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+          昼競技結果へ →
+        </a>
+      </div>
+
+      {#if relayInfoLoading}
+        <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          リレー情報を読み込み中です。
+        </p>
+      {:else if relayInfoError}
+        <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {relayInfoError}
+        </p>
+      {:else if relayMatches.length === 0}
+        <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          現在表示できるリレー情報はありません。
+        </p>
+      {:else}
+        <div class="grid gap-4 lg:grid-cols-2">
+          {#each relayMatches as match (match.id)}
+            <article class="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">{match.title || 'リレー'}</h3>
+                  <p class="mt-1 text-sm text-gray-600">ステータス: {formatStatus(match.status)}</p>
+                </div>
+                <span class="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
+                  {formatDateTime(match.scheduled_at)}
+                </span>
+              </div>
+
+              <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt class="font-semibold text-gray-700">場所</dt>
+                  <dd class="mt-1 text-gray-600">{match.location || '未定'}</dd>
+                </div>
+                <div>
+                  <dt class="font-semibold text-gray-700">形式</dt>
+                  <dd class="mt-1 text-gray-600">{match.format || '未定'}</dd>
+                </div>
+              </dl>
+
+              {#if match.memo}
+                <div class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  {match.memo}
+                </div>
+              {/if}
+
+              <div class="mt-4">
+                <h4 class="text-sm font-semibold text-gray-700">参加予定</h4>
+                {#if match.entries && match.entries.length > 0}
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    {#each match.entries as entry (entry.id)}
+                      <span class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-700">
+                        {entryName(entry)}
+                      </span>
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="mt-2 text-sm text-gray-500">参加予定はまだ登録されていません。</p>
+                {/if}
+              </div>
+
+              <div class="mt-4 border-t border-gray-100 pt-4">
+                <h4 class="text-sm font-semibold text-gray-700">結果</h4>
+                {#if resultEntries(match).length > 0}
+                  <div class="mt-2 space-y-2">
+                    {#each resultEntries(match) as detail (detail.id || detail.entry_id)}
+                      <div class="flex items-center justify-between rounded-md bg-indigo-50 px-3 py-2 text-sm">
+                        <span class="font-semibold text-indigo-700">
+                          {detail.rank ? `${detail.rank}位` : '-'}
+                        </span>
+                        <span class="text-gray-800">{resultEntryName(detail, match)}</span>
+                        <span class="font-semibold text-gray-900">{detail.points}点</span>
+                      </div>
+                    {/each}
+                  </div>
+                {:else if match.winner_display}
+                  <p class="mt-2 text-sm text-gray-700">勝者: {match.winner_display}</p>
+                {:else}
+                  <p class="mt-2 text-sm text-gray-500">結果はまだ登録されていません。</p>
+                {/if}
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   <section class="space-y-6">
     <div class="flex items-center justify-between">
