@@ -22,7 +22,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - "./letsencrypt:/letsencrypt"
     networks:
-      - spotease-net
+      - spotease-public
     restart: unless-stopped
 
   sportease-db:
@@ -43,7 +43,7 @@ services:
       - ./backapp/db/migrations:/docker-entrypoint-initdb.d
       - ./backapp/db/conf.d:/etc/mysql/conf.d
     networks:
-      - spotease-net
+      - spotease-internal
     restart: always
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
@@ -55,7 +55,7 @@ services:
     image: redis:7-alpine
     container_name: sportease-redis
     networks:
-      - spotease-net
+      - spotease-internal
     restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -77,7 +77,8 @@ services:
       sportease-redis:
         condition: service_healthy
     networks:
-      - spotease-net
+      - spotease-public
+      - spotease-internal
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health | grep -q 'UP'"]
@@ -87,12 +88,12 @@ services:
       start_period: 15s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend-https.rule=Host(`nitsche-gyouji.com`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
-      - "traefik.http.routers.backend-https.entrypoints=websecure"
-      - "traefik.http.routers.backend-https.tls.certresolver=myresolver"
-      - "traefik.http.routers.backend.rule=Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`) || PathPrefix(`/uploads`))"
-      - "traefik.http.routers.backend.entrypoints=local3300"
-      - "traefik.http.services.backend.loadbalancer.server.port=8080"
+      - "traefik.http.routers.uploads-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/uploads`)"
+      - "traefik.http.routers.uploads-https.entrypoints=websecure"
+      - "traefik.http.routers.uploads-https.tls.certresolver=myresolver"
+      - "traefik.http.routers.uploads.rule=Host(`localhost`) && PathPrefix(`/uploads`)"
+      - "traefik.http.routers.uploads.entrypoints=local3300"
+      - "traefik.http.services.uploads.loadbalancer.server.port=8080"
 
   sportease-frontapp:
     build:
@@ -106,7 +107,8 @@ services:
       sportease-backapp:
         condition: service_healthy
     networks:
-      - spotease-net
+      - spotease-public
+      - spotease-internal
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000"]
@@ -138,7 +140,9 @@ services:
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
 
 networks:
-  spotease-net:
+  spotease-public:
+    driver: bridge
+  spotease-internal:
     driver: bridge
 
 volumes:

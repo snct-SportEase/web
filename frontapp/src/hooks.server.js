@@ -1,9 +1,47 @@
 import { env } from '$env/dynamic/private';
-const BACKEND_URL = env.BACKEND_URL;
 import { redirect } from '@sveltejs/kit';
+
+const BACKEND_URL = env.BACKEND_URL;
+const BACKEND_PROXY_PREFIXES = ['/api', '/swagger'];
+
+function shouldProxyToBackend(pathname) {
+  return BACKEND_PROXY_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+async function proxyToBackend(event) {
+  if (!BACKEND_URL) {
+    return new Response('Backend URL is not configured', { status: 502 });
+  }
+
+  const targetUrl = new URL(event.url.pathname + event.url.search, BACKEND_URL);
+  const headers = new Headers(event.request.headers);
+
+  headers.delete('host');
+  headers.delete('connection');
+  headers.delete('content-length');
+  headers.set('x-forwarded-host', event.request.headers.get('host') ?? event.url.host);
+  headers.set('x-forwarded-proto', event.url.protocol.replace(':', ''));
+
+  const requestInit = {
+    method: event.request.method,
+    headers,
+    redirect: 'manual'
+  };
+
+  if (event.request.method !== 'GET' && event.request.method !== 'HEAD') {
+    requestInit.body = event.request.body;
+    requestInit.duplex = 'half';
+  }
+
+  return fetch(targetUrl, requestInit);
+}
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
+  if (shouldProxyToBackend(event.url.pathname)) {
+    return proxyToBackend(event);
+  }
+
   const sessionToken = event.cookies.get('session_token');
 
   if (sessionToken) {
