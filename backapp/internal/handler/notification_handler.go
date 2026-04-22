@@ -358,47 +358,6 @@ func (h *NotificationHandler) GetSubscription(c *gin.Context) {
 	})
 }
 
-func (h *NotificationHandler) GetNotificationDebugInfo(c *gin.Context) {
-	userValue, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "ユーザー情報を取得できませんでした"})
-		return
-	}
-
-	user, ok := userValue.(*models.User)
-	if !ok || user == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザー情報の解析に失敗しました"})
-		return
-	}
-
-	subs, err := h.NotificationRepo.GetPushSubscriptionsByUserID(user.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読情報の取得に失敗しました"})
-		return
-	}
-
-	// VAPIDキーの設定状態（セキュリティのため、公開鍵のみ表示）
-	vapidKeyConfigured := h.VAPIDPublicKey != "" && h.VAPIDPrivateKey != ""
-
-	debugInfo := gin.H{
-		"user_id":              user.ID,
-		"subscription_count":   len(subs),
-		"vapid_key_configured": vapidKeyConfigured,
-		"vapid_public_key_set": h.VAPIDPublicKey != "",
-		"subscriptions":        make([]gin.H, 0),
-	}
-
-	for _, sub := range subs {
-		debugInfo["subscriptions"] = append(debugInfo["subscriptions"].([]gin.H), gin.H{
-			"id":         sub.ID,
-			"endpoint":   sub.Endpoint,
-			"created_at": sub.CreatedAt,
-		})
-	}
-
-	c.JSON(http.StatusOK, debugInfo)
-}
-
 func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
 	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%v\n", notificationID, title, notificationType, targetRoles)
 

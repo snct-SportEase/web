@@ -13,8 +13,6 @@
   let isSupported = $state(false);
   let errorMessage = $state('');
   let subscriptionCount = $state(0);
-  let debugInfo = $state(null);
-  let showDebugDetails = $state(false);
   let isIOS = $state(false);
   let isPWA = $state(false);
 
@@ -28,7 +26,6 @@
       checkNotificationSupport();
       checkPermissionStatus();
       loadSubscriptionStatus();
-      loadDebugInfo();
     }
   });
 
@@ -64,24 +61,6 @@
     }
   }
 
-  async function loadDebugInfo() {
-    if (!browser || !canEnableNotifications) {
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/notifications/debug', {
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        debugInfo = await response.json();
-      }
-    } catch (error) {
-      console.error('[notification] Failed to load debug info:', error);
-    }
-  }
-
   async function enableNotifications() {
     if (!browser || !isSupported) {
       errorMessage = 'このブラウザは通知をサポートしていません。';
@@ -104,7 +83,6 @@
       if (result.status === 'subscribed') {
         isSubscribed = true;
         await loadSubscriptionStatus();
-        await loadDebugInfo();
         errorMessage = '';
       } else if (result.status === 'skipped') {
         if (result.reason === 'permission-denied') {
@@ -113,8 +91,8 @@
         } else if (result.reason === 'unsupported') {
           errorMessage = 'このブラウザは通知をサポートしていません。';
         } else if (result.reason === 'missing-vapid-key') {
-          errorMessage = 'VAPID公開鍵が設定されていません。本番環境の環境変数 PUBLIC_WEBPUSH_PUBLIC_KEY を設定してください。';
-          console.error('[notification] VAPID公開鍵が設定されていません。環境変数を確認してください。');
+          errorMessage = '通知機能は現在利用できません。管理者にお問い合わせください。';
+          console.error('[notification] VAPID public key is not configured.');
         } else {
           errorMessage = `通知の有効化に失敗しました。理由: ${result.reason || '不明'}`;
         }
@@ -179,7 +157,6 @@
 
         isSubscribed = false;
         subscriptionCount = 0;
-        await loadDebugInfo();
         errorMessage = '';
       }
     } catch (error) {
@@ -216,23 +193,6 @@
     return 'text-gray-600';
   }
 
-  // デバッグ情報を表示（開発環境のみ）
-  function showDebugInfo() {
-    if (!browser) return '';
-    const debug = {
-      isHTTPS: window.location.protocol === 'https:',
-      origin: window.location.origin,
-      notificationSupport: 'Notification' in window,
-      serviceWorkerSupport: 'serviceWorker' in navigator,
-      pushManagerSupport: 'PushManager' in window,
-      permission: Notification.permission,
-      isSupported: isSupported,
-      isSubscribed: isSubscribed,
-      subscriptionCount: subscriptionCount
-    };
-    console.log('[Notification Debug]', debug);
-    return JSON.stringify(debug, null, 2);
-  }
 </script>
 
 <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -281,9 +241,8 @@
   {#if canEnableNotifications && isSupported}
     {#if !vapidKeySet}
       <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-        <p class="font-semibold">VAPID公開鍵が設定されていません</p>
-        <p class="mt-1">本番環境の環境変数 <code class="bg-red-100 px-1 rounded">PUBLIC_WEBPUSH_PUBLIC_KEY</code> を設定してください。</p>
-        <p class="mt-1 text-xs">現在の値: {(publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY) || '(未設定)'}</p>
+        <p class="font-semibold">通知機能は現在利用できません</p>
+        <p class="mt-1">管理者にお問い合わせください。</p>
       </div>
     {/if}
     <div class="flex items-center justify-between">
@@ -324,7 +283,7 @@
             {:else if permissionStatus === 'denied'}
               通知が拒否されています
             {:else if !vapidKeySet}
-              VAPIDキー未設定
+              利用できません
             {:else}
               通知を有効にする
             {/if}
@@ -334,63 +293,4 @@
     </div>
   {/if}
 
-  {#if browser && debugInfo}
-    <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <div class="flex items-center justify-between mb-2">
-        <h4 class="text-sm font-semibold text-gray-700">診断情報</h4>
-        <button
-          type="button"
-          onclick={() => showDebugDetails = !showDebugDetails}
-          class="text-sm text-indigo-600 hover:text-indigo-700"
-        >
-          {showDebugDetails ? '非表示' : '詳細を表示'}
-        </button>
-      </div>
-      <div class="space-y-1 text-sm">
-        <div class="flex items-center">
-          <span class="text-gray-600 w-32">購読数:</span>
-          <span class="font-medium {debugInfo.subscription_count > 0 ? 'text-green-600' : 'text-red-600'}">
-            {debugInfo.subscription_count}件
-          </span>
-        </div>
-        <div class="flex items-center">
-          <span class="text-gray-600 w-32">VAPIDキー(フロント):</span>
-          <span class="font-medium {vapidKeySet ? 'text-green-600' : 'text-red-600'}">
-            {vapidKeySet ? '設定済み' : '未設定'}
-          </span>
-        </div>
-        <div class="flex items-center">
-          <span class="text-gray-600 w-32">VAPIDキー(バック):</span>
-          <span class="font-medium {debugInfo.vapid_key_configured ? 'text-green-600' : 'text-red-600'}">
-            {debugInfo.vapid_key_configured ? '設定済み' : '未設定'}
-          </span>
-        </div>
-        {#if showDebugDetails}
-          <div class="mt-3 pt-3 border-t border-gray-200">
-            <p class="text-xs text-gray-500 mb-2">購読詳細:</p>
-            {#if debugInfo.subscriptions && debugInfo.subscriptions.length > 0}
-              <ul class="space-y-1">
-                {#each debugInfo.subscriptions as sub (sub.endpoint || sub.id || sub)}
-                  <li class="text-xs text-gray-600">
-                    <span class="font-medium">ID {sub.id}:</span> {sub.endpoint.substring(0, 50)}...
-                  </li>
-                {/each}
-              </ul>
-            {:else}
-              <p class="text-xs text-gray-500">購読情報がありません</p>
-            {/if}
-          </div>
-        {/if}
-      </div>
-    </div>
-  {/if}
-
-  {#if browser && import.meta.env.DEV}
-    <details class="mt-4">
-      <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
-        デバッグ情報を表示（開発環境のみ）
-      </summary>
-      <pre class="mt-2 rounded bg-gray-100 p-3 text-xs overflow-auto">{showDebugInfo()}</pre>
-    </details>
-  {/if}
 </div>

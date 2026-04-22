@@ -32,13 +32,6 @@ describe('NotificationSettings', () => {
 				});
 			}
 
-			if (url === '/api/notifications/debug') {
-				return Promise.resolve({
-					ok: true,
-					json: () => Promise.resolve({ subscription_count: 0, subscriptions: [] })
-				});
-			}
-
 			return Promise.resolve({
 				ok: true,
 				json: () => Promise.resolve({})
@@ -115,5 +108,6 @@ describe('NotificationSettings', () => {
 				)
 			)
 			.not.toBeInTheDocument();
+		expect(fetchMock).not.toHaveBeenCalledWith('/api/notifications/debug', expect.anything());
 	});
 });
