@@ -297,13 +297,6 @@ import { onMount } from 'svelte';
     selectedUser = updatedUser;
   }
 
-  function syncSelectedUserFromUsers(userId) {
-    const updatedUser = users.find((user) => user.id === userId);
-    if (updatedUser) {
-      selectedUser = updatedUser;
-    }
-  }
-
   async function handlePromote(role) {
     if (!selectedUser) return;
     if (!confirm(`${selectedUser.email} を ${role} に昇格しますか？`)) return;
