@@ -88,6 +88,7 @@ services:
       start_period: 15s
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=sportease-public"
       - "traefik.http.routers.uploads-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/uploads`)"
       - "traefik.http.routers.uploads-https.entrypoints=websecure"
       - "traefik.http.routers.uploads-https.tls.certresolver=myresolver"
@@ -119,6 +120,7 @@ services:
       start_period: 20s
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=sportease-public"
 
       # nitsche-gyouji.com用（80/443）
       - "traefik.http.routers.frontend-http.rule=Host(`nitsche-gyouji.com`)"
@@ -145,8 +147,10 @@ services:
 
 networks:
   spotease-public:
+    name: sportease-public
     driver: bridge
   spotease-internal:
+    name: sportease-internal
     driver: bridge
 
 volumes:
