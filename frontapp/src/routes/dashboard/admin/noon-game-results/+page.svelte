@@ -363,7 +363,7 @@
             }
           } else {
             // 既存のフォームがない場合は、結果の順位でソート
-            const participantsWithRank = match.entries.map((entry, index) => {
+            const participantsWithRank = Array.from(match.entries, (entry, index) => {
               const detail = detailMap.get(entry.id);
               const rankValue = detail && detail.rank !== undefined && detail.rank !== null 
                 ? String(detail.rank) 
@@ -383,14 +383,14 @@
             });
             
             // 順位でソート（順位がない場合は最後に）
-            participantsWithRank.sort((a, b) => {
+            const sortedParticipantsWithRank = [...participantsWithRank].sort((a, b) => {
               if (a._rank === 999 && b._rank === 999) return 0;
               if (a._rank === 999) return 1;
               if (b._rank === 999) return -1;
               return a._rank - b._rank;
             });
             
-            participants = participantsWithRank.map((p) => ({
+            participants = sortedParticipantsWithRank.map((p) => ({
               id: p.id,
               entry_id: p.entry_id,
               name: p.name,
