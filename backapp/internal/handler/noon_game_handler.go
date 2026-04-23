@@ -581,33 +581,39 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		entryDisplays = append(entryDisplays, def.Display)
 	}
 
-	// 試合作成（4チーム）
-	title := "コース対抗リレー"
-	m := &models.NoonGameMatch{
-		SessionID: session.ID,
-		Title:     &title,
-		Status:    "scheduled",
-		AllowDraw: false,
-		Entries:   []*models.NoonGameMatchEntry{},
+	createMatchWithEntries := func(title string) (*models.NoonGameMatchWithResult, error) {
+		m := &models.NoonGameMatch{
+			SessionID: session.ID,
+			Title:     &title,
+			Status:    "scheduled",
+			AllowDraw: false,
+			Entries:   []*models.NoonGameMatchEntry{},
+		}
+		for i, groupID := range groupIDs {
+			display := entryDisplays[i]
+			displayCopy := display
+			gid := groupID
+			m.Entries = append(m.Entries, &models.NoonGameMatchEntry{
+				SideType:    "group",
+				GroupID:     &gid,
+				DisplayName: &displayCopy,
+			})
+		}
+		saved, err := h.noonRepo.SaveMatch(m)
+		if err != nil {
+			return nil, err
+		}
+		return h.noonRepo.GetMatchByID(saved.ID)
 	}
-	for i, groupID := range groupIDs {
-		display := entryDisplays[i]
-		displayCopy := display
-		gid := groupID
-		m.Entries = append(m.Entries, &models.NoonGameMatchEntry{
-			SideType:    "group",
-			GroupID:     &gid,
-			DisplayName: &displayCopy,
-		})
-	}
-	saved, err := h.noonRepo.SaveMatch(m)
+
+	matchRace1, err := createMatchWithEntries("コース対抗リレー 第1試合")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create match"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create race 1 match"})
 		return
 	}
-	match, err := h.noonRepo.GetMatchByID(saved.ID)
+	matchRace2, err := createMatchWithEntries("コース対抗リレー 第2試合")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch match"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create race 2 match"})
 		return
 	}
 
@@ -634,15 +640,20 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		return
 	}
 
-	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, match.ID, courseRelayMatchMain); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link match"})
+	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchRace1.ID, courseRelayMatchRace1); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link race 1 match"})
+		return
+	}
+	if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchRace2.ID, courseRelayMatchRace2); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link race 2 match"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, createCourseRelayRunResponse{
 		Run: run,
 		Matches: map[string]*models.NoonGameMatchWithResult{
-			courseRelayMatchMain: match,
+			courseRelayMatchRace1: matchRace1,
+			courseRelayMatchRace2: matchRace2,
 		},
 	})
 }
@@ -974,7 +985,8 @@ const (
 // --- Templates: コース対抗リレー ---
 const (
 	noonTemplateCourseRelay = "course_relay"
-	courseRelayMatchMain    = "MAIN"
+	courseRelayMatchRace1   = "RACE_1"
+	courseRelayMatchRace2   = "RACE_2"
 )
 
 // --- Templates: 綱引き ---
@@ -1040,6 +1052,7 @@ type courseRelayRankInput struct {
 type courseRelayResultRequest struct {
 	Rankings []courseRelayRankInput `json:"rankings" binding:"required"`
 	Note     *string                `json:"note"`
+	MatchID  *int                   `json:"match_id"`
 }
 
 type tugOfWarRankInput struct {
@@ -2215,7 +2228,21 @@ func (h *NoonGameHandler) RecordCourseRelayResult(c *gin.Context) {
 		Note:     req.Note,
 	}
 
-	h.applyCourseRelayRankingsToMatch(c, runID, courseRelayMatchMain, yearRelayReq, pointsByRank)
+	matchKey := courseRelayMatchRace1
+	if req.MatchID != nil {
+		link, err := h.noonRepo.GetTemplateRunMatchByMatchID(*req.MatchID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch run match"})
+			return
+		}
+		if link == nil || link.RunID != runID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "match_id does not belong to this template run"})
+			return
+		}
+		matchKey = link.MatchKey
+	}
+
+	h.applyCourseRelayRankingsToMatch(c, runID, matchKey, yearRelayReq, pointsByRank)
 }
 
 // RecordTugOfWarResult は綱引きの順位を登録し、テンプレ点を自動付与します。

@@ -253,18 +253,25 @@
       });
     }
 
-    // コース対抗リレーと綱引きは各試合が1つのrun
+    // コース対抗リレーは同じrunに複数試合が紐づく
     for (const { match, template } of courseRelayMatches) {
       const runId = await getRunIdFromMatchId(match.id);
       const runKey = runId ? `course-relay-${runId}` : `course-relay-${match.id}`;
-      runs.set(runKey, {
-        key: runKey,
-        type: 'course-relay',
-        matches: [{ match, template }],
-        runId: runId
-      });
+      const existing = runs.get(runKey);
+      if (existing) {
+        existing.matches = [...existing.matches, { match, template }];
+        runs.set(runKey, existing);
+      } else {
+        runs.set(runKey, {
+          key: runKey,
+          type: 'course-relay',
+          matches: [{ match, template }],
+          runId: runId
+        });
+      }
     }
 
+    // 綱引きは各試合が1つのrun
     for (const { match, template } of tugOfWarMatches) {
       const runId = await getRunIdFromMatchId(match.id);
       const runKey = runId ? `tug-of-war-${runId}` : `tug-of-war-${match.id}`;
@@ -454,7 +461,8 @@
       let endpoint = '';
       let payload = {
         rankings,
-        note: form.note || null
+        note: form.note || null,
+        match_id: match.id
       };
 
       if (template.type === 'year-relay') {
@@ -699,7 +707,7 @@
       <section class="bg-white shadow rounded-lg p-6 space-y-6">
         <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">テンプレート結果入力</h2>
         <div class="space-y-6">
-          {#each templateRuns as run (run.id || run.template?.id)}
+          {#each templateRuns as run (run.key)}
             <div class="border rounded-lg p-4 bg-blue-50 space-y-4">
               <h3 class="text-lg font-semibold text-gray-800">
                 {#if run.type === 'year-relay'}

@@ -1536,20 +1536,22 @@ func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
 			mockNoonRepo.On("SaveGroup", mock.AnythingOfType("*models.NoonGameGroup"), mock.AnythingOfType("[]int")).Return(group, nil).Once()
 		}
 
-		// 試合作成（1つ）
-		matchID := 301
-		match := &models.NoonGameMatch{
-			ID:        matchID,
-			SessionID: sessionID,
-			Status:    "scheduled",
-		}
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(match, nil).Once()
+		// 試合作成（2つ）
+		matchIDs := []int{301, 302}
+		for _, matchID := range matchIDs {
+			match := &models.NoonGameMatch{
+				ID:        matchID,
+				SessionID: sessionID,
+				Status:    "scheduled",
+			}
+			mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(match, nil).Once()
 
-		matchWithResult := &models.NoonGameMatchWithResult{
-			NoonGameMatch: match,
-			Entries:       []*models.NoonGameMatchEntry{},
+			matchWithResult := &models.NoonGameMatchWithResult{
+				NoonGameMatch: match,
+				Entries:       []*models.NoonGameMatchEntry{},
+			}
+			mockNoonRepo.On("GetMatchByID", matchID).Return(matchWithResult, nil).Once()
 		}
-		mockNoonRepo.On("GetMatchByID", matchID).Return(matchWithResult, nil).Once()
 
 		// Template run作成
 		run := &models.NoonGameTemplateRun{
@@ -1562,14 +1564,17 @@ func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
 		}
 		mockNoonRepo.On("CreateTemplateRunWithPointsByRankJSON", sessionID, "course_relay", "コース対抗リレー (event_id=1)", userID, mock.Anything).Return(run, nil).Once()
 
-		// 試合リンク（1回）
-		link := &models.NoonGameTemplateRunMatch{
-			ID:       501,
-			RunID:    401,
-			MatchID:  matchID,
-			MatchKey: "MAIN",
+		// 試合リンク（2回）
+		matchKeys := []string{"RACE_1", "RACE_2"}
+		for i, matchID := range matchIDs {
+			link := &models.NoonGameTemplateRunMatch{
+				ID:       501 + i,
+				RunID:    401,
+				MatchID:  matchID,
+				MatchKey: matchKeys[i],
+			}
+			mockNoonRepo.On("LinkTemplateRunMatch", 401, matchID, matchKeys[i]).Return(link, nil).Once()
 		}
-		mockNoonRepo.On("LinkTemplateRunMatch", 401, matchID, "MAIN").Return(link, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
