@@ -382,13 +382,25 @@
               };
             });
             
-            // 順位でソート（順位がない場合は最後に）
-            const sortedParticipantsWithRank = [...participantsWithRank].sort((a, b) => {
-              if (a._rank === 999 && b._rank === 999) return 0;
-              if (a._rank === 999) return 1;
-              if (b._rank === 999) return -1;
-              return a._rank - b._rank;
-            });
+            // 順位で並べる（Svelte state proxy の破壊的 sort を避ける）
+            let sortedParticipantsWithRank = [];
+            for (const participant of participantsWithRank) {
+              let insertAt = sortedParticipantsWithRank.length;
+              for (let i = 0; i < sortedParticipantsWithRank.length; i += 1) {
+                const current = sortedParticipantsWithRank[i];
+                const participantRank = participant._rank === 999 ? Number.POSITIVE_INFINITY : participant._rank;
+                const currentRank = current._rank === 999 ? Number.POSITIVE_INFINITY : current._rank;
+                if (participantRank < currentRank) {
+                  insertAt = i;
+                  break;
+                }
+              }
+              sortedParticipantsWithRank = [
+                ...sortedParticipantsWithRank.slice(0, insertAt),
+                participant,
+                ...sortedParticipantsWithRank.slice(insertAt)
+              ];
+            }
             
             participants = sortedParticipantsWithRank.map((p) => ({
               id: p.id,

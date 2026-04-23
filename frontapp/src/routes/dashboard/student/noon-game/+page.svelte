@@ -8,6 +8,8 @@
   let pointsSummary = $state([]);
   let loading = $state(false);
   let errorMessage = $state('');
+  let templateMatches = $derived(matches.filter((match) => detectTemplateFromMatch(match)));
+  let sortedPointsSummary = $derived(orderByPointsDesc(pointsSummary));
 
   onMount(async () => {
     await activeEvent.init();
@@ -32,7 +34,6 @@
       pointsSummary = data.points_summary || [];
       
       // デバッグ用: テンプレート結果のデータ構造を確認
-      const templateMatches = matches.filter(m => detectTemplateFromMatch(m));
       if (templateMatches.length > 0) {
         console.log('Template matches data:', templateMatches.map(m => ({
           id: m.id,
@@ -122,6 +123,45 @@
     return detail.resolved_name || detail.display_name || '-';
   }
 
+  function insertOrdered(items, item, compare) {
+    let insertAt = items.length;
+    for (let index = 0; index < items.length; index += 1) {
+      if (compare(item, items[index]) < 0) {
+        insertAt = index;
+        break;
+      }
+    }
+    return [
+      ...items.slice(0, insertAt),
+      item,
+      ...items.slice(insertAt)
+    ];
+  }
+
+  function orderByRank(details) {
+    let ordered = [];
+    for (const detail of details || []) {
+      ordered = insertOrdered(
+        ordered,
+        detail,
+        (left, right) => (left.rank || 999) - (right.rank || 999)
+      );
+    }
+    return ordered;
+  }
+
+  function orderByPointsDesc(summary) {
+    let ordered = [];
+    for (const item of summary || []) {
+      ordered = insertOrdered(
+        ordered,
+        item,
+        (left, right) => (right.points || 0) - (left.points || 0)
+      );
+    }
+    return ordered;
+  }
+
 </script>
 
 <div class="space-y-8 p-4 md:p-8">
@@ -141,11 +181,11 @@
     </div>
   {:else}
     <!-- テンプレートラン用の結果表示 -->
-    {#if matches.filter(m => detectTemplateFromMatch(m)).length > 0}
+    {#if templateMatches.length > 0}
       <section class="bg-white shadow rounded-lg p-6 space-y-6">
         <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">テンプレート結果</h2>
         <div class="space-y-6">
-          {#each matches.filter(m => detectTemplateFromMatch(m)) as match (match.id)}
+          {#each templateMatches as match (match.id)}
             {@const template = detectTemplateFromMatch(match)}
             {#if template}
               <div class="border rounded-lg p-4 bg-blue-50 space-y-3">
@@ -156,7 +196,7 @@
                       <div class="space-y-2">
                         <p class="text-sm font-semibold text-gray-700">順位・得点</p>
                         <div class="space-y-2">
-                          {#each match.result.details.sort((a, b) => (a.rank || 999) - (b.rank || 999)) as detail (detail.class_id || detail.id)}
+                          {#each orderByRank(match.result.details) as detail (detail.class_id || detail.id)}
                             <div class="border rounded px-3 py-2 bg-gray-50">
                               <div class="flex justify-between items-center">
                                 <span class="text-sm font-semibold text-gray-800">
@@ -210,7 +250,7 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              {#each pointsSummary.sort((a, b) => b.points - a.points) as item (item.class_id || item.id)}
+              {#each sortedPointsSummary as item (item.class_id || item.id)}
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-2">{item.class_name}</td>
                   <td class="px-4 py-2 text-right font-semibold">{item.points}</td>
