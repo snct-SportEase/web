@@ -83,6 +83,7 @@
   <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
     <h2 class="text-2xl font-bold text-center text-gray-800">プロフィールを設定してください</h2>
     <p class="text-center text-gray-600">初回ログインありがとうございます。サービスを利用する前に、表示名とクラスを設定してください。</p>
+    <p class="text-center text-gray-600">ユーザー名は適切な名前を入力してください。運営側で不適切と判断した場合は、表示名を変えさせていただく場合があります。</p>
 
     {#if !isConfirming}
       <!-- プロフィール更新フォーム -->
