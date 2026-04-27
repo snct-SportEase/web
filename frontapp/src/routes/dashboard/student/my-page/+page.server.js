@@ -3,6 +3,117 @@ const BACKEND_URL = env.BACKEND_URL;
 
 const toNumber = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : 0);
 
+const toDateValue = (value) => {
+	if (!value) return Number.POSITIVE_INFINITY;
+	const date = new Date(String(value).replace(' ', 'T'));
+	return Number.isNaN(date.getTime()) ? Number.POSITIVE_INFINITY : date.getTime();
+};
+
+const normalizeMatchStatus = (status) => String(status || '').toLowerCase();
+
+const getContestantName = (tournamentData, side) => {
+	if (!side) return '未定';
+	if (side.title) return side.title;
+	const contestant = tournamentData?.contestants?.[side.contestantId];
+	return contestant?.players?.[0]?.title || '未定';
+};
+
+const getRoundLabel = (tournamentData, match) =>
+	tournamentData?.rounds?.[match?.roundIndex]?.name || `Round ${toNumber(match?.roundIndex) + 1}`;
+
+const buildTournamentUpcomingMatches = (tournaments, teams) => {
+	if (!Array.isArray(tournaments) || !Array.isArray(teams) || teams.length === 0) {
+		return [];
+	}
+
+	const teamByID = new Map(teams.map((team) => [Number(team.id), team]));
+	const upcoming = [];
+
+	for (const tournament of tournaments) {
+		let tournamentData = tournament?.data;
+		if (typeof tournamentData === 'string') {
+			try {
+				tournamentData = JSON.parse(tournamentData);
+			} catch {
+				continue;
+			}
+		}
+
+		if (!tournamentData?.matches) continue;
+
+		for (const match of tournamentData.matches) {
+			const status = normalizeMatchStatus(match?.matchStatus);
+			if (status === 'completed' || status === 'finished') continue;
+
+			const sides = Array.isArray(match?.sides) ? match.sides : [];
+			const mySide = sides.find((side) => teamByID.has(Number(side?.teamId)));
+			if (!mySide) continue;
+
+			const team = teamByID.get(Number(mySide.teamId));
+			const opponentSide = sides.find((side) => Number(side?.teamId) !== Number(mySide.teamId));
+			const startTime = match?.startTime || match?.rainyModeStartTime;
+
+			upcoming.push({
+				id: `tournament-${tournament.id}-${match.id}`,
+				start_time: startTime || null,
+				sport_name: team?.sport_name || tournament?.name || '競技',
+				opponent_name: getContestantName(tournamentData, opponentSide),
+				location: getRoundLabel(tournamentData, match),
+				sort_value: toDateValue(startTime),
+				status
+			});
+		}
+	}
+
+	return upcoming;
+};
+
+const getParticipantEntries = (match, classId) =>
+	(match?.entries || []).filter((entry) =>
+		Array.isArray(entry?.class_ids) && entry.class_ids.some((id) => Number(id) === Number(classId))
+	);
+
+const getOpponentName = (match, classId) => {
+	const participantEntries = getParticipantEntries(match, classId);
+	if (participantEntries.length === 0) return '';
+
+	const participantIds = new Set(participantEntries.map((entry) => String(entry.id)));
+	const opponent = (match?.entries || []).find((entry) => !participantIds.has(String(entry.id)));
+	return opponent?.resolved_name || opponent?.display_name || '未定';
+};
+
+const buildNoonUpcomingMatches = (sessionPayload, classId) => {
+	if (!classId || !sessionPayload?.matches) return [];
+
+	return sessionPayload.matches
+		.filter((match) => getParticipantEntries(match, classId).length > 0)
+		.filter((match) => {
+			const status = normalizeMatchStatus(match?.status);
+			return status !== 'finished' && status !== 'completed' && !match?.result;
+		})
+		.map((match) => ({
+			id: `noon-${match.id}`,
+			start_time: match?.scheduled_at || null,
+			sport_name: '昼競技',
+			opponent_name: getOpponentName(match, classId),
+			location: match?.location || sessionPayload?.session?.name || '昼競技',
+			sort_value: toDateValue(match?.scheduled_at),
+			status: normalizeMatchStatus(match?.status)
+		}));
+};
+
+const buildAssignedSports = (teams) => {
+	if (!Array.isArray(teams)) return [];
+
+	const seen = new Set();
+	return teams.filter((team) => {
+		const key = `${team?.sport_id}-${team?.sport_name}-${team?.name}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+};
+
 const buildScoreBreakdown = (classScore) => {
 	if (!classScore) {
 		return {
@@ -166,6 +277,41 @@ export const load = async ({ fetch, locals, request }) => {
 
 		const breakdown = buildScoreBreakdown(myClassScore);
 
+		let upcomingMatches = [];
+		let assignedSports = [];
+		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
+		if (activeEventResponse.ok) {
+			const activeEventPayload = await activeEventResponse.json();
+			const activeEventId = activeEventPayload?.event_id;
+
+			if (activeEventId) {
+				const [teamsResponse, tournamentsResponse, noonResponse] = await Promise.all([
+					fetch(`${BACKEND_URL}/api/qrcode/teams`, { headers }),
+					fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
+					fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers })
+				]);
+
+				const teams = teamsResponse.ok ? await teamsResponse.json() : [];
+				const currentEventTeams = Array.isArray(teams)
+					? teams.filter((team) => Number(team?.event_id) === Number(activeEventId))
+					: [];
+				assignedSports = buildAssignedSports(currentEventTeams);
+
+				const tournamentMatches = tournamentsResponse.ok
+					? buildTournamentUpcomingMatches(await tournamentsResponse.json(), currentEventTeams)
+					: [];
+
+				const noonMatches = noonResponse.ok
+					? buildNoonUpcomingMatches(await noonResponse.json(), user.class_id)
+					: [];
+
+				upcomingMatches = [...tournamentMatches, ...noonMatches]
+					.filter((match) => match.start_time || match.opponent_name || match.location)
+					.sort((left, right) => left.sort_value - right.sort_value)
+					.map(({ sort_value, status, ...match }) => match);
+			}
+		}
+
 		return {
 			user,
 			myClassScore: {
@@ -179,7 +325,8 @@ export const load = async ({ fetch, locals, request }) => {
 			categoryBreakdown: breakdown.categoryBreakdown,
 			pointHighlights: breakdown.pointHighlights,
 			sportSections: breakdown.sportSections,
-			upcomingMatches: [],
+			assignedSports,
+			upcomingMatches,
 			scoreHistory: []
 		};
 	} catch (error) {

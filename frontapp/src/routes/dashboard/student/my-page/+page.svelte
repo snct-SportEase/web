@@ -10,6 +10,7 @@
 	let myClassScore = $derived(data.myClassScore);
 	let errorMessage = $derived(data.error);
 	let upcomingMatches = $derived(data.upcomingMatches || []);
+	let assignedSports = $derived(data.assignedSports || []);
 	let scoreItems = $derived(data.scoreItems || []);
 	let categoryBreakdown = $derived(data.categoryBreakdown || []);
 	let pointHighlights = $derived(data.pointHighlights || []);
@@ -321,6 +322,18 @@
 					</svg>
 					今後の試合予定
 				</h2>
+				{#if assignedSports.length > 0}
+					<div class="mb-4">
+						<p class="mb-2 text-sm font-medium text-gray-600">割り当てられている競技</p>
+						<div class="flex flex-wrap gap-2">
+							{#each assignedSports as sport, index (`${sport.sport_id}-${index}`)}
+								<span class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">
+									{sport.sport_name}
+								</span>
+							{/each}
+						</div>
+					</div>
+				{/if}
 				{#if upcomingMatches.length > 0}
 					<div class="overflow-x-auto rounded-lg border border-gray-200">
 						<table class="w-full">
@@ -349,7 +362,13 @@
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 text-blue-500 flex-shrink-0 mt-0.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 						</svg>
-						<span class="text-blue-800 font-medium">現在、予定されている試合はありません。</span>
+						<span class="text-blue-800 font-medium">
+							{#if assignedSports.length > 0}
+								今後の予定はまだ登録されていません。
+							{:else}
+								競技を割り当てられていません。
+							{/if}
+						</span>
 					</div>
 				{/if}
 			</section>
@@ -361,4 +380,3 @@
 		</div>
 	{/if}
 </div>
-
