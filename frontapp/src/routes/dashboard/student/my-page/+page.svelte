@@ -27,6 +27,32 @@
 			: '現在の順位'
 		: '');
 
+	function formatJapanDateTime(value) {
+		if (!value) return '未定';
+
+		const raw = String(value).trim();
+		const directMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+		if (directMatch) {
+			const [, year, month, day, hour, minute] = directMatch;
+			return `${year}/${month}/${day} ${hour}:${minute}`;
+		}
+
+		const date = new Date(raw);
+		if (Number.isNaN(date.getTime())) {
+			return raw;
+		}
+
+		return date.toLocaleString('ja-JP', {
+			timeZone: 'Asia/Tokyo',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			hour12: false
+		});
+	}
+
 	function createChart(ctx, labels, values) {
 		scoreBreakdownChart = new Chart(ctx, {
 			type: 'bar',
@@ -348,7 +374,7 @@
 							<tbody>
 								{#each upcomingMatches as match, index (match.id || index)}
 									<tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
-										<td class="px-4 py-3 text-sm text-gray-900">{new Date(match.start_time).toLocaleString('ja-JP')}</td>
+										<td class="px-4 py-3 text-sm text-gray-900">{formatJapanDateTime(match.start_time)}</td>
 										<td class="px-4 py-3 text-sm text-gray-900">{match.sport_name}</td>
 										<td class="px-4 py-3 text-sm text-gray-900">{match.opponent_name}</td>
 										<td class="px-4 py-3 text-sm text-gray-900">{match.location}</td>

@@ -18,6 +18,32 @@
     if (studentCount === 0) return 0;
     return ((item.attend_count ?? 0) / studentCount) * 100;
   }
+
+  function formatJapanDateTime(value) {
+    if (!value) return '未定';
+
+    const raw = String(value).trim();
+    const directMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (directMatch) {
+      const [, year, month, day, hour, minute] = directMatch;
+      return `${year}/${month}/${day} ${hour}:${minute}`;
+    }
+
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      return raw;
+    }
+
+    return date.toLocaleString('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  }
 </script>
 
 <div class="space-y-8">
@@ -146,7 +172,7 @@
                       {/if}
                     </p>
                     {#if item.next_match.start_time}
-                      <p class="text-xs text-gray-500">開始予定: {item.next_match.start_time}</p>
+                      <p class="text-xs text-gray-500">開始予定: {formatJapanDateTime(item.next_match.start_time)}</p>
                     {/if}
                     <p class="text-xs text-gray-500">ステータス: {item.next_match.match_status || '未定'}</p>
                   </div>
