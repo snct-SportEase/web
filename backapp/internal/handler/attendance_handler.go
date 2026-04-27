@@ -22,7 +22,7 @@ func NewAttendanceHandler(classRepo repository.ClassRepository, eventRepo reposi
 	}
 }
 
-func getAttendanceScope(user *models.User) (isRoot bool, isAdmin bool) {
+func getAttendanceScope(user *models.User) (isRoot bool, isAdmin bool, hasClassRepRole bool) {
 	for _, role := range user.Roles {
 		switch role.Name {
 		case "root":
@@ -30,9 +30,17 @@ func getAttendanceScope(user *models.User) (isRoot bool, isAdmin bool) {
 		case "admin":
 			isAdmin = true
 		}
+
+		if len(role.Name) > 4 && role.Name[len(role.Name)-4:] == "_rep" {
+			hasClassRepRole = true
+		}
 	}
 
-	return isRoot, isAdmin
+	return isRoot, isAdmin, hasClassRepRole
+}
+
+func (h *AttendanceHandler) getManagedAttendanceClass(user *models.User, activeEventID int) (*models.Class, error) {
+	return h.classRepo.GetClassByRepRole(user.ID, activeEventID)
 }
 
 func (h *AttendanceHandler) GetClassDetailsHandler(c *gin.Context) {
@@ -62,18 +70,22 @@ func (h *AttendanceHandler) GetClassDetailsHandler(c *gin.Context) {
 
 	user := userCtx.(*models.User)
 
-	isRoot, isAdmin := getAttendanceScope(user)
+	isRoot, isAdmin, hasClassRepRole := getAttendanceScope(user)
 
-	// Root users can access every class. Admin users are limited to their managed class.
-	if isAdmin && !isRoot {
-		managedClass, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
+	if !isRoot {
+		if !isAdmin && !hasClassRepRole {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
+			return
+		}
+
+		managedClass, err := h.getManagedAttendanceClass(user, activeEventID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
 			return
 		}
 
 		if managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this admin user"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this user"})
 			return
 		}
 
@@ -127,18 +139,22 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 
 	user := userCtx.(*models.User)
 
-	isRoot, isAdmin := getAttendanceScope(user)
+	isRoot, isAdmin, hasClassRepRole := getAttendanceScope(user)
 
-	// Root users can update every class. Admin users are limited to their managed class.
-	if isAdmin && !isRoot {
-		managedClass, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
+	if !isRoot {
+		if !isAdmin && !hasClassRepRole {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
+			return
+		}
+
+		managedClass, err := h.getManagedAttendanceClass(user, activeEventID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
 			return
 		}
 
 		if managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this admin user"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this user"})
 			return
 		}
 

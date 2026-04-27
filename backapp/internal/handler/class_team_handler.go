@@ -30,6 +30,57 @@ func NewClassTeamHandler(classRepo repository.ClassRepository, teamRepo reposito
 	}
 }
 
+func getClassTeamScope(user *models.User) (isRoot bool, isAdmin bool, hasClassRepRole bool) {
+	for _, role := range user.Roles {
+		switch role.Name {
+		case "root":
+			isRoot = true
+		case "admin":
+			isAdmin = true
+		}
+
+		if len(role.Name) > 4 && role.Name[len(role.Name)-4:] == "_rep" {
+			hasClassRepRole = true
+		}
+	}
+
+	return isRoot, isAdmin, hasClassRepRole
+}
+
+func (h *ClassTeamHandler) resolveManagedClassForTeamOps(currentUser *models.User, activeEventID int, requestedClassID *int) (*models.Class, int, string) {
+	isRoot, isAdmin, hasClassRepRole := getClassTeamScope(currentUser)
+
+	if isRoot {
+		if requestedClassID == nil {
+			return nil, http.StatusBadRequest, "class_id is required"
+		}
+
+		managedClass, err := h.classRepo.GetClassByID(*requestedClassID)
+		if err != nil || managedClass == nil {
+			return nil, http.StatusBadRequest, "Class not found"
+		}
+
+		return managedClass, 0, ""
+	}
+
+	if !isAdmin && !hasClassRepRole {
+		return nil, http.StatusForbidden, "You are not authorized to manage a class"
+	}
+
+	managedClass, err := h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, "Failed to get managed class"
+	}
+	if managedClass == nil {
+		return nil, http.StatusForbidden, "No managed class found for this user"
+	}
+	if requestedClassID != nil && managedClass.ID != *requestedClassID {
+		return nil, http.StatusForbidden, "You can only access your managed class"
+	}
+
+	return managedClass, 0, ""
+}
+
 // GetManagedClassHandler returns the class that the current user can manage based on class_name_rep role
 func (h *ClassTeamHandler) GetManagedClassHandler(c *gin.Context) {
 	userCtx, exists := c.Get("user")
@@ -51,17 +102,9 @@ func (h *ClassTeamHandler) GetManagedClassHandler(c *gin.Context) {
 		return
 	}
 
-	// Check if user is admin or root - if so, return all classes
-	isAdmin := false
-	for _, role := range user.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
-			break
-		}
-	}
+	isRoot, isAdmin, hasClassRepRole := getClassTeamScope(user)
 
-	if isAdmin {
-		// For admin users, return all classes
+	if isRoot {
 		classes, err := h.classRepo.GetAllClasses(activeEventID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get classes"})
@@ -71,7 +114,11 @@ func (h *ClassTeamHandler) GetManagedClassHandler(c *gin.Context) {
 		return
 	}
 
-	// For class rep users, return only their managed class
+	if !isAdmin && !hasClassRepRole {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
+		return
+	}
+
 	class, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get managed class"})
@@ -79,7 +126,7 @@ func (h *ClassTeamHandler) GetManagedClassHandler(c *gin.Context) {
 	}
 
 	if class == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No class found for this user"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this user"})
 		return
 	}
 
@@ -110,17 +157,13 @@ func (h *ClassTeamHandler) GetClassMembersHandler(c *gin.Context) {
 		return
 	}
 
-	// Check if user is admin or root
-	isAdmin := false
-	for _, role := range user.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
-			break
+	isRoot, isAdmin, hasClassRepRole := getClassTeamScope(user)
+	if !isRoot {
+		if !isAdmin && !hasClassRepRole {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage this class"})
+			return
 		}
-	}
 
-	if !isAdmin {
-		// For class rep users, verify they can manage this class
 		managedClass, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
 		if err != nil || managedClass == nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage this class"})
@@ -153,7 +196,7 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 	currentUser := userCtx.(*models.User)
 
 	var req struct {
-		ClassID *int     `json:"class_id"` // Optional for admin users
+		ClassID *int     `json:"class_id"`
 		SportID int      `json:"sport_id"`
 		UserIDs []string `json:"user_ids"`
 	}
@@ -175,36 +218,10 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		return
 	}
 
-	// Verify that the user can manage a class and get the class
-	var managedClass *models.Class
-	isAdmin := false
-	for _, role := range currentUser.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
-			break
-		}
-	}
-
-	if !isAdmin {
-		// For class rep users, get their managed class
-		var err error
-		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
-			return
-		}
-	} else {
-		// For admin users, get the class from class_id in the request
-		if req.ClassID == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required for admin users"})
-			return
-		}
-		var err error
-		managedClass, err = h.classRepo.GetClassByID(*req.ClassID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
-			return
-		}
+	managedClass, statusCode, errMsg := h.resolveManagedClassForTeamOps(currentUser, activeEventID, req.ClassID)
+	if statusCode != 0 {
+		c.JSON(statusCode, gin.H{"error": errMsg})
+		return
 	}
 
 	// Get sport information
@@ -336,7 +353,7 @@ func (h *ClassTeamHandler) RemoveTeamMemberHandler(c *gin.Context) {
 	currentUser := userCtx.(*models.User)
 
 	var req struct {
-		ClassID *int   `json:"class_id"` // Optional for admin users
+		ClassID *int   `json:"class_id"`
 		SportID int    `json:"sport_id"`
 		UserID  string `json:"user_id"`
 	}
@@ -358,36 +375,10 @@ func (h *ClassTeamHandler) RemoveTeamMemberHandler(c *gin.Context) {
 		return
 	}
 
-	// Verify that the user can manage a class and get the class
-	var managedClass *models.Class
-	isAdmin := false
-	for _, role := range currentUser.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
-			break
-		}
-	}
-
-	if !isAdmin {
-		// For class rep users, get their managed class
-		var err error
-		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
-			return
-		}
-	} else {
-		// For admin users, get the class from class_id in the request
-		if req.ClassID == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required for admin users"})
-			return
-		}
-		var err error
-		managedClass, err = h.classRepo.GetClassByID(*req.ClassID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
-			return
-		}
+	managedClass, statusCode, errMsg := h.resolveManagedClassForTeamOps(currentUser, activeEventID, req.ClassID)
+	if statusCode != 0 {
+		c.JSON(statusCode, gin.H{"error": errMsg})
+		return
 	}
 
 	// Get sport information
@@ -451,41 +442,21 @@ func (h *ClassTeamHandler) GetTeamMembersHandler(c *gin.Context) {
 		return
 	}
 
-	// Verify that the user can manage a class
-	var managedClass *models.Class
-	isAdmin := false
-	for _, role := range currentUser.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
-			break
-		}
-	}
-
-	if !isAdmin {
-		// For class rep users, get their managed class
-		var err error
-		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
-			return
-		}
-	} else {
-		// For admin users, we need class_id from query parameter
-		classIDStr := c.Query("class_id")
-		if classIDStr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required for admin users"})
-			return
-		}
+	var requestedClassID *int
+	classIDStr := c.Query("class_id")
+	if classIDStr != "" {
 		classID, err := strconv.Atoi(classIDStr)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
 			return
 		}
-		managedClass, err = h.classRepo.GetClassByID(classID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
-			return
-		}
+		requestedClassID = &classID
+	}
+
+	managedClass, statusCode, errMsg := h.resolveManagedClassForTeamOps(currentUser, activeEventID, requestedClassID)
+	if statusCode != 0 {
+		c.JSON(statusCode, gin.H{"error": errMsg})
+		return
 	}
 
 	// Get team
@@ -534,78 +505,20 @@ func (h *ClassTeamHandler) GetConfirmedTeamMembersHandler(c *gin.Context) {
 		return
 	}
 
-	// Verify that the user can manage a class
-	var managedClass *models.Class
-	isRoot := false
-	isAdmin := false
-	hasClassRepRole := false
-
-	for _, role := range currentUser.Roles {
-		if role.Name == "root" {
-			isRoot = true
-			break
+	var requestedClassID *int
+	classIDStr := c.Query("class_id")
+	if classIDStr != "" {
+		classID, err := strconv.Atoi(classIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
+			return
 		}
-		if role.Name == "admin" {
-			isAdmin = true
-		}
-		if len(role.Name) > 4 && role.Name[len(role.Name)-4:] == "_rep" {
-			hasClassRepRole = true
-		}
+		requestedClassID = &classID
 	}
 
-	if isRoot {
-		// Root users can access any class
-		classIDStr := c.Query("class_id")
-		if classIDStr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required"})
-			return
-		}
-		classID, err := strconv.Atoi(classIDStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
-			return
-		}
-		managedClass, err = h.classRepo.GetClassByID(classID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
-			return
-		}
-	} else if hasClassRepRole {
-		// Admin users with class_name_rep role can only access their managed class
-		var err error
-		managedClass, err = h.classRepo.GetClassByRepRole(currentUser.ID, activeEventID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to manage a class"})
-			return
-		}
-		// Verify that the requested class_id matches the managed class (if provided)
-		classIDStr := c.Query("class_id")
-		if classIDStr != "" {
-			requestedClassID, err := strconv.Atoi(classIDStr)
-			if err != nil || requestedClassID != managedClass.ID {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You can only access your managed class"})
-				return
-			}
-		}
-	} else if isAdmin {
-		// Admin users without class_name_rep role can access any class
-		classIDStr := c.Query("class_id")
-		if classIDStr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required"})
-			return
-		}
-		classID, err := strconv.Atoi(classIDStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
-			return
-		}
-		managedClass, err = h.classRepo.GetClassByID(classID)
-		if err != nil || managedClass == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
-			return
-		}
-	} else {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
+	managedClass, statusCode, errMsg := h.resolveManagedClassForTeamOps(currentUser, activeEventID, requestedClassID)
+	if statusCode != 0 {
+		c.JSON(statusCode, gin.H{"error": errMsg})
 		return
 	}
 

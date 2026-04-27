@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
@@ -28,6 +29,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 			ID: "admin-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
+				{Name: "1-1_rep"},
 			},
 		}
 
@@ -70,7 +72,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		confirmedCount := 2
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByID", classID).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, sportID, activeEventID).Return(team, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembers", teamID).Return(confirmedMembers, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembersCount", teamID).Return(confirmedCount, nil).Once()
@@ -121,6 +123,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 			ID: "admin-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
+				{Name: "1-1_rep"},
 			},
 		}
 
@@ -148,7 +151,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		confirmedCount := 0
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByID", classID).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, sportID, activeEventID).Return(team, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembers", teamID).Return(confirmedMembers, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembersCount", teamID).Return(confirmedCount, nil).Once()
@@ -189,6 +192,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 			ID: "admin-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
+				{Name: "1-1_rep"},
 			},
 		}
 
@@ -202,7 +206,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByID", classID).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, sportID, activeEventID).Return(nil, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -228,5 +232,43 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		mockClassRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
 		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Failure - Admin without rep role cannot access class", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockSportRepo := new(MockSportRepository)
+
+		h := handler.NewClassTeamHandler(mockClassRepo, mockTeamRepo, mockUserRepo, mockEventRepo, mockSportRepo)
+
+		currentUser := &models.User{
+			ID: "admin-user-id",
+			Roles: []models.Role{
+				{Name: "admin"},
+			},
+		}
+
+		activeEventID := 1
+		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(nil, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", currentUser)
+		c.Params = gin.Params{
+			{Key: "sport_id", Value: "1"},
+		}
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/class-team/sports/1/confirmed-members?class_id=1", nil)
+
+		h.GetConfirmedTeamMembersHandler(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Contains(t, w.Body.String(), "No managed class found")
+
+		mockClassRepo.AssertExpectations(t)
+		mockEventRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "GetTeamByClassAndSport", mock.Anything, mock.Anything, mock.Anything)
 	})
 }

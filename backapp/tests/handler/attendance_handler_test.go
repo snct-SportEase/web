@@ -33,11 +33,12 @@ func TestGetClassDetailsHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
+				{Name: "1A_rep"},
 			},
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, nil).Once() // Admin has no managed class
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassDetails", 1, 1).Return(expectedDetails, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
@@ -52,6 +53,34 @@ func TestGetClassDetailsHandler(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		expectedJSON, _ := json.Marshal(expectedDetails)
 		assert.JSONEq(t, string(expectedJSON), w.Body.String())
+		mockClassRepo.AssertExpectations(t)
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Admin without rep role is forbidden", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		user := &models.User{
+			ID: "test-user-id",
+			Roles: []models.Role{
+				{Name: "admin"},
+			},
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, nil).Once()
+
+		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
+		c.Params = gin.Params{gin.Param{Key: "classID", Value: "1"}}
+
+		h.GetClassDetailsHandler(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
 		mockClassRepo.AssertExpectations(t)
 		mockEventRepo.AssertExpectations(t)
 	})
@@ -71,6 +100,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
+				{Name: "1A_rep"},
 			},
 		}
 
@@ -80,7 +110,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		}
 		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(nil, nil).Once() // Admin has no managed class
+		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 		mockClassRepo.On("UpdateAttendance", reqBody.ClassID, activeEventID, reqBody.AttendanceCount).Return(10, nil).Once()
 
@@ -112,6 +142,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
+				{Name: "1A_rep"},
 			},
 		}
 
@@ -122,7 +153,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		class := &models.Class{ID: 1, EventID: &differentEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(nil, nil).Once() // Admin has no managed class
+		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
@@ -151,6 +182,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
+				{Name: "1A_rep"},
 			},
 		}
 
@@ -161,7 +193,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(nil, nil).Once() // Admin has no managed class
+		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
@@ -177,6 +209,43 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "cannot exceed student count")
+		mockClassRepo.AssertExpectations(t)
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Admin with rep role cannot register outside managed class", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		activeEventID := 1
+
+		user := &models.User{
+			ID: "test-user-id",
+			Roles: []models.Role{
+				{Name: "admin"},
+				{Name: "1A_rep"},
+			},
+		}
+
+		reqBody := handler.RegisterAttendanceRequest{
+			ClassID:         2,
+			AttendanceCount: 18,
+		}
+		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
+
+		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/register", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.RegisterAttendanceHandler(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
 		mockClassRepo.AssertExpectations(t)
 		mockEventRepo.AssertExpectations(t)
 	})
