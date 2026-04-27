@@ -111,7 +111,7 @@
         <div>
           <h2 class="text-xl font-semibold text-gray-800">勝ち進み状況</h2>
           <p class="mt-1 text-sm text-gray-600">
-            所属チームのトーナメント進行状況を確認できます。
+            所属チームのトーナメント進行状況と昼競技の参加状況を確認できます。
           </p>
         </div>
 
@@ -121,7 +121,7 @@
           </p>
         {:else}
           <div class="grid gap-4 lg:grid-cols-2">
-            {#each progressEntries as item (item.team_name + item.sport_name)}
+            {#each progressEntries as item (`${item.team_name}-${item.sport_name}-${item.tournament_name}-${item.current_round}`)}
               <article class="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm space-y-4">
                 <header class="space-y-1">
                   <p class="text-sm font-medium text-indigo-600">{item.sport_name}</p>
