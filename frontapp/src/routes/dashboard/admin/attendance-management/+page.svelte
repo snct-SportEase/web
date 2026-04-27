@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
 
   let { data } = $props();
-  let { classes, managedClass } = data;
+  let { classes, managedClass, canSelectAllClasses, restrictionError } = data;
 
   let selectedClassId = $state(null);
   let classDetails = $state(null);
@@ -19,6 +19,8 @@
     } else if (classes && classes.length > 0) {
       selectedClassId = classes[0].id;
       fetchClassDetails(selectedClassId);
+    } else if (restrictionError) {
+      errorMessage = restrictionError;
     }
   });
 
@@ -109,14 +111,12 @@
   <h1 class="text-3xl font-bold mb-6">出席点管理</h1>
 
   <div class="bg-white shadow-md rounded-lg p-6">
-    <!-- Conditional Class Display -->
-    {#if managedClass}
+    {#if managedClass && !canSelectAllClasses}
       <div class="mb-6">
         <h2 class="text-xl font-semibold text-gray-800">対象クラス: {managedClass.name}</h2>
-        <p class="text-sm text-gray-500">あなたの担当クラスが自動的に選択されています。</p>
+        <p class="text-sm text-gray-500">adminユーザーは担当クラスのみ操作できます。</p>
       </div>
-    {:else}
-      <!-- Class Selector for non-reps -->
+    {:else if canSelectAllClasses}
       <div class="mb-6">
         <label for="classSelector" class="block text-sm font-medium text-gray-700 mb-2">対象クラスを選択</label>
         <select
@@ -131,6 +131,10 @@
           {/each}
         </select>
       </div>
+    {/if}
+
+    {#if errorMessage && !classDetails}
+      <p class="text-red-500 text-sm mb-4">{errorMessage}</p>
     {/if}
 
     {#if isLoading && !classDetails}

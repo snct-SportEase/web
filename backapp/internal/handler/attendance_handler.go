@@ -22,6 +22,19 @@ func NewAttendanceHandler(classRepo repository.ClassRepository, eventRepo reposi
 	}
 }
 
+func getAttendanceScope(user *models.User) (isRoot bool, isAdmin bool) {
+	for _, role := range user.Roles {
+		switch role.Name {
+		case "root":
+			isRoot = true
+		case "admin":
+			isAdmin = true
+		}
+	}
+
+	return isRoot, isAdmin
+}
+
 func (h *AttendanceHandler) GetClassDetailsHandler(c *gin.Context) {
 	classIDStr := c.Param("classID")
 	classID, err := strconv.Atoi(classIDStr)
@@ -49,28 +62,24 @@ func (h *AttendanceHandler) GetClassDetailsHandler(c *gin.Context) {
 
 	user := userCtx.(*models.User)
 
-	// Check if user is admin or root
-	isAdmin := false
-	for _, role := range user.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
-			break
-		}
-	}
+	isRoot, isAdmin := getAttendanceScope(user)
 
-	// If user is admin and has a class_name_rep role, restrict to that class only
-	if isAdmin {
+	// Root users can access every class. Admin users are limited to their managed class.
+	if isAdmin && !isRoot {
 		managedClass, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
 			return
 		}
-		// If managedClass exists, user can only get details for that class
-		if managedClass != nil {
-			if managedClass.ID != classID {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to view details for your managed class"})
-				return
-			}
+
+		if managedClass == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this admin user"})
+			return
+		}
+
+		if managedClass.ID != classID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to view details for your managed class"})
+			return
 		}
 	}
 
@@ -118,28 +127,24 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 
 	user := userCtx.(*models.User)
 
-	// Check if user is admin or root
-	isAdmin := false
-	for _, role := range user.Roles {
-		if role.Name == "admin" || role.Name == "root" {
-			isAdmin = true
-			break
-		}
-	}
+	isRoot, isAdmin := getAttendanceScope(user)
 
-	// If user is admin and has a class_name_rep role, restrict to that class only
-	if isAdmin {
+	// Root users can update every class. Admin users are limited to their managed class.
+	if isAdmin && !isRoot {
 		managedClass, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
 			return
 		}
-		// If managedClass exists, user can only register attendance for that class
-		if managedClass != nil {
-			if managedClass.ID != req.ClassID {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to register attendance for your managed class"})
-				return
-			}
+
+		if managedClass == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this admin user"})
+			return
+		}
+
+		if managedClass.ID != req.ClassID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to register attendance for your managed class"})
+			return
 		}
 	}
 
