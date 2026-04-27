@@ -87,7 +87,8 @@ func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.
 		FROM teams t
 		INNER JOIN sports s ON t.sport_id = s.id
 		INNER JOIN classes c ON t.class_id = c.id
-		WHERE t.class_id = ? AND c.event_id = ?
+		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
+		WHERE t.class_id = ? AND c.event_id = ? AND es.location <> 'noon_game'
 	`
 	rows, err := r.db.Query(query, classID, eventID)
 	if err != nil {

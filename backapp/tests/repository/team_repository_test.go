@@ -151,7 +151,8 @@ func TestTeamRepository_GetTeamsByClassID(t *testing.T) {
 			FROM teams t
 			INNER JOIN sports s ON t.sport_id = s.id
 			INNER JOIN classes c ON t.class_id = c.id
-			WHERE t.class_id = ? AND c.event_id = ?
+			INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
+			WHERE t.class_id = ? AND c.event_id = ? AND es.location <> 'noon_game'
 		`
 	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name"}
 
