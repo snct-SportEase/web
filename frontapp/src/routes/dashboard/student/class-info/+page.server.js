@@ -90,11 +90,12 @@ function buildNoonProgressEntries(session, matches, classId, className) {
 		const resultLabel = buildNoonResult(match, classId);
 		const participantName = getParticipantName(match, classId, className);
 		const opponentName = getOpponentName(match, classId);
+		const eventLabel = session?.name || match?.title || '昼競技';
 
 		const entry = {
-			sport_name: '昼競技',
+			sport_name: eventLabel,
 			team_name: participantName,
-			tournament_name: match?.title || session?.name || '昼競技',
+			tournament_name: match?.title || eventLabel,
 			status: isFinished ? resultLabel || '終了' : formatNoonStatus(match?.status),
 			current_round: match?.title || formatNoonStatus(match?.status),
 			next_match: undefined,
