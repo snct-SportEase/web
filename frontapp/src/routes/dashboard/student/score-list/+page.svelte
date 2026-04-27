@@ -177,24 +177,30 @@
 				<div class="text-2xl font-bold text-center mb-4 {rank === 1 ? 'text-amber-900 text-[1.75rem] drop-shadow-[2px_2px_4px_rgba(0,0,0,0.3),0_0_10px_rgba(255,255,255,0.5)]' : rank === 2 ? 'text-gray-700 drop-shadow-sm' : rank === 3 ? 'text-amber-900 drop-shadow-sm' : isNotStarted ? 'text-gray-600 drop-shadow-sm' : 'text-gray-800 drop-shadow-sm'}">
 					{score.class_name}
 				</div>
-				
-				<div class="space-y-1">
-					{#each filteredScoreItems as item (item.key || item.label)}
-						{#if item.key !== 'rank_current_event' && item.key !== 'rank_overall' && item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'}
-							<div class="flex justify-between py-2 border-b border-black/10">
-								<span class="text-gray-500">{item.label}:</span>
-								<span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
-							</div>
-						{/if}
-					{/each}
-					
-					<div class="flex justify-between py-3 mt-2 border-t-2 border-black/20 font-bold {rank === 1 ? 'text-[1.75rem]' : 'text-xl'}">
-						<span class="text-gray-500">合計点:</span>
-						<span class="font-bold {rank === 1 ? 'text-amber-900 drop-shadow-[1px_1px_2px_rgba(0,0,0,0.2)]' : 'text-gray-800'}">
-							{totalPoints}
-						</span>
-					</div>
+
+				<div class="flex justify-between py-3 mt-2 border-t-2 border-black/20 font-bold {rank === 1 ? 'text-[1.75rem]' : 'text-xl'}">
+					<span class="text-gray-500">合計点:</span>
+					<span class="font-bold {rank === 1 ? 'text-amber-900 drop-shadow-[1px_1px_2px_rgba(0,0,0,0.2)]' : 'text-gray-800'}">
+						{totalPoints}
+					</span>
 				</div>
+
+				<details class="mt-4 rounded-lg border border-black/10 bg-white/40">
+					<summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-700 flex items-center justify-between">
+						<span>点数項目を表示</span>
+						<span class="text-sm text-gray-500">▼</span>
+					</summary>
+					<div class="space-y-1 px-4 pb-4">
+						{#each filteredScoreItems as item (item.key || item.label)}
+							{#if item.key !== 'rank_current_event' && item.key !== 'rank_overall' && item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'}
+								<div class="flex justify-between py-2 border-b border-black/10 last:border-b-0">
+									<span class="text-gray-500">{item.label}:</span>
+									<span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
+								</div>
+							{/if}
+						{/each}
+					</div>
+				</details>
 			</div>
 		{/each}
 	</div>
