@@ -253,18 +253,25 @@
       });
     }
 
-    // コース対抗リレーと綱引きは各試合が1つのrun
+    // コース対抗リレーは同じrunに複数試合が紐づく
     for (const { match, template } of courseRelayMatches) {
       const runId = await getRunIdFromMatchId(match.id);
       const runKey = runId ? `course-relay-${runId}` : `course-relay-${match.id}`;
-      runs.set(runKey, {
-        key: runKey,
-        type: 'course-relay',
-        matches: [{ match, template }],
-        runId: runId
-      });
+      const existing = runs.get(runKey);
+      if (existing) {
+        existing.matches = [...existing.matches, { match, template }];
+        runs.set(runKey, existing);
+      } else {
+        runs.set(runKey, {
+          key: runKey,
+          type: 'course-relay',
+          matches: [{ match, template }],
+          runId: runId
+        });
+      }
     }
 
+    // 綱引きは各試合が1つのrun
     for (const { match, template } of tugOfWarMatches) {
       const runId = await getRunIdFromMatchId(match.id);
       const runKey = runId ? `tug-of-war-${runId}` : `tug-of-war-${match.id}`;
@@ -356,7 +363,7 @@
             }
           } else {
             // 既存のフォームがない場合は、結果の順位でソート
-            const participantsWithRank = match.entries.map((entry, index) => {
+            const participantsWithRank = Array.from(match.entries, (entry, index) => {
               const detail = detailMap.get(entry.id);
               const rankValue = detail && detail.rank !== undefined && detail.rank !== null 
                 ? String(detail.rank) 
@@ -375,15 +382,27 @@
               };
             });
             
-            // 順位でソート（順位がない場合は最後に）
-            participantsWithRank.sort((a, b) => {
-              if (a._rank === 999 && b._rank === 999) return 0;
-              if (a._rank === 999) return 1;
-              if (b._rank === 999) return -1;
-              return a._rank - b._rank;
-            });
+            // 順位で並べる（Svelte state proxy の破壊的 sort を避ける）
+            let sortedParticipantsWithRank = [];
+            for (const participant of participantsWithRank) {
+              let insertAt = sortedParticipantsWithRank.length;
+              for (let i = 0; i < sortedParticipantsWithRank.length; i += 1) {
+                const current = sortedParticipantsWithRank[i];
+                const participantRank = participant._rank === 999 ? Number.POSITIVE_INFINITY : participant._rank;
+                const currentRank = current._rank === 999 ? Number.POSITIVE_INFINITY : current._rank;
+                if (participantRank < currentRank) {
+                  insertAt = i;
+                  break;
+                }
+              }
+              sortedParticipantsWithRank = [
+                ...sortedParticipantsWithRank.slice(0, insertAt),
+                participant,
+                ...sortedParticipantsWithRank.slice(insertAt)
+              ];
+            }
             
-            participants = participantsWithRank.map((p) => ({
+            participants = sortedParticipantsWithRank.map((p) => ({
               id: p.id,
               entry_id: p.entry_id,
               name: p.name,
@@ -454,7 +473,8 @@
       let endpoint = '';
       let payload = {
         rankings,
-        note: form.note || null
+        note: form.note || null,
+        match_id: match.id
       };
 
       if (template.type === 'year-relay') {
@@ -699,7 +719,7 @@
       <section class="bg-white shadow rounded-lg p-6 space-y-6">
         <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">テンプレート結果入力</h2>
         <div class="space-y-6">
-          {#each templateRuns as run (run.id || run.template?.id)}
+          {#each templateRuns as run (run.key)}
             <div class="border rounded-lg p-4 bg-blue-50 space-y-4">
               <h3 class="text-lg font-semibold text-gray-800">
                 {#if run.type === 'year-relay'}

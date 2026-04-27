@@ -94,8 +94,8 @@
 		selectedMatch = null;
 	}
 
-	function handleConfirm(event) {
-		scoresToSubmit = event.detail;
+	function handleConfirm(scores) {
+		scoresToSubmit = scores;
 		showConfirmModal = true;
 	}
 
@@ -104,11 +104,11 @@
 		scoresToSubmit = null;
 	}
 
-	async function handleSubmit(event) {
+	async function handleSubmit(result = {}) {
 		if (!selectedMatch || !scoresToSubmit) return;
 
 		const { team1_score, team2_score } = scoresToSubmit;
-		const winnerId = event?.detail?.winnerId;
+		const winnerId = result?.winnerId;
 
 		const body = {
 			team1_score: team1_score,
@@ -268,8 +268,8 @@
 
 <ConfirmMatchResultModal
     bind:showModal={showConfirmModal}
-    team1Score={scoresToSubmit?.team1_score}
-    team2Score={scoresToSubmit?.team2_score}
+    team1Score={scoresToSubmit?.team1_score ?? 0}
+    team2Score={scoresToSubmit?.team2_score ?? 0}
     team1Name={selectedTournament?.data.contestants[selectedMatch?.sides?.[0]?.contestantId]?.players?.[0]?.title}
     team2Name={selectedTournament?.data.contestants[selectedMatch?.sides?.[1]?.contestantId]?.players?.[0]?.title}
     team1Id={selectedMatch?.sides?.[0]?.teamId}
