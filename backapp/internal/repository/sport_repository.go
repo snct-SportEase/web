@@ -94,7 +94,13 @@ func (r *sportRepository) GetSportByName(name string) (*models.Sport, error) {
 
 // GetSportsByEventID retrieves all sports assigned to a specific event.
 func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport, error) {
-	query := "SELECT event_id, sport_id, description, rules, rules_type, rules_pdf_url, location, min_capacity, max_capacity FROM event_sports WHERE event_id = ?"
+	query := `
+		SELECT es.event_id, es.sport_id, s.name, es.description, es.rules, es.rules_type, es.rules_pdf_url, es.location, es.min_capacity, es.max_capacity
+		FROM event_sports es
+		JOIN sports s ON es.sport_id = s.id
+		WHERE es.event_id = ?
+		ORDER BY es.sport_id
+	`
 	rows, err := r.db.Query(query, eventID)
 	if err != nil {
 		return nil, err
@@ -104,7 +110,7 @@ func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport,
 	var eventSports []*models.EventSport
 	for rows.Next() {
 		eventSport := &models.EventSport{}
-		if err := rows.Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.Rules, &eventSport.RulesType, &eventSport.RulesPdfURL, &eventSport.Location, &eventSport.MinCapacity, &eventSport.MaxCapacity); err != nil {
+		if err := rows.Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.SportName, &eventSport.Description, &eventSport.Rules, &eventSport.RulesType, &eventSport.RulesPdfURL, &eventSport.Location, &eventSport.MinCapacity, &eventSport.MaxCapacity); err != nil {
 			return nil, err
 		}
 		eventSports = append(eventSports, eventSport)

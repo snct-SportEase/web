@@ -10,6 +10,7 @@ type Sport struct {
 type EventSport struct {
 	EventID     int     `json:"event_id"`
 	SportID     int     `json:"sport_id"`
+	SportName   string  `json:"sport_name,omitempty"`
 	Description *string `json:"description"`
 	Rules       *string `json:"rules"`
 	RulesType   string  `json:"rules_type"`
