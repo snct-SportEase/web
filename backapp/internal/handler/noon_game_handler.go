@@ -22,6 +22,14 @@ type NoonGameHandler struct {
 	sportRepo repository.SportRepository
 }
 
+var jstLocation = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		return time.FixedZone("JST", 9*60*60)
+	}
+	return loc
+}()
+
 const (
 	defaultYearRelaySessionName   = "学年対抗リレー"
 	defaultCourseRelaySessionName = "コース対抗リレー"
@@ -1694,6 +1702,7 @@ func (h *NoonGameHandler) SaveMatch(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
+	h.normalizeMatchesToJST([]*models.NoonGameMatchWithResult{full})
 
 	c.JSON(http.StatusOK, gin.H{"match": full})
 }
@@ -1981,6 +1990,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
+	h.normalizeMatchesToJST([]*models.NoonGameMatchWithResult{fullMatch})
 
 	payload, err := h.buildSessionPayload(session)
 	if err != nil {
@@ -2642,6 +2652,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 			log.Printf("WARNING: failed to calculate overall bonus: run_id=%d, error=%v", runID, err)
 		}
 	}
+	h.normalizeMatchesToJST([]*models.NoonGameMatchWithResult{full})
 
 	c.JSON(http.StatusOK, gin.H{"match": full})
 }
@@ -3395,6 +3406,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
+	h.normalizeMatchesToJST([]*models.NoonGameMatchWithResult{full})
 
 	c.JSON(http.StatusOK, gin.H{"match": full})
 }
@@ -3680,6 +3692,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enrich match data"})
 		return
 	}
+	h.normalizeMatchesToJST([]*models.NoonGameMatchWithResult{full})
 
 	c.JSON(http.StatusOK, gin.H{"match": full})
 }
@@ -3766,6 +3779,8 @@ func (h *NoonGameHandler) buildSessionPayload(session *models.NoonGameSession) (
 	session.Groups = groups
 	session.Matches = matches
 	session.PointsSummary = summary
+	h.normalizeSessionToJST(session)
+	h.normalizeMatchesToJST(matches)
 
 	return gin.H{
 		"session":        session,
@@ -3775,6 +3790,23 @@ func (h *NoonGameHandler) buildSessionPayload(session *models.NoonGameSession) (
 		"points_summary": summary,
 		"template_runs":  templateRuns,
 	}, nil
+}
+
+func (h *NoonGameHandler) normalizeSessionToJST(session *models.NoonGameSession) {
+	if session == nil {
+		return
+	}
+	h.normalizeMatchesToJST(session.Matches)
+}
+
+func (h *NoonGameHandler) normalizeMatchesToJST(matches []*models.NoonGameMatchWithResult) {
+	for _, match := range matches {
+		if match == nil || match.ScheduledAt == nil {
+			continue
+		}
+		jstTime := match.ScheduledAt.In(jstLocation)
+		match.ScheduledAt = &jstTime
+	}
 }
 
 func (h *NoonGameHandler) decorateMatches(matches []*models.NoonGameMatchWithResult, classMap map[int]*models.Class, groupMap map[int]*models.NoonGameGroupWithMembers) error {
