@@ -61,7 +61,7 @@
     { title: '競技管理', description: '競技情報とトーナメント生成', href: '/dashboard/root/sport-management' },
     { title: '雨天時モード管理', description: '雨天時モードの切り替えと設定', href: '/dashboard/root/rainy-mode' },
     { title: 'ユーザー管理', description: 'ユーザー名やクラス人数を調整', href: '/dashboard/root/change-username' },
-    { title: '権限管理', description: 'admin・root 権限の付与・剥奪', href: '/dashboard/root/user-promotion' }
+    { title: '権限管理', description: 'student・admin・root の切り替え', href: '/dashboard/root/user-promotion' }
   ];
 
   const adminShortcuts = [

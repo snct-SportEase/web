@@ -40,7 +40,8 @@ describe('Change Username Page', () => {
         class_id: 1,
         roles: [
           { id: 1, name: 'student' },
-          { id: 2, name: '1A_rep' }
+          { id: 2, name: '1A_rep' },
+          { id: 3, name: 'judge' }
         ]
       },
       {
@@ -49,7 +50,7 @@ describe('Change Username Page', () => {
         display_name: '運営花子',
         class_id: 2,
         roles: [
-          { id: 3, name: 'admin' }
+          { id: 4, name: 'admin' }
         ]
       }
     ];
@@ -72,6 +73,22 @@ describe('Change Username Page', () => {
       if (url === '/api/root/users/display-name' && options.method === 'PUT') {
         const body = JSON.parse(options.body);
         users = users.map((user) => user.id === body.user_id ? { ...user, display_name: body.display_name } : user);
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+      }
+
+      if (url === '/api/root/users/promote' && options.method === 'PUT') {
+        const body = JSON.parse(options.body);
+        const masterRoles = ['student', 'admin', 'root'];
+        users = users.map((user) => {
+          if (user.id !== body.user_id) return user;
+          return {
+            ...user,
+            roles: [
+              ...user.roles.filter((role) => !masterRoles.includes(role.name)),
+              { id: `master-${body.role}`, name: body.role }
+            ]
+          };
+        });
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
       }
 
@@ -131,27 +148,26 @@ describe('Change Username Page', () => {
     render(Page);
 
     await page.getByRole('button', { name: '管理' }).first().click();
-    await page.getByLabelText('新規ロール追加').fill('admin');
+    await page.getByLabelText('新規ロール追加').fill('score_keeper');
     await page.getByRole('button', { name: '追加' }).click();
 
     const addRoleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/admin/users/role' && options?.method === 'PUT');
     expect(addRoleCall).toBeTruthy();
     expect(JSON.parse(addRoleCall[1].body)).toEqual({
       user_id: 'user-1',
-      role: 'admin'
+      role: 'score_keeper'
     });
   });
 
-  it('rootロールを追加すると表示が更新される', async () => {
+  it('rootロールに切り替えると表示が更新される', async () => {
     render(Page);
 
     await page.getByRole('button', { name: '管理' }).first().click();
-    await page.getByLabelText('新規ロール追加').fill('root');
-    await page.getByRole('button', { name: '追加' }).click();
+    await page.getByRole('button', { name: 'root に切り替え' }).click();
 
-    const addRoleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/admin/users/role' && options?.method === 'PUT' && JSON.parse(options.body).role === 'root');
-    expect(addRoleCall).toBeTruthy();
-    expect(JSON.parse(addRoleCall[1].body)).toEqual({
+    const replaceCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/users/promote' && options?.method === 'PUT');
+    expect(replaceCall).toBeTruthy();
+    expect(JSON.parse(replaceCall[1].body)).toEqual({
       user_id: 'user-1',
       role: 'root'
     });
@@ -166,26 +182,19 @@ describe('Change Username Page', () => {
 
     const deleteRoleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/admin/users/role' && options?.method === 'DELETE');
     expect(deleteRoleCall).toBeTruthy();
-    expect(confirm).toHaveBeenCalledWith('ロール "student" を削除しますか？');
+    expect(confirm).toHaveBeenCalledWith('ロール "judge" を削除しますか？');
     expect(JSON.parse(deleteRoleCall[1].body)).toEqual({
       user_id: 'user-1',
-      role: 'student'
+      role: 'judge'
     });
   });
 
-  it('adminロールを削除すると表示が更新される', async () => {
+  it('masterロールはその他のロール削除対象に出ない', async () => {
     render(Page);
 
     await page.getByRole('button', { name: '管理' }).nth(1).click();
-    await page.getByTitle('ロールを削除').first().click();
-
-    const deleteRoleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/admin/users/role' && options?.method === 'DELETE' && JSON.parse(options.body).role === 'admin');
-    expect(deleteRoleCall).toBeTruthy();
-    expect(JSON.parse(deleteRoleCall[1].body)).toEqual({
-      user_id: 'user-2',
-      role: 'admin'
-    });
-    await expect.element(page.getByText('ロールなし')).toBeInTheDocument();
+    await expect.element(page.getByText('admin を保有中')).toBeInTheDocument();
+    await expect.element(page.getByTitle('ロールを削除')).not.toBeInTheDocument();
   });
 
   it('クラス所属ロールを付け替えできる', async () => {

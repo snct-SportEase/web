@@ -152,7 +152,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	middleware.CreateSession(sessionToken, user.ID)
 
 	isSecure := middleware.IsRequestSecure(c.Request)
-	
+
 	// Set session cookie
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session_token",
@@ -169,7 +169,6 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }
-
 
 func (h *AuthHandler) GetUser(c *gin.Context) {
 	userCtx, exists := c.Get("user")
@@ -413,10 +412,10 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 
 type PromoteUserRequest struct {
 	UserID string `json:"user_id"`
-	Role   string `json:"role"` // "admin" or "root"
+	Role   string `json:"role"` // "student", "admin", or "root"
 }
 
-// PromoteUserByRoot はroot権限でユーザーをadminまたはrootに昇格させる
+// PromoteUserByRoot はroot権限でユーザーのマスタロールを交換する
 func (h *AuthHandler) PromoteUserByRoot(c *gin.Context) {
 	var req PromoteUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -424,40 +423,23 @@ func (h *AuthHandler) PromoteUserByRoot(c *gin.Context) {
 		return
 	}
 
-	if req.Role != "admin" && req.Role != "root" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "昇格できるロールは 'admin' または 'root' のみです"})
+	if req.Role != "student" && req.Role != "admin" && req.Role != "root" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "設定できるマスタロールは 'student' / 'admin' / 'root' のみです"})
 		return
 	}
 
-	if err := h.userRepo.AddUserRoleIfNotExists(req.UserID, req.Role); err != nil {
+	if err := h.userRepo.ReplaceMasterRole(req.UserID, req.Role); err != nil {
 		log.Printf("PromoteUserByRoot error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to promote user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to replace master role"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User promoted successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Master role replaced successfully"})
 }
 
-// DemoteUserByRoot はroot権限でユーザーからadminまたはrootロールを剥奪する
+// DemoteUserByRoot は廃止された付与・剥奪APIの互換エンドポイント
 func (h *AuthHandler) DemoteUserByRoot(c *gin.Context) {
-	var req PromoteUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if req.Role != "admin" && req.Role != "root" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "降格できるロールは 'admin' または 'root' のみです"})
-		return
-	}
-
-	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role); err != nil {
-		log.Printf("DemoteUserByRoot error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to demote user"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "User demoted successfully"})
+	c.JSON(http.StatusBadRequest, gin.H{"error": "マスタロールは剥奪ではなく交換してください"})
 }
 
 // isClassManagedRole returns true for class-managed roles that should not be

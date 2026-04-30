@@ -8,7 +8,7 @@
   let isLoading = $state(false);
   let errorMessage = $state('');
 
-  const privilegeRoles = ['admin', 'root'];
+  const masterRoles = ['student', 'admin', 'root'];
 
   async function fetchUsers(query = '', type = '') {
     if (!browser) return;
@@ -36,12 +36,19 @@
     await fetchUsers(searchQuery, searchType);
   }
 
-  function hasRole(user, roleName) {
-    return user.roles?.some(r => r.name === roleName) ?? false;
+  function getMasterRoles(user) {
+    return (user.roles ?? [])
+      .filter((role) => masterRoles.includes(role.name))
+      .map((role) => role.name);
   }
 
-  async function promote(user, role) {
-    if (!confirm(`${user.email} を ${role} に昇格しますか？`)) return;
+  function getCurrentMasterRole(user) {
+    const userMasterRoles = getMasterRoles(user);
+    return masterRoles.find((role) => userMasterRoles.includes(role)) ?? null;
+  }
+
+  async function replaceMasterRole(user, role) {
+    if (!confirm(`${user.email} のマスタロールを ${role} に変更しますか？`)) return;
     try {
       const res = await fetch('/api/root/users/promote', {
         method: 'PUT',
@@ -52,26 +59,7 @@
         await fetchUsers(searchQuery, searchType);
       } else {
         const err = await res.json();
-        alert(`昇格失敗: ${err.error}`);
-      }
-    } catch {
-      alert('エラーが発生しました');
-    }
-  }
-
-  async function demote(user, role) {
-    if (!confirm(`${user.email} から ${role} ロールを剥奪しますか？`)) return;
-    try {
-      const res = await fetch('/api/root/users/promote', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id, role }),
-      });
-      if (res.ok) {
-        await fetchUsers(searchQuery, searchType);
-      } else {
-        const err = await res.json();
-        alert(`降格失敗: ${err.error}`);
+        alert(`マスタロール変更失敗: ${err.error}`);
       }
     } catch {
       alert('エラーが発生しました');
@@ -85,7 +73,7 @@
   <header class="space-y-2">
     <h1 class="text-2xl font-semibold text-gray-900">権限管理</h1>
     <p class="text-sm text-gray-600">
-      ユーザーに admin・root 権限を付与または剥奪できます。
+      `student` / `admin` / `root` のマスタロールを1つだけ選んで切り替えできます。
     </p>
   </header>
 
@@ -164,6 +152,7 @@
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">表示名</th>
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">現在のロール</th>
+            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">student</th>
             <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">admin</th>
             <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">root</th>
           </tr>
@@ -190,23 +179,24 @@
                   {/if}
                 </div>
               </td>
-              {#each privilegeRoles as role (role)}
+              {#each masterRoles as role (role)}
                 <td class="px-4 py-3 text-center">
-                  {#if hasRole(user, role)}
-                    <button
-                      class="rounded px-3 py-1 text-xs font-semibold bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 transition-colors"
-                      onclick={() => demote(user, role)}
-                    >
-                      剥奪
-                    </button>
-                  {:else}
-                    <button
-                      class="rounded px-3 py-1 text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                      onclick={() => promote(user, role)}
-                    >
-                      付与
-                    </button>
-                  {/if}
+                  {@const isCurrentRole = getCurrentMasterRole(user) === role && getMasterRoles(user).length === 1}
+                  <button
+                    class={`rounded px-3 py-1 text-xs font-semibold transition-colors ${
+                      isCurrentRole
+                        ? 'border border-emerald-300 bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-500 text-white hover:bg-amber-600'
+                    }`}
+                    onclick={() => replaceMasterRole(user, role)}
+                    disabled={isCurrentRole}
+                  >
+                    {#if isCurrentRole}
+                      保有中
+                    {:else}
+                      切替
+                    {/if}
+                  </button>
                 </td>
               {/each}
             </tr>
@@ -214,11 +204,11 @@
 
           {#if isLoading}
             <tr>
-              <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">読み込み中...</td>
+              <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">読み込み中...</td>
             </tr>
           {:else if users.length === 0}
             <tr>
-              <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">ユーザーが見つかりませんでした。</td>
+              <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">ユーザーが見つかりませんでした。</td>
             </tr>
           {/if}
         </tbody>

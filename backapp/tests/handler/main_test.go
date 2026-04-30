@@ -487,6 +487,11 @@ func (m *MockUserRepository) AddUserRoleIfNotExists(userID string, roleName stri
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) ReplaceMasterRole(userID string, roleName string) error {
+	args := m.Called(userID, roleName)
+	return args.Error(0)
+}
+
 func (m *MockUserRepository) UpdateUserRole(userID string, roleName string, eventID *int) error {
 	args := m.Called(userID, roleName, eventID)
 	return args.Error(0)

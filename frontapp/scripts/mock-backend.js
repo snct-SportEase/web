@@ -66,7 +66,8 @@ const defaultUsers = () => ([
     class_id: 1,
     roles: [
       { id: 1, name: 'student' },
-      { id: 2, name: '1A_rep' }
+      { id: 2, name: '1A_rep' },
+      { id: 4, name: 'judge' }
     ]
   },
   {
@@ -655,6 +656,21 @@ createServer(async (req, res) => {
   if (url.pathname === '/api/root/users/display-name' && req.method === 'PUT') {
     const body = await readJson(req);
     users = users.map((user) => user.id === body.user_id ? { ...user, display_name: body.display_name } : user);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (url.pathname === '/api/root/users/promote' && req.method === 'PUT') {
+    const body = await readJson(req);
+    const masterRoles = ['student', 'admin', 'root'];
+    users = users.map((user) => {
+      if (user.id !== body.user_id) return user;
+      const nonMasterRoles = user.roles.filter((role) => !masterRoles.includes(role.name));
+      return {
+        ...user,
+        roles: [...nonMasterRoles, { id: Date.now(), name: body.role }]
+      };
+    });
     sendJson(res, 200, { ok: true });
     return;
   }

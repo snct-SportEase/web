@@ -16,6 +16,7 @@ type UserRepository interface {
 	UpdateUserDisplayName(userID string, displayName string) error
 	GetUserWithRoles(userID string) (*models.User, error)
 	AddUserRoleIfNotExists(userID string, roleName string) error
+	ReplaceMasterRole(userID string, roleName string) error
 	UpdateUserRole(userID string, roleName string, eventID *int) error
 	DeleteUserRole(userID string, roleName string) error
 	UpdateNotificationFilters(userID string, filters []string) error
@@ -87,6 +88,60 @@ func (r *userRepository) AddUserRoleIfNotExists(userID string, roleName string) 
 		if err != nil {
 			return err
 		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *userRepository) ReplaceMasterRole(userID string, roleName string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	masterRoles := []string{"root", "admin", "student"}
+	roleIDs := make(map[string]int64, len(masterRoles))
+
+	for _, masterRole := range masterRoles {
+		var roleID int64
+		err = tx.QueryRow("SELECT id FROM roles WHERE name = ?", masterRole).Scan(&roleID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				result, createErr := tx.Exec("INSERT INTO roles (name) VALUES (?)", masterRole)
+				if createErr != nil {
+					return createErr
+				}
+				roleID, createErr = result.LastInsertId()
+				if createErr != nil {
+					return createErr
+				}
+			} else {
+				return err
+			}
+		}
+		roleIDs[masterRole] = roleID
+	}
+
+	_, err = tx.Exec(
+		"DELETE FROM user_roles WHERE user_id = ? AND role_id IN (?, ?, ?)",
+		userID,
+		roleIDs["root"],
+		roleIDs["admin"],
+		roleIDs["student"],
+	)
+	if err != nil {
+		return err
+	}
+
+	targetRoleID, ok := roleIDs[roleName]
+	if !ok {
+		return errors.New("invalid master role")
+	}
+
+	_, err = tx.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", userID, targetRoleID)
+	if err != nil {
+		return err
 	}
 
 	return tx.Commit()

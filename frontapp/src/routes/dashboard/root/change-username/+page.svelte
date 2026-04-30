@@ -18,6 +18,7 @@ import { onMount } from 'svelte';
   let showModal = $state(false);
   let isLoading = $state(false);
   let errorMessage = $state('');
+  const masterRoles = ['student', 'admin', 'root'];
 
   // 指数バックオフ付きのフェッチ関数
   async function fetchWithBackoff(url, options = {}, maxRetries = 5) {
@@ -218,15 +219,20 @@ import { onMount } from 'svelte';
   // その他のロール追加
   async function handleRoleAdd() {
     if (!newRoleName.trim()) return;
+    const roleToAdd = newRoleName.trim();
+
+    if (masterRoles.includes(roleToAdd)) {
+      alert('student / admin / root のマスタロールは「マスタロールの切り替え」から変更してください。');
+      return;
+    }
     
     // _rep制限
-    if (newRoleName.endsWith('_rep')) {
+    if (roleToAdd.endsWith('_rep')) {
       alert('クラス所属ロール（_rep）はここからは追加できません。「クラス所属の変更」を使用してください。');
       return;
     }
 
     try {
-      const roleToAdd = newRoleName.trim();
       const response = await fetchWithBackoff('/api/admin/users/role', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -297,9 +303,20 @@ import { onMount } from 'svelte';
     selectedUser = updatedUser;
   }
 
-  async function handlePromote(role) {
+  function getMasterRoles(user) {
+    return (user?.roles ?? [])
+      .filter((role) => masterRoles.includes(role.name))
+      .map((role) => role.name);
+  }
+
+  function getCurrentMasterRole(user) {
+    const userMasterRoles = getMasterRoles(user);
+    return masterRoles.find((role) => userMasterRoles.includes(role)) ?? null;
+  }
+
+  async function handleMasterRoleChange(role) {
     if (!selectedUser) return;
-    if (!confirm(`${selectedUser.email} を ${role} に昇格しますか？`)) return;
+    if (!confirm(`${selectedUser.email} のマスタロールを ${role} に変更しますか？`)) return;
     try {
       const res = await fetchWithBackoff('/api/root/users/promote', {
         method: 'PUT',
@@ -307,34 +324,17 @@ import { onMount } from 'svelte';
         body: JSON.stringify({ user_id: selectedUser.id, role }),
       });
       if (res.ok) {
-        const updatedRoles = [...(selectedUser.roles ?? []), { name: role }];
+        const nonMasterRoles = (selectedUser.roles ?? []).filter((existingRole) => !masterRoles.includes(existingRole.name));
+        const existingTargetRole = (selectedUser.roles ?? []).find((existingRole) => existingRole.name === role);
+        const updatedRoles = [
+          ...nonMasterRoles,
+          existingTargetRole ?? { id: `local-master-${role}`, name: role }
+        ];
         updateLocalUser({ ...selectedUser, roles: updatedRoles });
         await checkAndInvalidateIfSelf(selectedUser.id);
       } else {
         const err = await res.json();
-        alert(`昇格失敗: ${err.error}`);
-      }
-    } catch {
-      alert('エラーが発生しました');
-    }
-  }
-
-  async function handleDemote(role) {
-    if (!selectedUser) return;
-    if (!confirm(`${selectedUser.email} から ${role} ロールを剥奪しますか？`)) return;
-    try {
-      const res = await fetchWithBackoff('/api/root/users/promote', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: selectedUser.id, role }),
-      });
-      if (res.ok) {
-        const updatedRoles = (selectedUser.roles ?? []).filter(r => r.name !== role);
-        updateLocalUser({ ...selectedUser, roles: updatedRoles });
-        await checkAndInvalidateIfSelf(selectedUser.id);
-      } else {
-        const err = await res.json();
-        alert(`降格失敗: ${err.error}`);
+        alert(`マスタロール変更失敗: ${err.error}`);
       }
     } catch {
       alert('エラーが発生しました');
@@ -554,30 +554,37 @@ import { onMount } from 'svelte';
           </div>
         </section>
 
-        <!-- セクション2: 権限ロール昇格・降格 -->
+        <!-- セクション2: マスタロール切り替え -->
         <section class="bg-amber-50 p-4 rounded-md border border-amber-100">
-          <h4 class="text-md font-bold text-amber-900 mb-2">権限ロールの昇格・降格</h4>
+          <h4 class="text-md font-bold text-amber-900 mb-2">マスタロールの切り替え</h4>
           <p class="text-xs text-amber-700 mb-3">
-            ユーザーに admin または root 権限を付与・剥奪できます。
+            `student` / `admin` / `root` は同時に持てないため、1つだけ選んで交換します。
+          </p>
+          <p class="text-xs text-amber-800 mb-3">
+            現在のマスタロール:
+            <span class="font-semibold">{getMasterRoles(selectedUser).join(' / ') || '未設定'}</span>
+            {#if getMasterRoles(selectedUser).length > 1}
+              （重複あり。次回の切り替えで1つに正規化されます）
+            {/if}
           </p>
           <div class="flex flex-wrap gap-2">
-            {#each ['admin', 'root'] as privilegeRole (privilegeRole)}
-              {@const hasRole = selectedUser.roles?.some(r => r.name === privilegeRole)}
-              {#if hasRole}
-                <button
-                  class="rounded-md bg-red-100 border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-200 transition-colors"
-                  onclick={() => handleDemote(privilegeRole)}
-                >
-                  {privilegeRole} を剥奪
-                </button>
-              {:else}
-                <button
-                  class="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700 transition-colors"
-                  onclick={() => handlePromote(privilegeRole)}
-                >
-                  {privilegeRole} に昇格
-                </button>
-              {/if}
+            {#each masterRoles as privilegeRole (privilegeRole)}
+              {@const isCurrentRole = getCurrentMasterRole(selectedUser) === privilegeRole && getMasterRoles(selectedUser).length === 1}
+              <button
+                class={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  isCurrentRole
+                    ? 'border border-emerald-300 bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                }`}
+                onclick={() => handleMasterRoleChange(privilegeRole)}
+                disabled={isCurrentRole}
+              >
+                {#if isCurrentRole}
+                  {privilegeRole} を保有中
+                {:else}
+                  {privilegeRole} に切り替え
+                {/if}
+              </button>
             {/each}
           </div>
         </section>
@@ -626,8 +633,8 @@ import { onMount } from 'svelte';
                 {#each selectedUser.roles as role (role.id)}
                   <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 border border-gray-200">
                     <span>{role.name}</span>
-                    <!-- _repロールは削除不可（上のセクションで変更） -->
-                    {#if !role.name.endsWith('_rep')}
+                    <!-- マスタロールと_repロールは別セクションで管理 -->
+                    {#if !role.name.endsWith('_rep') && !masterRoles.includes(role.name)}
                       <button 
                         class="text-gray-400 hover:text-red-500 focus:outline-none ml-1"
                         onclick={() => handleRoleDelete(role.name)}
@@ -655,11 +662,11 @@ import { onMount } from 'svelte';
               <input 
                 id="newRoleInput" 
                 type="text" 
-                placeholder="admin, root など"
+                placeholder="judge, mic_staff など"
                 class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" 
                 bind:value={newRoleName}
               />
-              <p class="text-xs text-gray-500 mt-1">※ _rep で終わるロールはここでは追加できません。</p>
+              <p class="text-xs text-gray-500 mt-1">※ `student` / `admin` / `root` と `_rep` で終わるロールはここでは追加できません。</p>
             </div>
             <button 
               class="rounded-md bg-gray-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:bg-gray-300" 
