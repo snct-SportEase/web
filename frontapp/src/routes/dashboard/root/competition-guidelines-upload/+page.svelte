@@ -134,6 +134,26 @@
     errorMessage = '';
   }
 
+  async function readErrorMessage(response, fallbackMessage) {
+    const contentType = response.headers.get('content-type') ?? '';
+
+    if (contentType.includes('application/json')) {
+      try {
+        const errorData = await response.json();
+        return errorData.error || fallbackMessage;
+      } catch {
+        return fallbackMessage;
+      }
+    }
+
+    try {
+      const text = await response.text();
+      return text || fallbackMessage;
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
   async function uploadPdf(file) {
     const formData = new FormData();
     formData.append('pdf', file);
@@ -144,8 +164,8 @@
     });
 
     if (!uploadResponse.ok) {
-      const errorData = await uploadResponse.json();
-      throw new Error(errorData.error || 'PDFのアップロードに失敗しました');
+      const message = await readErrorMessage(uploadResponse, 'PDFのアップロードに失敗しました');
+      throw new Error(message);
     }
 
     const uploadData = await uploadResponse.json();

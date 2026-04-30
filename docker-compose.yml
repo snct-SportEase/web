@@ -103,6 +103,7 @@ services:
       - ./frontapp/.env
     environment:
       - BACKEND_URL=http://sportease-backapp:8080
+      - BODY_SIZE_LIMIT=10M
     depends_on:
       sportease-backapp:
         condition: service_healthy
