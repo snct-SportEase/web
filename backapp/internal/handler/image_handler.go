@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,6 +25,8 @@ var allowedImageMIMEs = map[string]string{
 }
 
 type ImageHandler struct{}
+
+const imageUploadDir = "uploads/images"
 
 func NewImageHandler() *ImageHandler {
 	return &ImageHandler{}
@@ -74,8 +77,9 @@ func (h *ImageHandler) UploadImageHandler(c *gin.Context) {
 
 	newFilename := uuid.New().String() + ext
 
-	uploadDir := "/app/uploads/images"
+	uploadDir := imageUploadDir
 	if err := os.MkdirAll(uploadDir, 0750); err != nil {
+		log.Printf("UploadImageHandler mkdir failed: dir=%s err=%v", uploadDir, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
 	}
@@ -83,6 +87,7 @@ func (h *ImageHandler) UploadImageHandler(c *gin.Context) {
 	// Save the file
 	dst := filepath.Join(uploadDir, newFilename)
 	if err := c.SaveUploadedFile(file, dst); err != nil {
+		log.Printf("UploadImageHandler save failed: dst=%s err=%v", dst, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image"})
 		return
 	}

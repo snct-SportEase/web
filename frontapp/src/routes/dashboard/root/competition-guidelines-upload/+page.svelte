@@ -6,14 +6,12 @@
   let selectedEventId = $state(null);
   let selectedEvent = $state(null);
   let pdfFile = $state(null);
-  let pdfPreviewUrl = $state(null);
   let existingPdfUrl = $state(null);
 
   let guideDocuments = $state([]);
   let guideTitle = $state('');
   let guideDescription = $state('');
   let guidePdfFile = $state(null);
-  let guidePdfPreviewUrl = $state(null);
 
   let isUploading = $state(false);
   let message = $state('');
@@ -73,10 +71,8 @@
       selectedEvent = allEvents.find((event) => event.id === eventId);
       if (selectedEvent && selectedEvent.competition_guidelines_pdf_url) {
         existingPdfUrl = selectedEvent.competition_guidelines_pdf_url;
-        pdfPreviewUrl = existingPdfUrl;
       } else {
         existingPdfUrl = null;
-        pdfPreviewUrl = null;
       }
     } catch (error) {
       console.error('Failed to load event details:', error);
@@ -92,7 +88,6 @@
   async function handleEventChange() {
     resetMessages();
     pdfFile = null;
-    pdfPreviewUrl = null;
     existingPdfUrl = null;
     guideDocuments = [];
     if (selectedEventId) {
@@ -122,9 +117,6 @@
 
     pdfFile = file;
     errorMessage = '';
-    if (browser) {
-      pdfPreviewUrl = URL.createObjectURL(file);
-    }
   }
 
   function handleGuideFileSelect(event) {
@@ -140,9 +132,6 @@
 
     guidePdfFile = file;
     errorMessage = '';
-    if (browser) {
-      guidePdfPreviewUrl = URL.createObjectURL(file);
-    }
   }
 
   async function uploadPdf(file) {
@@ -231,7 +220,6 @@
 
       message = '大会要項を削除しました';
       existingPdfUrl = null;
-      pdfPreviewUrl = null;
       await loadEventDetails(selectedEventId);
     } catch (error) {
       console.error('Delete error:', error);
@@ -275,7 +263,6 @@
       guideTitle = '';
       guideDescription = '';
       guidePdfFile = null;
-      guidePdfPreviewUrl = null;
       if (browser) {
         const fileInput = document.getElementById('guide-pdf-file-input');
         if (fileInput) fileInput.value = '';
@@ -383,9 +370,21 @@
           <p class="mt-1 text-xs text-gray-500">PDFファイルのみ（最大10MB）</p>
         </div>
 
-        {#if pdfPreviewUrl || existingPdfUrl}
-          <div class="border rounded-md h-96 overflow-hidden">
-            <embed src={pdfPreviewUrl || existingPdfUrl} type="application/pdf" width="100%" height="100%" />
+        {#if pdfFile || existingPdfUrl}
+          <div class="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 space-y-2">
+            {#if pdfFile}
+              <p>選択中: {pdfFile.name}</p>
+            {/if}
+            {#if existingPdfUrl}
+              <a
+                href={existingPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                現在の大会要項PDFを開く
+              </a>
+            {/if}
           </div>
         {/if}
 
@@ -461,9 +460,9 @@
         ></textarea>
       </div>
 
-      {#if guidePdfPreviewUrl}
-        <div class="border rounded-md h-96 overflow-hidden">
-          <embed src={guidePdfPreviewUrl} type="application/pdf" width="100%" height="100%" />
+      {#if guidePdfFile}
+        <div class="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+          選択中: {guidePdfFile.name}
         </div>
       {/if}
 

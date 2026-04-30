@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +18,8 @@ import (
 const maxPdfUploadSize = 10 * 1024 * 1024 // 10MB
 
 type PdfHandler struct{}
+
+const pdfUploadDir = "uploads/pdfs"
 
 func NewPdfHandler() *PdfHandler {
 	return &PdfHandler{}
@@ -62,8 +65,9 @@ func (h *PdfHandler) UploadPdfHandler(c *gin.Context) {
 
 	newFilename := uuid.New().String() + ".pdf"
 
-	uploadDir := "/app/uploads/pdfs"
+	uploadDir := pdfUploadDir
 	if err := os.MkdirAll(uploadDir, 0750); err != nil {
+		log.Printf("UploadPdfHandler mkdir failed: dir=%s err=%v", uploadDir, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
 		return
 	}
@@ -71,6 +75,7 @@ func (h *PdfHandler) UploadPdfHandler(c *gin.Context) {
 	// Save the file
 	dst := filepath.Join(uploadDir, newFilename)
 	if err := c.SaveUploadedFile(file, dst); err != nil {
+		log.Printf("UploadPdfHandler save failed: dst=%s err=%v", dst, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save PDF"})
 		return
 	}
