@@ -180,8 +180,8 @@
                 </div>
               </td>
               {#each masterRoles as role (role)}
+                {@const isCurrentRole = getCurrentMasterRole(user) === role && getMasterRoles(user).length === 1}
                 <td class="px-4 py-3 text-center">
-                  {@const isCurrentRole = getCurrentMasterRole(user) === role && getMasterRoles(user).length === 1}
                   <button
                     class={`rounded px-3 py-1 text-xs font-semibold transition-colors ${
                       isCurrentRole
