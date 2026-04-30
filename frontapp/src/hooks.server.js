@@ -28,12 +28,25 @@ async function proxyToBackend(event) {
     redirect: 'manual'
   };
 
-  if (event.request.method !== 'GET' && event.request.method !== 'HEAD') {
-    requestInit.body = event.request.body;
-    requestInit.duplex = 'half';
-  }
+  try {
+    if (event.request.method !== 'GET' && event.request.method !== 'HEAD') {
+      const body = await event.request.arrayBuffer();
+      if (body.byteLength > 0) {
+        requestInit.body = body;
+      }
+    }
 
-  return fetch(targetUrl, requestInit);
+    return await fetch(targetUrl, requestInit);
+  } catch (error) {
+    console.error('Backend proxy failed:', {
+      method: event.request.method,
+      path: event.url.pathname,
+      target: targetUrl.toString(),
+      error
+    });
+
+    return new Response('Backend proxy failed', { status: 502 });
+  }
 }
 
 /** @type {import('@sveltejs/kit').Handle} */
