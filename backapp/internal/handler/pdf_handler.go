@@ -1,15 +1,12 @@
 package handler
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"backapp/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -80,15 +77,7 @@ func (h *PdfHandler) UploadPdfHandler(c *gin.Context) {
 		return
 	}
 
-	isSecure := middleware.IsRequestSecure(c.Request)
-	scheme := "http"
-	if isSecure {
-		scheme = "https"
-	}
-
-	// Construct the full URL
-	host := c.Request.Host
-	url := fmt.Sprintf("%s://%s/uploads/pdfs/%s", scheme, host, newFilename)
+	url := buildPublicUploadURL(c.Request, "/uploads/pdfs/"+newFilename)
 
 	c.JSON(http.StatusOK, gin.H{"url": url})
 }
