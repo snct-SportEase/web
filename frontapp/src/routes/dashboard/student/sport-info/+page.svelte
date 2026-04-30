@@ -4,7 +4,6 @@
   import RulesDisplayModal from '$lib/components/RulesDisplayModal.svelte';
 
   let eventSports = $state([]);
-  let allSports = $state([]);
 
   let showRulesModal = $state(false);
   let selectedRulesType = $state('');
@@ -23,11 +22,9 @@
       }
       const eventData = await eventRes.json();
       const activeEventId = eventData.event_id;
-      selectedRulesType = eventData.rules_type;
 
       if (!activeEventId) {
         eventSports = [];
-        allSports = [];
         return;
       }
 
@@ -40,24 +37,14 @@
       }
       eventSports = await sportsRes.json();
 
-      // Fetch all sports to get their names
-      const allSportsRes = await fetch(`/api/admin/allsports`, { credentials: 'include' });
-      if (!allSportsRes.ok) {
-        const errorBody = await allSportsRes.text();
-        console.error(`Failed to load all sports: ${allSportsRes.status} ${errorBody}`);
-        throw error(allSportsRes.status, 'Failed to load all sports');
-      }
-      allSports = await allSportsRes.json();
-
     } catch (err) {
       console.error('Error loading sport info:', err);
       // Handle error display to user if needed
     }
   });
 
-  function getSportName(sportId) {
-    const sport = allSports.find(s => s.id === sportId);
-    return sport ? sport.name : '不明な競技';
+  function getSportName(sport) {
+    return sport?.sport_name || '不明な競技';
   }
 
   function openRulesModal(sport) {
@@ -68,7 +55,7 @@
     }
     
     // マークダウンの場合はモーダルを開く
-    selectedSportName = getSportName(sport.sport_id);
+    selectedSportName = getSportName(sport);
     selectedRulesType = sport.rules_type;
     selectedRulesContent = sport.rules;
     selectedRulesPdfUrl = sport.rules_pdf_url;
@@ -83,11 +70,11 @@
 <div class="space-y-8 p-4 md:p-8">
   <h1 class="text-2xl md:text-3xl font-bold text-gray-800 border-b pb-2">競技一覧・詳細閲覧</h1>
 
-  {#if eventSports.length > 0 && allSports.length > 0}
+  {#if eventSports.length > 0}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {#each eventSports as sport (sport.id)}
+      {#each eventSports as sport (sport.sport_id)}
         <div class="bg-white p-6 rounded-lg shadow-lg flex flex-col">
-          <h2 class="text-xl font-semibold text-gray-800 mb-2">{getSportName(sport.sport_id)}</h2>
+          <h2 class="text-xl font-semibold text-gray-800 mb-2">{getSportName(sport)}</h2>
           {#if sport.description}
             <p class="text-gray-600 mb-4 flex-grow">{sport.description || '説明がありません'}</p>
           {/if}

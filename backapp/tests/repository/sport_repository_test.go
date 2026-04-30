@@ -21,6 +21,11 @@ func setupSport(t *testing.T) (repository.SportRepository, sqlmock.Sqlmock, func
 }
 
 var eventSportCols = []string{
+	"event_id", "sport_id", "sport_name", "description", "rules", "rules_type",
+	"rules_pdf_url", "location", "min_capacity", "max_capacity",
+}
+
+var eventSportDetailCols = []string{
 	"event_id", "sport_id", "description", "rules", "rules_type",
 	"rules_pdf_url", "location", "min_capacity", "max_capacity",
 }
@@ -162,7 +167,13 @@ func intPtr(i int) *int {
 // ─── GetSportsByEventID ────────────────────────────────────────────────────
 
 func TestSportRepository_GetSportsByEventID(t *testing.T) {
-	const q = "SELECT event_id, sport_id, description, rules, rules_type, rules_pdf_url, location, min_capacity, max_capacity FROM event_sports WHERE event_id = ?"
+	const q = `
+		SELECT es.event_id, es.sport_id, s.name, es.description, es.rules, es.rules_type, es.rules_pdf_url, es.location, es.min_capacity, es.max_capacity
+		FROM event_sports es
+		JOIN sports s ON es.sport_id = s.id
+		WHERE es.event_id = ?
+		ORDER BY es.sport_id
+	`
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
@@ -170,12 +181,13 @@ func TestSportRepository_GetSportsByEventID(t *testing.T) {
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1).
 			WillReturnRows(sqlmock.NewRows(eventSportCols).
-				AddRow(1, 1, "desc", "rules", "markdown", nil, "gym1", 3, 8).
-				AddRow(1, 2, "desc2", "rules2", "markdown", nil, "ground", 5, 10))
+				AddRow(1, 1, "バスケットボール", "desc", "rules", "markdown", nil, "gym1", 3, 8).
+				AddRow(1, 2, "サッカー", "desc2", "rules2", "markdown", nil, "ground", 5, 10))
 
 		sports, err := repo.GetSportsByEventID(1)
 		require.NoError(t, err)
 		assert.Len(t, sports, 2)
+		assert.Equal(t, "バスケットボール", sports[0].SportName)
 		assert.Equal(t, "gym1", sports[0].Location)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -369,7 +381,7 @@ func TestSportRepository_GetSportDetails(t *testing.T) {
 		defer close()
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1, 1).
-			WillReturnRows(sqlmock.NewRows(eventSportCols).
+			WillReturnRows(sqlmock.NewRows(eventSportDetailCols).
 				AddRow(1, 1, "desc", "rules", "markdown", nil, "gym1", 3, 8))
 
 		es, err := repo.GetSportDetails(1, 1)
@@ -384,7 +396,7 @@ func TestSportRepository_GetSportDetails(t *testing.T) {
 		defer close()
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1, 99).
-			WillReturnRows(sqlmock.NewRows(eventSportCols))
+			WillReturnRows(sqlmock.NewRows(eventSportDetailCols))
 
 		es, err := repo.GetSportDetails(1, 99)
 		require.NoError(t, err)
