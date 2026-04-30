@@ -41,6 +41,7 @@ func NewDB(cfg *config.Config) (*sql.DB, error) {
 	mysqlConfig.DBName = cfg.DBName
 	mysqlConfig.AllowNativePasswords = true
 	mysqlConfig.ParseTime = true
+	mysqlConfig.Loc = time.UTC
 	mysqlConfig.Collation = "utf8mb4_unicode_ci"
 	mysqlConfig.Params = map[string]string{"charset": "utf8mb4"}
 
