@@ -60,6 +60,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	imageHandler := handler.NewImageHandler()
 	pdfHandler := handler.NewPdfHandler()
+	guideDocumentRepo := repository.NewGuideDocumentRepository(db)
+	guideDocumentHandler := handler.NewGuideDocumentHandler(guideDocumentRepo)
 
 	micRepo := repository.NewMICRepository(db)
 	micHandler := handler.NewMICHandler(micRepo)
@@ -84,6 +86,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), classHandler.GetClassScores)
 
 		api.GET("/events/active", middleware.AuthMiddleware(userRepo), eventHandler.GetActiveEvent)
+		api.GET("/guide-documents", middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"), guideDocumentHandler.ListGuideDocuments)
 
 		auth := api.Group("/auth")
 		{
@@ -314,6 +317,13 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByAdmin)
 				rootUsers.PUT("/promote", authHandler.PromoteUserByRoot)
 				rootUsers.DELETE("/promote", authHandler.DemoteUserByRoot)
+			}
+
+			rootGuideDocuments := root.Group("/guide-documents")
+			{
+				rootGuideDocuments.GET("", guideDocumentHandler.ListGuideDocuments)
+				rootGuideDocuments.POST("", guideDocumentHandler.CreateGuideDocument)
+				rootGuideDocuments.DELETE("/:id", guideDocumentHandler.DeleteGuideDocument)
 			}
 
 			rootNotificationRequests := root.Group("/notification-requests")

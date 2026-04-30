@@ -157,6 +157,14 @@ let classes = [
 ];
 let notificationRequests = defaultNotificationRequests();
 let users = defaultUsers();
+let guideDocuments = [
+  {
+    id: 10,
+    title: '会場案内',
+    description: '当日の導線資料',
+    pdf_url: 'https://example.com/map.pdf'
+  }
+];
 let defaultGroups = defaultDefaultGroups();
 let tournaments = defaultTournaments();
 let noonSession = null;
@@ -279,6 +287,14 @@ createServer(async (req, res) => {
     ];
     notificationRequests = defaultNotificationRequests();
     users = defaultUsers();
+    guideDocuments = [
+      {
+        id: 10,
+        title: '会場案内',
+        description: '当日の導線資料',
+        pdf_url: 'https://example.com/map.pdf'
+      }
+    ];
     defaultGroups = defaultDefaultGroups();
     tournaments = defaultTournaments();
     noonSession = null;
@@ -672,6 +688,36 @@ createServer(async (req, res) => {
       };
     });
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (url.pathname === '/api/guide-documents' && req.method === 'GET') {
+    sendJson(res, 200, { documents: guideDocuments });
+    return;
+  }
+
+  if (url.pathname === '/api/root/guide-documents' && req.method === 'GET') {
+    sendJson(res, 200, { documents: guideDocuments });
+    return;
+  }
+
+  if (url.pathname === '/api/root/guide-documents' && req.method === 'POST') {
+    const body = await readJson(req);
+    const nextDocument = {
+      id: guideDocuments.reduce((maxId, doc) => Math.max(maxId, doc.id), 0) + 1,
+      title: body.title,
+      description: body.description ?? null,
+      pdf_url: body.pdf_url
+    };
+    guideDocuments = [nextDocument, ...guideDocuments];
+    sendJson(res, 201, { document: nextDocument });
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/root/guide-documents/') && req.method === 'DELETE') {
+    const id = Number(url.pathname.split('/').pop());
+    guideDocuments = guideDocuments.filter((doc) => doc.id !== id);
+    sendJson(res, 200, { message: 'deleted' });
     return;
   }
 

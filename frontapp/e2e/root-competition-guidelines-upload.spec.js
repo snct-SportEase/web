@@ -7,7 +7,7 @@ test.describe('大会要項アップロード (root)', () => {
     await request.post(`${mockBackendUrl}/__reset`);
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/root/competition-guidelines-upload');
-    await expect(page.getByRole('heading', { name: '大会要項アップロード' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '資料管理' })).toBeVisible();
   });
 
   test('大会選択を表示できる', async ({ page }) => {
@@ -16,5 +16,9 @@ test.describe('大会要項アップロード (root)', () => {
 
   test('PDF未選択ではアップロードしない', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'アップロード' })).toBeDisabled();
+  });
+
+  test('登録済み資料を表示できる', async ({ page }) => {
+    await expect(page.getByText('会場案内')).toBeVisible();
   });
 });

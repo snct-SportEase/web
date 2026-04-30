@@ -106,6 +106,28 @@ type MockEventRepository struct {
 	mock.Mock
 }
 
+type MockGuideDocumentRepository struct {
+	mock.Mock
+}
+
+func (m *MockGuideDocumentRepository) ListGuideDocuments(eventID int) ([]*models.GuideDocument, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.GuideDocument), args.Error(1)
+}
+
+func (m *MockGuideDocumentRepository) CreateGuideDocument(doc *models.GuideDocument) (int64, error) {
+	args := m.Called(doc)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockGuideDocumentRepository) DeleteGuideDocument(id int) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
 func (m *MockEventRepository) CreateEvent(event *models.Event) (int64, error) {
 	args := m.Called(event)
 	return args.Get(0).(int64), args.Error(1)

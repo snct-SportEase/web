@@ -130,7 +130,7 @@
           MIC確認
         </a>
         <a href="/dashboard/root/competition-guidelines-upload" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
-          大会要項アップロード
+          資料管理
         </a>
       </div>
     {/if}
