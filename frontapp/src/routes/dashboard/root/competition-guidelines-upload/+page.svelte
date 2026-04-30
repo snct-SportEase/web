@@ -20,14 +20,14 @@
   let errorMessage = $state('');
 
   onMount(async () => {
-    await Promise.all([fetchEvents(), fetchGuideDocuments()]);
+    await fetchEvents();
     try {
       const response = await fetch('/api/events/active');
       if (response.ok) {
         const data = await response.json();
         if (data.event_id) {
           selectedEventId = data.event_id;
-          await loadEventDetails(data.event_id);
+          await Promise.all([loadEventDetails(data.event_id), fetchGuideDocuments(data.event_id)]);
         }
       }
     } catch (error) {
@@ -48,9 +48,10 @@
     }
   }
 
-  async function fetchGuideDocuments() {
+  async function fetchGuideDocuments(eventId) {
+    if (!eventId) return;
     try {
-      const response = await fetch('/api/root/guide-documents');
+      const response = await fetch(`/api/root/guide-documents?event_id=${eventId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch guide documents');
       }
@@ -93,8 +94,9 @@
     pdfFile = null;
     pdfPreviewUrl = null;
     existingPdfUrl = null;
+    guideDocuments = [];
     if (selectedEventId) {
-      await loadEventDetails(selectedEventId);
+      await Promise.all([loadEventDetails(selectedEventId), fetchGuideDocuments(selectedEventId)]);
     } else {
       selectedEvent = null;
     }
@@ -258,6 +260,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          event_id: selectedEventId,
           title: guideTitle.trim(),
           description: guideDescription.trim() || null,
           pdf_url: pdfUrl
@@ -277,7 +280,7 @@
         const fileInput = document.getElementById('guide-pdf-file-input');
         if (fileInput) fileInput.value = '';
       }
-      await fetchGuideDocuments();
+      await fetchGuideDocuments(selectedEventId);
       message = '資料を登録しました';
     } catch (error) {
       console.error('Create guide document error:', error);
@@ -303,7 +306,7 @@
         throw new Error(errorData.error || '資料の削除に失敗しました');
       }
 
-      await fetchGuideDocuments();
+      await fetchGuideDocuments(selectedEventId);
       message = '資料を削除しました';
     } catch (error) {
       console.error('Delete guide document error:', error);

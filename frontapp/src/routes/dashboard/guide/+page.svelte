@@ -9,11 +9,7 @@
 
   onMount(async () => {
     try {
-      const [eventResponse, documentsResponse] = await Promise.all([
-        fetch('/api/events/active'),
-        fetch('/api/guide-documents')
-      ]);
-
+      const eventResponse = await fetch('/api/events/active');
       if (eventResponse.ok) {
         const data = await eventResponse.json();
         if (data.event_id) {
@@ -24,12 +20,12 @@
           if (data.competition_guidelines_pdf_url) {
             competitionGuidelinesUrl = data.competition_guidelines_pdf_url;
           }
+          const documentsResponse = await fetch(`/api/guide-documents?event_id=${data.event_id}`);
+          if (documentsResponse.ok) {
+            const documentsData = await documentsResponse.json();
+            guideDocuments = documentsData.documents ?? [];
+          }
         }
-      }
-
-      if (documentsResponse.ok) {
-        const documentsData = await documentsResponse.json();
-        guideDocuments = documentsData.documents ?? [];
       }
     } catch (error) {
       console.error('Failed to fetch guide data:', error);

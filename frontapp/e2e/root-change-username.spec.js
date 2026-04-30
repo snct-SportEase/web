@@ -57,7 +57,7 @@ test.describe('ユーザー管理 (root)', () => {
       user_id: 'user-1',
       role: 'root'
     });
-    await expect(page.locator('[aria-labelledby="modal-title"]').getByText('root', { exact: true })).toBeVisible();
+    await expect(page.locator('[aria-labelledby="modal-title"]').getByRole('button', { name: 'root を保有中' })).toBeVisible();
   });
 
   test('ロールを削除できる', async ({ page }) => {

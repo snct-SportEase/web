@@ -21,7 +21,7 @@ describe('Guide Management Page', () => {
       if (url === '/api/root/events') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(events) });
       }
-      if (url === '/api/root/guide-documents') {
+      if (url.split('?')[0] === '/api/root/guide-documents') {
         if (options.method === 'POST') {
           return Promise.resolve({ ok: true, json: () => Promise.resolve({ document: { id: 11 } }) });
         }
@@ -52,7 +52,7 @@ describe('Guide Management Page', () => {
 
     await expect.element(page.getByRole('heading', { name: '資料管理' })).toBeInTheDocument();
     await expect.element(page.getByText('2025春季スポーツ大会')).toBeInTheDocument();
-    await expect.element(page.getByText('会場案内')).toBeInTheDocument();
+    await expect.element(page.getByText('会場案内', { exact: true })).toBeInTheDocument();
   });
 
   it('大会要項PDF未選択ではアップロードしない', async () => {
