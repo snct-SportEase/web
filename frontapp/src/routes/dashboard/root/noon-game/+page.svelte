@@ -567,7 +567,7 @@
 
       const payload = {
         title: matchForm.title || null,
-        scheduled_at: matchForm.scheduled_at ? new Date(matchForm.scheduled_at).toISOString() : null,
+        scheduled_at: matchForm.scheduled_at ? new Date(matchForm.scheduled_at + ':00+09:00').toISOString() : null,
         location: matchForm.location || null,
         format: matchForm.format || null,
         memo: matchForm.memo || null,
@@ -695,9 +695,12 @@
   function toLocalDateTime(value) {
     if (!value) return '';
     const date = new Date(value);
-    const tzOffset = date.getTimezoneOffset() * 60000;
-    const localISO = new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
-    return localISO;
+    const formatter = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+    return formatter.format(date).replace(' ', 'T');
   }
 
   async function safeJson(response) {
@@ -1651,7 +1654,7 @@
                             <p class="font-semibold text-gray-800">{match.title ?? `試合 #${match.id}`}</p>
                             <p class="text-xs text-gray-500">ステータス: {match.status}</p>
                             {#if match.scheduled_at}
-                              <p class="text-xs text-gray-500">日時: {new Date(match.scheduled_at).toLocaleString()}</p>
+                              <p class="text-xs text-gray-500">日時: {new Date(match.scheduled_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
                             {/if}
                           </div>
                           <div class="space-x-2">
