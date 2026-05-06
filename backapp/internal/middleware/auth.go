@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -44,6 +45,22 @@ func GetUserIDFromSession(token string) (string, bool) {
 
 func DeleteSession(token string) {
 	redisClient.Del(context.Background(), sessionKeyPrefix+token)
+}
+
+func SetRedisValue(key, value string, ttl time.Duration) error {
+	if redisClient == nil {
+		return fmt.Errorf("redis client is not initialized")
+	}
+
+	return redisClient.Set(context.Background(), key, value, ttl).Err()
+}
+
+func GetRedisValue(key string) (string, error) {
+	if redisClient == nil {
+		return "", fmt.Errorf("redis client is not initialized")
+	}
+
+	return redisClient.Get(context.Background(), key).Result()
 }
 
 func IsRequestSecure(r *http.Request) bool {

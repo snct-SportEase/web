@@ -173,6 +173,8 @@ let noonMatches = [];
 let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let rainyModeSettings = [];
+let qrCodeSequence = 0;
+let qrCodeActiveTokens = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -221,6 +223,48 @@ function sendJson(res, status, body) {
 function sendResponse(res, status, body, headers = {}) {
   res.writeHead(status, headers);
   res.end(body);
+}
+
+function encodeBase64Url(value) {
+  return Buffer.from(value).toString('base64url');
+}
+
+function decodeBase64Url(value) {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function qrCodeKey(userId, eventId, sportId) {
+  return `${userId}:${eventId}:${sportId}`;
+}
+
+function buildMockQRCodeResponse(eventId, sportId) {
+  qrCodeSequence += 1;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const expiresAt = timestamp + 10;
+  const userId = rootUser.id;
+  const displayName = rootUser.display_name;
+  const sportName = sportId === 1 ? 'バスケットボール' : 'バレーボール';
+  const token = `mock-token-${qrCodeSequence}`;
+
+  qrCodeActiveTokens.set(qrCodeKey(userId, eventId, sportId), token);
+
+  const payload = {
+    token,
+    data: {
+      event_id: eventId,
+      sport_id: sportId,
+      sport_name: sportName,
+      user_id: userId,
+      display_name: displayName,
+      timestamp,
+      expires_at: expiresAt
+    }
+  };
+
+  return {
+    qr_code_data: encodeBase64Url(JSON.stringify(payload)),
+    expires_at: expiresAt
+  };
 }
 
 function readJson(req) {
@@ -303,6 +347,8 @@ createServer(async (req, res) => {
     noonPointsSummary = [];
     noonTemplateRuns = [];
     rainyModeSettings = [];
+    qrCodeSequence = 0;
+    qrCodeActiveTokens = new Map();
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -423,6 +469,72 @@ createServer(async (req, res) => {
           }
         : null
     );
+    return;
+  }
+
+  if (url.pathname === '/api/qrcode/teams' && req.method === 'GET') {
+    sendJson(res, 200, [
+      {
+        id: 101,
+        name: 'Team A',
+        class_id: 1,
+        event_id: 1,
+        sport_id: 1,
+        sport_name: 'バスケットボール'
+      }
+    ]);
+    return;
+  }
+
+  if (url.pathname === '/api/qrcode/generate' && req.method === 'POST') {
+    const body = await readJson(req);
+    sendJson(res, 200, buildMockQRCodeResponse(body.event_id, body.sport_id));
+    return;
+  }
+
+  if (url.pathname === '/api/qrcode/verify' && req.method === 'POST') {
+    const body = await readJson(req);
+
+    try {
+      const combined = JSON.parse(decodeBase64Url(body.qr_code_data ?? ''));
+      const token = combined?.token;
+      const data = combined?.data;
+
+      if (!token) {
+        sendJson(res, 400, { error: 'Invalid QR code token' });
+        return;
+      }
+
+      const activeToken = qrCodeActiveTokens.get(qrCodeKey(data.user_id, data.event_id, data.sport_id));
+      if (!activeToken || activeToken !== token) {
+        sendJson(res, 400, { error: 'QRコードは無効または期限切れです' });
+        return;
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      if (now > data.expires_at) {
+        sendJson(res, 400, {
+          error: 'QRコードの有効期限が切れています',
+          expired: true,
+          expires_at: data.expires_at
+        });
+        return;
+      }
+
+      sendJson(res, 200, {
+        valid: true,
+        event_id: data.event_id,
+        sport_id: data.sport_id,
+        sport_name: data.sport_name,
+        user_id: data.user_id,
+        display_name: data.display_name,
+        timestamp: data.timestamp,
+        expires_at: data.expires_at,
+        remaining_time: Math.max(0, data.expires_at - now)
+      });
+    } catch {
+      sendJson(res, 400, { error: 'Invalid QR code data' });
+    }
     return;
   }
 

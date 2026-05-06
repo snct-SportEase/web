@@ -15,22 +15,31 @@ import (
 
 // QRCodeHandler handles QR code related API requests
 type QRCodeHandler struct {
-	teamRepo  repository.TeamRepository
-	sportRepo repository.SportRepository
-	userRepo  repository.UserRepository
-	eventRepo repository.EventRepository
-	classRepo repository.ClassRepository
+	teamRepo   repository.TeamRepository
+	sportRepo  repository.SportRepository
+	userRepo   repository.UserRepository
+	eventRepo  repository.EventRepository
+	classRepo  repository.ClassRepository
+	tokenStore QRCodeTokenStore
 }
+
+const qrCodeTTL = 10 * time.Second
 
 // NewQRCodeHandler creates a new instance of QRCodeHandler
 func NewQRCodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *QRCodeHandler {
 	return &QRCodeHandler{
-		teamRepo:  teamRepo,
-		sportRepo: sportRepo,
-		userRepo:  userRepo,
-		eventRepo: eventRepo,
-		classRepo: classRepo,
+		teamRepo:   teamRepo,
+		sportRepo:  sportRepo,
+		userRepo:   userRepo,
+		eventRepo:  eventRepo,
+		classRepo:  classRepo,
+		tokenStore: NewRedisQRCodeTokenStore(),
 	}
+}
+
+func (h *QRCodeHandler) WithTokenStore(tokenStore QRCodeTokenStore) *QRCodeHandler {
+	h.tokenStore = tokenStore
+	return h
 }
 
 // GetUserTeamsHandler returns all teams that the current user is a member of
@@ -97,9 +106,9 @@ func (h *QRCodeHandler) GenerateQRCodeHandler(c *gin.Context) {
 		displayName = *user.DisplayName
 	}
 
-	// Generate timestamp and expiration (5 minutes from now)
+	// Generate timestamp and expiration (10 seconds from now)
 	timestamp := time.Now().Unix()
-	expiresAt := timestamp + (5 * 60) // 5 minutes
+	expiresAt := timestamp + int64(qrCodeTTL/time.Second)
 
 	// Create QR code data
 	qrData := models.QRCodeData{
@@ -119,6 +128,11 @@ func (h *QRCodeHandler) GenerateQRCodeHandler(c *gin.Context) {
 		return
 	}
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
+
+	if err := h.tokenStore.SaveActiveToken(user.ID, req.EventID, req.SportID, token, qrCodeTTL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store QR code token"})
+		return
+	}
 
 	// Combine token and data
 	combinedData := map[string]interface{}{
@@ -178,7 +192,23 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 		return
 	}
 
-	// Check expiration (5 minutes)
+	token, ok := combinedData["token"].(string)
+	if !ok || token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid QR code token"})
+		return
+	}
+
+	activeToken, err := h.tokenStore.GetActiveToken(qrData.UserID, qrData.EventID, qrData.SportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate QR code token"})
+		return
+	}
+	if activeToken == "" || activeToken != token {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "QRコードは無効または期限切れです"})
+		return
+	}
+
+	// Check expiration (10 seconds)
 	currentTime := time.Now().Unix()
 	if currentTime > qrData.ExpiresAt {
 		c.JSON(http.StatusBadRequest, gin.H{

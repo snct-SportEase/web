@@ -1,10 +1,12 @@
 package handler_test
 
 import (
+	"backapp/internal/handler"
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -290,6 +292,22 @@ func (m *MockTeamRepository) CreateTeamsBulk(teams []*models.Team) error {
 type MockTournamentRepository struct {
 	mock.Mock
 }
+
+type MockQRCodeTokenStore struct {
+	mock.Mock
+}
+
+func (m *MockQRCodeTokenStore) SaveActiveToken(userID string, eventID, sportID int, token string, ttl time.Duration) error {
+	args := m.Called(userID, eventID, sportID, token, ttl)
+	return args.Error(0)
+}
+
+func (m *MockQRCodeTokenStore) GetActiveToken(userID string, eventID, sportID int) (string, error) {
+	args := m.Called(userID, eventID, sportID)
+	return args.String(0), args.Error(1)
+}
+
+var _ handler.QRCodeTokenStore = (*MockQRCodeTokenStore)(nil)
 
 func (m *MockTournamentRepository) SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {
 	args := m.Called(eventID, sportID, sportName, tournamentData, teams)

@@ -288,7 +288,7 @@
 			<div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
 				<h3 class="font-semibold text-blue-900 mb-2">ご注意</h3>
 				<ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
-					<li>QRコードは発行から5分間のみ有効です</li>
+					<li>QRコードは発行から10秒間のみ有効です</li>
 					<li>有効期限が切れたQRコードは使用できません</li>
 					<li>事前に競技割り当てされた方のみQRコードを発行できます</li>
 					<li>QRコードにはイベントID、競技名、表示名などの情報が含まれます</li>
