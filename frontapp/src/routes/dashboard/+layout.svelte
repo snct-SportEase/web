@@ -143,7 +143,7 @@
 
   <footer class="border-t border-gray-200 bg-white px-6 py-4 text-center text-sm text-gray-600">
     <div class="flex flex-col items-center gap-2">
-      <p>SportEase @ 仙台高専行事委員会 佐藤佑作 2301059</p>
+      <p>SportEase © 仙台高専行事委員会 佐藤佑作 2301059</p>
       <a
         href="https://github.com/snct-SportEase/web"
         target="_blank"
