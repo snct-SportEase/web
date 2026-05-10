@@ -102,13 +102,13 @@
   }
 </script>
 
-<h1 class="text-2xl font-bold mb-4">MIC投票</h1>
+<h1 class="text-2xl font-bold mb-4">行事委員会賞投票</h1>
 
 {#if hasVoted}
   <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 text-center">
     <h2 class="text-xl font-bold mb-2">投票済みです</h2>
     <p>あなたは <span class="font-bold">{votedForClassName}</span> に投票しました。</p>
-    <p class="text-gray-600 mt-4">MIC投票は一人一票までです。</p>
+    <p class="text-gray-600 mt-4">行事委員会賞投票は一人一票までです。</p>
   </div>
 {:else}
   <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" onsubmit={(e) => { e.preventDefault(); vote(e); }}>

@@ -19,6 +19,7 @@ type MICVote struct {
 type MICResult struct {
 	ClassName   string `json:"class_name"`
 	TotalPoints int    `json:"total_points"`
+	VoteCount   int    `json:"vote_count"`
 	Season      string `json:"season"`
 	EventID     int    `json:"event_id"`
 }

@@ -131,17 +131,22 @@ func (r *micRepository) GetMICClass(eventID int) (*models.MICResult, error) {
 
 	var query string
 	query = `
-		SELECT c.name, (cs.total_points_overall + cs.mic_points) AS total_points
+		SELECT
+			c.name,
+			(cs.total_points_overall + cs.mic_points) AS total_points,
+			COUNT(mv.id) AS vote_count
 		FROM class_scores cs
 		JOIN classes c ON cs.class_id = c.id
+		LEFT JOIN mic_votes mv ON mv.voted_for_class_id = c.id AND mv.event_id = cs.event_id
 		WHERE cs.event_id = ?
 			AND c.name IN ('1-1', '1-2', '1-3', 'IS2', 'IT2', 'IE2')
+		GROUP BY c.id, c.name, cs.total_points_overall, cs.mic_points
 		ORDER BY total_points DESC
 		LIMIT 1
 	`
 
 	var result models.MICResult
-	err = r.db.QueryRow(query, eventID).Scan(&result.ClassName, &result.TotalPoints)
+	err = r.db.QueryRow(query, eventID).Scan(&result.ClassName, &result.TotalPoints, &result.VoteCount)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // No MIC class found yet

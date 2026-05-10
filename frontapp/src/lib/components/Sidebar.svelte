@@ -127,7 +127,7 @@
           権限管理
         </a>
         <a href="/dashboard/root/identify-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
-          MIC確認
+          行事委員会賞確認
         </a>
         <a href="/dashboard/root/competition-guidelines-upload" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           資料管理
@@ -160,9 +160,9 @@
         <a href="/dashboard/admin/attendance-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           出席登録
         </a>
-        <!-- MIC投票の被対象者は1~2年生のみ。投票はadminとrootしか行えない -->
+        <!-- 行事委員会賞投票の被対象者は1~2年生のみ。投票はadminとrootしか行えない -->
         <a href="/dashboard/admin/vorting-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
-          MIC投票
+          行事委員会賞投票
         </a>
         <a href="/dashboard/admin/sport-details-registration" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           競技詳細情報登録

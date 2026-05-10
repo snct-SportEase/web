@@ -19,7 +19,7 @@
 
       const response = await fetch(`/api/root/mic/class?event_id=${eventData.event_id}`);
       if (!response.ok) {
-        throw new Error('MICデータの取得に失敗しました。');
+        throw new Error('行事委員会賞データの取得に失敗しました。');
       }
       const data = await response.json();
       if (data.message) {
@@ -33,17 +33,18 @@
   });
 </script>
 
-<h1 class="text-2xl font-bold mb-4">MIC確認</h1>
+<h1 class="text-2xl font-bold mb-4">行事委員会賞確認</h1>
 
 {#if error}
   <p class="text-red-500">{error}</p>
 {:else if micResult}
   <div class="bg-white shadow-md rounded-lg p-6">
-    <h2 class="text-xl font-semibold mb-2">MIC Class</h2>
+    <h2 class="text-xl font-semibold mb-2">行事委員会賞クラス</h2>
     <p><strong>Class:</strong> {micResult.class_name}</p>
+    <p><strong>Votes:</strong> {micResult.vote_count}</p>
     <p><strong>Total Points:</strong> {micResult.total_points}</p>
     <p><strong>Season:</strong> {micResult.season}</p>
   </div>
 {:else}
-  <p>Loading MIC data...</p>
+  <p>Loading award data...</p>
 {/if}

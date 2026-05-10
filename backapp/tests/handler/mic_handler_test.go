@@ -153,7 +153,7 @@ func TestMICHandler_GetMICClass(t *testing.T) {
 		mockRepo := new(MockMICRepository)
 		h := handler.NewMICHandler(mockRepo)
 
-		res := &models.MICResult{ClassName: "1-1", TotalPoints: 100}
+		res := &models.MICResult{ClassName: "1-1", TotalPoints: 100, VoteCount: 4}
 		mockRepo.On("GetMICClass", 1).Return(res, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -163,6 +163,9 @@ func TestMICHandler_GetMICClass(t *testing.T) {
 		h.GetMICClass(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, float64(4), resp["vote_count"])
 	})
 
 	t.Run("Not Found", func(t *testing.T) {
