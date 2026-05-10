@@ -754,6 +754,7 @@ createServer(async (req, res) => {
   if (url.pathname === '/api/root/mic/class' && req.method === 'GET') {
     sendJson(res, 200, {
       class_name: '1A',
+      vote_count: 5,
       total_points: 120,
       season: 'spring'
     });
