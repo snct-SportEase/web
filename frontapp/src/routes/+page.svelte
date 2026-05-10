@@ -1,7 +1,9 @@
 <script>
   import { browser } from '$app/environment';
+  import { onMount } from 'svelte';
 
   let handledLoginError = $state(false);
+  let isLineInAppBrowser = $state(false);
 
   $effect(() => {
     if (!browser || handledLoginError) return;
@@ -19,6 +21,9 @@
       case 'access_denied':
         errorMessage = 'アクセスが拒否されました。詳しくは管理者にお問い合わせください。';
         break;
+      case 'line_inapp_browser_unsupported':
+        errorMessage = 'LINEブラウザではGoogleログインができません。SafariまたはChromeなどの外部ブラウザで開いてからサインインしてください。';
+        break;
       default:
         errorMessage = 'ログインに失敗しました。もう一度お試しください。';
     }
@@ -29,6 +34,18 @@
     newUrl.searchParams.delete('error');
     window.history.replaceState({}, '', newUrl);
   });
+
+  onMount(() => {
+    if (!browser) return;
+    const userAgent = navigator.userAgent || '';
+    isLineInAppBrowser = /line\//i.test(userAgent) || /liff/i.test(userAgent);
+  });
+
+  function handleGoogleLoginClick(event) {
+    if (!isLineInAppBrowser) return;
+    event.preventDefault();
+    alert('LINEブラウザではGoogleログインができません。SafariまたはChromeなどの外部ブラウザで開いてからサインインしてください。');
+  }
 </script>
 
 <!-- ヒーローセクション -->
@@ -59,8 +76,14 @@
             </div>
             <h2 class="text-2xl md:text-3xl font-bold text-center text-gray-900 mb-2">SportEaseへようこそ</h2>
             <p class="text-center text-gray-600 mb-8">学校のGoogleアカウントでサインインしてください。</p>
+            {#if isLineInAppBrowser}
+            <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                LINEブラウザではGoogleログインがブロックされます。右上メニューなどからSafariまたはChromeで開いてからログインしてください。
+            </div>
+            {/if}
             <a 
                 href="/api/auth/google/login"
+                onclick={handleGoogleLoginClick}
                 class="w-full flex items-center justify-center bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 hover:border-[#4a69bd] hover:text-[#4a69bd] focus:outline-none focus:ring-2 focus:ring-[#4a69bd] focus:ring-offset-2 transition-all duration-200 font-medium shadow-sm"
             >
                 <svg class="w-5 h-5 mr-3" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 109.8 512 0 402.2 0 261.8S109.8 11.6 244 11.6C318.3 11.6 382.8 45 427.3 99.9L353.5 168.3C327.2 145.3 289.3 129.8 244 129.8c-66.8 0-121.5 54.9-121.5 122.1s54.7 122.1 121.5 122.1c76.3 0 104.5-54.7 108.8-82.9H244v-66.8h236.1c2.4 12.6 3.9 26.1 3.9 40.9z"></path></svg>

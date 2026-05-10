@@ -51,6 +51,11 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 // ... (GoogleLogin, GoogleCallback, GetUser are unchanged)
 
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
+	if isLINEInAppBrowser(c.GetHeader("User-Agent")) {
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=line_inapp_browser_unsupported")
+		return
+	}
+
 	state := generateStateOauthCookie(c.Writer, c.Request)
 	url := h.oauth2Config.AuthCodeURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, url)
@@ -535,4 +540,9 @@ func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 	http.SetCookie(w, &cookie)
 
 	return state
+}
+
+func isLINEInAppBrowser(userAgent string) bool {
+	ua := strings.ToLower(userAgent)
+	return strings.Contains(ua, "line/") || strings.Contains(ua, "liff")
 }

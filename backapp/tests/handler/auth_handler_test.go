@@ -13,6 +13,29 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestAuthHandler_GoogleLogin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("redirects LINE in-app browser users back to frontend", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{
+			FrontendURL: "http://localhost:5173",
+		}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/auth/google/login", nil)
+		c.Request.Header.Set("User-Agent", "Mozilla/5.0 Line/14.1.0")
+
+		authHandler.GoogleLogin(c)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+		assert.Equal(t, "http://localhost:5173/?error=line_inapp_browser_unsupported", w.Header().Get("Location"))
+	})
+}
+
 func TestAuthHandler_PromoteUserByRoot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
