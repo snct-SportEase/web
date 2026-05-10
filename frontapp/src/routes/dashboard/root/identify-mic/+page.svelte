@@ -40,10 +40,10 @@
 {:else if micResult}
   <div class="bg-white shadow-md rounded-lg p-6">
     <h2 class="text-xl font-semibold mb-2">行事委員会賞クラス</h2>
-    <p><strong>Class:</strong> {micResult.class_name}</p>
-    <p><strong>Votes:</strong> {micResult.vote_count}</p>
-    <p><strong>Total Points:</strong> {micResult.total_points}</p>
-    <p><strong>Season:</strong> {micResult.season}</p>
+    <p><strong>クラス:</strong> {micResult.class_name}</p>
+    <p><strong>得票数:</strong> {micResult.vote_count}</p>
+    <p><strong>合計ポイント:</strong> {micResult.total_points}</p>
+    <p><strong>シーズン:</strong> {micResult.season}</p>
   </div>
 {:else}
   <p>Loading award data...</p>

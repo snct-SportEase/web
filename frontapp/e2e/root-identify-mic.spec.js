@@ -13,7 +13,7 @@ test.describe('行事委員会賞確認 (root)', () => {
     await expect(page.getByRole('heading', { name: '行事委員会賞確認' })).toBeVisible();
     await expect(page.getByText('行事委員会賞クラス')).toBeVisible();
     await expect(page.getByText('1A')).toBeVisible();
-    await expect(page.getByText('Votes: 5')).toBeVisible();
+    await expect(page.getByText('得票数: 5')).toBeVisible();
     await expect(page.getByText('120')).toBeVisible();
   });
 });
