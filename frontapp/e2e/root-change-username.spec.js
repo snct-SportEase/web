@@ -20,6 +20,19 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.getByText('student1@sendai-nct.jp')).toBeVisible();
   });
 
+  test('クラス列でユーザー一覧を並び替えできる', async ({ page }) => {
+    await expect(page.getByText('student1@sendai-nct.jp')).toBeVisible();
+
+    const sortButton = page.getByRole('button', { name: 'クラスで並び替え' });
+    await sortButton.click();
+    await expect(sortButton).toContainText('↑');
+    await expect(page.locator('tbody tr').first()).toContainText('student1@sendai-nct.jp');
+
+    await sortButton.click();
+    await expect(sortButton).toContainText('↓');
+    await expect(page.locator('tbody tr').first()).toContainText('admin1@sendai-nct.jp');
+  });
+
   test('表示名を更新できる', async ({ page }) => {
     await page.locator('tbody button').first().click({ force: true });
     await expect(page.locator('#displayNameInput')).toBeVisible();

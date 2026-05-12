@@ -9,6 +9,8 @@ import { onMount } from 'svelte';
   let classes = $state([]); // クラス一覧
   let searchQuery = $state('');
   let searchType = $state('email'); // 'email' or 'display_name'
+  let sortKey = $state('');
+  let sortDirection = $state('asc');
   let selectedUser = $state(null);
   let newDisplayName = $state('');
   // ロール管理用
@@ -303,6 +305,67 @@ import { onMount } from 'svelte';
     selectedUser = updatedUser;
   }
 
+  function getClass(user) {
+    return classes.find((cls) => String(cls.id) === String(user?.class_id));
+  }
+
+  function getClassDisplayName(user) {
+    if (user?.class_id === null || user?.class_id === undefined || user?.class_id === '') return '-';
+    return getClass(user)?.name ?? `ID ${user.class_id}`;
+  }
+
+  function getClassSortValue(user) {
+    return getClass(user)?.name ?? String(user.class_id);
+  }
+
+  function hasClass(user) {
+    return user?.class_id !== null && user?.class_id !== undefined && user?.class_id !== '';
+  }
+
+  function sortBy(key) {
+    if (sortKey === key) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      return;
+    }
+
+    sortKey = key;
+    sortDirection = 'asc';
+  }
+
+  function getSortIndicator(key) {
+    if (sortKey !== key) return '';
+    return sortDirection === 'asc' ? '↑' : '↓';
+  }
+
+  function getSortedUsers() {
+    if (!sortKey) return users;
+
+    const direction = sortDirection === 'asc' ? 1 : -1;
+    return [...users].sort((left, right) => {
+      let comparison = 0;
+
+      if (sortKey === 'class') {
+        if (hasClass(left) !== hasClass(right)) {
+          return hasClass(left) ? -1 : 1;
+        }
+
+        comparison = getClassSortValue(left).localeCompare(getClassSortValue(right), 'ja', {
+          numeric: true,
+          sensitivity: 'base'
+        });
+      }
+
+      if (comparison === 0) {
+        comparison = String(left.email ?? '').localeCompare(String(right.email ?? ''), 'ja', {
+          numeric: true,
+          sensitivity: 'base'
+        });
+      }
+
+      return comparison * direction;
+    });
+  }
+
   function getMasterRoles(user) {
     return (user?.roles ?? [])
       .filter((role) => masterRoles.includes(role.name))
@@ -434,12 +497,22 @@ import { onMount } from 'svelte';
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">表示名</th>
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">ロール</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">クラスID</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+              <button
+                class="inline-flex items-center gap-1 rounded px-1 py-0.5 font-semibold text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                type="button"
+                onclick={() => sortBy('class')}
+                aria-label="クラスで並び替え"
+              >
+                クラス
+                <span class="inline-block w-4 text-xs text-indigo-600" aria-hidden="true">{getSortIndicator('class')}</span>
+              </button>
+            </th>
             <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">アクション</th>
           </tr>
         </thead>
         <tbody>
-          {#each users as user (user.id)}
+          {#each getSortedUsers() as user (user.id)}
             <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
               <td class="px-4 py-3 text-sm font-medium text-gray-900">{user.email}</td>
               <td class="px-4 py-3 text-sm text-gray-700">
@@ -462,7 +535,7 @@ import { onMount } from 'svelte';
                   <span class="text-gray-400 text-xs">なし</span>
                 {/if}
               </td>
-              <td class="px-4 py-3 text-sm font-mono text-indigo-600">{user.class_id || '-'}</td>
+              <td class="px-4 py-3 text-sm font-medium text-indigo-700">{getClassDisplayName(user)}</td>
               <td class="px-4 py-3 text-right">
                 <button 
                   class="inline-flex items-center gap-2 rounded-md border border-indigo-600 bg-white px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1" 

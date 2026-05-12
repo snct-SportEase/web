@@ -129,6 +129,20 @@ describe('Change Username Page', () => {
     await expect.element(page.getByText('student1@sendai-nct.jp')).toBeInTheDocument();
   });
 
+  it('クラス列でユーザー一覧を並び替えできる', async () => {
+    users = [users[1], users[0]];
+
+    render(Page);
+
+    await expect.element(page.getByText('admin1@sendai-nct.jp')).toBeInTheDocument();
+    const sortButton = page.getByRole('button', { name: 'クラスで並び替え' });
+    await sortButton.click();
+    expect(document.querySelector('tbody tr')?.textContent).toContain('student1@sendai-nct.jp');
+
+    await sortButton.click();
+    expect(document.querySelector('tbody tr')?.textContent).toContain('admin1@sendai-nct.jp');
+  });
+
   it('表示名を更新できる', async () => {
     render(Page);
 
