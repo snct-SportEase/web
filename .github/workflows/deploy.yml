@@ -65,6 +65,11 @@ jobs:
   frontend-test:
     name: Frontend SvelteKit Tests
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
     steps:
       - name: Checkout Repository
@@ -80,10 +85,6 @@ jobs:
       - name: Install dependencies
         working-directory: ./frontapp
         run: npm ci
-
-      - name: Install Playwright Browsers
-        working-directory: ./frontapp
-        run: npx playwright install --with-deps
 
       - name: Check Formatting & Lint
         working-directory: ./frontapp
