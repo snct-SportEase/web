@@ -9,6 +9,7 @@ import { onMount } from 'svelte';
   let classes = $state([]); // クラス一覧
   let searchQuery = $state('');
   let searchType = $state('email'); // 'email' or 'display_name'
+  let selectedClassFilter = $state('');
   let sortKey = $state('');
   let sortDirection = $state('asc');
   let selectedUser = $state(null);
@@ -322,6 +323,12 @@ import { onMount } from 'svelte';
     return user?.class_id !== null && user?.class_id !== undefined && user?.class_id !== '';
   }
 
+  function matchesClassFilter(user) {
+    if (selectedClassFilter === '') return true;
+    if (selectedClassFilter === '__none__') return !hasClass(user);
+    return String(user?.class_id) === selectedClassFilter;
+  }
+
   function sortBy(key) {
     if (sortKey === key) {
       sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -337,11 +344,16 @@ import { onMount } from 'svelte';
     return sortDirection === 'asc' ? '↑' : '↓';
   }
 
+  function getFilteredUsers() {
+    return users.filter((user) => matchesClassFilter(user));
+  }
+
   function getSortedUsers() {
-    if (!sortKey) return users;
+    const filteredUsers = getFilteredUsers();
+    if (!sortKey) return filteredUsers;
 
     const direction = sortDirection === 'asc' ? 1 : -1;
-    return [...users].sort((left, right) => {
+    return [...filteredUsers].sort((left, right) => {
       let comparison = 0;
 
       if (sortKey === 'class') {
@@ -460,6 +472,22 @@ import { onMount } from 'svelte';
           </svg>
         </div>
       </div>
+
+      <div class="w-full md:w-48">
+        <label for="classFilter" class="sr-only">クラスで絞り込み</label>
+        <select
+          id="classFilter"
+          class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          bind:value={selectedClassFilter}
+          aria-label="クラスで絞り込み"
+        >
+          <option value="">すべてのクラス</option>
+          {#each classes as cls (cls.id)}
+            <option value={String(cls.id)}>{cls.name}</option>
+          {/each}
+          <option value="__none__">クラス未設定</option>
+        </select>
+      </div>
       
       <!-- 検索ボタン -->
       <button 
@@ -473,7 +501,7 @@ import { onMount } from 'svelte';
       <!-- すべて表示ボタン -->
       <button 
         class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed" 
-        onclick={() => { searchQuery = ''; fetchUsers('', ''); }}
+        onclick={() => { searchQuery = ''; selectedClassFilter = ''; fetchUsers('', ''); }}
         disabled={isLoading}
       >
         すべて表示
@@ -550,7 +578,7 @@ import { onMount } from 'svelte';
               </td>
             </tr>
           {/each}
-          {#if !isLoading && users.length === 0}
+          {#if !isLoading && getSortedUsers().length === 0}
             <tr>
               <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">
                 ユーザーが見つかりませんでした。
