@@ -197,6 +197,58 @@ func TestTeamRepository_GetTeamsByClassID(t *testing.T) {
 	})
 }
 
+func TestTeamRepository_GetNoonGameTeamsByClassID(t *testing.T) {
+	const q = `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
+		FROM teams t
+		INNER JOIN sports s ON t.sport_id = s.id
+		INNER JOIN classes c ON t.class_id = c.id
+		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
+		WHERE t.class_id = ? AND c.event_id = ? AND es.location = 'noon_game'
+	`
+	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name"}
+
+	t.Run("success", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(5, 1).
+			WillReturnRows(sqlmock.NewRows(cols).
+				AddRow(10, "IS3リレー", 5, 99, 1, "学年対抗リレー"))
+
+		teams, err := repo.GetNoonGameTeamsByClassID(5, 1)
+		require.NoError(t, err)
+		assert.Len(t, teams, 1)
+		assert.Equal(t, "学年対抗リレー", teams[0].SportName)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("empty result", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(999, 1).
+			WillReturnRows(sqlmock.NewRows(cols))
+
+		teams, err := repo.GetNoonGameTeamsByClassID(999, 1)
+		assert.NoError(t, err)
+		assert.Nil(t, teams)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WillReturnError(errors.New("db error"))
+
+		teams, err := repo.GetNoonGameTeamsByClassID(5, 1)
+		assert.Error(t, err)
+		assert.Nil(t, teams)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 // ─── GetTeamByClassAndSport ────────────────────────────────────────────────
 
 func TestTeamRepository_GetTeamByClassAndSport(t *testing.T) {

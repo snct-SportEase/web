@@ -219,6 +219,14 @@ func (m *MockTeamRepository) GetTeamsByClassID(classID int, eventID int) ([]*mod
 	return args.Get(0).([]*models.TeamWithSport), args.Error(1)
 }
 
+func (m *MockTeamRepository) GetNoonGameTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
+	args := m.Called(classID, eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.TeamWithSport), args.Error(1)
+}
+
 func (m *MockTeamRepository) GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error) {
 	args := m.Called(classID, sportID, eventID)
 	if args.Get(0) == nil {

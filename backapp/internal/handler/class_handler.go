@@ -245,6 +245,11 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get teams"})
 		return
 	}
+	noonGameTeams, err := h.teamRepo.GetNoonGameTeamsByClassID(class.ID, activeEventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get noon game teams"})
+		return
+	}
 
 	members, err := h.classRepo.GetClassMembers(class.ID)
 	if err != nil {
@@ -309,6 +314,38 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 
 		entry := buildClassProgress(team, matchDetails)
 		progress = append(progress, entry)
+	}
+
+	noonGameTeamIDs := make([]int, 0, len(noonGameTeams))
+	for _, team := range noonGameTeams {
+		noonGameTeamIDs = append(noonGameTeamIDs, team.ID)
+	}
+
+	noonGameTeamMembersByTeamID, err := h.teamRepo.GetTeamMembersByTeamIDs(noonGameTeamIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get noon game team members"})
+		return
+	}
+
+	for _, team := range noonGameTeams {
+		teamMembers := noonGameTeamMembersByTeamID[team.ID]
+		for _, tm := range teamMembers {
+			view, exists := memberLookup[tm.ID]
+			if !exists {
+				view = &models.ClassMemberView{
+					ID:          tm.ID,
+					Email:       tm.Email,
+					DisplayName: tm.DisplayName,
+					Assignments: []models.ClassMemberAssignment{},
+				}
+				memberLookup[tm.ID] = view
+				memberList = append(memberList, view)
+			}
+			view.Assignments = append(view.Assignments, models.ClassMemberAssignment{
+				SportName: team.SportName,
+				TeamName:  team.Name,
+			})
+		}
 	}
 
 	sort.SliceStable(memberList, func(i, j int) bool {

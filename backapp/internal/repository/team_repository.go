@@ -11,6 +11,7 @@ type TeamRepository interface {
 	DeleteTeamsByEventAndSportID(eventID int, sportID int) error
 	GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error)
 	GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
+	GetNoonGameTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
 	GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error)
 	AddTeamMember(teamID int, userID string) error
 	GetTeamMembers(teamID int) ([]*models.User, error)
@@ -89,6 +90,32 @@ func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.
 		INNER JOIN classes c ON t.class_id = c.id
 		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
 		WHERE t.class_id = ? AND c.event_id = ? AND es.location <> 'noon_game'
+	`
+	rows, err := r.db.Query(query, classID, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []*models.TeamWithSport
+	for rows.Next() {
+		team := &models.TeamWithSport{}
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &team.SportName); err != nil {
+			return nil, err
+		}
+		teams = append(teams, team)
+	}
+	return teams, nil
+}
+
+func (r *teamRepository) GetNoonGameTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
+	query := `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
+		FROM teams t
+		INNER JOIN sports s ON t.sport_id = s.id
+		INNER JOIN classes c ON t.class_id = c.id
+		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
+		WHERE t.class_id = ? AND c.event_id = ? AND es.location = 'noon_game'
 	`
 	rows, err := r.db.Query(query, classID, eventID)
 	if err != nil {
