@@ -92,6 +92,27 @@ describe('Change Username Page', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
       }
 
+      if (url === '/api/root/users/class-rep' && options.method === 'PUT') {
+        const body = JSON.parse(options.body);
+        const classes = [
+          { id: 1, name: '1A' },
+          { id: 2, name: '1B' }
+        ];
+        const targetClass = classes.find((cls) => cls.id === body.class_id);
+        users = users.map((user) => {
+          if (user.id !== body.user_id || !targetClass) return user;
+          return {
+            ...user,
+            class_id: body.class_id,
+            roles: [
+              ...user.roles.filter((role) => !role.name.endsWith('_rep')),
+              { id: `class-${body.class_id}`, name: `${targetClass.name}_rep` }
+            ]
+          };
+        });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+      }
+
       if (url === '/api/admin/users/role' && options.method === 'PUT') {
         const body = JSON.parse(options.body);
         users = users.map((user) => {
@@ -235,17 +256,12 @@ describe('Change Username Page', () => {
     await page.getByLabelText('担当クラスを選択').selectOptions('2');
     await page.getByRole('button', { name: '変更・保存' }).click();
 
-    const addRoleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/admin/users/role' && options?.method === 'PUT');
-    const deleteRoleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/admin/users/role' && options?.method === 'DELETE');
-    expect(addRoleCall).toBeTruthy();
-    expect(deleteRoleCall).toBeTruthy();
-    expect(JSON.parse(addRoleCall[1].body)).toEqual({
+    const classRepCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/users/class-rep' && options?.method === 'PUT');
+    expect(classRepCall).toBeTruthy();
+    expect(JSON.parse(classRepCall[1].body)).toEqual({
       user_id: 'user-1',
-      role: '1B_rep'
+      class_id: 2
     });
-    expect(JSON.parse(deleteRoleCall[1].body)).toEqual({
-      user_id: 'user-1',
-      role: '1A_rep'
-    });
+    await expect.element(page.getByRole('row', { name: /student1@sendai-nct\.jp.*1B_rep.*1B/ })).toBeInTheDocument();
   });
 });

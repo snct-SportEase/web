@@ -540,6 +540,11 @@ func (m *MockUserRepository) ReplaceMasterRole(userID string, roleName string) e
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) ReplaceClassRepRole(userID string, roleName string, classID int, eventID *int) error {
+	args := m.Called(userID, roleName, classID, eventID)
+	return args.Error(0)
+}
+
 func (m *MockUserRepository) UpdateUserRole(userID string, roleName string, eventID *int) error {
 	args := m.Called(userID, roleName, eventID)
 	return args.Error(0)

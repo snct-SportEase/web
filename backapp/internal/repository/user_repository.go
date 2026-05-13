@@ -17,6 +17,7 @@ type UserRepository interface {
 	GetUserWithRoles(userID string) (*models.User, error)
 	AddUserRoleIfNotExists(userID string, roleName string) error
 	ReplaceMasterRole(userID string, roleName string) error
+	ReplaceClassRepRole(userID string, roleName string, classID int, eventID *int) error
 	UpdateUserRole(userID string, roleName string, eventID *int) error
 	DeleteUserRole(userID string, roleName string) error
 	UpdateNotificationFilters(userID string, filters []string) error
@@ -140,6 +141,56 @@ func (r *userRepository) ReplaceMasterRole(userID string, roleName string) error
 	}
 
 	_, err = tx.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", userID, targetRoleID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *userRepository) ReplaceClassRepRole(userID string, roleName string, classID int, eventID *int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err = tx.Exec("UPDATE users SET class_id = ? WHERE id = ?", classID, userID); err != nil {
+		return err
+	}
+
+	var roleID int64
+	err = tx.QueryRow("SELECT id FROM roles WHERE name = ?", roleName).Scan(&roleID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			result, createErr := tx.Exec("INSERT INTO roles (name) VALUES (?)", roleName)
+			if createErr != nil {
+				return createErr
+			}
+			roleID, createErr = result.LastInsertId()
+			if createErr != nil {
+				return createErr
+			}
+		} else {
+			return err
+		}
+	}
+
+	_, err = tx.Exec(`
+		DELETE ur
+		FROM user_roles ur
+		INNER JOIN roles r ON ur.role_id = r.id
+		WHERE ur.user_id = ? AND RIGHT(r.name, 4) = '_rep'
+	`, userID)
+	if err != nil {
+		return err
+	}
+
+	if eventID != nil {
+		_, err = tx.Exec("INSERT INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, ?)", userID, roleID, *eventID)
+	} else {
+		_, err = tx.Exec("INSERT INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, NULL)", userID, roleID)
+	}
 	if err != nil {
 		return err
 	}

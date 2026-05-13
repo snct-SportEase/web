@@ -96,12 +96,12 @@ test.describe('ユーザー管理 (root)', () => {
     await page.locator('tbody button').first().click({ force: true });
     await expect(page.locator('#classRepSelect')).toBeVisible();
     await page.locator('#classRepSelect').selectOption('2');
-    const addRequestPromise = page.waitForRequest((request) => request.url().endsWith('/api/admin/users/role') && request.method() === 'PUT');
+    const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/users/class-rep') && request.method() === 'PUT');
     await page.getByRole('button', { name: '変更・保存' }).click();
-    const req = await addRequestPromise;
+    const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',
-      role: '1B_rep'
+      class_id: 2
     });
   });
 });

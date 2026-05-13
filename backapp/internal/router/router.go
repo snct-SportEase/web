@@ -315,6 +315,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				rootUsers.GET("", authHandler.FindUsersHandler)
 				rootUsers.PUT("/display-name", authHandler.UpdateUserDisplayNameByAdmin)
+				rootUsers.PUT("/class-rep", authHandler.UpdateUserClassRepByRoot)
 				rootUsers.PUT("/promote", authHandler.PromoteUserByRoot)
 				rootUsers.DELETE("/promote", authHandler.DemoteUserByRoot)
 			}

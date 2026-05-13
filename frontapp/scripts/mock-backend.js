@@ -804,6 +804,24 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/root/users/class-rep' && req.method === 'PUT') {
+    const body = await readJson(req);
+    const targetClass = classes.find((cls) => cls.id === body.class_id);
+    users = users.map((user) => {
+      if (user.id !== body.user_id || !targetClass) return user;
+      return {
+        ...user,
+        class_id: body.class_id,
+        roles: [
+          ...user.roles.filter((role) => !role.name.endsWith('_rep')),
+          { id: Date.now(), name: `${targetClass.name}_rep` }
+        ]
+      };
+    });
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   if (url.pathname === '/api/guide-documents' && req.method === 'GET') {
     sendJson(res, 200, { documents: guideDocuments });
     return;

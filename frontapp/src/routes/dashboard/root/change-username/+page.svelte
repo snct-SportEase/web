@@ -174,38 +174,20 @@ import { onMount } from 'svelte';
     const targetClass = classes.find(c => c.id == selectedClassRep);
     if (!targetClass) return;
 
-    const newRole = `${targetClass.name}_rep`;
-    
-    // 現在の代表ロールを取得（削除用）
-    const currentRepRole = selectedUser.roles?.find(r => r.name.endsWith('_rep'));
-
-    // 1. 新しいロールを追加
     try {
-      const addRes = await fetchWithBackoff('/api/admin/users/role', {
+      const response = await fetchWithBackoff('/api/root/users/class-rep', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: selectedUser.id,
-          role: newRole
+          class_id: Number(selectedClassRep)
         }),
       });
 
-      if (!addRes.ok) {
-        const err = await addRes.json();
-        alert(`ロール追加失敗: ${err.error}`);
+      if (!response.ok) {
+        const err = await response.json();
+        alert(`クラス所属変更失敗: ${err.error}`);
         return;
-      }
-
-      // 2. 成功したら古いロールを削除（もしあれば、かつ新しいロールと違う場合）
-      if (currentRepRole && currentRepRole.name !== newRole) {
-        await fetchWithBackoff('/api/admin/users/role', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: selectedUser.id,
-            role: currentRepRole.name
-          }),
-        });
       }
 
       alert('クラス所属を変更しました');

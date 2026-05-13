@@ -3,6 +3,7 @@ package handler_test
 import (
 	"backapp/internal/config"
 	"backapp/internal/handler"
+	"backapp/internal/models"
 	"bytes"
 	"net/http"
 	"net/http/httptest"
@@ -33,6 +34,66 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 
 		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
 		assert.Equal(t, "http://localhost:5173/?error=line_inapp_browser_unsupported", w.Header().Get("Location"))
+	})
+}
+
+func TestAuthHandler_UpdateUserClassRepByRoot(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("replaces class representative role", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		activeEventID := 3
+		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
+		mockClassRepo.On("GetClassByID", 12).Return(&models.Class{
+			ID:      12,
+			EventID: &activeEventID,
+			Name:    "2A",
+		}, nil).Once()
+		mockUserRepo.On("ReplaceClassRepRole", "user-1", "2A_rep", 12, &activeEventID).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/users/class-rep", bytes.NewBufferString(`{"user_id":"user-1","class_id":12}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		authHandler.UpdateUserClassRepByRoot(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.JSONEq(t, `{"message":"Class representative role replaced successfully"}`, w.Body.String())
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("rejects class outside active event", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		activeEventID := 3
+		otherEventID := 4
+		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
+		mockClassRepo.On("GetClassByID", 12).Return(&models.Class{
+			ID:      12,
+			EventID: &otherEventID,
+			Name:    "2A",
+		}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/users/class-rep", bytes.NewBufferString(`{"user_id":"user-1","class_id":12}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		authHandler.UpdateUserClassRepByRoot(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.JSONEq(t, `{"error":"Selected class does not belong to the active event"}`, w.Body.String())
+		mockUserRepo.AssertNotCalled(t, "ReplaceClassRepRole", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 
