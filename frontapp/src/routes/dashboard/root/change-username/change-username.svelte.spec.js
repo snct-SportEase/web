@@ -148,6 +148,7 @@ describe('Change Username Page', () => {
 
     await expect.element(page.getByRole('heading', { name: 'ユーザー管理' })).toBeInTheDocument();
     await expect.element(page.getByText('student1@sendai-nct.jp')).toBeInTheDocument();
+    expect(document.querySelector('[aria-label="表示中ユーザー数"]')?.textContent?.trim()).toBe('表示中 2 / 全 2 件');
   });
 
   it('クラス列でユーザー一覧を並び替えできる', async () => {
@@ -169,16 +170,19 @@ describe('Change Username Page', () => {
 
     await expect.element(page.getByText('student1@sendai-nct.jp')).toBeInTheDocument();
     await expect.element(page.getByText('admin1@sendai-nct.jp')).toBeInTheDocument();
+    expect(document.querySelector('[aria-label="表示中ユーザー数"]')?.textContent?.trim()).toBe('表示中 2 / 全 2 件');
 
     await page.getByLabelText('クラスで絞り込み').selectOptions('2');
 
     await expect.element(page.getByText('student1@sendai-nct.jp')).not.toBeInTheDocument();
     await expect.element(page.getByText('admin1@sendai-nct.jp')).toBeInTheDocument();
+    expect(document.querySelector('[aria-label="表示中ユーザー数"]')?.textContent?.trim()).toBe('表示中 1 / 全 2 件');
 
     await page.getByRole('button', { name: 'すべて表示' }).click();
 
     await expect.element(page.getByText('student1@sendai-nct.jp')).toBeInTheDocument();
     await expect.element(page.getByText('admin1@sendai-nct.jp')).toBeInTheDocument();
+    expect(document.querySelector('[aria-label="表示中ユーザー数"]')?.textContent?.trim()).toBe('表示中 2 / 全 2 件');
   });
 
   it('表示名を更新できる', async () => {

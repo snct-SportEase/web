@@ -330,6 +330,10 @@ import { onMount } from 'svelte';
     return users.filter((user) => matchesClassFilter(user));
   }
 
+  function getVisibleUserCount() {
+    return getFilteredUsers().length;
+  }
+
   function getSortedUsers() {
     const filteredUsers = getFilteredUsers();
     if (!sortKey) return filteredUsers;
@@ -500,6 +504,12 @@ import { onMount } from 'svelte';
 
   <!-- ユーザーリストカード -->
   <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
+      <h2 class="text-lg font-semibold text-gray-800">ユーザー一覧</h2>
+      <p class="text-sm font-medium text-gray-600" aria-label="表示中ユーザー数">
+        表示中 {getVisibleUserCount()} / 全 {users.length} 件
+      </p>
+    </div>
     <div class="overflow-x-auto">
       <table class="w-full">
         <thead>

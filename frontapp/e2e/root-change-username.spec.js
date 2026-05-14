@@ -18,6 +18,7 @@ test.describe('ユーザー管理 (root)', () => {
 
   test('ユーザー一覧を表示できる', async ({ page }) => {
     await expect(page.getByText('student1@sendai-nct.jp')).toBeVisible();
+    await expect(page.getByLabel('表示中ユーザー数')).toHaveText('表示中 2 / 全 2 件');
   });
 
   test('クラス列でユーザー一覧を並び替えできる', async ({ page }) => {
@@ -31,6 +32,15 @@ test.describe('ユーザー管理 (root)', () => {
     await sortButton.click();
     await expect(sortButton).toContainText('↓');
     await expect(page.locator('tbody tr').first()).toContainText('admin1@sendai-nct.jp');
+  });
+
+  test('クラスで絞り込むと表示件数も更新される', async ({ page }) => {
+    await expect(page.getByLabel('表示中ユーザー数')).toHaveText('表示中 2 / 全 2 件');
+
+    await page.getByLabel('クラスで絞り込み').selectOption('2');
+
+    await expect(page.getByText('admin1@sendai-nct.jp')).toBeVisible();
+    await expect(page.getByLabel('表示中ユーザー数')).toHaveText('表示中 1 / 全 2 件');
   });
 
   test('表示名を更新できる', async ({ page }) => {
