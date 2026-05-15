@@ -403,11 +403,15 @@ func buildClassProgress(team *models.TeamWithSport, matches []*models.MatchDetai
 				lastMatch = &copy
 			}
 		} else {
-			if nextMatch == nil {
+			if shouldUseAsNextMatch(m, lastMatch) && nextMatch == nil {
 				copy := *m
 				nextMatch = &copy
 			}
 		}
+	}
+
+	if nextMatch != nil && !shouldUseAsNextMatch(nextMatch, lastMatch) {
+		nextMatch = nil
 	}
 
 	if nextMatch != nil {
@@ -461,6 +465,32 @@ func buildClassProgress(team *models.TeamWithSport, matches []*models.MatchDetai
 	}
 
 	return entry
+}
+
+func shouldUseAsNextMatch(candidate *models.MatchDetail, lastMatch *models.MatchDetail) bool {
+	if candidate == nil {
+		return false
+	}
+	if lastMatch == nil {
+		return true
+	}
+
+	// A future bronze match is valid even after a loss in the semi-final.
+	if candidate.IsBronzeMatch {
+		return true
+	}
+
+	// Separate tournaments (e.g. loser bracket) may legitimately continue after a loss.
+	if candidate.TournamentID != lastMatch.TournamentID {
+		return true
+	}
+
+	// Within the same tournament, only a winner should advance to a later round.
+	if lastMatch.WinnerTeamID.Valid {
+		return candidate.Round > lastMatch.Round
+	}
+
+	return false
 }
 
 func buildProgressMatch(detail *models.MatchDetail, teamID int, result string, maxRound int) *models.ClassProgressMatch {

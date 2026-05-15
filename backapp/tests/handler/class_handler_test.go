@@ -308,6 +308,86 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockTournamentRepo.AssertExpectations(t)
 	})
 
+	t.Run("does not show advancement after losing in same tournament", func(t *testing.T) {
+		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
+
+		losingMatches := []*models.MatchDetail{
+			{
+				MatchID:        10,
+				TournamentID:   9,
+				TournamentName: "卓球 Tournament",
+				SportName:      "卓球",
+				MaxRound:       2,
+				Round:          0,
+				MatchNumber:    0,
+				Team1ID:        sql.NullInt64{Int64: 100, Valid: true},
+				Team2ID:        sql.NullInt64{Int64: 200, Valid: true},
+				Team1Score:     sql.NullInt32{Int32: 0, Valid: true},
+				Team2Score:     sql.NullInt32{Int32: 5, Valid: true},
+				WinnerTeamID:   sql.NullInt64{Int64: 200, Valid: true},
+				Status:         "finished",
+				NextMatchID:    sql.NullInt64{Int64: 11, Valid: true},
+				Team1Name:      sql.NullString{String: "IS4", Valid: true},
+				Team2Name:      sql.NullString{String: "IT3", Valid: true},
+			},
+			{
+				MatchID:        11,
+				TournamentID:   9,
+				TournamentName: "卓球 Tournament",
+				SportName:      "卓球",
+				MaxRound:       2,
+				Round:          0,
+				MatchNumber:    1,
+				Team1ID:        sql.NullInt64{Int64: 100, Valid: true},
+				Team2ID:        sql.NullInt64{Int64: 300, Valid: true},
+				WinnerTeamID:   sql.NullInt64{Valid: false},
+				Status:         "pending",
+				NextMatchID:    sql.NullInt64{Int64: 12, Valid: true},
+				Team1Name:      sql.NullString{String: "IS4", Valid: true},
+				Team2Name:      sql.NullString{String: "IE4", Valid: true},
+			},
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
+		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
+		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(map[int][]*models.User{team.ID: members}, nil).Once()
+		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{}).Return(map[int][]*models.User{}, nil).Once()
+		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: losingMatches}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/student/class-progress", nil)
+		c.Set("user", user)
+
+		h.GetClassProgress(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+
+		progressData, ok := response["progress"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, progressData, 1)
+
+		progress := progressData[0].(map[string]any)
+		assert.Equal(t, "準々決勝敗退", progress["status"])
+		assert.Nil(t, progress["next_match"])
+
+		lastMatch, ok := progress["last_match"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, "敗戦", lastMatch["result"])
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
+
 	t.Run("unauthorized - no user in context", func(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
 
