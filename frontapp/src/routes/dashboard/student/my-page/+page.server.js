@@ -255,6 +255,13 @@ export const load = async ({ fetch, locals, request }) => {
 			throw new Error('クラスの得点一覧の取得に失敗しました。');
 		}
 		const classScores = await scoreResponse.json();
+		if (classScores?.message) {
+			return {
+				myClassScore: null,
+				user,
+				error: classScores.message
+			};
+		}
 		const myClassScore = classScores.find((score) => score.class_id === user.class_id);
 
 		if (!myClassScore) {

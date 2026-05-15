@@ -176,6 +176,7 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 
 func (h *ClassHandler) GetClassScores(c *gin.Context) {
 	var eventID int
+	requestedEventID := false
 	eventIDStr := c.Query("event_id")
 	if eventIDStr != "" {
 		id, err := strconv.Atoi(eventIDStr)
@@ -184,6 +185,7 @@ func (h *ClassHandler) GetClassScores(c *gin.Context) {
 			return
 		}
 		eventID = id
+		requestedEventID = true
 	} else {
 		activeEventID, err := h.eventRepo.GetActiveEvent()
 		if err != nil {
@@ -195,6 +197,16 @@ func (h *ClassHandler) GetClassScores(c *gin.Context) {
 			return
 		}
 		eventID = activeEventID
+	}
+
+	hideScores, err := h.shouldHideScoresForCurrentUser(c, eventID, requestedEventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event settings"})
+		return
+	}
+	if hideScores {
+		c.JSON(http.StatusOK, gin.H{"message": "Scores are hidden for this event"})
+		return
 	}
 
 	scores, err := h.classRepo.GetClassScoresByEvent(eventID)
@@ -227,6 +239,12 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 	}
 	if activeEventID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No active event found"})
+		return
+	}
+
+	hideScores, err := h.shouldHideScoresForCurrentUser(c, activeEventID, true)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event settings"})
 		return
 	}
 
@@ -313,6 +331,9 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		}
 
 		entry := buildClassProgress(team, matchDetails)
+		if hideScores && entry.LastMatch != nil {
+			entry.LastMatch.Score = nil
+		}
 		progress = append(progress, entry)
 	}
 
@@ -374,6 +395,57 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		"members":  memberList,
 		"progress": progress,
 	})
+}
+
+func (h *ClassHandler) shouldHideScoresForCurrentUser(c *gin.Context, eventID int, isCurrentEventCandidate bool) (bool, error) {
+	userValue, exists := c.Get("user")
+	if !exists {
+		return false, nil
+	}
+
+	user, ok := userValue.(*models.User)
+	if !ok || user == nil || userHasPrivilegedScoreAccess(user) {
+		return false, nil
+	}
+
+	activeEventID, err := h.eventRepo.GetActiveEvent()
+	if err != nil {
+		return false, err
+	}
+	if activeEventID == 0 {
+		return false, nil
+	}
+
+	if !isCurrentEventCandidate && eventID != activeEventID {
+		return false, nil
+	}
+	if eventID != activeEventID {
+		return false, nil
+	}
+
+	event, err := h.eventRepo.GetEventByID(eventID)
+	if err != nil {
+		return false, err
+	}
+	if event == nil {
+		return false, nil
+	}
+
+	return event.HideScores, nil
+}
+
+func userHasPrivilegedScoreAccess(user *models.User) bool {
+	if user == nil {
+		return false
+	}
+
+	for _, role := range user.Roles {
+		if role.Name == "admin" || role.Name == "root" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildClassProgress(team *models.TeamWithSport, matches []*models.MatchDetail) models.ClassProgress {

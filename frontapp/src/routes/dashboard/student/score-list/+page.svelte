@@ -3,6 +3,7 @@
 	let { data } = $props();
 
 	let scores = $derived(data.scores || []);
+	let errorMessage = $derived(data.error || '');
 	let season = $derived(scores.length > 0 ? scores[0].season : '');
 	let sportNames = $derived(scores.length > 0 ? scores[0].sport_names : {});
 
@@ -163,7 +164,11 @@
 
 <h1 class="text-2xl font-bold mb-6">点数一覧</h1>
 
-{#if scores.length > 0}
+{#if errorMessage}
+	<div class="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+		{errorMessage}
+	</div>
+{:else if scores.length > 0}
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 py-4">
 		{#each sortedScores as score (score.id || score.class_id)}
 			{@const rank = season === 'spring' ? score.rank_current_event : score.rank_overall}

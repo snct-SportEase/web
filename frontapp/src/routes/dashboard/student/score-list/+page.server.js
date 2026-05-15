@@ -23,6 +23,9 @@ export async function load({ fetch, locals, request }) {
 
 		if (response.ok) {
 			const scores = await response.json();
+			if (scores?.message) {
+				return { scores: [], error: scores.message };
+			}
 			return { scores };
 		}
 
