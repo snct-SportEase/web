@@ -17,15 +17,22 @@ export async function load({ fetch, locals, request }) {
 			headers.Authorization = authHeader;
 		}
 
+		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, {
+			headers
+		});
+		if (activeEventResponse.ok) {
+			const activeEvent = await activeEventResponse.json();
+			if (activeEvent?.hide_scores) {
+				return { scores: [], error: '得点一覧は現在非表示です。' };
+			}
+		}
+
 		const response = await fetch(`${BACKEND_URL}/api/scores/class`, {
 			headers
 		});
 
 		if (response.ok) {
 			const scores = await response.json();
-			if (scores?.message) {
-				return { scores: [], error: scores.message };
-			}
 			return { scores };
 		}
 
