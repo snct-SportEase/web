@@ -553,8 +553,8 @@ func (r *tournamentRepository) IsMatchResultAlreadyEntered(matchID int) (bool, e
 		}
 		return false, err
 	}
-	// 試合結果が既に入力済みかどうか: winner_team_idが設定されていて、statusが"finished"
-	return winnerID.Valid && status == "finished", nil
+	// 同点時は勝者を別入力するためwinner_team_idだけでは判定できない。statusを真実の値として扱う。
+	return status == "finished", nil
 }
 
 func (r *tournamentRepository) GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error) {
@@ -691,32 +691,114 @@ func (r *tournamentRepository) getTournamentMetadata(tx *sql.Tx, tournamentID in
 	return eventID, sportID, loc, nil
 }
 
-func (r *tournamentRepository) addPoints(tx *sql.Tx, eventID int, classID int, column string, points int) error {
+func (r *tournamentRepository) addPoints(tx *sql.Tx, eventID int, classID int, column string, points int, sourceMatchID int) error {
 	if column == "" || points == 0 {
 		return nil
 	}
 
 	query := `
-		INSERT INTO score_logs (event_id, class_id, points, reason)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id)
+		VALUES (?, ?, ?, ?, ?)
 	`
 
-	_, err := tx.Exec(query, eventID, classID, points, column)
+	_, err := tx.Exec(query, eventID, classID, points, column, sourceMatchID)
 	return err
 }
 
-func (r *tournamentRepository) subtractPoints(tx *sql.Tx, eventID int, classID int, column string, points int) error {
+func (r *tournamentRepository) subtractPoints(tx *sql.Tx, eventID int, classID int, column string, points int, sourceMatchID int) error {
 	if column == "" || points == 0 {
 		return nil
 	}
 
 	query := `
-		INSERT INTO score_logs (event_id, class_id, points, reason)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id)
+		VALUES (?, ?, ?, ?, ?)
 	`
 
-	_, err := tx.Exec(query, eventID, classID, -points, column)
+	_, err := tx.Exec(query, eventID, classID, -points, column, sourceMatchID)
 	return err
+}
+
+func (r *tournamentRepository) inferStoredWinnerID(tx *sql.Tx, match *models.MatchDB) (int64, error) {
+	if match == nil || match.Status != "finished" {
+		return 0, nil
+	}
+	if match.WinnerID.Valid {
+		return match.WinnerID.Int64, nil
+	}
+
+	if match.NextMatchID.Valid {
+		nextMatch, err := r.getMatchByID(tx, int(match.NextMatchID.Int64))
+		if err != nil {
+			return 0, err
+		}
+		switch {
+		case nextMatch.Team1ID.Valid && nextMatch.Team1ID.Int64 == match.Team1ID.Int64:
+			return match.Team1ID.Int64, nil
+		case nextMatch.Team2ID.Valid && nextMatch.Team2ID.Int64 == match.Team1ID.Int64:
+			return match.Team1ID.Int64, nil
+		case nextMatch.Team1ID.Valid && nextMatch.Team1ID.Int64 == match.Team2ID.Int64:
+			return match.Team2ID.Int64, nil
+		case nextMatch.Team2ID.Valid && nextMatch.Team2ID.Int64 == match.Team2ID.Int64:
+			return match.Team2ID.Int64, nil
+		}
+	}
+
+	rows, err := tx.Query(`
+		SELECT class_id, SUM(points) AS total_points
+		FROM score_logs
+		WHERE source_match_id = ?
+		GROUP BY class_id
+		ORDER BY total_points DESC
+	`, match.ID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var bestClassID int
+	var bestPoints int
+	found := false
+	for rows.Next() {
+		var classID int
+		var totalPoints int
+		if err := rows.Scan(&classID, &totalPoints); err != nil {
+			return 0, err
+		}
+		if !found || totalPoints > bestPoints {
+			bestClassID = classID
+			bestPoints = totalPoints
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	if !found || bestPoints <= 0 {
+		return 0, nil
+	}
+
+	switch {
+	case match.Team1ID.Valid:
+		team1, err := r.getTeamByIDTx(tx, match.Team1ID.Int64)
+		if err != nil {
+			return 0, err
+		}
+		if team1 != nil && team1.ClassID == bestClassID {
+			return match.Team1ID.Int64, nil
+		}
+		fallthrough
+	case match.Team2ID.Valid:
+		team2, err := r.getTeamByIDTx(tx, match.Team2ID.Int64)
+		if err != nil {
+			return 0, err
+		}
+		if team2 != nil && team2.ClassID == bestClassID {
+			return match.Team2ID.Int64, nil
+		}
+	}
+
+	return 0, nil
 }
 
 func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, winnerID, loserID int64, totalRounds int) error {
@@ -758,7 +840,7 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 	// 敗者戦二回戦の場合、勝者に10点付与（敗者戦ブロック優勝）
 	if match.IsLoserBracketMatch && match.LoserBracketRound.Valid && match.LoserBracketRound.Int64 == 2 {
 		if location == "gym2" {
-			if err := r.addPoints(tx, eventID, winnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10); err != nil {
+			if err := r.addPoints(tx, eventID, winnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10, match.ID); err != nil {
 				return err
 			}
 		}
@@ -767,7 +849,7 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 
 	if match.Round >= 0 && match.Round < len(columns.win) {
 		column := columns.win[match.Round]
-		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, column, 10); err != nil {
+		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, column, 10, match.ID); err != nil {
 			return err
 		}
 	}
@@ -777,20 +859,20 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 	}
 
 	if match.IsBronzeMatch {
-		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 50); err != nil {
+		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 50, match.ID); err != nil {
 			return err
 		}
-		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 40); err != nil {
+		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 40, match.ID); err != nil {
 			return err
 		}
 		return nil
 	}
 
 	if match.Round == totalRounds {
-		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 80); err != nil {
+		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 80, match.ID); err != nil {
 			return err
 		}
-		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 60); err != nil {
+		if err := r.addPoints(tx, eventID, loserTeam.ClassID, columns.champion, 60, match.ID); err != nil {
 			return err
 		}
 	}
@@ -1244,7 +1326,7 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 	}
 
 	// 既に入力済みでない場合はエラー
-	if !match.WinnerID.Valid || match.Status != "finished" {
+	if match.Status != "finished" {
 		return fmt.Errorf("試合結果がまだ入力されていません。通常の更新メソッドを使用してください")
 	}
 
@@ -1263,7 +1345,13 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 	}
 
 	// 前回の勝者を取得
-	previousWinnerID := match.WinnerID.Int64
+	previousWinnerID, err := r.inferStoredWinnerID(tx, match)
+	if err != nil {
+		return err
+	}
+	if previousWinnerID == 0 {
+		return fmt.Errorf("前回の勝者を特定できないため、この同点試合は修正できません")
+	}
 
 	// 前回の敗者を取得
 	previousLoserID := match.Team1ID.Int64
@@ -1559,7 +1647,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	// 敗者戦二回戦の場合、前回の勝者から10点減算
 	if match.IsLoserBracketMatch && match.LoserBracketRound.Valid && match.LoserBracketRound.Int64 == 2 {
 		if location == "gym2" {
-			if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10); err != nil {
+			if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, "gym2_loser_bracket_champion_points", 10, match.ID); err != nil {
 				return err
 			}
 			return nil
@@ -1578,7 +1666,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 
 	if match.Round >= 0 && match.Round < len(columns.win) {
 		column := columns.win[match.Round]
-		if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, column, 10); err != nil {
+		if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, column, 10, match.ID); err != nil {
 			return err
 		}
 	}
@@ -1589,10 +1677,10 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 
 	// 3位決定戦の場合
 	if match.IsBronzeMatch {
-		if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, columns.champion, 50); err != nil {
+		if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, columns.champion, 50, match.ID); err != nil {
 			return err
 		}
-		if err := r.subtractPoints(tx, eventID, previousLoserTeam.ClassID, columns.champion, 40); err != nil {
+		if err := r.subtractPoints(tx, eventID, previousLoserTeam.ClassID, columns.champion, 40, match.ID); err != nil {
 			return err
 		}
 		return nil
@@ -1600,10 +1688,10 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 
 	// 決勝の場合
 	if match.Round == totalRounds {
-		if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, columns.champion, 80); err != nil {
+		if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, columns.champion, 80, match.ID); err != nil {
 			return err
 		}
-		if err := r.subtractPoints(tx, eventID, previousLoserTeam.ClassID, columns.champion, 60); err != nil {
+		if err := r.subtractPoints(tx, eventID, previousLoserTeam.ClassID, columns.champion, 60, match.ID); err != nil {
 			return err
 		}
 	}

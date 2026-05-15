@@ -161,8 +161,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(team2ID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team2ID, "Loser Team", 102, 1, 1))
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)")).
-			WithArgs(1, 101, 10, "gym1_win2_points").
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
+			WithArgs(1, 101, 10, "gym1_win2_points", matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectCommit()
@@ -249,8 +249,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(loserID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(loserID, "Loser Team", 201, 1, 1))
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)")).
-			WithArgs(1, 202, 10, "gym1_win3_points").
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
+			WithArgs(1, 202, 10, "gym1_win3_points", matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectCommit()
@@ -326,8 +326,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(loserID, "Loser Team", 302, 2, eventID))
 
 		// Mock adding points to gym2_loser_bracket_champion_points
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason) VALUES (?, ?, ?, ?)")).
-			WithArgs(eventID, classID, 10, "gym2_loser_bracket_champion_points").
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
+			WithArgs(eventID, classID, 10, "gym2_loser_bracket_champion_points", matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectCommit()
@@ -337,4 +337,23 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+}
+
+func TestTournamentRepository_IsMatchResultAlreadyEntered(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	r := repository.NewTournamentRepository(db)
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status FROM matches WHERE id = ?")).
+		WithArgs(42).
+		WillReturnRows(sqlmock.NewRows([]string{"winner_team_id", "status"}).AddRow(nil, "finished"))
+
+	alreadyEntered, err := r.IsMatchResultAlreadyEntered(42)
+	assert.NoError(t, err)
+	assert.True(t, alreadyEntered)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
