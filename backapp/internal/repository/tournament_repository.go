@@ -34,6 +34,13 @@ type tournamentRepository struct {
 	db *sql.DB
 }
 
+type matchWinnerLookup struct {
+	team1ID    sql.NullInt64
+	team2ID    sql.NullInt64
+	nextMatchID sql.NullInt64
+	status     string
+}
+
 func NewTournamentRepository(db *sql.DB) TournamentRepository {
 	return &tournamentRepository{db: db}
 }
@@ -250,6 +257,12 @@ func (r *tournamentRepository) getMatchesByEventID(eventID int) (map[int][]*mode
 			m.LoserBracketBlock = loserBracketBlock
 		}
 		result[m.TournamentID] = append(result[m.TournamentID], &m)
+	}
+
+	for _, matches := range result {
+		if err := r.populateDisplayWinnerIDs(matches); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, rows.Err()
@@ -523,7 +536,118 @@ func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*
 		}
 		matches = append(matches, &m)
 	}
+	if err := r.populateDisplayWinnerIDs(matches); err != nil {
+		return nil, err
+	}
 	return matches, nil
+}
+
+func (r *tournamentRepository) populateDisplayWinnerIDs(matches []*models.MatchDB) error {
+	matchByID := make(map[int]*matchWinnerLookup, len(matches))
+	for _, match := range matches {
+		matchByID[match.ID] = &matchWinnerLookup{
+			team1ID:    match.Team1ID,
+			team2ID:    match.Team2ID,
+			nextMatchID: match.NextMatchID,
+			status:     match.Status,
+		}
+	}
+
+	for _, match := range matches {
+		if match.WinnerID.Valid || match.Status != "finished" {
+			continue
+		}
+
+		inferredWinnerID, err := r.inferWinnerIDForDisplay(match, matchByID)
+		if err != nil {
+			return err
+		}
+		if inferredWinnerID != 0 {
+			match.WinnerID = sql.NullInt64{Int64: inferredWinnerID, Valid: true}
+		}
+	}
+
+	return nil
+}
+
+func (r *tournamentRepository) inferWinnerIDForDisplay(match *models.MatchDB, matchByID map[int]*matchWinnerLookup) (int64, error) {
+	if match == nil || match.Status != "finished" {
+		return 0, nil
+	}
+	if match.WinnerID.Valid {
+		return match.WinnerID.Int64, nil
+	}
+
+	if match.NextMatchID.Valid {
+		nextMatch := matchByID[int(match.NextMatchID.Int64)]
+		if nextMatch != nil {
+			switch {
+			case nextMatch.team1ID.Valid && nextMatch.team1ID.Int64 == match.Team1ID.Int64:
+				return match.Team1ID.Int64, nil
+			case nextMatch.team2ID.Valid && nextMatch.team2ID.Int64 == match.Team1ID.Int64:
+				return match.Team1ID.Int64, nil
+			case nextMatch.team1ID.Valid && nextMatch.team1ID.Int64 == match.Team2ID.Int64:
+				return match.Team2ID.Int64, nil
+			case nextMatch.team2ID.Valid && nextMatch.team2ID.Int64 == match.Team2ID.Int64:
+				return match.Team2ID.Int64, nil
+			}
+		}
+	}
+
+	rows, err := r.db.Query(`
+		SELECT class_id, SUM(points) AS total_points
+		FROM score_logs
+		WHERE source_match_id = ?
+		GROUP BY class_id
+		ORDER BY total_points DESC
+	`, match.ID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var bestClassID int
+	var bestPoints int
+	found := false
+	for rows.Next() {
+		var classID int
+		var totalPoints int
+		if err := rows.Scan(&classID, &totalPoints); err != nil {
+			return 0, err
+		}
+		if !found || totalPoints > bestPoints {
+			bestClassID = classID
+			bestPoints = totalPoints
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	if !found || bestPoints <= 0 {
+		return 0, nil
+	}
+
+	if match.Team1ID.Valid {
+		team1, err := r.getTeamByID(match.Team1ID.Int64)
+		if err != nil {
+			return 0, err
+		}
+		if team1 != nil && team1.ClassID == bestClassID {
+			return match.Team1ID.Int64, nil
+		}
+	}
+	if match.Team2ID.Valid {
+		team2, err := r.getTeamByID(match.Team2ID.Int64)
+		if err != nil {
+			return 0, err
+		}
+		if team2 != nil && team2.ClassID == bestClassID {
+			return match.Team2ID.Int64, nil
+		}
+	}
+
+	return 0, nil
 }
 
 func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.MatchDB, error) {
