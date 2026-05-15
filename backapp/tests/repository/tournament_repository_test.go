@@ -426,6 +426,72 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("Success - championship round second match without bronze flag still awards bronze points", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewTournamentRepository(db)
+
+		matchID := 20
+		team1ID := int64(20)
+		team2ID := int64(21)
+		tournamentID := 3
+		eventID := 1
+		team1Score := 2
+		team2Score := 0
+		winnerID := team1ID
+
+		mock.ExpectBegin()
+
+		rows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
+			AddRow(matchID, tournamentID, 3, 1, team1ID, team2ID, nil, "inprogress", nil, "", false, false, nil, nil, nil)
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+			WithArgs(matchID).WillReturnRows(rows)
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
+			WithArgs(tournamentID).
+			WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(eventID, 1, "gym1"))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT is_rainy_mode FROM events WHERE id = ?")).
+			WithArgs(eventID).
+			WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
+
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?")).
+			WithArgs(team1Score, team2Score, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT MAX(round) FROM matches WHERE tournament_id = ?")).
+			WithArgs(tournamentID).
+			WillReturnRows(sqlmock.NewRows([]string{"MAX(round)"}).AddRow(3))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
+			WithArgs(tournamentID).
+			WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(eventID, 1, "gym1"))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
+			WithArgs(winnerID).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(winnerID, "Winner Team", 401, 1, eventID))
+
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
+			WithArgs(team2ID).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team2ID, "Loser Team", 402, 1, eventID))
+
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
+			WithArgs(eventID, 401, 50, "gym1_champion_points", matchID).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
+			WithArgs(eventID, 402, 40, "gym1_champion_points", matchID).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mock.ExpectCommit()
+
+		err = r.UpdateMatchResult(matchID, team1Score, team2Score, int(winnerID))
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 }
 
 func TestTournamentRepository_IsMatchResultAlreadyEntered(t *testing.T) {

@@ -35,10 +35,10 @@ type tournamentRepository struct {
 }
 
 type matchWinnerLookup struct {
-	team1ID    sql.NullInt64
-	team2ID    sql.NullInt64
+	team1ID     sql.NullInt64
+	team2ID     sql.NullInt64
 	nextMatchID sql.NullInt64
-	status     string
+	status      string
 }
 
 func NewTournamentRepository(db *sql.DB) TournamentRepository {
@@ -546,10 +546,10 @@ func (r *tournamentRepository) populateDisplayWinnerIDs(matches []*models.MatchD
 	matchByID := make(map[int]*matchWinnerLookup, len(matches))
 	for _, match := range matches {
 		matchByID[match.ID] = &matchWinnerLookup{
-			team1ID:    match.Team1ID,
-			team2ID:    match.Team2ID,
+			team1ID:     match.Team1ID,
+			team2ID:     match.Team2ID,
 			nextMatchID: match.NextMatchID,
-			status:     match.Status,
+			status:      match.Status,
 		}
 	}
 
@@ -982,7 +982,7 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 		return nil
 	}
 
-	if match.IsBronzeMatch {
+	if isEffectiveBronzeMatch(match, totalRounds) {
 		if err := r.addPoints(tx, eventID, winnerTeam.ClassID, columns.champion, 50, match.ID); err != nil {
 			return err
 		}
@@ -1800,7 +1800,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	}
 
 	// 3位決定戦の場合
-	if match.IsBronzeMatch {
+	if isEffectiveBronzeMatch(match, totalRounds) {
 		if err := r.subtractPoints(tx, eventID, previousWinnerTeam.ClassID, columns.champion, 50, match.ID); err != nil {
 			return err
 		}
@@ -1821,6 +1821,19 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	}
 
 	return nil
+}
+
+func isEffectiveBronzeMatch(match *models.MatchDB, totalRounds int) bool {
+	if match == nil {
+		return false
+	}
+	if match.IsBronzeMatch {
+		return true
+	}
+
+	// Older or inconsistent data may miss the bronze flag even though the
+	// bronze match is stored as the second match in the championship round.
+	return totalRounds > 0 && match.Round == totalRounds && match.MatchNumberInRound > 0
 }
 
 // invalidateSubsequentMatches invalidates all subsequent matches that depend on the given match

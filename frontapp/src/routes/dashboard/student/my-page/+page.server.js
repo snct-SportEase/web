@@ -18,8 +18,12 @@ const getContestantName = (tournamentData, side) => {
 	return contestant?.players?.[0]?.title || '未定';
 };
 
-const getRoundLabel = (tournamentData, match) =>
-	tournamentData?.rounds?.[match?.roundIndex]?.name || `Round ${toNumber(match?.roundIndex) + 1}`;
+const getRoundLabel = (tournamentData, match) => {
+	if (match?.isBronzeMatch) {
+		return '3位決定戦';
+	}
+	return tournamentData?.rounds?.[match?.roundIndex]?.name || `Round ${toNumber(match?.roundIndex) + 1}`;
+};
 
 const buildTournamentUpcomingMatches = (tournaments, teams) => {
 	if (!Array.isArray(tournaments) || !Array.isArray(teams) || teams.length === 0) {
