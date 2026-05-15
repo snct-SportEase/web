@@ -407,6 +407,9 @@ func (h *ClassHandler) shouldHideScoresForCurrentUser(c *gin.Context, eventID in
 	if !ok || user == nil || userHasPrivilegedScoreAccess(user) {
 		return false, nil
 	}
+	if len(user.Roles) == 0 {
+		return false, nil
+	}
 
 	activeEventID, err := h.eventRepo.GetActiveEvent()
 	if err != nil {

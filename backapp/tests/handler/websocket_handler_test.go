@@ -3,7 +3,8 @@ package handler_test
 import (
 	"backapp/internal/handler"
 	"backapp/internal/websocket"
-	"net/http/httptest"
+	"net"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func readWithDeadline(conn *gowebsocket.Conn, d time.Duration) (string, bool) {
 	return string(msg), true
 }
 
-func newWSTestServer(t *testing.T) (*httptest.Server, *websocket.HubManager) {
+func newWSTestServer(t *testing.T) (string, *websocket.HubManager) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	hubManager := websocket.NewHubManager()
@@ -43,15 +44,27 @@ func newWSTestServer(t *testing.T) (*httptest.Server, *websocket.HubManager) {
 	router.GET("/ws/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
 	router.GET("/ws/progress", wsHandler.ServeProgressWebSocket)
 
-	server := httptest.NewServer(router)
-	t.Cleanup(server.Close)
-	return server, hubManager
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		if strings.Contains(err.Error(), "operation not permitted") {
+			t.Skipf("skipping websocket server test: %v", err)
+		}
+		require.NoError(t, err, "failed to create IPv4 listener for websocket test server")
+	}
+	server := &http.Server{Handler: router}
+	go func() {
+		_ = server.Serve(listener)
+	}()
+	t.Cleanup(func() {
+		_ = server.Close()
+	})
+	return "http://" + listener.Addr().String(), hubManager
 }
 
 func TestWebSocketHandler_ServeTournamentWebSocket(t *testing.T) {
 	t.Run("client receives broadcast", func(t *testing.T) {
-		server, hubManager := newWSTestServer(t)
-		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/tournaments/1"
+		baseURL, hubManager := newWSTestServer(t)
+		wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/ws/tournaments/1"
 
 		conn := dialWS(t, wsURL)
 		defer conn.Close()
@@ -65,8 +78,8 @@ func TestWebSocketHandler_ServeTournamentWebSocket(t *testing.T) {
 	})
 
 	t.Run("multiple clients on the same tournament all receive the broadcast", func(t *testing.T) {
-		server, hubManager := newWSTestServer(t)
-		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/tournaments/2"
+		baseURL, hubManager := newWSTestServer(t)
+		wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/ws/tournaments/2"
 
 		conn1 := dialWS(t, wsURL)
 		defer conn1.Close()
@@ -86,8 +99,8 @@ func TestWebSocketHandler_ServeTournamentWebSocket(t *testing.T) {
 	})
 
 	t.Run("topic isolation - client on tournament:3 does not receive tournament:4 broadcast", func(t *testing.T) {
-		server, hubManager := newWSTestServer(t)
-		baseURL := "ws" + strings.TrimPrefix(server.URL, "http")
+		baseURL, hubManager := newWSTestServer(t)
+		baseURL = "ws" + strings.TrimPrefix(baseURL, "http")
 
 		conn3 := dialWS(t, baseURL+"/ws/tournaments/3")
 		defer conn3.Close()
@@ -116,12 +129,12 @@ func TestWebSocketHandler_ServeTournamentWebSocket(t *testing.T) {
 	})
 
 	t.Run("client disconnects and subsequent broadcast does not panic", func(t *testing.T) {
-		server, hubManager := newWSTestServer(t)
-		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/tournaments/5"
+		baseURL, hubManager := newWSTestServer(t)
+		wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/ws/tournaments/5"
 
 		conn := dialWS(t, wsURL)
 		time.Sleep(50 * time.Millisecond)
-		conn.Close() // disconnect
+		conn.Close()                      // disconnect
 		time.Sleep(50 * time.Millisecond) // wait for unregister
 
 		assert.NotPanics(t, func() {
@@ -132,8 +145,8 @@ func TestWebSocketHandler_ServeTournamentWebSocket(t *testing.T) {
 
 func TestWebSocketHandler_ServeProgressWebSocket(t *testing.T) {
 	t.Run("client receives broadcast on progress topic", func(t *testing.T) {
-		server, hubManager := newWSTestServer(t)
-		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/progress"
+		baseURL, hubManager := newWSTestServer(t)
+		wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/ws/progress"
 
 		conn := dialWS(t, wsURL)
 		defer conn.Close()
@@ -147,8 +160,8 @@ func TestWebSocketHandler_ServeProgressWebSocket(t *testing.T) {
 	})
 
 	t.Run("progress and tournament topics are isolated", func(t *testing.T) {
-		server, hubManager := newWSTestServer(t)
-		baseURL := "ws" + strings.TrimPrefix(server.URL, "http")
+		baseURL, hubManager := newWSTestServer(t)
+		baseURL = "ws" + strings.TrimPrefix(baseURL, "http")
 
 		progressConn := dialWS(t, baseURL+"/ws/progress")
 		defer progressConn.Close()
