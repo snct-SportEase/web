@@ -360,7 +360,7 @@ describe('Event Management Page', () => {
   it('クラス別スコア集計をCSV出力できること', async () => {
     render(Page);
 
-    await page.getByRole('button', { name: 'CSV出力' }).click();
+    await page.getByRole('button', { name: 'CSV出力' }).first().click();
 
     await vi.waitFor(() => {
       const exportCall = fetchMock.mock.calls.find(([url]) => url === '/api/root/events/1/export/csv');
@@ -374,7 +374,7 @@ describe('Event Management Page', () => {
   it('クラス別スコア集計をPDF出力できること', async () => {
     render(Page);
 
-    await page.getByRole('button', { name: 'PDF出力' }).click();
+    await page.getByRole('button', { name: 'PDF出力' }).first().click();
 
     await vi.waitFor(() => {
       const scoreCall = fetchMock.mock.calls.find(([url]) => url === '/api/scores/class?event_id=1');
