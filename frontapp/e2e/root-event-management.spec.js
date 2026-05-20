@@ -21,7 +21,7 @@ test.describe('大会情報登録・管理 (root)', () => {
 
   test('大会一覧を表示できる', async ({ page }) => {
     await expect(page.getByRole('heading', { name: '大会情報登録・管理' })).toBeVisible();
-    await expect(page.getByText('予定')).toBeVisible();
+    await expect(page.getByText('予定').first()).toBeVisible();
   });
 
   test('新しい大会を作成できる', async ({ page }) => {
@@ -187,15 +187,16 @@ test.describe('大会情報登録・管理 (root)', () => {
     await notifyRequest;
   });
 
-  test('春季大会の得点CSVをインポートできる', async ({ page }) => {
+  test('秋季大会の得点CSVをインポートできる', async ({ page }) => {
     page.once('dialog', (dialog) => {
       void dialog.accept().catch(() => {});
     });
 
     const uploadRequest = page.waitForRequest((request) => {
-      return request.url().endsWith('/api/root/events/1/import-survey-scores') && request.method() === 'POST';
+      return request.url().endsWith('/api/root/events/2/import-survey-scores') && request.method() === 'POST';
     });
 
+    await expect(page.getByText('2025秋季スポーツ大会')).toBeVisible();
     await page.locator('input[type="file"]').setInputFiles({
       name: 'scores.csv',
       mimeType: 'text/csv',
@@ -211,7 +212,7 @@ test.describe('大会情報登録・管理 (root)', () => {
       return request.url().endsWith('/api/root/events/1/export/csv') && request.method() === 'GET';
     });
 
-    await page.getByRole('button', { name: 'CSV出力' }).click();
+    await page.getByRole('button', { name: 'CSV出力' }).first().click();
 
     await exportRequest;
   });
@@ -221,7 +222,7 @@ test.describe('大会情報登録・管理 (root)', () => {
       return request.url().includes('/api/scores/class?event_id=1') && request.method() === 'GET';
     });
 
-    await page.getByRole('button', { name: 'PDF出力' }).click();
+    await page.getByRole('button', { name: 'PDF出力' }).first().click();
 
     await scoreRequest;
   });

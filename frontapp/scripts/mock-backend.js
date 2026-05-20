@@ -23,6 +23,17 @@ const defaultEvents = () => ([
     status: 'upcoming',
     survey_url: 'https://example.com/survey',
     hide_scores: false
+  },
+  {
+    id: 2,
+    name: '2025秋季スポーツ大会',
+    year: 2025,
+    season: 'autumn',
+    start_date: '2025-10-01T00:00:00Z',
+    end_date: '2025-10-02T00:00:00Z',
+    status: 'upcoming',
+    survey_url: 'https://example.com/autumn-survey',
+    hide_scores: false
   }
 ]);
 
@@ -418,6 +429,11 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/root/events/1/import-survey-scores' && req.method === 'POST') {
+    sendJson(res, 200, { imported_classes_count: classes.length });
+    return;
+  }
+
+  if (url.pathname === '/api/root/events/2/import-survey-scores' && req.method === 'POST') {
     sendJson(res, 200, { imported_classes_count: classes.length });
     return;
   }
