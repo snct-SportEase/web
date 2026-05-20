@@ -8,8 +8,91 @@
     let eventData = $state(null);
     let scores = $state([]);
     let tournaments = $state([]);
+    let relayMatches = $state([]);
+    let relayError = $state('');
     let loading = $state(true);
     let error = $state(null);
+
+    function normalizeTournament(tournament) {
+        const normalized = { ...tournament };
+
+        if (typeof normalized.data === 'string') {
+            try {
+                normalized.data = JSON.parse(normalized.data);
+            } catch (parseError) {
+                console.error('Failed to parse tournament data:', parseError);
+                normalized.data = null;
+            }
+        }
+
+        return normalized;
+    }
+
+    function getSideName(tournament, side) {
+        if (!side) return '未定';
+        if (side.title) return side.title;
+
+        const contestant = tournament?.data?.contestants?.[side.contestantId];
+        const playerTitle = contestant?.players?.[0]?.title;
+        return playerTitle || '未定';
+    }
+
+    function getSideScore(side) {
+        return side?.scores?.[0]?.mainScore;
+    }
+
+    function isMatchCompleted(match) {
+        return match?.sides?.some((side) => getSideScore(side) !== undefined);
+    }
+
+    function getWinnerName(tournament, match) {
+        const winnerSide = match?.sides?.find((side) => side?.isWinner);
+        return winnerSide ? getSideName(tournament, winnerSide) : '引き分け';
+    }
+
+    function isRelayMatch(match) {
+        const title = match?.title || '';
+        return title.includes('リレー');
+    }
+
+    function formatDateTime(value) {
+        if (!value) return '日時未定';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '日時未定';
+        return new Intl.DateTimeFormat('ja-JP', {
+            month: 'numeric',
+            day: 'numeric',
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    }
+
+    function formatStatus(status) {
+        const labels = {
+            scheduled: '予定',
+            in_progress: '進行中',
+            finished: '終了',
+            cancelled: '中止'
+        };
+        return labels[status] || status || '未定';
+    }
+
+    function entryName(entry) {
+        return entry?.resolved_name || entry?.display_name || '参加者未定';
+    }
+
+    function resultEntries(match) {
+        return [...(match?.result?.details || [])].sort(
+            (a, b) => (a.rank || 999) - (b.rank || 999)
+        );
+    }
+
+    function resultEntryName(detail, match) {
+        if (detail?.entry_resolved_name) return detail.entry_resolved_name;
+        const entry = match?.entries?.find((item) => String(item.id) === String(detail?.entry_id));
+        return entryName(entry);
+    }
 
     onMount(async () => {
         try {
@@ -29,8 +112,19 @@
             // Fetch tournaments
             const tournRes = await fetch(`/api/student/events/${eventId}/tournaments`);
             if (tournRes.ok) {
-                const resData = await tournRes.json();
-                tournaments = resData.tournaments || [];
+                const fetchedTournaments = await tournRes.json();
+                tournaments = Array.isArray(fetchedTournaments)
+                    ? fetchedTournaments.map(normalizeTournament)
+                    : [];
+            }
+
+            const relayRes = await fetch(`/api/student/events/${eventId}/noon-game/session`);
+            if (relayRes.ok) {
+                const relayPayload = await relayRes.json();
+                relayMatches = (relayPayload.matches || []).filter(isRelayMatch);
+            } else {
+                const relayDetail = await relayRes.json().catch(() => null);
+                relayError = relayDetail?.error || 'リレー結果を取得できませんでした。';
             }
         } catch (err) {
             error = err.message;
@@ -100,7 +194,13 @@
                     onclick={() => activeTab = 'tournaments'}
                     class="{activeTab === 'tournaments' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
                 >
-                    トーナメント結果
+                    試合結果
+                </button>
+                <button
+                    onclick={() => activeTab = 'relays'}
+                    class="{activeTab === 'relays' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+                >
+                    リレー結果
                 </button>
             </nav>
         </div>
@@ -131,17 +231,14 @@
         {:else if activeTab === 'tournaments'}
             {#if tournaments.length === 0}
                 <div class="bg-gray-50 rounded-lg p-8 text-center text-gray-500 border border-gray-200">
-                    トーナメントデータが見つかりませんでした。
+                    試合結果データが見つかりませんでした。
                 </div>
             {:else}
                 <div class="space-y-6">
                     {#each tournaments as tournament (tournament.id)}
                         <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
                                 <h3 class="text-lg font-bold text-gray-900">{tournament.name}</h3>
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
-                                    {tournament.sport_name}
-                                </span>
                             </div>
                             <div class="p-6">
                                 <p class="text-sm text-gray-600 mb-4">
@@ -161,34 +258,30 @@
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white divide-y divide-gray-200">
-                                            {#each tournament.matches as match (match.id)}
+                                            {#each tournament.data?.matches || [] as match (match.id)}
+                                                {@const team1 = match.sides?.[0]}
+                                                {@const team2 = match.sides?.[1]}
                                                 <tr class="hover:bg-gray-50">
-                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">#{match.match_id}</td>
+                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">#{match.id}</td>
                                                     <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                        {match.is_bronze_match ? '3位決定戦' : (match.round + 1) + '回戦'}
+                                                        {match.isBronzeMatch ? '3位決定戦' : (match.roundIndex + 1) + '回戦'}
                                                     </td>
-                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 {match.winner_team_id === match.team1_id ? 'font-bold text-indigo-600' : ''}">
-                                                        {match.team1_name || '未定'}
+                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 {team1?.isWinner ? 'font-bold text-indigo-600' : ''}">
+                                                        {getSideName(tournament, team1)}
                                                     </td>
                                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-center font-medium">
-                                                        {#if match.status === 'completed'}
-                                                            {match.team1_score} - {match.team2_score}
+                                                        {#if isMatchCompleted(match)}
+                                                            {getSideScore(team1) ?? '-'} - {getSideScore(team2) ?? '-'}
                                                         {:else}
                                                             -
                                                         {/if}
                                                     </td>
-                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 {match.winner_team_id === match.team2_id ? 'font-bold text-indigo-600' : ''}">
-                                                        {match.team2_name || '未定'}
+                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 {team2?.isWinner ? 'font-bold text-indigo-600' : ''}">
+                                                        {getSideName(tournament, team2)}
                                                     </td>
                                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                        {#if match.status === 'completed'}
-                                                            {#if match.winner_team_id === match.team1_id}
-                                                                {match.team1_name}
-                                                            {:else if match.winner_team_id === match.team2_id}
-                                                                {match.team2_name}
-                                                            {:else}
-                                                                引き分け
-                                                            {/if}
+                                                        {#if isMatchCompleted(match)}
+                                                            {getWinnerName(tournament, match)}
                                                         {:else}
                                                             未完了
                                                         {/if}
@@ -200,6 +293,84 @@
                                 </div>
                             </div>
                         </div>
+                    {/each}
+                </div>
+            {/if}
+        {:else if activeTab === 'relays'}
+            {#if relayError}
+                <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {relayError}
+                </p>
+            {:else if relayMatches.length === 0}
+                <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                    リレー結果データが見つかりませんでした。
+                </p>
+            {:else}
+                <div class="grid gap-4 lg:grid-cols-2">
+                    {#each relayMatches as match (match.id)}
+                        <article class="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900">{match.title || 'リレー'}</h3>
+                                    <p class="mt-1 text-sm text-gray-600">ステータス: {formatStatus(match.status)}</p>
+                                </div>
+                                <span class="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
+                                    {formatDateTime(match.scheduled_at)}
+                                </span>
+                            </div>
+
+                            <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                                <div>
+                                    <dt class="font-semibold text-gray-700">場所</dt>
+                                    <dd class="mt-1 text-gray-600">{match.location || '未定'}</dd>
+                                </div>
+                                <div>
+                                    <dt class="font-semibold text-gray-700">形式</dt>
+                                    <dd class="mt-1 text-gray-600">{match.format || '未定'}</dd>
+                                </div>
+                            </dl>
+
+                            {#if match.memo}
+                                <div class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                                    {match.memo}
+                                </div>
+                            {/if}
+
+                            <div class="mt-4">
+                                <h4 class="text-sm font-semibold text-gray-700">参加予定</h4>
+                                {#if match.entries && match.entries.length > 0}
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        {#each match.entries as entry (entry.id)}
+                                            <span class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-700">
+                                                {entryName(entry)}
+                                            </span>
+                                        {/each}
+                                    </div>
+                                {:else}
+                                    <p class="mt-2 text-sm text-gray-500">参加予定はまだ登録されていません。</p>
+                                {/if}
+                            </div>
+
+                            <div class="mt-4">
+                                <h4 class="text-sm font-semibold text-gray-700">結果</h4>
+                                {#if match.result?.details?.length}
+                                    <ol class="mt-2 space-y-2">
+                                        {#each resultEntries(match) as detail (detail.id)}
+                                            <li class="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-sm">
+                                                <span class="font-medium text-gray-900">
+                                                    {detail.rank ? `${detail.rank}位` : '順位未設定'} {resultEntryName(detail, match)}
+                                                </span>
+                                                <span class="text-indigo-700 font-semibold">{detail.points} 点</span>
+                                            </li>
+                                        {/each}
+                                    </ol>
+                                {:else if match.winner_display}
+                                    <p class="mt-2 text-sm text-gray-600">勝者: {match.winner_display}</p>
+                                {:else}
+                                    <p class="mt-2 text-sm text-gray-500">結果はまだ登録されていません。</p>
+                                {/if}
+                            </div>
+                        </article>
                     {/each}
                 </div>
             {/if}
