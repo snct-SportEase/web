@@ -13,6 +13,12 @@
     let loading = $state(true);
     let error = $state(null);
 
+    function getSportName(location) {
+        const firstScore = scores?.[0];
+        const sportNames = firstScore?.sport_names || {};
+        return sportNames[location] || location;
+    }
+
     function normalizeTournament(tournament) {
         const normalized = { ...tournament };
 
@@ -134,6 +140,35 @@
     });
 
     let season = $derived(eventData ? eventData.season : (scores.length > 0 ? scores[0].season : ''));
+    let scoreItemDefinitions = $derived([
+        { key: 'initial_points', label: '初期点' },
+        { key: 'survey_points', label: 'アンケート' },
+        { key: 'attendance_points', label: '出席点' },
+        { key: 'gym1_win1_points', label: `${getSportName('gym1')}1勝点` },
+        { key: 'gym1_win2_points', label: `${getSportName('gym1')}2勝点` },
+        { key: 'gym1_win3_points', label: `${getSportName('gym1')}3勝点` },
+        { key: 'gym1_champion_points', label: `${getSportName('gym1')}優勝点` },
+        { key: 'gym2_win1_points', label: `${getSportName('gym2')}1勝点` },
+        { key: 'gym2_win2_points', label: `${getSportName('gym2')}2勝点` },
+        { key: 'gym2_win3_points', label: `${getSportName('gym2')}3勝点` },
+        { key: 'gym2_champion_points', label: `${getSportName('gym2')}優勝点` },
+        { key: 'gym2_loser_bracket_champion_points', label: '敗者戦ブロック優勝' },
+        { key: 'ground_win1_points', label: `${getSportName('ground')}1勝点` },
+        { key: 'ground_win2_points', label: `${getSportName('ground')}2勝点` },
+        { key: 'ground_win3_points', label: `${getSportName('ground')}3勝点` },
+        { key: 'ground_champion_points', label: `${getSportName('ground')}優勝点` },
+        { key: 'noon_game_points', label: '昼競技' },
+        { key: 'total_points_current_event', label: '合計点' },
+        { key: 'rank_current_event', label: '順位' },
+        { key: 'total_points_overall', label: '総合点' },
+        { key: 'rank_overall', label: '総合順位' }
+    ]);
+    let filteredScoreItems = $derived(scoreItemDefinitions.filter((item) => {
+        if (season === 'spring') {
+            return item.key !== 'initial_points' && item.key !== 'survey_points' && item.key !== 'total_points_overall' && item.key !== 'rank_overall';
+        }
+        return true;
+    }));
 
     // Simplistic rank sorting
     let sortedScores = $derived([...scores].sort((a, b) => {
@@ -224,6 +259,23 @@
                                 <span class="text-gray-500 text-sm">合計スコア</span>
                                 <span class="text-2xl font-bold text-indigo-600">{totalPoints}</span>
                             </div>
+
+                            <details class="mt-4 rounded-lg border border-gray-200 bg-gray-50/70">
+                                <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-700 flex items-center justify-between">
+                                    <span>得点内訳を表示</span>
+                                    <span class="text-sm text-gray-500">▼</span>
+                                </summary>
+                                <div class="space-y-1 px-4 pb-4">
+                                    {#each filteredScoreItems as item (item.key || item.label)}
+                                        {#if item.key !== 'rank_current_event' && item.key !== 'rank_overall' && item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'}
+                                            <div class="flex justify-between py-2 border-b border-gray-200 last:border-b-0">
+                                                <span class="text-gray-500">{item.label}</span>
+                                                <span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
+                                            </div>
+                                        {/if}
+                                    {/each}
+                                </div>
+                            </details>
                         </div>
                     {/each}
                 </div>

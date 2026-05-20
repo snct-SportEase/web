@@ -96,7 +96,38 @@ describe('Archive Event Detail Page', () => {
       if (url === '/api/scores/class?event_id=1') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([])
+          json: () => Promise.resolve([
+            {
+              id: 1,
+              class_id: 1,
+              class_name: '1A',
+              season: 'spring',
+              attendance_points: 5,
+              gym1_win1_points: 3,
+              gym1_win2_points: 0,
+              gym1_win3_points: 0,
+              gym1_champion_points: 0,
+              gym2_win1_points: 0,
+              gym2_win2_points: 0,
+              gym2_win3_points: 0,
+              gym2_champion_points: 0,
+              gym2_loser_bracket_champion_points: 0,
+              ground_win1_points: 0,
+              ground_win2_points: 0,
+              ground_win3_points: 0,
+              ground_champion_points: 0,
+              noon_game_points: 2,
+              total_points_current_event: 10,
+              rank_current_event: 1,
+              total_points_overall: 10,
+              rank_overall: 1,
+              sport_names: {
+                gym1: 'バスケットボール',
+                gym2: 'バレーボール',
+                ground: 'サッカー'
+              }
+            }
+          ])
         });
       }
 
@@ -161,5 +192,18 @@ describe('Archive Event Detail Page', () => {
     await expect.element(page.getByText('1位 1A')).toBeInTheDocument();
     await expect.element(page.getByText('10 点')).toBeInTheDocument();
     await expect.element(page.getByText('2位 1B')).toBeInTheDocument();
+  });
+
+  it('スコアカードから得点内訳を表示できること', async () => {
+    render(Page);
+
+    await expect.element(page.getByText('1A')).toBeInTheDocument();
+
+    const detailsToggle = page.getByText('得点内訳を表示');
+    await detailsToggle.click();
+
+    await expect.element(page.getByText('出席点')).toBeInTheDocument();
+    await expect.element(page.getByText('昼競技')).toBeInTheDocument();
+    await expect.element(page.getByText('バスケットボール1勝点')).toBeInTheDocument();
   });
 });
