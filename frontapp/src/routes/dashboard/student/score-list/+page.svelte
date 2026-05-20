@@ -40,7 +40,7 @@
 	// Filter score items based on season
 	let filteredScoreItems = $derived(scoreItemDefinitions.filter(item => {
 		if (season === 'spring') {
-			return item.key !== 'initial_points' && item.key !== 'total_points_overall' && item.key !== 'rank_overall';
+			return item.key !== 'initial_points' && item.key !== 'survey_points' && item.key !== 'total_points_overall' && item.key !== 'rank_overall';
 		}
 		return true; // For autumn, include all
 	}));

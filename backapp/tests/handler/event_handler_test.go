@@ -621,14 +621,14 @@ func TestEventHandler_NotifySurvey(t *testing.T) {
 func TestEventHandler_ImportSurveyScores(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("Error - Not a spring event", func(t *testing.T) {
+	t.Run("Error - Not an autumn event", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockUserRepo := new(MockUserRepository)
 
 		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, mockUserRepo, "", "")
 
 		eventID := 1
-		event := &models.Event{ID: eventID, Season: "autumn"}
+		event := &models.Event{ID: eventID, Season: "spring"}
 
 		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
 
@@ -642,7 +642,7 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		var response map[string]interface{}
 		json.Unmarshal(w.Body.Bytes(), &response)
-		assert.Equal(t, "Survey score import is only allowed for the spring event", response["error"])
+		assert.Equal(t, "Survey score import is only allowed for the autumn event", response["error"])
 	})
 
 	t.Run("Success - Import Survey Scores", func(t *testing.T) {
@@ -652,7 +652,7 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		h := handler.NewEventHandler(mockEventRepo, nil, mockClassRepo, nil, mockUserRepo, "", "")
 
 		eventID := 1
-		event := &models.Event{ID: eventID, Season: "spring"}
+		event := &models.Event{ID: eventID, Season: "autumn"}
 
 		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
 
@@ -708,7 +708,7 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, mockUserRepo, "", "")
 
 		eventID := 1
-		event := &models.Event{ID: eventID, Season: "spring"}
+		event := &models.Event{ID: eventID, Season: "autumn"}
 
 		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
 
@@ -729,7 +729,7 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, mockUserRepo, "", "")
 
 		eventID := 1
-		event := &models.Event{ID: eventID, Season: "spring"}
+		event := &models.Event{ID: eventID, Season: "autumn"}
 
 		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
 

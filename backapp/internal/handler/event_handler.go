@@ -498,8 +498,8 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 		return
 	}
 
-	if event.Season != "spring" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Survey score import is only allowed for the spring event"})
+	if event.Season != "autumn" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Survey score import is only allowed for the autumn event"})
 		return
 	}
 

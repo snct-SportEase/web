@@ -25,6 +25,17 @@ describe('Event Management Page', () => {
       status: 'upcoming',
       survey_url: 'https://example.com/survey',
       hide_scores: false
+    },
+    {
+      id: 2,
+      name: '2025秋季スポーツ大会',
+      year: 2025,
+      season: 'autumn',
+      start_date: '2025-10-01T00:00:00Z',
+      end_date: '2025-10-02T00:00:00Z',
+      status: 'upcoming',
+      survey_url: 'https://example.com/autumn-survey',
+      hide_scores: false
     }
   ];
 
@@ -65,7 +76,7 @@ describe('Event Management Page', () => {
         });
       }
 
-      if (url === '/api/root/events/1/import-survey-scores' && options.method === 'POST') {
+      if (url === '/api/root/events/2/import-survey-scores' && options.method === 'POST') {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ imported_classes_count: 2 })
@@ -315,9 +326,10 @@ describe('Event Management Page', () => {
     expect(alert).toHaveBeenCalledWith('アンケート通知を送信しました。');
   });
 
-  it('春季大会の得点CSVをインポートできること', async () => {
+  it('秋季大会の得点CSVをインポートできること', async () => {
     const view = render(Page);
 
+    await page.getByText('2025秋季スポーツ大会').click();
     await expect.element(page.getByText('点数インポート(CSV)')).toBeInTheDocument();
 
     const fileInput = view.container.querySelector('input[type="file"]');
@@ -335,7 +347,7 @@ describe('Event Management Page', () => {
 
     await vi.waitFor(() => {
       const uploadCall = fetchMock.mock.calls.find(([url, options]) => {
-        return url === '/api/root/events/1/import-survey-scores' && options?.method === 'POST';
+        return url === '/api/root/events/2/import-survey-scores' && options?.method === 'POST';
       });
 
       expect(uploadCall).toBeTruthy();

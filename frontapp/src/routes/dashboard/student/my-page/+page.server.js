@@ -129,10 +129,11 @@ const buildScoreBreakdown = (classScore) => {
 	}
 
 	const sportNames = classScore.sport_names || {};
+	const isAutumn = classScore.season === 'autumn';
 
 	const baseItems = [
-		{ key: 'initial_points', label: '初期点', value: toNumber(classScore.initial_points) },
-		{ key: 'survey_points', label: 'アンケート', value: toNumber(classScore.survey_points) },
+		...(isAutumn ? [{ key: 'initial_points', label: '初期点', value: toNumber(classScore.initial_points) }] : []),
+		...(isAutumn ? [{ key: 'survey_points', label: 'アンケート', value: toNumber(classScore.survey_points) }] : []),
 		{ key: 'attendance_points', label: '出席', value: toNumber(classScore.attendance_points) },
 		{ key: 'noon_game_points', label: '昼競技', value: toNumber(classScore.noon_game_points) }
 	];
@@ -204,14 +205,14 @@ const buildScoreBreakdown = (classScore) => {
 	].filter((item) => item.value > 0);
 
 	const categoryBreakdown = [
-		{ label: 'アンケート', value: toNumber(classScore.survey_points) },
+		...(isAutumn ? [{ label: 'アンケート', value: toNumber(classScore.survey_points) }] : []),
 		{ label: '出席', value: toNumber(classScore.attendance_points) },
 		...sportSections.map((section) => ({
 			label: section.label,
 			value: section.total
 		})),
 		{ label: '昼競技', value: toNumber(classScore.noon_game_points) },
-		{ label: '初期点', value: toNumber(classScore.initial_points) }
+		...(isAutumn ? [{ label: '初期点', value: toNumber(classScore.initial_points) }] : [])
 	].filter((item) => item.value > 0);
 
 	const pointHighlights = [...scoreItems]

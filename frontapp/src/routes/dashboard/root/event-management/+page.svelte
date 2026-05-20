@@ -302,7 +302,7 @@
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" onclick={(e) => e.stopPropagation()}>
               <div class="flex flex-col space-y-2">
-                {#if event.season === 'spring'}
+                {#if event.season === 'autumn'}
                   <div class="flex flex-col">
                     <label class="text-xs text-gray-600 mb-1">点数インポート(CSV)
                       <input type="file" accept=".csv" class="text-xs mt-1 block" onchange={(e) => handleCsvUpload(event.id, e)} />
