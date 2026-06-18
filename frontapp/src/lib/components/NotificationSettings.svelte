@@ -13,6 +13,7 @@
   let isSupported = $state(false);
   let errorMessage = $state('');
   let subscriptionCount = $state(0);
+  let registeredEndpoints = $state([]);
   let isIOS = $state(false);
   let isPWA = $state(false);
 
@@ -53,11 +54,29 @@
 
       if (response.ok) {
         const data = await response.json();
-        isSubscribed = data.subscribed || false;
+        registeredEndpoints = Array.isArray(data.endpoints) ? data.endpoints : [];
         subscriptionCount = data.count || 0;
+
+        const currentSubscription = await getCurrentDeviceSubscription();
+        const currentEndpoint = currentSubscription?.endpoint ?? '';
+        isSubscribed = currentEndpoint !== '' && registeredEndpoints.includes(currentEndpoint);
       }
     } catch (error) {
       console.error('[notification] Failed to load subscription status:', error);
+    }
+  }
+
+  async function getCurrentDeviceSubscription() {
+    if (!browser || !isSupported) {
+      return null;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      return await registration.pushManager.getSubscription();
+    } catch (error) {
+      console.error('[notification] Failed to get current device subscription:', error);
+      return null;
     }
   }
 
@@ -117,48 +136,32 @@
     errorMessage = '';
 
     try {
-      // 現在の購読を取得
-      const response = await fetch('/api/notifications/subscription', {
-        credentials: 'include'
-      });
+      const subscription = await getCurrentDeviceSubscription();
 
-      if (response.ok) {
-        const data = await response.json();
-        const endpoints = data.endpoints || [];
-
-        // 各エンドポイントの購読を削除
-        for (const endpoint of endpoints) {
-          try {
-            await fetch('/api/notifications/subscription', {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              credentials: 'include',
-              body: JSON.stringify({ endpoint })
-            });
-          } catch (error) {
-            console.error('[notification] Failed to delete subscription:', error);
-          }
+      if (subscription) {
+        try {
+          await fetch('/api/notifications/subscription', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ endpoint: subscription.endpoint })
+          });
+        } catch (error) {
+          console.error('[notification] Failed to delete subscription:', error);
         }
 
-        // Service Workerからも購読を解除
-        if ('serviceWorker' in navigator) {
-          try {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
-            if (subscription) {
-              await subscription.unsubscribe();
-            }
-          } catch (error) {
-            console.error('[notification] Failed to unsubscribe from service worker:', error);
-          }
+        try {
+          await subscription.unsubscribe();
+        } catch (error) {
+          console.error('[notification] Failed to unsubscribe from service worker:', error);
         }
-
-        isSubscribed = false;
-        subscriptionCount = 0;
-        errorMessage = '';
       }
+
+      isSubscribed = false;
+      errorMessage = '';
+      await loadSubscriptionStatus();
     } catch (error) {
       console.error('[notification] Failed to disable notifications:', error);
       errorMessage = '通知の無効化中にエラーが発生しました。';
@@ -249,7 +252,11 @@
       <div class="flex-1">
         {#if isSubscribed}
           <p class="text-sm text-gray-700">
-            通知は有効です。{subscriptionCount > 0 ? `${subscriptionCount}件のデバイスで通知を受信できます。` : ''}
+            このデバイスの通知は有効です。{subscriptionCount > 0 ? `${subscriptionCount}件のデバイスで通知を受信できます。` : ''}
+          </p>
+        {:else if subscriptionCount > 0}
+          <p class="text-sm text-gray-700">
+            ほかのデバイスでは通知が有効です。このデバイスでも受け取るには通知を有効にしてください。
           </p>
         {:else}
           <p class="text-sm text-gray-700">
@@ -268,7 +275,7 @@
             {#if isLoading}
               処理中...
             {:else}
-              通知を無効にする
+              このデバイスの通知を無効にする
             {/if}
           </button>
         {:else}

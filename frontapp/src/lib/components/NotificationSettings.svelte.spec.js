@@ -22,13 +22,18 @@ describe('NotificationSettings', () => {
 	let originalNotification;
 	let originalServiceWorkerDescriptor;
 	let originalPushManager;
+	let serverSubscriptionPayload;
+	let currentDeviceSubscription;
 
 	beforeEach(() => {
+		serverSubscriptionPayload = { subscribed: false, count: 0, endpoints: [] };
+		currentDeviceSubscription = null;
+
 		fetchMock = vi.fn((url) => {
 			if (url === '/api/notifications/subscription') {
 				return Promise.resolve({
 					ok: true,
-					json: () => Promise.resolve({ subscribed: false, count: 0, endpoints: [] })
+					json: () => Promise.resolve(serverSubscriptionPayload)
 				});
 			}
 
@@ -54,7 +59,7 @@ describe('NotificationSettings', () => {
 			value: {
 				ready: Promise.resolve({
 					pushManager: {
-						getSubscription: vi.fn(async () => null),
+						getSubscription: vi.fn(async () => currentDeviceSubscription),
 						subscribe: vi.fn(async () => ({
 							toJSON: () => ({
 								endpoint: 'https://example.com/push',
@@ -109,5 +114,26 @@ describe('NotificationSettings', () => {
 			)
 			.not.toBeInTheDocument();
 		expect(fetchMock).not.toHaveBeenCalledWith('/api/notifications/debug', expect.anything());
+	});
+
+	it('別デバイスだけ購読済みの場合はこのデバイスの有効化ボタンを表示する', async () => {
+		NotificationMock.permission = 'granted';
+		serverSubscriptionPayload = {
+			subscribed: true,
+			count: 1,
+			endpoints: ['https://example.com/other-device']
+		};
+
+		render(NotificationSettings, {
+			user: {
+				roles: [{ name: 'student' }]
+			}
+		});
+
+		await expect
+			.element(page.getByText('ほかのデバイスでは通知が有効です。このデバイスでも受け取るには通知を有効にしてください。'))
+			.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: '通知を有効にする' })).toBeInTheDocument();
+		await expect.element(page.getByText('無効')).toBeInTheDocument();
 	});
 });

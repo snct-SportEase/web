@@ -358,6 +358,7 @@ func (h *NotificationRequestHandler) sendPushToUsers(userIDs []string, payload g
 			TTL:             60,
 		})
 		if err == nil && resp != nil {
+			cleanupExpiredPushSubscription(h.NotificationRepo, sub, resp.StatusCode, "notification-request")
 			resp.Body.Close()
 		}
 	}

@@ -470,6 +470,7 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 			if resp.StatusCode >= 400 {
 				bodyBytes, _ := io.ReadAll(resp.Body)
 				log.Printf("[event-notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode, string(bodyBytes))
+				cleanupExpiredPushSubscription(h.notificationRepo, sub, resp.StatusCode, "event-notification")
 			} else {
 				log.Printf("[event-notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode)
 			}
