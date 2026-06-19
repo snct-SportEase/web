@@ -24,7 +24,7 @@ test.describe('QRコード発行 (student)', () => {
       sport_id: 1
     });
 
-    await expect(page.getByRole('heading', { name: 'QRコード' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'QRコード', exact: true })).toBeVisible();
     await expect(page.getByAltText('QR Code')).toBeVisible();
     await expect(page.getByText('競技: バスケットボール')).toBeVisible();
     await expect(page.getByText('有効期限まで残り時間:')).toBeVisible();
