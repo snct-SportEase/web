@@ -8,6 +8,9 @@ on:
     branches:
       - ci/auto-test # For testing the workflow itself
 
+permissions:
+  contents: read
+
 jobs:
   frontend-test:
     name: Frontend SvelteKit Tests

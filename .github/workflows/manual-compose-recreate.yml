@@ -3,6 +3,8 @@ name: Manual Compose Recreate
 on:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   compose-recreate:
     name: Compose Recreate On Server

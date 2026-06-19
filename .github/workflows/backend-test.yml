@@ -8,6 +8,9 @@ on:
     branches:
       - ci/auto-test
 
+permissions:
+  contents: read
+
 jobs:
   backend-test:
     name: Backend Go Tests
