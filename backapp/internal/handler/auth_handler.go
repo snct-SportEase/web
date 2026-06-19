@@ -156,21 +156,11 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	sessionToken := uuid.New().String()
 	middleware.CreateSession(sessionToken, user.ID)
 
-	isSecure := middleware.IsRequestSecure(c.Request)
-
 	// Set session cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "session_token",
-		Value:    sessionToken,
-		Expires:  time.Now().Add(24 * time.Hour),
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   isSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	setSessionTokenCookie(c.Writer, sessionToken, time.Now().Add(24*time.Hour))
 
 	// Add a debug log to verify cookie flags
-	log.Printf("[auth] Session created for user %s, secure=%v, origin=%s", user.Email, isSecure, c.Request.RemoteAddr)
+	log.Printf("[auth] Session created for user %s, secure=true, origin=%s", user.Email, c.Request.RemoteAddr)
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }
@@ -280,15 +270,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	middleware.DeleteSession(cookie)
 
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "session_token",
-		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour),
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   middleware.IsRequestSecure(c.Request),
-		SameSite: http.SameSiteLaxMode,
-	})
+	setSessionTokenCookie(c.Writer, "", time.Now().Add(-1*time.Hour))
 
 	c.JSON(http.StatusOK, gin.H{"message": "logout successful"})
 }
@@ -586,6 +568,18 @@ func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 	http.SetCookie(w, &cookie)
 
 	return state
+}
+
+func setSessionTokenCookie(w http.ResponseWriter, value string, expiration time.Time) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    value,
+		Expires:  expiration,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func isLINEInAppBrowser(userAgent string) bool {
