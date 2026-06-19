@@ -26,6 +26,7 @@
 		"@tailwindcss/vite": "^4.3.1",
 		"@types/node": "^22",
 		"@vitest/browser": "^4.1.9",
+		"@vitest/browser-playwright": "^4.1.9",
 		"eslint": "^9.22.0",
 		"eslint-plugin-svelte": "^3.0.0",
 		"globals": "^16.0.0",
