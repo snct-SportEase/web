@@ -19,6 +19,8 @@ name: Recover SSH Key for Local Access
 on:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   recover-key:
     runs-on: ubuntu-latest

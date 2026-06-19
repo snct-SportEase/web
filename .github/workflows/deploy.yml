@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   backend-test:
     name: Backend Go Tests
@@ -107,6 +110,7 @@ jobs:
     name: Deploy to Server
     needs: [backend-test, frontend-test]
     runs-on: ubuntu-latest
+    permissions: {}
 
     steps:
       - name: Deploy using SSH
