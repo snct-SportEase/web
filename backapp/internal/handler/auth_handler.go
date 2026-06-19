@@ -580,7 +580,7 @@ func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 		Expires:  expiration,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   middleware.IsRequestSecure(r),
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, &cookie)
