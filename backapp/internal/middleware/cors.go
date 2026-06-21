@@ -12,9 +12,11 @@ func CORSMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		frontendURL := strings.TrimSuffix(cfg.FrontendURL, "/")
+		isProduction := strings.EqualFold(cfg.AppEnv, "production") || strings.EqualFold(gin.Mode(), gin.ReleaseMode)
+		isLocalhost := strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:")
 
-		// Allow configured frontend URL or localhost for development
-		if origin == frontendURL || strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") {
+		// Allow configured frontend URL, with localhost limited to development.
+		if origin == frontendURL || (!isProduction && isLocalhost) {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}
 

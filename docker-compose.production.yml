@@ -76,6 +76,8 @@ services:
         condition: service_healthy
       sportease-redis:
         condition: service_healthy
+    environment:
+      - APP_ENV=production
     networks:
       - spotease-public
       - spotease-internal

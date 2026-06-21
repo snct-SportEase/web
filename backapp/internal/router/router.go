@@ -66,7 +66,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	micRepo := repository.NewMICRepository(db)
 	micHandler := handler.NewMICHandler(micRepo)
 
-	wsHandler := handler.NewWebSocketHandler(hubManager)
+	wsHandler := handler.NewWebSocketHandler(hubManager, cfg.FrontendURL)
 
 	systemHandler := handler.NewSystemHandler(cfg)
 
@@ -79,8 +79,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	api := router.Group("/api")
 	{
-		api.GET("/ws/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
-		api.GET("/ws/progress", wsHandler.ServeProgressWebSocket)
+		ws := api.Group("/ws")
+		{
+			ws.Use(middleware.AuthMiddleware(userRepo))
+			ws.GET("/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
+			ws.GET("/progress", wsHandler.ServeProgressWebSocket)
+		}
 
 		api.GET("/classes", classHandler.GetAllClasses)
 		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), classHandler.GetClassScores)

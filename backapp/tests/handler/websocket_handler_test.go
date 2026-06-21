@@ -23,6 +23,12 @@ func dialWS(t *testing.T, wsURL string) *gowebsocket.Conn {
 	return conn
 }
 
+func dialWSWithOrigin(wsURL, origin string) (*gowebsocket.Conn, *http.Response, error) {
+	header := http.Header{}
+	header.Set("Origin", origin)
+	return gowebsocket.DefaultDialer.Dial(wsURL, header)
+}
+
 // readWithDeadline reads one message within the given duration, returning (message, true) on
 // success or ("", false) if the deadline expires.
 func readWithDeadline(conn *gowebsocket.Conn, d time.Duration) (string, bool) {
@@ -36,9 +42,14 @@ func readWithDeadline(conn *gowebsocket.Conn, d time.Duration) (string, bool) {
 
 func newWSTestServer(t *testing.T) (string, *websocket.HubManager) {
 	t.Helper()
+	return newWSTestServerWithAllowedOrigin(t, "")
+}
+
+func newWSTestServerWithAllowedOrigin(t *testing.T, allowedOrigin string) (string, *websocket.HubManager) {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 	hubManager := websocket.NewHubManager()
-	wsHandler := handler.NewWebSocketHandler(hubManager)
+	wsHandler := handler.NewWebSocketHandler(hubManager, allowedOrigin)
 
 	router := gin.New()
 	router.GET("/ws/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
@@ -140,6 +151,37 @@ func TestWebSocketHandler_ServeTournamentWebSocket(t *testing.T) {
 		assert.NotPanics(t, func() {
 			hubManager.BroadcastTo("tournament:5", gin.H{"type": "after_disconnect"})
 		})
+	})
+
+	t.Run("rejects websocket connection from disallowed origin", func(t *testing.T) {
+		baseURL, _ := newWSTestServerWithAllowedOrigin(t, "https://frontend.example")
+		wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/ws/tournaments/7"
+
+		conn, resp, err := dialWSWithOrigin(wsURL, "https://evil.example")
+		if conn != nil {
+			conn.Close()
+		}
+
+		require.Error(t, err)
+		if resp != nil {
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		}
+	})
+
+	t.Run("accepts websocket connection from configured origin", func(t *testing.T) {
+		baseURL, hubManager := newWSTestServerWithAllowedOrigin(t, "https://frontend.example")
+		wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/ws/tournaments/8"
+
+		conn, _, err := dialWSWithOrigin(wsURL, "https://frontend.example")
+		require.NoError(t, err)
+		defer conn.Close()
+
+		time.Sleep(50 * time.Millisecond)
+		hubManager.BroadcastTo("tournament:8", gin.H{"type": "origin_ok"})
+
+		msg, ok := readWithDeadline(conn, time.Second)
+		require.True(t, ok, "expected to receive a message")
+		assert.JSONEq(t, `{"type":"origin_ok"}`, msg)
 	})
 }
 

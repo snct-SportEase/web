@@ -3,6 +3,8 @@ package websocket
 import (
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -22,12 +24,28 @@ const (
 	maxMessageSize = 512
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins
-	},
+func isAllowedWebSocketOrigin(r *http.Request, allowedOrigin string) bool {
+	origin := strings.TrimSuffix(r.Header.Get("Origin"), "/")
+	if origin == "" {
+		return true
+	}
+
+	allowedOrigin = strings.TrimSuffix(allowedOrigin, "/")
+	if allowedOrigin == "" {
+		return false
+	}
+
+	originURL, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	allowedURL, err := url.Parse(allowedOrigin)
+	if err != nil {
+		return false
+	}
+
+	return strings.EqualFold(originURL.Scheme, allowedURL.Scheme) &&
+		strings.EqualFold(originURL.Host, allowedURL.Host)
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -97,7 +115,15 @@ func (c *Client) writePump() {
 }
 
 // ServeWs handles websocket requests from the peer.
-func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request, allowedOrigin string) {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return isAllowedWebSocketOrigin(r, allowedOrigin)
+		},
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)

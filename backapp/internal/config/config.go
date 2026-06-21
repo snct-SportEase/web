@@ -10,6 +10,7 @@ type Config struct {
 	DBHost, DBPort, DBUser, DBPassword, DBName                           string
 	GoogleClientID, GoogleClientSecret, GoogleRedirectURL                string
 	FrontendURL                                                          string
+	AppEnv                                                               string
 	InitRootUser                                                         string
 	InitEventName, InitEventSeason, InitEventStartDate, InitEventEndDate string
 	InitEventYear                                                        string
@@ -34,6 +35,7 @@ func Load() (*Config, error) {
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
 		FrontendURL:        os.Getenv("FRONTEND_URL"),
+		AppEnv:             os.Getenv("APP_ENV"),
 		InitRootUser:       os.Getenv("INIT_ROOT_USER"),
 		InitEventName:      os.Getenv("INIT_EVENT_NAME"),
 		InitEventYear:      os.Getenv("INIT_EVENT_YEAR"),
