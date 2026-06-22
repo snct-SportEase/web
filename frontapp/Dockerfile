@@ -18,6 +18,7 @@ WORKDIR /app
 
 # Copy built assets from builder stage
 COPY --from=builder /app/build ./build
+RUN ln -s ../../client ./build/server/chunks/client
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
