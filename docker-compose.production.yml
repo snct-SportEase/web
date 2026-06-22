@@ -109,6 +109,7 @@ services:
       - ORIGIN=https://nitsche-gyouji.com
       - PROTOCOL_HEADER=x-forwarded-proto
       - HOST_HEADER=x-forwarded-host
+      - PORT=3000
     depends_on:
       sportease-backapp:
         condition: service_healthy
