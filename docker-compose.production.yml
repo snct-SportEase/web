@@ -93,6 +93,7 @@ services:
       - "traefik.docker.network=sportease-public"
       - "traefik.http.routers.uploads-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/uploads`)"
       - "traefik.http.routers.uploads-https.entrypoints=websecure"
+      - "traefik.http.routers.uploads-https.tls=true"
       - "traefik.http.routers.uploads-https.tls.certresolver=myresolver"
       - "traefik.http.services.uploads.loadbalancer.server.port=8080"
 
@@ -132,6 +133,7 @@ services:
       # 3. 既存のHTTPS用ルーター（nitsche-gyouji.comのみ）
       - "traefik.http.routers.frontend-https.rule=Host(`nitsche-gyouji.com`)"
       - "traefik.http.routers.frontend-https.entrypoints=websecure"
+      - "traefik.http.routers.frontend-https.tls=true"
       - "traefik.http.routers.frontend-https.tls.certresolver=myresolver"
       - "traefik.http.routers.frontend-https.middlewares=security-headers"
 
