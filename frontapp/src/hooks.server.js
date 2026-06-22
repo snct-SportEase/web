@@ -1,8 +1,9 @@
-import { env } from '$env/dynamic/private';
-import { redirect } from '@sveltejs/kit';
-
-const BACKEND_URL = env.BACKEND_URL;
+const BACKEND_URL = process.env.BACKEND_URL;
 const BACKEND_PROXY_PREFIXES = ['/api', '/swagger'];
+
+function redirectResponse(event, status, location) {
+  return Response.redirect(new URL(location, event.url), status);
+}
 
 function shouldProxyToBackend(pathname) {
   return BACKEND_PROXY_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -88,14 +89,14 @@ export async function handle({ event, resolve }) {
   // Protect dashboard route
   if (event.url.pathname.startsWith('/dashboard')) {
     if (!event.locals.user) {
-      throw redirect(302, '/');
+      return redirectResponse(event, 302, '/');
     }
   }
 
   // Redirect from login page if already logged in
   if (event.url.pathname === '/') {
     if (event.locals.user) {
-      throw redirect(302, '/dashboard');
+      return redirectResponse(event, 302, '/dashboard');
     }
   }
 
