@@ -12,6 +12,30 @@ const rootUser = {
   roles: [{ name: 'root' }]
 };
 
+const studentUser = {
+  id: 'user-1',
+  email: 'student1@sendai-nct.jp',
+  display_name: '山田太郎',
+  class_id: 1,
+  is_profile_complete: true,
+  roles: [
+    { id: 1, name: 'student' },
+    { id: 2, name: '1A_rep' },
+    { id: 4, name: 'judge' }
+  ]
+};
+
+const adminUser = {
+  id: 'user-2',
+  email: 'admin1@sendai-nct.jp',
+  display_name: '運営花子',
+  class_id: 2,
+  is_profile_complete: true,
+  roles: [
+    { id: 3, name: 'admin' }
+  ]
+};
+
 const defaultEvents = () => ([
   {
     id: 1,
@@ -162,6 +186,7 @@ let notifications = [
     created_at: '2025-04-01T09:00:00Z'
   }
 ];
+let currentUser = rootUser;
 let classes = [
   { id: 1, name: '1A', student_count: 40 },
   { id: 2, name: '1B', student_count: 38 }
@@ -360,13 +385,39 @@ createServer(async (req, res) => {
     rainyModeSettings = [];
     qrCodeSequence = 0;
     qrCodeActiveTokens = new Map();
+    currentUser = rootUser;
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (url.pathname === '/__set-user' && req.method === 'POST') {
+    const body = await readJson(req);
+    if (body.user === 'student') {
+      currentUser = studentUser;
+    } else if (body.user === 'admin') {
+      currentUser = adminUser;
+    } else {
+      currentUser = rootUser;
+    }
+    sendJson(res, 200, { user: currentUser });
+    return;
+  }
+
+  if (url.pathname === '/__set-active-event' && req.method === 'POST') {
+    const body = await readJson(req);
+    const eventId = Number(body.event_id ?? 1);
+    events = events.map((event) => ({
+      ...event,
+      status: event.id === eventId ? 'active' : event.status === 'active' ? 'upcoming' : event.status,
+      hide_scores: event.id === eventId ? Boolean(body.hide_scores) : event.hide_scores
+    }));
+    sendJson(res, 200, { event: events.find((event) => event.id === eventId) ?? null });
     return;
   }
 
   if (url.pathname === '/api/auth/user' && req.method === 'GET') {
     if (getSessionToken(req) === 'test-session-token') {
-      sendJson(res, 200, rootUser);
+      sendJson(res, 200, currentUser);
       return;
     }
 
@@ -456,16 +507,26 @@ createServer(async (req, res) => {
   if (url.pathname === '/api/scores/class' && req.method === 'GET') {
     sendJson(res, 200, [
       {
+        class_id: 1,
         class_name: '1A',
+        season: 'spring',
+        rank_current_event: 1,
         rank_overall: 1,
         total_points_overall: 120,
-        total_points_current_event: 60
+        total_points_current_event: 60,
+        attendance_points: 10,
+        noon_game_points: 20
       },
       {
+        class_id: 2,
         class_name: '1B',
+        season: 'spring',
+        rank_current_event: 2,
         rank_overall: 2,
         total_points_overall: 100,
-        total_points_current_event: 50
+        total_points_current_event: 50,
+        attendance_points: 8,
+        noon_game_points: 12
       }
     ]);
     return;
@@ -481,7 +542,8 @@ createServer(async (req, res) => {
             event_id: activeEvent.id,
             event_name: activeEvent.name,
             id: activeEvent.id,
-            name: activeEvent.name
+            name: activeEvent.name,
+            hide_scores: activeEvent.hide_scores
           }
         : null
     );
