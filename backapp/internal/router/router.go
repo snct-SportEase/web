@@ -290,6 +290,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				rootDB.GET("/export", systemHandler.ExportDBDump)
 			}
+			rootUploads := root.Group("/uploads")
+			{
+				rootUploads.GET("/export", systemHandler.ExportUploadsDump)
+			}
 
 			rootNoon := root.Group("/noon-game")
 			{

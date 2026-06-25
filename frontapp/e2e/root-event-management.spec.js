@@ -236,4 +236,14 @@ test.describe('大会情報登録・管理 (root)', () => {
 
     await dumpRequest;
   });
+
+  test('アップロードファイルダンプを出力できる', async ({ page }) => {
+    const dumpRequest = page.waitForRequest((request) => {
+      return request.url().endsWith('/api/root/uploads/export') && request.method() === 'GET';
+    });
+
+    await page.getByRole('button', { name: 'アップロードファイル出力' }).click();
+
+    await dumpRequest;
+  });
 });

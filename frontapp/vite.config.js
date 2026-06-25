@@ -4,6 +4,7 @@ import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 const backendUrl = process.env.PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080';
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
@@ -28,7 +29,11 @@ export default defineConfig({
 					name: 'client',
 					browser: {
 						enabled: true,
-						provider: playwright(),
+						provider: playwright(
+							chromiumExecutablePath
+								? { launchOptions: { executablePath: chromiumExecutablePath } }
+								: undefined
+						),
 						instances: [{ browser: 'chromium' }],
 						headless: true
 					},

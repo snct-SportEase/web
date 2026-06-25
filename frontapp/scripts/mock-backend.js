@@ -504,6 +504,14 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/root/uploads/export' && req.method === 'GET') {
+    sendResponse(res, 200, 'mock zip', {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': 'attachment; filename="mock_uploads.zip"'
+    });
+    return;
+  }
+
   if (url.pathname === '/api/scores/class' && req.method === 'GET') {
     sendJson(res, 200, [
       {

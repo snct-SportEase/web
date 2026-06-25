@@ -253,14 +253,44 @@
       alert(err.message);
     }
   }
+
+  async function downloadUploadsDump() {
+    try {
+      const resp = await fetch('/api/root/uploads/export');
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => null);
+        throw new Error((errorData && errorData.error) || 'アップロードファイルダンプのダウンロードに失敗しました');
+      }
+
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const contentDisposition = resp.headers.get('Content-Disposition');
+      let filename = 'uploads_dump.zip';
+      if (contentDisposition && contentDisposition.includes('filename=')) {
+        filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+      }
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
 </script>
 
 <div class="container mx-auto p-4">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">大会情報登録・管理</h1>
-    <div class="flex space-x-2">
+    <div class="flex flex-wrap gap-2">
       <button onclick={downloadDBDump} class="btn btn-secondary bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
         DBダンプ出力
+      </button>
+      <button onclick={downloadUploadsDump} class="btn btn-secondary bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+        アップロードファイル出力
       </button>
       <button onclick={openCreateModal} class="btn btn-primary bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
         新規作成
