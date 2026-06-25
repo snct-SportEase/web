@@ -315,6 +315,11 @@ func (m *MockQRCodeTokenStore) GetActiveToken(userID string, eventID, sportID in
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockQRCodeTokenStore) ConsumeActiveToken(userID string, eventID, sportID int, token string) (bool, error) {
+	args := m.Called(userID, eventID, sportID, token)
+	return args.Bool(0), args.Error(1)
+}
+
 var _ handler.QRCodeTokenStore = (*MockQRCodeTokenStore)(nil)
 
 func (m *MockTournamentRepository) SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {

@@ -11,6 +11,7 @@ import (
 type QRCodeTokenStore interface {
 	SaveActiveToken(userID string, eventID, sportID int, token string, ttl time.Duration) error
 	GetActiveToken(userID string, eventID, sportID int) (string, error)
+	ConsumeActiveToken(userID string, eventID, sportID int, token string) (bool, error)
 }
 
 type redisQRCodeTokenStore struct{}
@@ -29,6 +30,10 @@ func (s *redisQRCodeTokenStore) GetActiveToken(userID string, eventID, sportID i
 		return "", nil
 	}
 	return token, err
+}
+
+func (s *redisQRCodeTokenStore) ConsumeActiveToken(userID string, eventID, sportID int, token string) (bool, error) {
+	return middleware.CompareAndDeleteRedisValue(qrCodeTokenKey(userID, eventID, sportID), token)
 }
 
 func qrCodeTokenKey(userID string, eventID, sportID int) string {

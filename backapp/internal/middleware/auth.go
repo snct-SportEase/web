@@ -63,6 +63,24 @@ func GetRedisValue(key string) (string, error) {
 	return redisClient.Get(context.Background(), key).Result()
 }
 
+func CompareAndDeleteRedisValue(key, expectedValue string) (bool, error) {
+	if redisClient == nil {
+		return false, fmt.Errorf("redis client is not initialized")
+	}
+
+	const script = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+	return redis.call("DEL", KEYS[1])
+end
+return 0
+`
+	result, err := redisClient.Eval(context.Background(), script, []string{key}, expectedValue).Int()
+	if err != nil {
+		return false, err
+	}
+	return result == 1, nil
+}
+
 func IsRequestSecure(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
