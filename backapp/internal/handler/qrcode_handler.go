@@ -251,6 +251,16 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 		return
 	}
 
+	consumed, err := h.tokenStore.ConsumeActiveToken(qrData.UserID, qrData.EventID, qrData.SportID, token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume QR code token"})
+		return
+	}
+	if !consumed {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "QRコードは無効または期限切れです"})
+		return
+	}
+
 	// Confirm team member (参加本登録)
 	err = h.teamRepo.ConfirmTeamMember(team.ID, qrData.UserID)
 	if err != nil {
