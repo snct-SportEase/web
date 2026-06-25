@@ -70,7 +70,7 @@ test.describe('通知管理 (root)', () => {
     expect(body.target_roles).toContain('admin');
     expect(body.type).toBe('general');
 
-    await expect(page.getByText('通知を送信しました。')).toBeVisible();
+    await expect(page.getByText('通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。')).toBeVisible();
     await expect(page.getByLabel('タイトル')).toHaveValue('');
     await expect(page.getByLabel('本文')).toHaveValue('');
   });

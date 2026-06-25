@@ -1,7 +1,10 @@
 <script>
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { env as publicEnv } from '$env/dynamic/public';
   import { notificationBadgeCount, refreshNotificationBadge } from '$lib/stores/notificationBadgeStore.js';
+  import { pushSubscriptionStatus, updatePushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
 
   /** @type {import('@sveltejs/kit').MaybePromise<import('../../routes/$types').LayoutData>} */
   let { user } = $props();
@@ -14,6 +17,14 @@
   const isAdmin = hasRole('admin');
   const isRoot = hasRole('root');
   const canSeeNotifications = isStudent || isAdmin || isRoot;
+  const vapidKeySet = browser ? (publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '') !== '' : false;
+  let shouldShowPushSetupBadge = $derived(
+    canSeeNotifications &&
+    $pushSubscriptionStatus.loaded &&
+    $pushSubscriptionStatus.isSupported &&
+    $pushSubscriptionStatus.vapidKeySet &&
+    !$pushSubscriptionStatus.isSubscribed
+  );
 
   onMount(() => {
     if (!canSeeNotifications) return;
@@ -25,6 +36,7 @@
     };
 
     refreshBadge();
+    refreshPushSubscriptionStatus();
 
     const interval = setInterval(refreshBadge, 60 * 1000);
     const handleVisibilityChange = () => {
@@ -47,6 +59,52 @@
       navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
     };
   });
+
+  async function refreshPushSubscriptionStatus() {
+    if (!browser) return;
+
+    const isSupported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+    const permission = 'Notification' in window ? Notification.permission : 'default';
+
+    if (!isSupported || !vapidKeySet) {
+      updatePushSubscriptionStatus({
+        isSubscribed: false,
+        isSupported,
+        canEnable: canSeeNotifications,
+        permission,
+        vapidKeySet
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/notifications/subscription', {
+        credentials: 'include'
+      });
+      const data = response.ok ? await response.json() : {};
+      const endpoints = Array.isArray(data.endpoints) ? data.endpoints : [];
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      const endpoint = subscription?.endpoint ?? '';
+
+      updatePushSubscriptionStatus({
+        isSubscribed: endpoint !== '' && endpoints.includes(endpoint),
+        isSupported,
+        canEnable: canSeeNotifications,
+        permission,
+        vapidKeySet
+      });
+    } catch (error) {
+      console.error('[notification] Failed to refresh push subscription status:', error);
+      updatePushSubscriptionStatus({
+        isSubscribed: false,
+        isSupported,
+        canEnable: canSeeNotifications,
+        permission,
+        vapidKeySet
+      });
+    }
+  }
 
   function closeSidebar(event) {
     if (event) {
@@ -91,6 +149,15 @@
       <svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
     </button>
   </div>
+  {#if shouldShowPushSetupBadge}
+    <a
+      href="/dashboard"
+      class="mx-3 mb-2 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-200"
+      onclick={handleLinkClick}
+    >
+      {$pushSubscriptionStatus.permission === 'denied' ? '通知拒否中' : '通知未設定'}
+    </a>
+  {/if}
   <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
     <!-- Root Menu -->
     {#if isRoot}
@@ -203,14 +270,21 @@
         </a>
         <a href="/dashboard/student/notification" class="flex items-center justify-between px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           <span>通知</span>
-          {#if $notificationBadgeCount > 0}
-            <span
-              class="ml-3 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold leading-none text-white shadow"
-              aria-label={`未読通知 ${$notificationBadgeCount} 件`}
-            >
-              {$notificationBadgeCount > 99 ? '99+' : $notificationBadgeCount}
-            </span>
-          {/if}
+          <span class="ml-3 flex items-center gap-2">
+            {#if shouldShowPushSetupBadge}
+              <span class="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-amber-950">
+                {$pushSubscriptionStatus.permission === 'denied' ? '拒否中' : '未設定'}
+              </span>
+            {/if}
+            {#if $notificationBadgeCount > 0}
+              <span
+                class="inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold leading-none text-white shadow"
+                aria-label={`未読通知 ${$notificationBadgeCount} 件`}
+              >
+                {$notificationBadgeCount > 99 ? '99+' : $notificationBadgeCount}
+              </span>
+            {/if}
+          </span>
         </a>
         <a href="/dashboard/student/notification-request" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           通知申請
