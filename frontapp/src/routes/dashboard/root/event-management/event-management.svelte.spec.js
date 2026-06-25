@@ -100,6 +100,16 @@ describe('Event Management Page', () => {
         });
       }
 
+      if (url === '/api/root/uploads/export') {
+        return Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['mock zip'], { type: 'application/zip' })),
+          headers: {
+            get: (name) => name === 'Content-Disposition' ? 'attachment; filename="mock_uploads.zip"' : null
+          }
+        });
+      }
+
       if (typeof url === 'string' && url.startsWith('/api/scores/class?')) {
         return Promise.resolve({
           ok: true,
@@ -395,6 +405,22 @@ describe('Event Management Page', () => {
       expect(anchorClickMock).toHaveBeenCalled();
       const anchor = document.createElement.mock.results.find((result) => result.value?.download === 'mock_dump.sql')?.value;
       expect(anchor?.download).toBe('mock_dump.sql');
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-export');
+    });
+  });
+
+  it('アップロードファイルダンプを出力できること', async () => {
+    render(Page);
+
+    await page.getByRole('button', { name: 'アップロードファイル出力' }).click();
+
+    await vi.waitFor(() => {
+      const dumpCall = fetchMock.mock.calls.find(([url]) => url === '/api/root/uploads/export');
+      expect(dumpCall).toBeTruthy();
+      expect(createObjectURLMock).toHaveBeenCalled();
+      expect(anchorClickMock).toHaveBeenCalled();
+      const anchor = document.createElement.mock.results.find((result) => result.value?.download === 'mock_uploads.zip')?.value;
+      expect(anchor?.download).toBe('mock_uploads.zip');
       expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-export');
     });
   });
