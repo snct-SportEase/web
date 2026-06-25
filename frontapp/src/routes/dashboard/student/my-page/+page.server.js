@@ -3,6 +3,9 @@ const BACKEND_URL = env.BACKEND_URL;
 
 const toNumber = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : 0);
 
+const canViewHiddenScores = (user) =>
+	user?.roles?.some((role) => role?.name === 'admin' || role?.name === 'root') ?? false;
+
 const toDateValue = (value) => {
 	if (!value) return Number.POSITIVE_INFINITY;
 	const date = new Date(String(value).replace(' ', 'T'));
@@ -253,10 +256,46 @@ export const load = async ({ fetch, locals, request }) => {
 			headers.Authorization = authHeader;
 		}
 
+		let activeEventId = null;
+		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
+		if (activeEventResponse.ok) {
+			const activeEventPayload = await activeEventResponse.json();
+			activeEventId = activeEventPayload?.event_id;
+
+			if (activeEventPayload?.hide_scores && !canViewHiddenScores(user)) {
+				return {
+					user,
+					myClassScore: null,
+					scoresHidden: true,
+					scoreItems: [],
+					categoryBreakdown: [],
+					pointHighlights: [],
+					sportSections: [],
+					assignedSports: [],
+					upcomingMatches: [],
+					scoreHistory: []
+				};
+			}
+		}
+
 		const scoreResponse = await fetch(`${BACKEND_URL}/api/scores/class`, {
 			headers
 		});
 		if (!scoreResponse.ok) {
+			if (scoreResponse.status === 403) {
+				return {
+					user,
+					myClassScore: null,
+					scoresHidden: true,
+					scoreItems: [],
+					categoryBreakdown: [],
+					pointHighlights: [],
+					sportSections: [],
+					assignedSports: [],
+					upcomingMatches: [],
+					scoreHistory: []
+				};
+			}
 			throw new Error('クラスの得点一覧の取得に失敗しました。');
 		}
 		const classScores = await scoreResponse.json();
@@ -284,37 +323,37 @@ export const load = async ({ fetch, locals, request }) => {
 
 		let upcomingMatches = [];
 		let assignedSports = [];
-		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
-		if (activeEventResponse.ok) {
-			const activeEventPayload = await activeEventResponse.json();
-			const activeEventId = activeEventPayload?.event_id;
+		if (activeEventId) {
+			const [teamsResponse, tournamentsResponse, noonResponse] = await Promise.all([
+				fetch(`${BACKEND_URL}/api/qrcode/teams`, { headers }),
+				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
+				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers })
+			]);
 
-			if (activeEventId) {
-				const [teamsResponse, tournamentsResponse, noonResponse] = await Promise.all([
-					fetch(`${BACKEND_URL}/api/qrcode/teams`, { headers }),
-					fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
-					fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers })
-				]);
+			const teams = teamsResponse.ok ? await teamsResponse.json() : [];
+			const currentEventTeams = Array.isArray(teams)
+				? teams.filter((team) => Number(team?.event_id) === Number(activeEventId))
+				: [];
+			assignedSports = buildAssignedSports(currentEventTeams);
 
-				const teams = teamsResponse.ok ? await teamsResponse.json() : [];
-				const currentEventTeams = Array.isArray(teams)
-					? teams.filter((team) => Number(team?.event_id) === Number(activeEventId))
-					: [];
-				assignedSports = buildAssignedSports(currentEventTeams);
+			const tournamentMatches = tournamentsResponse.ok
+				? buildTournamentUpcomingMatches(await tournamentsResponse.json(), currentEventTeams)
+				: [];
 
-				const tournamentMatches = tournamentsResponse.ok
-					? buildTournamentUpcomingMatches(await tournamentsResponse.json(), currentEventTeams)
-					: [];
+			const noonMatches = noonResponse.ok
+				? buildNoonUpcomingMatches(await noonResponse.json(), user.class_id)
+				: [];
 
-				const noonMatches = noonResponse.ok
-					? buildNoonUpcomingMatches(await noonResponse.json(), user.class_id)
-					: [];
-
-				upcomingMatches = [...tournamentMatches, ...noonMatches]
-					.filter((match) => match.start_time || match.opponent_name || match.location)
-					.sort((left, right) => left.sort_value - right.sort_value)
-					.map(({ sort_value, status, ...match }) => match);
-			}
+			upcomingMatches = [...tournamentMatches, ...noonMatches]
+				.filter((match) => match.start_time || match.opponent_name || match.location)
+				.sort((left, right) => left.sort_value - right.sort_value)
+				.map((match) => ({
+					id: match.id,
+					start_time: match.start_time,
+					sport_name: match.sport_name,
+					opponent_name: match.opponent_name,
+					location: match.location
+				}));
 		}
 
 		return {

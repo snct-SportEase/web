@@ -32,11 +32,13 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockEventRepo.On("GetEventByID", 1).Return(&models.Event{ID: 1, HideScores: false}, nil).Once()
 		mockClassRepo.On("GetClassScoresByEvent", 1).Return(expectedScores, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class", nil)
+		c.Set("user", &models.User{ID: "user-1", Roles: []models.Role{{Name: "student"}}})
 
 		h.GetClassScores(c)
 
@@ -63,11 +65,13 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 			{ID: 1, ClassName: "Class A", Season: "spring", TotalPointsCurrentEvent: 100, RankCurrentEvent: 1},
 		}
 
+		mockEventRepo.On("GetEventByID", 2).Return(&models.Event{ID: 2, HideScores: false}, nil).Once()
 		mockClassRepo.On("GetClassScoresByEvent", 2).Return(expectedScores, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class?event_id=2", nil)
+		c.Set("user", &models.User{ID: "user-1", Roles: []models.Role{{Name: "student"}}})
 
 		h.GetClassScores(c)
 
@@ -80,6 +84,7 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 
 		mockClassRepo.AssertExpectations(t)
 		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
+		mockEventRepo.AssertExpectations(t)
 	})
 
 	t.Run("no active event", func(t *testing.T) {
@@ -135,15 +140,80 @@ func TestClassHandler_GetClassScores(t *testing.T) {
 		h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockEventRepo.On("GetEventByID", 1).Return(&models.Event{ID: 1, HideScores: false}, nil).Once()
 		mockClassRepo.On("GetClassScoresByEvent", 1).Return(nil, errors.New("db error")).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class", nil)
+		c.Set("user", &models.User{ID: "user-1", Roles: []models.Role{{Name: "student"}}})
 
 		h.GetClassScores(c)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+		mockClassRepo.AssertExpectations(t)
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("hidden scores returns forbidden for student", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockEventRepo.On("GetEventByID", 1).Return(&models.Event{ID: 1, HideScores: true}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class", nil)
+		c.Set("user", &models.User{ID: "user-1", Roles: []models.Role{{Name: "student"}}})
+
+		h.GetClassScores(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+
+		var response map[string]string
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "得点一覧は現在非表示です。", response["error"])
+
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertNotCalled(t, "GetClassScoresByEvent", mock.Anything)
+	})
+
+	t.Run("hidden scores visible for admin", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+
+		h := handler.NewClassHandler(mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo)
+
+		expectedScores := []*models.ClassScore{
+			{ID: 1, ClassName: "Class A", Season: "spring", TotalPointsCurrentEvent: 100, RankCurrentEvent: 1},
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockEventRepo.On("GetEventByID", 1).Return(&models.Event{ID: 1, HideScores: true}, nil).Once()
+		mockClassRepo.On("GetClassScoresByEvent", 1).Return(expectedScores, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/scores/class", nil)
+		c.Set("user", &models.User{ID: "admin-1", Roles: []models.Role{{Name: "admin"}}})
+
+		h.GetClassScores(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var actualScores []*models.ClassScore
+		err := json.Unmarshal(w.Body.Bytes(), &actualScores)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedScores, actualScores)
 
 		mockClassRepo.AssertExpectations(t)
 		mockEventRepo.AssertExpectations(t)

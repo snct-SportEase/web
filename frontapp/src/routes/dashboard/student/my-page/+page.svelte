@@ -9,6 +9,7 @@
 	let user = $derived(data.user);
 	let myClassScore = $derived(data.myClassScore);
 	let errorMessage = $derived(data.error);
+	let scoresHidden = $derived(Boolean(data.scoresHidden));
 	let upcomingMatches = $derived(data.upcomingMatches || []);
 	let assignedSports = $derived(data.assignedSports || []);
 	let scoreItems = $derived(data.scoreItems || []);
@@ -158,7 +159,28 @@
 		<p class="text-base text-gray-600">クラスの現状とポイント内訳をまとめて確認できます</p>
 	</div>
 
-	{#if errorMessage && !hasScore}
+	{#if scoresHidden}
+		<div class="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="h-6 w-6 text-amber-500 flex-shrink-0 mt-0.5"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+				/>
+			</svg>
+			<div class="space-y-1">
+				<p class="font-semibold text-amber-900">得点・順位は現在非表示です。</p>
+				<p class="text-sm text-amber-800">公開されるまでお待ちください。</p>
+			</div>
+		</div>
+	{:else if errorMessage && !hasScore}
 		<div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 flex items-start gap-3 shadow-sm">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
