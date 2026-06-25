@@ -130,7 +130,7 @@
         const d = await resp.json();
         throw new Error(d.error || 'Failed to send notification');
       }
-      alert('アンケート通知を送信しました。');
+      alert('アンケート通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。');
     } catch (err) {
       alert(err.message);
     }

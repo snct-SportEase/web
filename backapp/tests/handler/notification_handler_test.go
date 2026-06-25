@@ -329,6 +329,50 @@ func TestNotificationHandler_GetSubscription_RepositoryError(t *testing.T) {
 	mockNotifRepo.AssertExpectations(t)
 }
 
+func TestNotificationHandler_GetPushSubscriptionStats_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockNotifRepo := new(MockNotificationRepository)
+	mockEventRepo := new(MockEventRepository)
+	mockRoleRepo := new(MockRoleRepository)
+	mockUserRepo := new(MockUserRepository)
+
+	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, mockRoleRepo, mockUserRepo, "", "")
+
+	mockRoleRepo.On("GetAllRoles").Return([]models.Role{
+		{ID: 1, Name: "student"},
+		{ID: 2, Name: "admin"},
+	}, nil).Once()
+	mockNotifRepo.On("GetPushSubscriptionStatsByRoles", []string{"admin", "student"}).
+		Return(models.PushSubscriptionStats{
+			TargetUserCount:           10,
+			SubscribedUserCount:       6,
+			SubscriptionEndpointCount: 8,
+		}, nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/api/root/notifications/subscription-stats?roles=Student&roles=admin", nil)
+
+	h.GetPushSubscriptionStats(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, []interface{}{"admin", "student"}, response["target_roles"])
+
+	stats := response["stats"].(map[string]interface{})
+	assert.Equal(t, float64(10), stats["target_user_count"])
+	assert.Equal(t, float64(6), stats["subscribed_user_count"])
+	assert.Equal(t, float64(8), stats["subscription_endpoint_count"])
+
+	mockRoleRepo.AssertExpectations(t)
+	mockNotifRepo.AssertExpectations(t)
+}
+
 func TestNotificationHandler_UpdateNotificationFilters_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -14,6 +14,7 @@ type NotificationRepository interface {
 	GetUserIDsByRoles(roleNames []string) ([]string, error)
 	GetPushSubscriptionsByUserIDs(userIDs []string) ([]models.PushSubscription, error)
 	GetPushSubscriptionsByUserID(userID string) ([]models.PushSubscription, error)
+	GetPushSubscriptionStatsByRoles(roleNames []string) (models.PushSubscriptionStats, error)
 	UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error
 	DeletePushSubscription(userID, endpoint string) error
 }
@@ -262,6 +263,38 @@ func (r *notificationRepository) GetPushSubscriptionsByUserID(userID string) ([]
 	}
 
 	return subs, nil
+}
+
+func (r *notificationRepository) GetPushSubscriptionStatsByRoles(roleNames []string) (models.PushSubscriptionStats, error) {
+	if len(roleNames) == 0 {
+		return models.PushSubscriptionStats{}, nil
+	}
+
+	placeholders := strings.Repeat(",?", len(roleNames)-1)
+	query := `
+		SELECT
+			COUNT(DISTINCT u.id) AS target_user_count,
+			COUNT(DISTINCT ps.user_id) AS subscribed_user_count,
+			COUNT(DISTINCT ps.endpoint) AS subscription_endpoint_count
+		FROM users u
+		INNER JOIN user_roles ur ON u.id = ur.user_id
+		INNER JOIN roles r ON ur.role_id = r.id
+		LEFT JOIN push_subscriptions ps ON u.id = ps.user_id
+		WHERE r.name IN (?` + placeholders + `)
+	`
+
+	args := make([]interface{}, len(roleNames))
+	for i, role := range roleNames {
+		args[i] = role
+	}
+
+	var stats models.PushSubscriptionStats
+	err := r.db.QueryRow(query, args...).Scan(
+		&stats.TargetUserCount,
+		&stats.SubscribedUserCount,
+		&stats.SubscriptionEndpointCount,
+	)
+	return stats, err
 }
 
 func (r *notificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error {

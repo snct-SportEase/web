@@ -21,3 +21,9 @@ type PushSubscription struct {
 	P256dhKey string    `json:"p256dh_key"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type PushSubscriptionStats struct {
+	TargetUserCount           int `json:"target_user_count"`
+	SubscribedUserCount       int `json:"subscribed_user_count"`
+	SubscriptionEndpointCount int `json:"subscription_endpoint_count"`
+}

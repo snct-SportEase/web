@@ -313,6 +313,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				rootNotifications.POST("", notificationHandler.CreateNotification)
 				rootNotifications.GET("/roles", notificationHandler.ListAvailableRoles)
+				rootNotifications.GET("/subscription-stats", notificationHandler.GetPushSubscriptionStats)
 			}
 
 			rootUsers := root.Group("/users")

@@ -687,6 +687,20 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/root/notifications/subscription-stats' && req.method === 'GET') {
+    const roles = url.searchParams.getAll('roles');
+    const roleCount = roles.length || 1;
+    sendJson(res, 200, {
+      target_roles: roles,
+      stats: {
+        target_user_count: roleCount * 10,
+        subscribed_user_count: roleCount * 6,
+        subscription_endpoint_count: roleCount * 8
+      }
+    });
+    return;
+  }
+
   if (url.pathname === '/api/notifications' && req.method === 'GET') {
     sendJson(res, 200, { notifications });
     return;

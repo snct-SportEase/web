@@ -4,6 +4,7 @@
 
   let { data } = $page;
   let notifications = $state(data.notifications ? [...data.notifications] : []);
+  let subscriptionStats = $state(data.subscriptionStats ?? null);
 
   const roleLabelMap = {
     student: '学生',
@@ -53,6 +54,7 @@
   let errorMessage = $state('');
   let isSubmitting = $state(false);
   let isReloading = $state(false);
+  let isStatsLoading = $state(false);
   let isInteractive = $state(false);
 
   onMount(() => {
@@ -60,6 +62,7 @@
   });
   function toggleRole(roleName) {
     selectedRoles = { ...selectedRoles, [roleName]: !selectedRoles[roleName] };
+    refreshSubscriptionStats();
   }
 
   function resetSelectedRoles() {
@@ -70,6 +73,39 @@
     return availableRoles
       .map((role) => role.name)
       .filter((roleName) => selectedRoles[roleName]);
+  }
+
+  function getSelectedRoleLabels() {
+    return getSelectedRoles().map((role) => roleLabelMap[role] ?? role).join('、');
+  }
+
+  async function refreshSubscriptionStats() {
+    const targetRoles = getSelectedRoles();
+    if (targetRoles.length === 0) {
+      subscriptionStats = null;
+      return;
+    }
+
+    isStatsLoading = true;
+    try {
+      const query = targetRoles
+        .map((role) => `roles=${encodeURIComponent(role)}`)
+        .join('&');
+
+      const response = await fetch(`/api/root/notifications/subscription-stats?${query}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || '購読状況の取得に失敗しました。');
+      }
+
+      const result = await response.json();
+      subscriptionStats = result.stats ?? null;
+    } catch (error) {
+      console.error('購読状況の取得に失敗しました:', error);
+      subscriptionStats = null;
+    } finally {
+      isStatsLoading = false;
+    }
   }
 
   async function handleSubmit() {
@@ -107,12 +143,13 @@
         throw new Error(err.error || '通知の作成に失敗しました。');
       }
 
-      message = '通知を送信しました。';
+      message = '通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。';
       title = '';
       body = '';
       resetSelectedRoles();
 
       await refreshNotifications();
+      await refreshSubscriptionStats();
     } catch (error) {
       errorMessage = error.message;
     } finally {
@@ -188,6 +225,45 @@
 
   <section class="bg-white shadow rounded-lg p-6 space-y-6">
     <h2 class="text-xl font-semibold text-gray-800">新しい通知を作成</h2>
+
+    <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-semibold text-indigo-900">Push通知の受信可能状況</h3>
+          <p class="mt-1 text-sm text-indigo-800">
+            宛先: {getSelectedRoleLabels() || '未選択'}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="rounded-md border border-indigo-300 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+          onclick={refreshSubscriptionStats}
+          disabled={!isInteractive || isStatsLoading || getSelectedRoles().length === 0}
+        >
+          {isStatsLoading ? '確認中...' : '再確認'}
+        </button>
+      </div>
+      {#if subscriptionStats}
+        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-md bg-white p-3">
+            <p class="text-xs font-medium text-gray-500">対象ユーザー</p>
+            <p class="mt-1 text-2xl font-semibold text-gray-900">{subscriptionStats.target_user_count ?? 0}</p>
+          </div>
+          <div class="rounded-md bg-white p-3">
+            <p class="text-xs font-medium text-gray-500">通知有効ユーザー</p>
+            <p class="mt-1 text-2xl font-semibold text-gray-900">{subscriptionStats.subscribed_user_count ?? 0}</p>
+          </div>
+          <div class="rounded-md bg-white p-3">
+            <p class="text-xs font-medium text-gray-500">登録デバイス</p>
+            <p class="mt-1 text-2xl font-semibold text-gray-900">{subscriptionStats.subscription_endpoint_count ?? 0}</p>
+          </div>
+        </div>
+      {:else}
+        <p class="mt-4 text-sm text-indigo-800">
+          宛先ロールを選択すると、Push通知を受け取れる人数を確認できます。
+        </p>
+      {/if}
+    </div>
 
     <div class="space-y-4">
       <div>

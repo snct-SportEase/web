@@ -127,7 +127,7 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 	go h.dispatchPushNotifications(int(notificationID), req.Title, req.Body, req.Type, targetRoles)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":        "通知を送信しました",
+		"message":        "通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます",
 		"notificationId": notificationID,
 	})
 }
@@ -180,6 +180,31 @@ func (h *NotificationHandler) ListAvailableRoles(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"roles": roles})
+}
+
+func (h *NotificationHandler) GetPushSubscriptionStats(c *gin.Context) {
+	availableRoles, err := h.RoleRepo.GetAllRoles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ロール情報の取得に失敗しました"})
+		return
+	}
+
+	targetRoles, err := normalizeTargetRoles(c.QueryArray("roles"), availableRoles)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	stats, err := h.NotificationRepo.GetPushSubscriptionStatsByRoles(targetRoles)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読状況の取得に失敗しました"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"target_roles": targetRoles,
+		"stats":        stats,
+	})
 }
 
 type updateNotificationFiltersRequest struct {

@@ -323,7 +323,7 @@ describe('Event Management Page', () => {
 
     expect(notifyCall).toBeTruthy();
     expect(confirm).toHaveBeenCalledWith('アンケート通知を全ユーザーに送信します。よろしいですか？');
-    expect(alert).toHaveBeenCalledWith('アンケート通知を送信しました。');
+    expect(alert).toHaveBeenCalledWith('アンケート通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。');
   });
 
   it('秋季大会の得点CSVをインポートできること', async () => {

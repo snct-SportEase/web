@@ -21,7 +21,12 @@ vi.mock('$app/stores', () => ({
             { id: 1, name: 'student' },
             { id: 2, name: 'admin' },
             { id: 3, name: 'root' }
-          ]
+          ],
+          subscriptionStats: {
+            target_user_count: 12,
+            subscribed_user_count: 8,
+            subscription_endpoint_count: 10
+          }
         }
       });
 
@@ -63,6 +68,19 @@ describe('Notification Management Page', () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ notifications })
+        });
+      }
+
+      if (typeof url === 'string' && url.startsWith('/api/root/notifications/subscription-stats?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            stats: {
+              target_user_count: 12,
+              subscribed_user_count: 8,
+              subscription_endpoint_count: 10
+            }
+          })
         });
       }
 
@@ -116,7 +134,7 @@ describe('Notification Management Page', () => {
       target_roles: ['student', 'admin']
     });
 
-    await expect.element(page.getByText('通知を送信しました。')).toBeInTheDocument();
+    await expect.element(page.getByText('通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。')).toBeInTheDocument();
     await expect.element(page.getByText('競技開始時間変更')).toBeInTheDocument();
   });
 });
