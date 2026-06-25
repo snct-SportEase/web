@@ -2,10 +2,11 @@
   import { browser } from '$app/environment';
   import { ensurePushSubscription, userHasPushEligibleRole } from '$lib/utils/push.js';
   import { isPWAInstalled, getDeviceType } from '$lib/utils/pwa.js';
+  import { updatePushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
   import { env as publicEnv } from '$env/dynamic/public';
   import { onMount } from 'svelte';
 
-  let { user } = $props();
+  let { user, prominent = false } = $props();
 
   let isSubscribed = $state(false);
   let isLoading = $state(false);
@@ -26,9 +27,20 @@
       isPWA = isPWAInstalled();
       checkNotificationSupport();
       checkPermissionStatus();
+      publishStatus();
       loadSubscriptionStatus();
     }
   });
+
+  function publishStatus() {
+    updatePushSubscriptionStatus({
+      isSubscribed,
+      isSupported,
+      canEnable: canEnableNotifications,
+      permission: permissionStatus,
+      vapidKeySet
+    });
+  }
 
   function checkNotificationSupport() {
     isSupported = 'Notification' in window && 
@@ -63,6 +75,8 @@
       }
     } catch (error) {
       console.error('[notification] Failed to load subscription status:', error);
+    } finally {
+      publishStatus();
     }
   }
 
@@ -124,6 +138,7 @@
     } finally {
       isLoading = false;
       checkPermissionStatus();
+      publishStatus();
     }
   }
 
@@ -167,6 +182,7 @@
       errorMessage = '通知の無効化中にエラーが発生しました。';
     } finally {
       isLoading = false;
+      publishStatus();
     }
   }
 
@@ -198,12 +214,16 @@
 
 </script>
 
-<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+<div class="{prominent && canEnableNotifications && isSupported && !isSubscribed ? 'rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm' : 'rounded-lg border border-gray-200 bg-white p-5 shadow-sm'}">
   <div class="flex items-center justify-between mb-4">
     <div>
-      <h3 class="text-lg font-semibold text-gray-800">プッシュ通知設定</h3>
-      <p class="mt-1 text-sm text-gray-600">
-        モバイルデバイスで通知を受け取ることができます
+      <h3 class="text-lg font-semibold {prominent && !isSubscribed ? 'text-amber-900' : 'text-gray-800'}">プッシュ通知設定</h3>
+      <p class="mt-1 text-sm {prominent && !isSubscribed ? 'text-amber-800' : 'text-gray-600'}">
+        {#if prominent && canEnableNotifications && isSupported && !isSubscribed}
+          重要なお知らせを見逃さないよう、この端末で通知を有効にしてください。
+        {:else}
+          モバイルデバイスで通知を受け取ることができます
+        {/if}
       </p>
     </div>
     {#if isSupported}

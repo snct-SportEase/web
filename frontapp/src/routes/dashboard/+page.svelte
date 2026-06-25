@@ -221,6 +221,10 @@
   {/if}
 
   <section class="space-y-6">
+    <NotificationSettings user={user} prominent={true} />
+  </section>
+
+  <section class="space-y-6">
     <div class="flex items-center justify-between">
       <h2 class="text-2xl font-semibold text-gray-900">資料</h2>
     </div>
@@ -405,13 +409,6 @@
       {/if}
     </section>
   {/if}
-
-  <section class="space-y-6">
-    <div class="flex items-center justify-between">
-      <h2 class="text-2xl font-semibold text-gray-900">通知</h2>
-    </div>
-    <NotificationSettings user={user} />
-  </section>
 
   {#if data.isClassRep}
     <section class="space-y-6">

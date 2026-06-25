@@ -6,6 +6,7 @@
   import PWANotificationBanner from '$lib/components/PWANotificationBanner.svelte';
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
+  import { pushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
 
   let { children } = $props();
   let { data } = $page;
@@ -14,6 +15,14 @@
   let showEditDisplayNameModal = $state(false);
   let showPWANotification = $state(false);
   let isMobile = $state(false);
+  let canSeeNotifications = $derived(user?.roles?.some(role => ['student', 'admin', 'root'].includes(role.name)));
+  let shouldShowPushSetupBadge = $derived(
+    canSeeNotifications &&
+    $pushSubscriptionStatus.loaded &&
+    $pushSubscriptionStatus.isSupported &&
+    $pushSubscriptionStatus.vapidKeySet &&
+    !$pushSubscriptionStatus.isSubscribed
+  );
   
   onMount(() => {
     if (browser) {
@@ -112,6 +121,14 @@
           <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800">Dashboard</h1></a>
         </div>
         <div class="flex items-center pointer-events-auto">
+          {#if shouldShowPushSetupBadge}
+            <a
+              href="/dashboard"
+              class="mr-3 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-200"
+            >
+              {$pushSubscriptionStatus.permission === 'denied' ? '通知拒否中' : '通知未設定'}
+            </a>
+          {/if}
           <button 
             type="button"
             onclick={handleDisplayNameClick}
