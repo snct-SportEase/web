@@ -197,6 +197,21 @@ func (h *ClassHandler) GetClassScores(c *gin.Context) {
 		eventID = activeEventID
 	}
 
+	event, err := h.eventRepo.GetEventByID(eventID)
+	if err != nil {
+		log.Printf("GetEventByID error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event"})
+		return
+	}
+	if event == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+	if event.HideScores && !canViewHiddenClassScores(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "得点一覧は現在非表示です。"})
+		return
+	}
+
 	scores, err := h.classRepo.GetClassScoresByEvent(eventID)
 	if err != nil {
 		log.Printf("GetClassScoresByEvent error: %v", err)
@@ -205,6 +220,25 @@ func (h *ClassHandler) GetClassScores(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, scores)
+}
+
+func canViewHiddenClassScores(c *gin.Context) bool {
+	userValue, exists := c.Get("user")
+	if !exists {
+		return false
+	}
+
+	user, ok := userValue.(*models.User)
+	if !ok || user == nil {
+		return false
+	}
+
+	for _, role := range user.Roles {
+		if role.Name == "admin" || role.Name == "root" {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *ClassHandler) GetClassProgress(c *gin.Context) {

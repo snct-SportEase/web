@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const appPort = Number(process.env.PLAYWRIGHT_APP_PORT ?? 5000);
 const backendPort = Number(process.env.MOCK_BACKEND_PORT ?? 8081);
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: './e2e',
@@ -13,6 +14,7 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${appPort}`,
     trace: 'on-first-retry',
+    launchOptions: chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined
   },
   projects: [
     {
