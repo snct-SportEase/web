@@ -24,6 +24,7 @@ const studentUser = {
     { id: 4, name: 'judge' }
   ]
 };
+const studentTeamId = 101;
 
 const adminUser = {
   id: 'user-2',
@@ -141,8 +142,8 @@ const sampleTournamentData = () => ({
       roundIndex: 0,
       order: 0,
       sides: [
-        { contestantId: 'c0', scores: [{ mainScore: 3 }], isWinner: true },
-        { contestantId: 'c1', scores: [{ mainScore: 1 }] }
+        { contestantId: 'c0', teamId: studentTeamId, scores: [{ mainScore: 3 }], isWinner: true },
+        { contestantId: 'c1', teamId: 102, scores: [{ mainScore: 1 }] }
       ]
     }
   ],
@@ -516,7 +517,7 @@ createServer(async (req, res) => {
   if (url.pathname === '/api/barcode/teams' && req.method === 'GET') {
     sendJson(res, 200, [
       {
-        id: 101,
+        id: studentTeamId,
         name: 'Team A',
         class_id: 1,
         event_id: 1,
@@ -553,6 +554,10 @@ createServer(async (req, res) => {
       sendJson(res, 400, { error: '選択した試合がこの競技に存在しません' });
       return;
     }
+    if (!match.sides?.some((side) => Number(side?.teamId) === studentTeamId)) {
+      sendJson(res, 403, { error: '読み取った学生のチームは選択した試合に出場していません' });
+      return;
+    }
 
     const sport = sports.find((item) => item.id === sportId);
     const round = Number(match.roundIndex ?? 0) + 1;
@@ -565,7 +570,7 @@ createServer(async (req, res) => {
       sport_name: sport?.name ?? 'バスケットボール',
       round,
       match_id: matchId,
-      team_id: 101,
+      team_id: studentTeamId,
       user_id: studentUser.id,
       display_name: studentUser.display_name,
       student_number: barcode.slice(3),

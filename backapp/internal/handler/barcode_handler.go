@@ -111,6 +111,10 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
 		return
 	}
+	if !isTeamInMatch(team.ID, match) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "読み取った学生のチームは選択した試合に出場していません"})
+		return
+	}
 	round := match.Round + 1
 
 	teamDetails, err := h.teamRepo.GetTeamByClassAndSport(team.ClassID, req.SportID, req.EventID)
@@ -235,4 +239,17 @@ func (h *BarcodeHandler) findPreEnteredTeam(userID string, eventID int, sportID 
 	}
 
 	return nil, nil
+}
+
+func isTeamInMatch(teamID int, match *models.MatchDB) bool {
+	if match == nil {
+		return false
+	}
+	if match.Team1ID.Valid && int(match.Team1ID.Int64) == teamID {
+		return true
+	}
+	if match.Team2ID.Valid && int(match.Team2ID.Int64) == teamID {
+		return true
+	}
+	return false
 }

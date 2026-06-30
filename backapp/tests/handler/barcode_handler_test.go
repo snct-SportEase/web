@@ -4,6 +4,7 @@ import (
 	"backapp/internal/handler"
 	"backapp/internal/models"
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -168,7 +169,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTournamentRepo.On("GetMatchForEventSport", 100, 1, 2).Return(&models.MatchDB{ID: 100, Round: 2}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 100, 1, 2).Return(&models.MatchDB{ID: 100, Round: 2, Team1ID: sql.NullInt64{Int64: 10, Valid: true}, Team2ID: sql.NullInt64{Int64: 20, Valid: true}}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 3).Return(nil).Once()
@@ -204,7 +205,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{otherUser, user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0, Team2ID: sql.NullInt64{Int64: 10, Valid: true}}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(nil).Once()
@@ -414,6 +415,65 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
 	})
 
+	t.Run("Failure - Student team is not in selected match", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{
+			ID:      101,
+			Round:   0,
+			Team1ID: sql.NullInt64{Int64: 20, Valid: true},
+			Team2ID: sql.NullInt64{Int64: 30, Valid: true},
+		}, nil).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     2,
+			MatchID:     101,
+		})
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Equal(t, "読み取った学生のチームは選択した試合に出場していません", response["error"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "GetTeamByClassAndSport")
+		mockTeamRepo.AssertNotCalled(t, "ConfirmTeamMember")
+		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
+	})
+
+	t.Run("Failure - Selected match has no assigned teams", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     2,
+			MatchID:     101,
+		})
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Equal(t, "読み取った学生のチームは選択した試合に出場していません", response["error"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "GetTeamByClassAndSport")
+		mockTeamRepo.AssertNotCalled(t, "ConfirmTeamMember")
+		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
+	})
+
 	t.Run("Failure - Confirm team member error", func(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
 
@@ -423,7 +483,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0, Team1ID: sql.NullInt64{Int64: 10, Valid: true}}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(assert.AnError).Once()
 
@@ -451,7 +511,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0, Team1ID: sql.NullInt64{Int64: 10, Valid: true}}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(assert.AnError).Once()
@@ -486,7 +546,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0, Team1ID: sql.NullInt64{Int64: 10, Valid: true}}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(nil).Once()
