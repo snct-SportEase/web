@@ -70,7 +70,7 @@
 % =====================================================================
 
 本書は、SportEase（スポーティーズ）の\textbf{student権限を持つ学生}向けの操作説明書である。
-学生アカウントでは、大会のスコア閲覧・試合日程の確認・QRコードの発行・通知の受信など、
+学生アカウントでは、大会のスコア閲覧・試合日程の確認・参加情報の確認・通知の受信など、
 大会参加に必要な基本的な操作を行うことができる。
 
 \subsection*{権限の種類}
@@ -113,13 +113,13 @@
 \node[main, below of=s2] (s3) {③ トーナメント・昼競技・スコア閲覧　→ 第\ref{sec:tournament}章};
 \node[main, below of=s3] (s4) {④ 通知受信・管理　→ 第\ref{sec:notification}章};
 
-\node[opt, right=1.5cm of s2] (qr) {QRコード発行（任意）→ 第\ref{sec:qr}章};
+\node[opt, right=1.5cm of s2] (myid) {MyID提示（必要時）→ 第\ref{sec:myid}章};
 \node[opt, right=1.5cm of s4] (req) {通知申請（任意）→ 第\ref{sec:notificationreq}章};
 
 \draw[arr] (s1) -- (s2);
 \draw[arr] (s2) -- (s3);
 \draw[arr] (s3) -- (s4);
-\draw[optarr] (s2.east) -- (qr.west);
+\draw[optarr] (s2.east) -- (myid.west);
 \draw[optarr] (s4.east) -- (req.west);
 
 \end{tikzpicture}
@@ -321,28 +321,27 @@
 \newpage
 
 % =====================================================================
-\section{QRコードの発行}\label{sec:qr}
+\section{MyIDによる参加確認}\label{sec:myid}
 % =====================================================================
 
-\textbf{ページ}: \code{/dashboard/student/issueqr-code}
+MyIDによる参加確認では、学生側でQRコードを発行する操作は不要である。
+大会当日に運営スタッフから案内があった場合は、学生証等のMyIDバーコードを提示する。
 
-競技への参加確認に使用するQRコードを発行するページである。
-試合当日にadminのスキャナーにかざして参加を登録する。
+運営スタッフはMyIDバーコードを読み取り、対象競技への参加本登録とラウンドチェックインを行う。
+MyIDバーコードは \code{H10} に7桁の学籍番号が続く形式（例: \code{H102301059}）として扱われる。
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.8\textwidth]{./images/student-qr.png}
-  \caption{QRコード発行画面}
-\end{figure}
+\subsection{当日の流れ}
 
-\subsection{チームと大会の選択}
+\begin{enumerate}
+  \item 事前に自分が参加する競技へエントリーされていることを確認する。
+  \item 受付または競技開始前の案内に従い、運営スタッフへMyIDバーコードを提示する。
+  \item 読み取りが完了すると、参加本登録および対象ラウンドへのチェックインが行われる。
+\end{enumerate}
 
-自分が登録されているチームと対象の大会を選択してQRコードを生成する。
+\subsection{注意事項}
 
-\subsection{QRコードの有効期限}
-
-発行されたQRコードには有効期限があり、画面上にカウントダウンが表示される。
-有効期限が切れた場合は再発行が必要である。
+MyIDバーコードが読み取れない場合は、運営スタッフに学籍番号を伝えて手入力で確認してもらう。
+ただし、対象競技に事前エントリーされていない場合は参加本登録できない。
 
 
 \newpage
@@ -522,7 +521,7 @@ rootがアップロードした競技要項PDFをここから参照できる。
 \midrule
 スコア一覧の閲覧 & 全クラスの得点・ランキング・カテゴリ別内訳を確認 \\
 \midrule
-QRコードの発行 & 競技参加確認用のQRコードを生成 \\
+MyIDによる参加確認 & 大会当日にMyIDバーコードを提示し、運営スタッフによる参加本登録を受ける \\
 \midrule
 通知の受信・フィルタリング & 運営からの通知を受信し、種別ごとに表示を管理 \\
 \midrule
