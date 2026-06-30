@@ -259,9 +259,6 @@
         <a href="/dashboard/student/tournament" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           トーナメント
         </a>
-        <a href="/dashboard/student/issueqr-code" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
-          参加競技確認
-        </a>
         <a href="/dashboard/student/score-list" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           点数一覧
         </a>

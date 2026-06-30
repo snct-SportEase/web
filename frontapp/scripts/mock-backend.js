@@ -585,7 +585,14 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/events/1/sports' && req.method === 'GET') {
-    sendJson(res, 200, eventSports);
+    sendJson(res, 200, eventSports.map((eventSport) => {
+      const sport = sports.find((item) => item.id === eventSport.sport_id);
+      return {
+        ...eventSport,
+        id: eventSport.sport_id,
+        name: sport?.name ?? `競技${eventSport.sport_id}`
+      };
+    }));
     return;
   }
 
@@ -1083,6 +1090,6 @@ createServer(async (req, res) => {
   sendJson(res, 404, {
     error: `Mock backend route not found: ${req.method} ${url.pathname}`
   });
-}).listen(port, () => {
-  console.log(`Mock backend listening on port ${port}`);
+}).listen(port, '127.0.0.1', () => {
+  console.log(`Mock backend listening on http://127.0.0.1:${port}`);
 });
