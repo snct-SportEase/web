@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,7 @@ type QRCodeHandler struct {
 }
 
 const qrCodeTTL = 10 * time.Second
+const myIDBarcodePrefix = "H10"
 
 // NewQRCodeHandler creates a new instance of QRCodeHandler
 func NewQRCodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *QRCodeHandler {
@@ -162,6 +164,11 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 	var req models.QRCodeVerifyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if strings.TrimSpace(req.BarcodeData) != "" {
+		h.verifyBarcode(c, req)
 		return
 	}
 
@@ -314,4 +321,157 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func (h *QRCodeHandler) verifyBarcode(c *gin.Context, req models.QRCodeVerifyRequest) {
+	if req.EventID == 0 || req.SportID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "イベントIDと競技IDが必要です"})
+		return
+	}
+
+	studentNumber, err := parseMyIDBarcode(req.BarcodeData)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "バーコード形式が不正です"})
+		return
+	}
+
+	user, err := h.findUserByStudentNumber(studentNumber)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find user by student number"})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "該当する学生が見つかりません"})
+		return
+	}
+
+	displayName := ""
+	if user.DisplayName != nil {
+		displayName = *user.DisplayName
+	}
+
+	response, err := h.confirmParticipation(user.ID, req.EventID, req.SportID, "", displayName)
+	if err != nil {
+		status := http.StatusInternalServerError
+		message := err.Error()
+		if message == "not assigned" {
+			status = http.StatusForbidden
+			message = "このユーザーはこの競技に参加登録されていません"
+		}
+		c.JSON(status, gin.H{"error": message})
+		return
+	}
+
+	response["student_number"] = studentNumber
+	response["barcode_data"] = strings.TrimSpace(req.BarcodeData)
+	c.JSON(http.StatusOK, response)
+}
+
+func parseMyIDBarcode(barcodeData string) (string, error) {
+	barcode := strings.TrimSpace(barcodeData)
+	if !strings.HasPrefix(barcode, myIDBarcodePrefix) {
+		return "", fmt.Errorf("invalid MyID barcode prefix")
+	}
+
+	studentNumber := strings.TrimPrefix(barcode, myIDBarcodePrefix)
+	if studentNumber == "" {
+		return "", fmt.Errorf("student number is empty")
+	}
+
+	for _, char := range studentNumber {
+		if char < '0' || char > '9' {
+			return "", fmt.Errorf("student number must be numeric")
+		}
+	}
+
+	return studentNumber, nil
+}
+
+func (h *QRCodeHandler) findUserByStudentNumber(studentNumber string) (*models.User, error) {
+	users, err := h.userRepo.FindUsers(studentNumber, "email")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, user := range users {
+		emailLocalPart := strings.SplitN(user.Email, "@", 2)[0]
+		if strings.EqualFold(emailLocalPart, studentNumber) {
+			return user, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (h *QRCodeHandler) confirmParticipation(userID string, eventID int, sportID int, sportName string, displayName string) (gin.H, error) {
+	teams, err := h.teamRepo.GetTeamsByUserID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to verify user assignment")
+	}
+
+	var targetTeam *models.TeamWithSport
+	for _, team := range teams {
+		if team.EventID == eventID && team.SportID == sportID {
+			targetTeam = team
+			break
+		}
+	}
+
+	if targetTeam == nil {
+		return nil, fmt.Errorf("not assigned")
+	}
+
+	if sportName == "" {
+		sportName = targetTeam.SportName
+	}
+
+	team, err := h.teamRepo.GetTeamByClassAndSport(targetTeam.ClassID, sportID, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get team details")
+	}
+
+	if team == nil {
+		return nil, fmt.Errorf("Team not found")
+	}
+
+	if err := h.teamRepo.ConfirmTeamMember(team.ID, userID); err != nil {
+		return nil, fmt.Errorf("Failed to confirm team member")
+	}
+
+	var capacityWarning *string
+	if team.MinCapacity != nil {
+		confirmedCount, err := h.teamRepo.GetConfirmedTeamMembersCount(team.ID)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to check team capacity")
+		}
+
+		if confirmedCount < *team.MinCapacity {
+			class, err := h.classRepo.GetClassByID(targetTeam.ClassID)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to get class information")
+			}
+			className := "不明"
+			if class != nil {
+				className = class.Name
+			}
+			warningMsg := fmt.Sprintf("%sクラスの%sの参加本登録済みメンバー数（%d人）が最低人数（%d人）に達していません",
+				className, sportName, confirmedCount, *team.MinCapacity)
+			capacityWarning = &warningMsg
+		}
+	}
+
+	response := gin.H{
+		"valid":        true,
+		"event_id":     eventID,
+		"sport_id":     sportID,
+		"sport_name":   sportName,
+		"user_id":      userID,
+		"display_name": displayName,
+	}
+
+	if capacityWarning != nil {
+		response["capacity_warning"] = *capacityWarning
+	}
+
+	return response, nil
 }

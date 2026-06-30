@@ -600,6 +600,180 @@ func TestQRCodeHandler_VerifyQRCodeHandler(t *testing.T) {
 		mockTokenStore.AssertExpectations(t)
 	})
 
+	t.Run("Success - Verify MyID barcode and confirm participation", func(t *testing.T) {
+		mockTeamRepo := new(MockTeamRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockTokenStore := new(MockQRCodeTokenStore)
+
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, mockClassRepo).WithTokenStore(mockTokenStore)
+
+		userID := "test-user-id"
+		displayName := "Test User"
+		classID := 1
+		teamID := 1
+		studentNumber := "2301059"
+
+		reqBody := models.QRCodeVerifyRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     1,
+		}
+
+		user := &models.User{
+			ID:          userID,
+			Email:       "2301059@sendai-nct.jp",
+			DisplayName: &displayName,
+		}
+
+		teams := []*models.TeamWithSport{
+			{
+				ID:        teamID,
+				Name:      "Team A",
+				ClassID:   classID,
+				SportID:   1,
+				EventID:   1,
+				SportName: "Basketball",
+			},
+		}
+
+		team := &models.Team{
+			ID:          teamID,
+			Name:        "Team A",
+			ClassID:     classID,
+			SportID:     1,
+			EventID:     1,
+			MinCapacity: nil,
+			MaxCapacity: nil,
+		}
+
+		mockUserRepo.On("FindUsers", studentNumber, "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", userID).Return(teams, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", classID, 1, 1).Return(team, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", teamID, userID).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/qrcode/verify", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.VerifyQRCodeHandler(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, true, response["valid"])
+		assert.Equal(t, float64(1), response["event_id"])
+		assert.Equal(t, float64(1), response["sport_id"])
+		assert.Equal(t, "Basketball", response["sport_name"])
+		assert.Equal(t, userID, response["user_id"])
+		assert.Equal(t, displayName, response["display_name"])
+		assert.Equal(t, studentNumber, response["student_number"])
+
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTokenStore.AssertNotCalled(t, "GetActiveToken")
+	})
+
+	t.Run("Failure - Invalid MyID barcode format", func(t *testing.T) {
+		mockTeamRepo := new(MockTeamRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTokenStore := new(MockQRCodeTokenStore)
+
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository)).WithTokenStore(mockTokenStore)
+
+		reqBody := models.QRCodeVerifyRequest{
+			BarcodeData: "2301059",
+			EventID:     1,
+			SportID:     1,
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/qrcode/verify", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.VerifyQRCodeHandler(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "バーコード形式が不正です", response["error"])
+
+		mockUserRepo.AssertNotCalled(t, "FindUsers")
+		mockTeamRepo.AssertNotCalled(t, "GetTeamsByUserID")
+		mockTokenStore.AssertNotCalled(t, "GetActiveToken")
+	})
+
+	t.Run("Failure - MyID barcode user not assigned to sport", func(t *testing.T) {
+		mockTeamRepo := new(MockTeamRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockTokenStore := new(MockQRCodeTokenStore)
+
+		h := handler.NewQRCodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository)).WithTokenStore(mockTokenStore)
+
+		userID := "test-user-id"
+		studentNumber := "2301059"
+		user := &models.User{
+			ID:    userID,
+			Email: "2301059@sendai-nct.jp",
+		}
+
+		reqBody := models.QRCodeVerifyRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     99,
+		}
+
+		teams := []*models.TeamWithSport{
+			{
+				ID:        1,
+				Name:      "Team A",
+				ClassID:   1,
+				SportID:   1,
+				EventID:   1,
+				SportName: "Basketball",
+			},
+		}
+
+		mockUserRepo.On("FindUsers", studentNumber, "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", userID).Return(teams, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		jsonBody, _ := json.Marshal(reqBody)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/qrcode/verify", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.VerifyQRCodeHandler(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "このユーザーはこの競技に参加登録されていません", response["error"])
+
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTokenStore.AssertNotCalled(t, "GetActiveToken")
+	})
+
 	t.Run("Success - Verify QR code with capacity warning", func(t *testing.T) {
 		mockTeamRepo := new(MockTeamRepository)
 		mockSportRepo := new(MockSportRepository)

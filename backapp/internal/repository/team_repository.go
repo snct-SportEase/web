@@ -311,7 +311,14 @@ func (r *teamRepository) ConfirmTeamMember(teamID int, userID string) error {
 		return err
 	}
 	if rowsAffected == 0 {
-		return sql.ErrNoRows // Team member not found
+		var exists int
+		err := r.db.QueryRow("SELECT COUNT(*) FROM team_members WHERE team_id = ? AND user_id = ?", teamID, userID).Scan(&exists)
+		if err != nil {
+			return err
+		}
+		if exists == 0 {
+			return sql.ErrNoRows // Team member not found
+		}
 	}
 	return nil
 }

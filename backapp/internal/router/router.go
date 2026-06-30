@@ -119,13 +119,13 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			events.GET("/:id/sports", sportHandler.GetSportsByEventHandler)
 		}
 
-		// QR Code routes accessible to authenticated users
+		// Participation confirmation routes accessible to authenticated users
 		qrcode := api.Group("/qrcode")
 		{
 			qrcode.Use(middleware.AuthMiddleware(userRepo))
 			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
 			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
-			qrcode.POST("/verify", middleware.RateLimit(20, time.Minute), qrCodeHandler.VerifyQRCodeHandler)
+			qrcode.POST("/verify", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), qrCodeHandler.VerifyQRCodeHandler)
 		}
 
 		student := api.Group("/student")

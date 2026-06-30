@@ -46,5 +46,8 @@ type QRCodeData struct {
 
 // QRCodeVerifyRequest represents a request to verify a QR code
 type QRCodeVerifyRequest struct {
-	QRCodeData string `json:"qr_code_data"`
+	QRCodeData  string `json:"qr_code_data"`
+	BarcodeData string `json:"barcode_data"`
+	EventID     int    `json:"event_id"`
+	SportID     int    `json:"sport_id"`
 }

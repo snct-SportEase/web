@@ -546,6 +546,7 @@ func TestTeamRepository_GetTeamCapacity(t *testing.T) {
 
 func TestTeamRepository_ConfirmTeamMember(t *testing.T) {
 	const q = "UPDATE team_members SET is_confirmed = true WHERE team_id = ? AND user_id = ?"
+	const existsQ = "SELECT COUNT(*) FROM team_members WHERE team_id = ? AND user_id = ?"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
@@ -558,12 +559,27 @@ func TestTeamRepository_ConfirmTeamMember(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("already confirmed - 0 rows affected but member exists returns nil", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "user-1").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(existsQ)).WithArgs(10, "user-1").
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+		assert.NoError(t, repo.ConfirmTeamMember(10, "user-1"))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("member not found - 0 rows affected returns ErrNoRows", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
 
 		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "ghost-user").
 			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(existsQ)).WithArgs(10, "ghost-user").
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
 		err := repo.ConfirmTeamMember(10, "ghost-user")
 		assert.ErrorIs(t, err, sql.ErrNoRows)

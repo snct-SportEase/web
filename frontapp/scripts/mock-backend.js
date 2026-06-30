@@ -581,6 +581,27 @@ createServer(async (req, res) => {
   if (url.pathname === '/api/qrcode/verify' && req.method === 'POST') {
     const body = await readJson(req);
 
+    if (body.barcode_data) {
+      const barcode = String(body.barcode_data).trim();
+      if (!/^H10\d+$/.test(barcode)) {
+        sendJson(res, 400, { error: 'バーコード形式が不正です' });
+        return;
+      }
+
+      const sport = sports.find((item) => item.id === Number(body.sport_id));
+      sendJson(res, 200, {
+        valid: true,
+        event_id: Number(body.event_id),
+        sport_id: Number(body.sport_id),
+        sport_name: sport?.name ?? 'バスケットボール',
+        user_id: studentUser.id,
+        display_name: studentUser.display_name,
+        student_number: barcode.slice(3),
+        barcode_data: barcode
+      });
+      return;
+    }
+
     try {
       const combined = JSON.parse(decodeBase64Url(body.qr_code_data ?? ''));
       const token = combined?.token;
