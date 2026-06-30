@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -157,10 +158,10 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	middleware.CreateSession(sessionToken, user.ID)
 
 	// Set session cookie
-	setSessionTokenCookie(c.Writer, sessionToken, time.Now().Add(24*time.Hour))
+	setSessionTokenCookie(c.Writer, c.Request, sessionToken, time.Now().Add(24*time.Hour))
 
 	// Add a debug log to verify cookie flags
-	log.Printf("[auth] Session created for user %s, secure=true, origin=%s", user.Email, c.Request.RemoteAddr)
+	log.Printf("[auth] Session created for user %s, secure=%v, origin=%s", user.Email, shouldUseSecureCookie(c.Request), c.Request.RemoteAddr)
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }
@@ -270,7 +271,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	middleware.DeleteSession(cookie)
 
-	setSessionTokenCookie(c.Writer, "", time.Now().Add(-1*time.Hour))
+	setSessionTokenCookie(c.Writer, c.Request, "", time.Now().Add(-1*time.Hour))
 
 	c.JSON(http.StatusOK, gin.H{"message": "logout successful"})
 }
@@ -562,7 +563,7 @@ func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 		Expires:  expiration,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, &cookie)
@@ -570,16 +571,35 @@ func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 	return state
 }
 
-func setSessionTokenCookie(w http.ResponseWriter, value string, expiration time.Time) {
+func setSessionTokenCookie(w http.ResponseWriter, r *http.Request, value string, expiration time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    value,
 		Expires:  expiration,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func shouldUseSecureCookie(r *http.Request) bool {
+	host := r.Host
+	if forwardedHost := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0]); forwardedHost != "" {
+		host = forwardedHost
+	}
+
+	host = strings.ToLower(strings.TrimSpace(host))
+	if hostname, _, err := net.SplitHostPort(host); err == nil {
+		host = hostname
+	}
+	host = strings.Trim(host, "[]")
+
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return false
+	}
+
+	return middleware.IsRequestSecure(r)
 }
 
 func isLINEInAppBrowser(userAgent string) bool {

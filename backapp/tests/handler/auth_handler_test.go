@@ -36,7 +36,7 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 		assert.Equal(t, "http://localhost:5173/?error=line_inapp_browser_unsupported", w.Header().Get("Location"))
 	})
 
-	t.Run("sets oauth state cookie with secure attribute", func(t *testing.T) {
+	t.Run("sets oauth state cookie without secure attribute for local http", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 		mockClassRepo := new(MockClassRepository)
@@ -45,6 +45,36 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/api/auth/google/login", nil)
+
+		authHandler.GoogleLogin(c)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+
+		var oauthStateCookie *http.Cookie
+		for _, cookie := range w.Result().Cookies() {
+			if cookie.Name == "oauthstate" {
+				oauthStateCookie = cookie
+				break
+			}
+		}
+
+		if assert.NotNil(t, oauthStateCookie) {
+			assert.False(t, oauthStateCookie.Secure)
+			assert.True(t, oauthStateCookie.HttpOnly)
+			assert.Equal(t, http.SameSiteLaxMode, oauthStateCookie.SameSite)
+		}
+	})
+
+	t.Run("sets oauth state cookie with secure attribute for forwarded https", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/auth/google/login", nil)
+		c.Request.Header.Set("X-Forwarded-Proto", "https")
 
 		authHandler.GoogleLogin(c)
 
