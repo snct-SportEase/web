@@ -325,7 +325,7 @@ export const load = async ({ fetch, locals, request }) => {
 		let assignedSports = [];
 		if (activeEventId) {
 			const [teamsResponse, tournamentsResponse, noonResponse] = await Promise.all([
-				fetch(`${BACKEND_URL}/api/qrcode/teams`, { headers }),
+				fetch(`${BACKEND_URL}/api/barcode/teams`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers })
 			]);

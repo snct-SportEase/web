@@ -54,7 +54,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
-	qrCodeHandler := handler.NewQRCodeHandler(teamRepo, sportRepo, userRepo, eventRepo, classRepo)
+	barcodeHandler := handler.NewBarcodeHandler(teamRepo, sportRepo, userRepo, eventRepo, classRepo)
 
 	classTeamHandler := handler.NewClassTeamHandler(classRepo, teamRepo, userRepo, eventRepo, sportRepo)
 
@@ -120,12 +120,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		}
 
 		// Participation confirmation routes accessible to authenticated users
-		qrcode := api.Group("/qrcode")
+		barcode := api.Group("/barcode")
 		{
-			qrcode.Use(middleware.AuthMiddleware(userRepo))
-			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
-			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
-			qrcode.POST("/verify", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), qrCodeHandler.VerifyQRCodeHandler)
+			barcode.Use(middleware.AuthMiddleware(userRepo))
+			barcode.GET("/teams", barcodeHandler.GetUserTeamsHandler)
+			barcode.POST("/generate", barcodeHandler.GenerateBarcodeHandler)
+			barcode.POST("/verify", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), barcodeHandler.VerifyBarcodeHandler)
 		}
 
 		student := api.Group("/student")

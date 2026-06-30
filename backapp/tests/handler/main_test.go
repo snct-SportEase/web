@@ -301,26 +301,26 @@ type MockTournamentRepository struct {
 	mock.Mock
 }
 
-type MockQRCodeTokenStore struct {
+type MockBarcodeTokenStore struct {
 	mock.Mock
 }
 
-func (m *MockQRCodeTokenStore) SaveActiveToken(userID string, eventID, sportID int, token string, ttl time.Duration) error {
+func (m *MockBarcodeTokenStore) SaveActiveToken(userID string, eventID, sportID int, token string, ttl time.Duration) error {
 	args := m.Called(userID, eventID, sportID, token, ttl)
 	return args.Error(0)
 }
 
-func (m *MockQRCodeTokenStore) GetActiveToken(userID string, eventID, sportID int) (string, error) {
+func (m *MockBarcodeTokenStore) GetActiveToken(userID string, eventID, sportID int) (string, error) {
 	args := m.Called(userID, eventID, sportID)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockQRCodeTokenStore) ConsumeActiveToken(userID string, eventID, sportID int, token string) (bool, error) {
+func (m *MockBarcodeTokenStore) ConsumeActiveToken(userID string, eventID, sportID int, token string) (bool, error) {
 	args := m.Called(userID, eventID, sportID, token)
 	return args.Bool(0), args.Error(1)
 }
 
-var _ handler.QRCodeTokenStore = (*MockQRCodeTokenStore)(nil)
+var _ handler.BarcodeTokenStore = (*MockBarcodeTokenStore)(nil)
 
 func (m *MockTournamentRepository) SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {
 	args := m.Called(eventID, sportID, sportName, tournamentData, teams)

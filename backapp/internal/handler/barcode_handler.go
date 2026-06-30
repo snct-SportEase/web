@@ -14,38 +14,38 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// QRCodeHandler handles QR code related API requests
-type QRCodeHandler struct {
+// BarcodeHandler handles barcode related API requests
+type BarcodeHandler struct {
 	teamRepo   repository.TeamRepository
 	sportRepo  repository.SportRepository
 	userRepo   repository.UserRepository
 	eventRepo  repository.EventRepository
 	classRepo  repository.ClassRepository
-	tokenStore QRCodeTokenStore
+	tokenStore BarcodeTokenStore
 }
 
-const qrCodeTTL = 10 * time.Second
+const barcodeTTL = 10 * time.Second
 const myIDBarcodePrefix = "H10"
 
-// NewQRCodeHandler creates a new instance of QRCodeHandler
-func NewQRCodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *QRCodeHandler {
-	return &QRCodeHandler{
+// NewBarcodeHandler creates a new instance of BarcodeHandler
+func NewBarcodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *BarcodeHandler {
+	return &BarcodeHandler{
 		teamRepo:   teamRepo,
 		sportRepo:  sportRepo,
 		userRepo:   userRepo,
 		eventRepo:  eventRepo,
 		classRepo:  classRepo,
-		tokenStore: NewRedisQRCodeTokenStore(),
+		tokenStore: NewRedisBarcodeTokenStore(),
 	}
 }
 
-func (h *QRCodeHandler) WithTokenStore(tokenStore QRCodeTokenStore) *QRCodeHandler {
+func (h *BarcodeHandler) WithTokenStore(tokenStore BarcodeTokenStore) *BarcodeHandler {
 	h.tokenStore = tokenStore
 	return h
 }
 
 // GetUserTeamsHandler returns all teams that the current user is a member of
-func (h *QRCodeHandler) GetUserTeamsHandler(c *gin.Context) {
+func (h *BarcodeHandler) GetUserTeamsHandler(c *gin.Context) {
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
@@ -63,8 +63,8 @@ func (h *QRCodeHandler) GetUserTeamsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, teams)
 }
 
-// GenerateQRCodeHandler generates a QR code for a specific event and sport
-func (h *QRCodeHandler) GenerateQRCodeHandler(c *gin.Context) {
+// GenerateBarcodeHandler generates a barcode for a specific event and sport
+func (h *BarcodeHandler) GenerateBarcodeHandler(c *gin.Context) {
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
@@ -73,7 +73,7 @@ func (h *QRCodeHandler) GenerateQRCodeHandler(c *gin.Context) {
 
 	user := userCtx.(*models.User)
 
-	var req models.QRCodeRequest
+	var req models.BarcodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
@@ -110,10 +110,10 @@ func (h *QRCodeHandler) GenerateQRCodeHandler(c *gin.Context) {
 
 	// Generate timestamp and expiration (10 seconds from now)
 	timestamp := time.Now().Unix()
-	expiresAt := timestamp + int64(qrCodeTTL/time.Second)
+	expiresAt := timestamp + int64(barcodeTTL/time.Second)
 
-	// Create QR code data
-	qrData := models.QRCodeData{
+	// Create barcode data
+	barcodeTokenData := models.BarcodeData{
 		EventID:     req.EventID,
 		SportID:     req.SportID,
 		SportName:   sportName,
@@ -131,103 +131,104 @@ func (h *QRCodeHandler) GenerateQRCodeHandler(c *gin.Context) {
 	}
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
 
-	if err := h.tokenStore.SaveActiveToken(user.ID, req.EventID, req.SportID, token, qrCodeTTL); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store QR code token"})
+	if err := h.tokenStore.SaveActiveToken(user.ID, req.EventID, req.SportID, token, barcodeTTL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store barcode token"})
 		return
 	}
 
 	// Combine token and data
 	combinedData := map[string]interface{}{
 		"token": token,
-		"data":  qrData,
+		"data":  barcodeTokenData,
 	}
 
 	combinedJSON, err := json.Marshal(combinedData)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode QR code"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode barcode"})
 		return
 	}
 
 	// Base64 encode the combined data
-	qrCodeData := base64.URLEncoding.EncodeToString(combinedJSON)
+	barcodeData := base64.URLEncoding.EncodeToString(combinedJSON)
 
-	response := models.QRCodeResponse{
-		QRCodeData: qrCodeData,
-		ExpiresAt:  expiresAt,
+	response := models.BarcodeResponse{
+		BarcodeData: barcodeData,
+		ExpiresAt:   expiresAt,
 	}
 
 	c.JSON(http.StatusOK, response)
 }
 
-// VerifyQRCodeHandler verifies a QR code and checks if it's valid (within 5 minutes)
-func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
-	var req models.QRCodeVerifyRequest
+// VerifyBarcodeHandler verifies a barcode and checks if it's valid (within 5 minutes)
+func (h *BarcodeHandler) VerifyBarcodeHandler(c *gin.Context) {
+	var req models.BarcodeVerifyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	if strings.TrimSpace(req.BarcodeData) != "" {
-		h.verifyBarcode(c, req)
+	barcodeData := strings.TrimSpace(req.BarcodeData)
+	if isMyIDBarcodeRequest(req, barcodeData) {
+		h.verifyMyIDBarcode(c, req)
 		return
 	}
 
 	// Decode base64
-	decoded, err := base64.URLEncoding.DecodeString(req.QRCodeData)
+	decoded, err := base64.URLEncoding.DecodeString(barcodeData)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid QR code format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid barcode format"})
 		return
 	}
 
 	// Parse JSON
 	var combinedData map[string]interface{}
 	if err := json.Unmarshal(decoded, &combinedData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid QR code data"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid barcode data"})
 		return
 	}
 
 	// Extract data
 	dataBytes, err := json.Marshal(combinedData["data"])
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid QR code data structure"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid barcode data structure"})
 		return
 	}
 
-	var qrData models.QRCodeData
-	if err := json.Unmarshal(dataBytes, &qrData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse QR code data"})
+	var barcodeTokenData models.BarcodeData
+	if err := json.Unmarshal(dataBytes, &barcodeTokenData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse barcode data"})
 		return
 	}
 
 	token, ok := combinedData["token"].(string)
 	if !ok || token == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid QR code token"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid barcode token"})
 		return
 	}
 
-	activeToken, err := h.tokenStore.GetActiveToken(qrData.UserID, qrData.EventID, qrData.SportID)
+	activeToken, err := h.tokenStore.GetActiveToken(barcodeTokenData.UserID, barcodeTokenData.EventID, barcodeTokenData.SportID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate QR code token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate barcode token"})
 		return
 	}
 	if activeToken == "" || activeToken != token {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "QRコードは無効または期限切れです"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "バーコードは無効または期限切れです"})
 		return
 	}
 
 	// Check expiration (10 seconds)
 	currentTime := time.Now().Unix()
-	if currentTime > qrData.ExpiresAt {
+	if currentTime > barcodeTokenData.ExpiresAt {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "QRコードの有効期限が切れています",
+			"error":      "バーコードの有効期限が切れています",
 			"expired":    true,
-			"expires_at": qrData.ExpiresAt,
+			"expires_at": barcodeTokenData.ExpiresAt,
 		})
 		return
 	}
 
 	// Verify user exists and is assigned to the event/sport
-	teams, err := h.teamRepo.GetTeamsByUserID(qrData.UserID)
+	teams, err := h.teamRepo.GetTeamsByUserID(barcodeTokenData.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify user assignment"})
 		return
@@ -235,7 +236,7 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 
 	var targetTeam *models.TeamWithSport
 	for _, team := range teams {
-		if team.EventID == qrData.EventID && team.SportID == qrData.SportID {
+		if team.EventID == barcodeTokenData.EventID && team.SportID == barcodeTokenData.SportID {
 			targetTeam = team
 			break
 		}
@@ -247,7 +248,7 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 	}
 
 	// Get full team details including capacity
-	team, err := h.teamRepo.GetTeamByClassAndSport(targetTeam.ClassID, qrData.SportID, qrData.EventID)
+	team, err := h.teamRepo.GetTeamByClassAndSport(targetTeam.ClassID, barcodeTokenData.SportID, barcodeTokenData.EventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team details"})
 		return
@@ -258,18 +259,18 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 		return
 	}
 
-	consumed, err := h.tokenStore.ConsumeActiveToken(qrData.UserID, qrData.EventID, qrData.SportID, token)
+	consumed, err := h.tokenStore.ConsumeActiveToken(barcodeTokenData.UserID, barcodeTokenData.EventID, barcodeTokenData.SportID, token)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume QR code token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume barcode token"})
 		return
 	}
 	if !consumed {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "QRコードは無効または期限切れです"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "バーコードは無効または期限切れです"})
 		return
 	}
 
 	// Confirm team member (参加本登録)
-	err = h.teamRepo.ConfirmTeamMember(team.ID, qrData.UserID)
+	err = h.teamRepo.ConfirmTeamMember(team.ID, barcodeTokenData.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to confirm team member"})
 		return
@@ -296,23 +297,23 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 				className = class.Name
 			}
 			warningMsg := fmt.Sprintf("%sクラスの%sの参加本登録済みメンバー数（%d人）が最低人数（%d人）に達していません",
-				className, qrData.SportName, confirmedCount, *team.MinCapacity)
+				className, barcodeTokenData.SportName, confirmedCount, *team.MinCapacity)
 			capacityWarning = &warningMsg
 		}
 	}
 
 	// Calculate remaining time
-	remainingTime := qrData.ExpiresAt - currentTime
+	remainingTime := barcodeTokenData.ExpiresAt - currentTime
 
 	response := gin.H{
 		"valid":          true,
-		"event_id":       qrData.EventID,
-		"sport_id":       qrData.SportID,
-		"sport_name":     qrData.SportName,
-		"user_id":        qrData.UserID,
-		"display_name":   qrData.DisplayName,
-		"timestamp":      qrData.Timestamp,
-		"expires_at":     qrData.ExpiresAt,
+		"event_id":       barcodeTokenData.EventID,
+		"sport_id":       barcodeTokenData.SportID,
+		"sport_name":     barcodeTokenData.SportName,
+		"user_id":        barcodeTokenData.UserID,
+		"display_name":   barcodeTokenData.DisplayName,
+		"timestamp":      barcodeTokenData.Timestamp,
+		"expires_at":     barcodeTokenData.ExpiresAt,
 		"remaining_time": remainingTime,
 	}
 
@@ -323,7 +324,11 @@ func (h *QRCodeHandler) VerifyQRCodeHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-func (h *QRCodeHandler) verifyBarcode(c *gin.Context, req models.QRCodeVerifyRequest) {
+func isMyIDBarcodeRequest(req models.BarcodeVerifyRequest, barcodeData string) bool {
+	return req.EventID != 0 || req.SportID != 0 || strings.HasPrefix(barcodeData, myIDBarcodePrefix)
+}
+
+func (h *BarcodeHandler) verifyMyIDBarcode(c *gin.Context, req models.BarcodeVerifyRequest) {
 	if req.EventID == 0 || req.SportID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "イベントIDと競技IDが必要です"})
 		return
@@ -387,7 +392,7 @@ func parseMyIDBarcode(barcodeData string) (string, error) {
 	return studentNumber, nil
 }
 
-func (h *QRCodeHandler) findUserByStudentNumber(studentNumber string) (*models.User, error) {
+func (h *BarcodeHandler) findUserByStudentNumber(studentNumber string) (*models.User, error) {
 	users, err := h.userRepo.FindUsers(studentNumber, "email")
 	if err != nil {
 		return nil, err
@@ -403,7 +408,7 @@ func (h *QRCodeHandler) findUserByStudentNumber(studentNumber string) (*models.U
 	return nil, nil
 }
 
-func (h *QRCodeHandler) confirmParticipation(userID string, eventID int, sportID int, sportName string, displayName string) (gin.H, error) {
+func (h *BarcodeHandler) confirmParticipation(userID string, eventID int, sportID int, sportName string, displayName string) (gin.H, error) {
 	teams, err := h.teamRepo.GetTeamsByUserID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to verify user assignment")

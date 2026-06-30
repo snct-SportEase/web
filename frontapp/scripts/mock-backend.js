@@ -209,8 +209,8 @@ let noonMatches = [];
 let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let rainyModeSettings = [];
-let qrCodeSequence = 0;
-let qrCodeActiveTokens = new Map();
+let barcodeSequence = 0;
+let barcodeActiveTokens = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -269,20 +269,20 @@ function decodeBase64Url(value) {
   return Buffer.from(value, 'base64url').toString('utf8');
 }
 
-function qrCodeKey(userId, eventId, sportId) {
+function barcodeKey(userId, eventId, sportId) {
   return `${userId}:${eventId}:${sportId}`;
 }
 
-function buildMockQRCodeResponse(eventId, sportId) {
-  qrCodeSequence += 1;
+function buildMockBarcodeResponse(eventId, sportId) {
+  barcodeSequence += 1;
   const timestamp = Math.floor(Date.now() / 1000);
   const expiresAt = timestamp + 10;
   const userId = rootUser.id;
   const displayName = rootUser.display_name;
   const sportName = sportId === 1 ? 'バスケットボール' : 'バレーボール';
-  const token = `mock-token-${qrCodeSequence}`;
+  const token = `mock-token-${barcodeSequence}`;
 
-  qrCodeActiveTokens.set(qrCodeKey(userId, eventId, sportId), token);
+  barcodeActiveTokens.set(barcodeKey(userId, eventId, sportId), token);
 
   const payload = {
     token,
@@ -298,7 +298,7 @@ function buildMockQRCodeResponse(eventId, sportId) {
   };
 
   return {
-    qr_code_data: encodeBase64Url(JSON.stringify(payload)),
+    barcode_data: encodeBase64Url(JSON.stringify(payload)),
     expires_at: expiresAt
   };
 }
@@ -383,8 +383,8 @@ createServer(async (req, res) => {
     noonPointsSummary = [];
     noonTemplateRuns = [];
     rainyModeSettings = [];
-    qrCodeSequence = 0;
-    qrCodeActiveTokens = new Map();
+    barcodeSequence = 0;
+    barcodeActiveTokens = new Map();
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
     return;
@@ -558,7 +558,7 @@ createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/qrcode/teams' && req.method === 'GET') {
+  if (url.pathname === '/api/barcode/teams' && req.method === 'GET') {
     sendJson(res, 200, [
       {
         id: 101,
@@ -572,16 +572,16 @@ createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/qrcode/generate' && req.method === 'POST') {
+  if (url.pathname === '/api/barcode/generate' && req.method === 'POST') {
     const body = await readJson(req);
-    sendJson(res, 200, buildMockQRCodeResponse(body.event_id, body.sport_id));
+    sendJson(res, 200, buildMockBarcodeResponse(body.event_id, body.sport_id));
     return;
   }
 
-  if (url.pathname === '/api/qrcode/verify' && req.method === 'POST') {
+  if (url.pathname === '/api/barcode/verify' && req.method === 'POST') {
     const body = await readJson(req);
 
-    if (body.barcode_data) {
+    if (body.event_id || body.sport_id || String(body.barcode_data ?? '').trim().startsWith('H10')) {
       const barcode = String(body.barcode_data).trim();
       if (!/^H10\d+$/.test(barcode)) {
         sendJson(res, 400, { error: 'バーコード形式が不正です' });
@@ -603,25 +603,25 @@ createServer(async (req, res) => {
     }
 
     try {
-      const combined = JSON.parse(decodeBase64Url(body.qr_code_data ?? ''));
+      const combined = JSON.parse(decodeBase64Url(body.barcode_data ?? ''));
       const token = combined?.token;
       const data = combined?.data;
 
       if (!token) {
-        sendJson(res, 400, { error: 'Invalid QR code token' });
+        sendJson(res, 400, { error: 'Invalid barcode token' });
         return;
       }
 
-      const activeToken = qrCodeActiveTokens.get(qrCodeKey(data.user_id, data.event_id, data.sport_id));
+      const activeToken = barcodeActiveTokens.get(barcodeKey(data.user_id, data.event_id, data.sport_id));
       if (!activeToken || activeToken !== token) {
-        sendJson(res, 400, { error: 'QRコードは無効または期限切れです' });
+        sendJson(res, 400, { error: 'バーコードは無効または期限切れです' });
         return;
       }
 
       const now = Math.floor(Date.now() / 1000);
       if (now > data.expires_at) {
         sendJson(res, 400, {
-          error: 'QRコードの有効期限が切れています',
+          error: 'バーコードの有効期限が切れています',
           expired: true,
           expires_at: data.expires_at
         });
@@ -640,7 +640,7 @@ createServer(async (req, res) => {
         remaining_time: Math.max(0, data.expires_at - now)
       });
     } catch {
-      sendJson(res, 400, { error: 'Invalid QR code data' });
+      sendJson(res, 400, { error: 'Invalid barcode data' });
     }
     return;
   }

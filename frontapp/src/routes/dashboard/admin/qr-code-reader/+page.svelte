@@ -1,8 +1,11 @@
 <script>
 	import { onMount } from 'svelte';
-	import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+	import {
+		Html5Qrcode as Html5BarcodeScanner,
+		Html5QrcodeSupportedFormats as Html5BarcodeSupportedFormats
+	} from 'html5-qrcode';
 
-	let html5QrCode = $state();
+	let html5BarcodeScanner = $state();
 	let errorMessage = $state('');
 	let verificationResult = $state(null);
 	let activeEventId = $state(null);
@@ -80,7 +83,7 @@
 		errorMessage = '';
 
 		try {
-			const response = await fetch('/api/qrcode/verify', {
+			const response = await fetch('/api/barcode/verify', {
 				method: 'POST',
 				credentials: 'include',
 				headers: {
@@ -117,19 +120,19 @@
 		errorMessage = '';
 		verificationResult = null;
 
-		html5QrCode = new Html5Qrcode('barcode-reader-region', {
+		html5BarcodeScanner = new Html5BarcodeScanner('barcode-reader-region', {
 			formatsToSupport: [
-				Html5QrcodeSupportedFormats.CODE_39,
-				Html5QrcodeSupportedFormats.CODE_128,
-				Html5QrcodeSupportedFormats.EAN_13,
-				Html5QrcodeSupportedFormats.EAN_8,
-				Html5QrcodeSupportedFormats.ITF,
-				Html5QrcodeSupportedFormats.UPC_A,
-				Html5QrcodeSupportedFormats.UPC_E
+				Html5BarcodeSupportedFormats.CODE_39,
+				Html5BarcodeSupportedFormats.CODE_128,
+				Html5BarcodeSupportedFormats.EAN_13,
+				Html5BarcodeSupportedFormats.EAN_8,
+				Html5BarcodeSupportedFormats.ITF,
+				Html5BarcodeSupportedFormats.UPC_A,
+				Html5BarcodeSupportedFormats.UPC_E
 			]
 		});
 
-		html5QrCode
+		html5BarcodeScanner
 			.start(
 				{ facingMode: 'environment' },
 				{
@@ -152,9 +155,9 @@
 	}
 
 	async function stopScan() {
-		if (html5QrCode?.isScanning) {
+		if (html5BarcodeScanner?.isScanning) {
 			try {
-				await html5QrCode.stop();
+				await html5BarcodeScanner.stop();
 			} catch (err) {
 				console.error(`Error stopping scanner: ${err}`);
 			}

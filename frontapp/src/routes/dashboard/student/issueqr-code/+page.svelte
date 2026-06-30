@@ -24,7 +24,7 @@
 		try {
 			const [eventResponse, teamsResponse] = await Promise.all([
 				fetch('/api/events/active', { credentials: 'include' }),
-				fetch('/api/qrcode/teams', { credentials: 'include' })
+				fetch('/api/barcode/teams', { credentials: 'include' })
 			]);
 
 			if (!eventResponse.ok) {
