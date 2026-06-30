@@ -161,11 +161,11 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo := newHandler()
 
 		displayName := "山田 太郎"
-		user := &models.User{ID: "user-1", Email: "2301059@example.com", DisplayName: &displayName}
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com", DisplayName: &displayName}
 		team := &models.TeamWithSport{ID: 10, Name: "1A", ClassID: 1, EventID: 1, SportID: 2, SportName: "バスケットボール"}
 		teamDetails := &models.Team{ID: 10, ClassID: 1, EventID: 1, SportID: 2}
 
-		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
@@ -190,15 +190,15 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.AssertExpectations(t)
 	})
 
-	t.Run("Success - Trim barcode and match exact email local part", func(t *testing.T) {
+	t.Run("Success - Trim barcode and match exact s-prefixed email local part", func(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo := newHandler()
 
-		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
-		otherUser := &models.User{ID: "user-2", Email: "x2301059@example.com"}
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		otherUser := &models.User{ID: "user-2", Email: "xs2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2, SportName: "バスケットボール"}
 		teamDetails := &models.Team{ID: 10, EventID: 1, SportID: 2}
 
-		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{otherUser, user}, nil).Once()
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{otherUser, user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
@@ -262,11 +262,30 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.AssertNotCalled(t, "GetTeamsByUserID")
 	})
 
-	t.Run("Failure - User not found by exact email local part", func(t *testing.T) {
+	t.Run("Failure - User not found by exact s-prefixed email local part", func(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo := newHandler()
 
-		mockUserRepo.On("FindUsers", "2301059", "email").
-			Return([]*models.User{{ID: "user-2", Email: "x2301059@example.com"}}, nil).Once()
+		mockUserRepo.On("FindUsers", "s2301059", "email").
+			Return([]*models.User{{ID: "user-2", Email: "xs2301059@example.com"}}, nil).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     2,
+			Round:       1,
+		})
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, "該当する学生が見つかりません", response["error"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "GetTeamsByUserID")
+	})
+
+	t.Run("Failure - Email local part without s prefix is not accepted", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo := newHandler()
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").
+			Return([]*models.User{{ID: "user-2", Email: "2301059@example.com"}}, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
 			BarcodeData: "H102301059",
@@ -284,7 +303,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	t.Run("Failure - User lookup error", func(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo := newHandler()
 
-		mockUserRepo.On("FindUsers", "2301059", "email").Return(nil, assert.AnError).Once()
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return(nil, assert.AnError).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
 			BarcodeData: "H102301059",
@@ -302,8 +321,8 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	t.Run("Failure - Student is not pre-entered for sport", func(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo := newHandler()
 
-		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
-		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").
 			Return([]*models.TeamWithSport{{ID: 10, EventID: 1, SportID: 9}}, nil).Once()
 
@@ -325,11 +344,11 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	t.Run("Failure - Confirm team member error", func(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo := newHandler()
 
-		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
 		teamDetails := &models.Team{ID: 10, EventID: 1, SportID: 2}
 
-		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(assert.AnError).Once()
@@ -351,11 +370,11 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	t.Run("Failure - Check-in repository error", func(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo := newHandler()
 
-		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
 		teamDetails := &models.Team{ID: 10, EventID: 1, SportID: 2}
 
-		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
@@ -383,11 +402,11 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, mockClassRepo)
 
 		minCapacity := 3
-		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, Name: "1A", ClassID: 1, EventID: 1, SportID: 2, SportName: "バスケットボール"}
 		teamDetails := &models.Team{ID: 10, ClassID: 1, EventID: 1, SportID: 2, MinCapacity: &minCapacity}
 
-		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()

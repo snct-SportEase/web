@@ -187,14 +187,15 @@ func parseMyIDBarcode(barcodeData string) (string, error) {
 }
 
 func (h *BarcodeHandler) findUserByStudentNumber(studentNumber string) (*models.User, error) {
-	users, err := h.userRepo.FindUsers(studentNumber, "email")
+	emailLocalPartForStudentNumber := "s" + studentNumber
+	users, err := h.userRepo.FindUsers(emailLocalPartForStudentNumber, "email")
 	if err != nil {
 		return nil, err
 	}
 
 	for _, user := range users {
 		emailLocalPart := strings.SplitN(user.Email, "@", 2)[0]
-		if strings.EqualFold(emailLocalPart, studentNumber) {
+		if strings.EqualFold(emailLocalPart, emailLocalPartForStudentNumber) {
 			return user, nil
 		}
 	}
