@@ -53,7 +53,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
     await page.getByRole('button', { name: 'チェックインする' }).click();
 
     await checkInRequest;
-    await expect(page.getByText('ラウンドチェックインしました')).toBeVisible();
+    await expect(page.getByText('参加本登録とラウンドチェックインを完了しました')).toBeVisible();
     await expect(page.getByText('氏名: 山田太郎')).toBeVisible();
     await expect(page.getByText('学籍番号: 2301059')).toBeVisible();
     await expect(page.getByText('競技: バスケットボール')).toBeVisible();

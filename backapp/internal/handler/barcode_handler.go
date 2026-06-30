@@ -95,9 +95,49 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		return
 	}
 
+	teamDetails, err := h.teamRepo.GetTeamByClassAndSport(team.ClassID, req.SportID, req.EventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team details"})
+		return
+	}
+	if teamDetails == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Team not found"})
+		return
+	}
+
+	if err := h.teamRepo.ConfirmTeamMember(teamDetails.ID, user.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to confirm team member"})
+		return
+	}
+
 	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, req.Round); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check in round"})
 		return
+	}
+
+	var capacityWarning *string
+	if teamDetails.MinCapacity != nil {
+		confirmedCount, err := h.teamRepo.GetConfirmedTeamMembersCount(teamDetails.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team capacity"})
+			return
+		}
+
+		if confirmedCount < *teamDetails.MinCapacity {
+			className := "不明"
+			class, err := h.classRepo.GetClassByID(team.ClassID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class information"})
+				return
+			}
+			if class != nil {
+				className = class.Name
+			}
+
+			warningMsg := fmt.Sprintf("%sクラスの%sの参加本登録済みメンバー数（%d人）が最低人数（%d人）に達していません",
+				className, team.SportName, confirmedCount, *teamDetails.MinCapacity)
+			capacityWarning = &warningMsg
+		}
 	}
 
 	displayName := ""
@@ -105,8 +145,9 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		displayName = *user.DisplayName
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"valid":          true,
+		"confirmed":      true,
 		"checked_in":     true,
 		"event_id":       req.EventID,
 		"sport_id":       req.SportID,
@@ -117,7 +158,12 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		"display_name":   displayName,
 		"student_number": studentNumber,
 		"barcode_data":   trimmedBarcode,
-	})
+	}
+	if capacityWarning != nil {
+		response["capacity_warning"] = *capacityWarning
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func parseMyIDBarcode(barcodeData string) (string, error) {

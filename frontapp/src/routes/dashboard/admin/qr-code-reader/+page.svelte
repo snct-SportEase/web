@@ -288,7 +288,7 @@
 	{#if verificationResult}
 		{#if verificationResult.success}
 			<div class="mt-6 rounded border border-green-400 bg-green-100 p-4 text-green-800">
-				<p class="font-bold">ラウンドチェックインしました</p>
+				<p class="font-bold">参加本登録とラウンドチェックインを完了しました</p>
 				<p>氏名: {verificationResult.data.display_name || '未設定'}</p>
 				<p>学籍番号: {verificationResult.data.student_number}</p>
 				<p>競技: {verificationResult.data.sport_name}</p>

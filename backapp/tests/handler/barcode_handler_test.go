@@ -163,9 +163,12 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		displayName := "山田 太郎"
 		user := &models.User{ID: "user-1", Email: "2301059@example.com", DisplayName: &displayName}
 		team := &models.TeamWithSport{ID: 10, Name: "1A", ClassID: 1, EventID: 1, SportID: 2, SportName: "バスケットボール"}
+		teamDetails := &models.Team{ID: 10, ClassID: 1, EventID: 1, SportID: 2}
 
 		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 3).Return(nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
@@ -177,6 +180,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, true, response["valid"])
+		assert.Equal(t, true, response["confirmed"])
 		assert.Equal(t, true, response["checked_in"])
 		assert.Equal(t, "2301059", response["student_number"])
 		assert.Equal(t, "H102301059", response["barcode_data"])
@@ -192,9 +196,12 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
 		otherUser := &models.User{ID: "user-2", Email: "x2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2, SportName: "バスケットボール"}
+		teamDetails := &models.Team{ID: 10, EventID: 1, SportID: 2}
 
 		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{otherUser, user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
@@ -312,6 +319,33 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
 		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
+		mockTeamRepo.AssertNotCalled(t, "ConfirmTeamMember")
+	})
+
+	t.Run("Failure - Confirm team member error", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
+		teamDetails := &models.Team{ID: 10, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(assert.AnError).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     2,
+			Round:       1,
+		})
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, "Failed to confirm team member", response["error"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
 	})
 
 	t.Run("Failure - Check-in repository error", func(t *testing.T) {
@@ -319,9 +353,12 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
+		teamDetails := &models.Team{ID: 10, EventID: 1, SportID: 2}
 
 		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(assert.AnError).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
@@ -335,5 +372,41 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		assert.Equal(t, "Failed to check in round", response["error"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - Returns capacity warning after confirming team member", func(t *testing.T) {
+		mockTeamRepo := new(MockTeamRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		minCapacity := 3
+		user := &models.User{ID: "user-1", Email: "2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, Name: "1A", ClassID: 1, EventID: 1, SportID: 2, SportName: "バスケットボール"}
+		teamDetails := &models.Team{ID: 10, ClassID: 1, EventID: 1, SportID: 2, MinCapacity: &minCapacity}
+
+		mockUserRepo.On("FindUsers", "2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
+		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(nil).Once()
+		mockTeamRepo.On("GetConfirmedTeamMembersCount", 10).Return(2, nil).Once()
+		mockClassRepo.On("GetClassByID", 1).Return(&models.Class{Name: "1A"}, nil).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     2,
+			Round:       1,
+		})
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, true, response["confirmed"])
+		assert.Equal(t, "1Aクラスのバスケットボールの参加本登録済みメンバー数（2人）が最低人数（3人）に達していません", response["capacity_warning"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
 	})
 }
