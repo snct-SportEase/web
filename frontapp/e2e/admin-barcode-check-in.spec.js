@@ -59,6 +59,9 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
     await expect(page.getByText('競技: バスケットボール')).toBeVisible();
     await expect(page.getByText('ラウンド: 1').nth(1)).toBeVisible();
     await expect(page.getByLabel('バーコード値')).toHaveValue('');
+    await expect(page.getByText('この試合のチェックイン済み')).toBeVisible();
+    await expect(page.getByText('1 人')).toBeVisible();
+    await expect(page.getByText('s2301059@sendai-nct.jp')).toBeVisible();
   });
 
   test('MyID形式ではないバーコードはrejectされる', async ({ page }) => {

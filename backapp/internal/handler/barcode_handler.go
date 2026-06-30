@@ -5,6 +5,7 @@ import (
 	"backapp/internal/repository"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -132,7 +133,7 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		return
 	}
 
-	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, round); err != nil {
+	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, req.MatchID, round); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check in round"})
 		return
 	}
@@ -187,6 +188,48 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// GetMatchCheckInsHandler returns students checked in for a selected match.
+func (h *BarcodeHandler) GetMatchCheckInsHandler(c *gin.Context) {
+	matchID, err := strconv.Atoi(c.Param("match_id"))
+	if err != nil || matchID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match_id"})
+		return
+	}
+
+	eventID, err := strconv.Atoi(c.Query("event_id"))
+	if err != nil || eventID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "イベントIDが必要です"})
+		return
+	}
+
+	sportID, err := strconv.Atoi(c.Query("sport_id"))
+	if err != nil || sportID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "競技IDが必要です"})
+		return
+	}
+
+	match, err := h.tournRepo.GetMatchForEventSport(matchID, eventID, sportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
+		return
+	}
+	if match == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "選択した試合がこの競技に存在しません"})
+		return
+	}
+
+	members, err := h.teamRepo.GetMatchCheckIns(eventID, sportID, matchID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match check-ins"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"members": members,
+		"count":   len(members),
+	})
 }
 
 func parseMyIDBarcode(barcodeData string) (string, error) {

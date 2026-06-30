@@ -290,9 +290,17 @@ func (m *MockTeamRepository) GetConfirmedTeamMembersCount(teamID int) (int, erro
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockTeamRepository) CheckInRound(teamID int, userID string, eventID int, sportID int, round int) error {
-	args := m.Called(teamID, userID, eventID, sportID, round)
+func (m *MockTeamRepository) CheckInRound(teamID int, userID string, eventID int, sportID int, matchID int, round int) error {
+	args := m.Called(teamID, userID, eventID, sportID, matchID, round)
 	return args.Error(0)
+}
+
+func (m *MockTeamRepository) GetMatchCheckIns(eventID int, sportID int, matchID int) ([]*models.MatchCheckInMember, error) {
+	args := m.Called(eventID, sportID, matchID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.MatchCheckInMember), args.Error(1)
 }
 
 func (m *MockTeamRepository) CreateTeamsBulk(teams []*models.Team) error {

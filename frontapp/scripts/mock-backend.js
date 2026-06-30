@@ -211,6 +211,7 @@ let guideDocuments = [
 ];
 let defaultGroups = defaultDefaultGroups();
 let tournaments = defaultTournaments();
+let barcodeCheckIns = [];
 let noonSession = null;
 let noonGroups = [];
 let noonMatches = [];
@@ -341,6 +342,7 @@ createServer(async (req, res) => {
     ];
     defaultGroups = defaultDefaultGroups();
     tournaments = defaultTournaments();
+    barcodeCheckIns = [];
     noonSession = null;
     noonGroups = [];
     noonMatches = [];
@@ -567,6 +569,31 @@ createServer(async (req, res) => {
 
     const sport = sports.find((item) => item.id === sportId);
     const round = Number(match.roundIndex ?? 0) + 1;
+    const existingCheckIn = barcodeCheckIns.find((item) =>
+      item.event_id === eventId
+      && item.sport_id === sportId
+      && item.match_id === matchId
+      && item.user_id === studentUser.id
+    );
+    if (!existingCheckIn) {
+      barcodeCheckIns = [
+        {
+          user_id: studentUser.id,
+          email: 's2301059@sendai-nct.jp',
+          display_name: studentUser.display_name,
+          class_id: 1,
+          class_name: '1A',
+          team_id: studentTeamId,
+          team_name: 'Team A',
+          event_id: eventId,
+          sport_id: sportId,
+          match_id: matchId,
+          round,
+          checked_in_at: new Date().toISOString()
+        },
+        ...barcodeCheckIns
+      ];
+    }
     sendJson(res, 200, {
       valid: true,
       checked_in: true,
@@ -582,6 +609,27 @@ createServer(async (req, res) => {
       student_number: barcode.slice(3),
       barcode_data: barcode
     });
+    return;
+  }
+
+  const barcodeMatchCheckInsMatch = url.pathname.match(/^\/api\/barcode\/matches\/(\d+)\/check-ins$/);
+  if (barcodeMatchCheckInsMatch && req.method === 'GET') {
+    const matchId = Number(barcodeMatchCheckInsMatch[1]);
+    const eventId = Number(url.searchParams.get('event_id'));
+    const sportId = Number(url.searchParams.get('sport_id'));
+    const tournament = tournaments.find((item) => item.sport_id === sportId);
+    const match = tournament?.data?.matches?.find((item) => item.id === matchId);
+    if (!match) {
+      sendJson(res, 400, { error: '選択した試合がこの競技に存在しません' });
+      return;
+    }
+
+    const members = barcodeCheckIns.filter((item) =>
+      item.event_id === eventId
+      && item.sport_id === sportId
+      && item.match_id === matchId
+    );
+    sendJson(res, 200, { members, count: members.length });
     return;
   }
 

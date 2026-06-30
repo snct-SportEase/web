@@ -18,6 +18,10 @@
 	let isScanning = $state(false);
 	let isVerifying = $state(false);
 	let loading = $state(true);
+	let matchCheckIns = $state([]);
+	let matchCheckInCount = $state(0);
+	let checkInsLoading = $state(false);
+	let checkInsError = $state('');
 
 	let selectedSport = $derived(
 		selectedSportId ? sports.find((sport) => `${sport.id}` === `${selectedSportId}`) : null
@@ -144,6 +148,66 @@
 	function handleSportChange(event) {
 		selectedSportId = event.currentTarget.value;
 		selectedMatchId = '';
+		clearMatchCheckIns();
+	}
+
+	async function handleMatchChange(event) {
+		selectedMatchId = event.currentTarget.value;
+		await loadMatchCheckIns();
+	}
+
+	function clearMatchCheckIns() {
+		matchCheckIns = [];
+		matchCheckInCount = 0;
+		checkInsError = '';
+	}
+
+	async function loadMatchCheckIns() {
+		if (!activeEventId || !selectedSportId || !selectedMatch) {
+			clearMatchCheckIns();
+			return;
+		}
+
+		checkInsLoading = true;
+		checkInsError = '';
+
+		try {
+			const params = new URLSearchParams({
+				event_id: String(activeEventId),
+				sport_id: String(selectedSportId)
+			});
+			const response = await fetch(`/api/barcode/matches/${selectedMatch.id}/check-ins?${params}`, {
+				credentials: 'include'
+			});
+			const data = await response.json();
+			if (!response.ok) {
+				throw new Error(data.error || 'チェックイン済み一覧の取得に失敗しました');
+			}
+			matchCheckIns = data.members || [];
+			matchCheckInCount = data.count || matchCheckIns.length;
+		} catch (err) {
+			checkInsError = err.message || 'チェックイン済み一覧の取得に失敗しました';
+			matchCheckIns = [];
+			matchCheckInCount = 0;
+		} finally {
+			checkInsLoading = false;
+		}
+	}
+
+	function formatCheckedInAt(value) {
+		if (!value) {
+			return '';
+		}
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) {
+			return '';
+		}
+		return date.toLocaleString('ja-JP', {
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
 	}
 
 	async function verifyBarcode(barcodeData) {
@@ -180,6 +244,7 @@
 			if (response.ok) {
 				verificationResult = { success: true, data: result };
 				manualBarcode = '';
+				await loadMatchCheckIns();
 			} else {
 				verificationResult = { success: false, message: result.error };
 			}
@@ -289,6 +354,7 @@
 				<select
 					id="match-select"
 					bind:value={selectedMatchId}
+					onchange={handleMatchChange}
 					disabled={isScanning || isVerifying || !selectedSportId}
 					class="w-full rounded border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
 				>
@@ -364,6 +430,44 @@
 					<p class="mt-1 text-sm text-gray-600">試合: {selectedMatch.label}</p>
 					<p class="mt-1 text-sm text-gray-600">ラウンド: {selectedMatch.round}</p>
 				{/if}
+
+				<div class="mt-6 border-t border-gray-200 pt-4">
+					<div class="mb-3 flex items-center justify-between">
+						<h3 class="text-base font-semibold text-gray-900">この試合のチェックイン済み</h3>
+						<span class="text-sm text-gray-600">{matchCheckInCount} 人</span>
+					</div>
+
+					{#if checkInsError}
+						<p class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+							{checkInsError}
+						</p>
+					{:else if !selectedMatch}
+						<p class="text-sm text-gray-500">試合を選択してください</p>
+					{:else if checkInsLoading}
+						<p class="text-sm text-gray-500">読み込み中...</p>
+					{:else if matchCheckIns.length === 0}
+						<p class="text-sm text-gray-500">まだチェックインしていません</p>
+					{:else}
+						<ul class="max-h-72 divide-y divide-gray-200 overflow-y-auto rounded border border-gray-200">
+							{#each matchCheckIns as member (member.user_id)}
+								<li class="px-3 py-2">
+									<p class="text-sm font-medium text-gray-900">
+										{member.display_name || '未設定'}
+									</p>
+									<p class="text-xs text-gray-600">
+										{member.class_name} / {member.team_name}
+									</p>
+									<p class="text-xs text-gray-500">
+										{member.email}
+										{#if formatCheckedInAt(member.checked_in_at)}
+											・{formatCheckedInAt(member.checked_in_at)}
+										{/if}
+									</p>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
 			</aside>
 		</div>
 	{/if}

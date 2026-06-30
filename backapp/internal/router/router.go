@@ -125,6 +125,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			barcode.Use(middleware.AuthMiddleware(userRepo))
 			barcode.GET("/teams", barcodeHandler.GetUserTeamsHandler)
 			barcode.POST("/check-in", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), barcodeHandler.CheckInRoundHandler)
+			barcode.GET("/matches/:match_id/check-ins", middleware.RoleRequired("admin", "root"), barcodeHandler.GetMatchCheckInsHandler)
 		}
 
 		student := api.Group("/student")
