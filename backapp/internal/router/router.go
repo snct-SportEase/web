@@ -54,7 +54,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
-	barcodeHandler := handler.NewBarcodeHandler(teamRepo, sportRepo, userRepo, eventRepo, classRepo)
+	barcodeHandler := handler.NewBarcodeHandler(teamRepo, sportRepo, userRepo, eventRepo, classRepo, tournRepo)
 
 	classTeamHandler := handler.NewClassTeamHandler(classRepo, teamRepo, userRepo, eventRepo, sportRepo)
 

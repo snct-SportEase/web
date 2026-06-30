@@ -137,6 +137,7 @@ const sampleTournamentData = () => ({
   ],
   matches: [
     {
+      id: 1,
       roundIndex: 0,
       order: 0,
       sides: [
@@ -531,29 +532,39 @@ createServer(async (req, res) => {
     const barcode = String(body.barcode_data ?? '').trim();
     const eventId = Number(body.event_id);
     const sportId = Number(body.sport_id);
-    const round = Number(body.round);
+    const matchId = Number(body.match_id);
 
     if (!eventId || !sportId) {
       sendJson(res, 400, { error: 'イベントIDと競技IDが必要です' });
       return;
     }
-    if (!round || round <= 0) {
-      sendJson(res, 400, { error: 'ラウンドを指定してください' });
+    if (!matchId || matchId <= 0) {
+      sendJson(res, 400, { error: '試合を選択してください' });
       return;
     }
-    if (!/^H10\d+$/.test(barcode)) {
+    if (!/^H10\d{7}$/.test(barcode)) {
       sendJson(res, 400, { error: 'バーコード形式が不正です' });
       return;
     }
 
+    const tournament = tournaments.find((item) => item.sport_id === sportId);
+    const match = tournament?.data?.matches?.find((item) => item.id === matchId);
+    if (!match) {
+      sendJson(res, 400, { error: '選択した試合がこの競技に存在しません' });
+      return;
+    }
+
     const sport = sports.find((item) => item.id === sportId);
+    const round = Number(match.roundIndex ?? 0) + 1;
     sendJson(res, 200, {
       valid: true,
       checked_in: true,
+      confirmed: true,
       event_id: eventId,
       sport_id: sportId,
       sport_name: sport?.name ?? 'バスケットボール',
       round,
+      match_id: matchId,
       team_id: 101,
       user_id: studentUser.id,
       display_name: studentUser.display_name,

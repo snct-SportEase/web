@@ -22,7 +22,7 @@ func TestBarcodeHandler_GetUserTeamsHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
+		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository), new(MockTournamentRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -75,7 +75,7 @@ func TestBarcodeHandler_GetUserTeamsHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
+		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository), new(MockTournamentRepository))
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -99,7 +99,7 @@ func TestBarcodeHandler_GetUserTeamsHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 
-		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
+		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository), new(MockTournamentRepository))
 
 		userID := "test-user-id"
 		displayName := "Test User"
@@ -131,13 +131,14 @@ func TestBarcodeHandler_GetUserTeamsHandler(t *testing.T) {
 func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	newHandler := func() (*handler.BarcodeHandler, *MockTeamRepository, *MockUserRepository) {
+	newHandler := func() (*handler.BarcodeHandler, *MockTeamRepository, *MockUserRepository, *MockTournamentRepository) {
 		mockTeamRepo := new(MockTeamRepository)
 		mockSportRepo := new(MockSportRepository)
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
-		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository))
-		return h, mockTeamRepo, mockUserRepo
+		mockTournamentRepo := new(MockTournamentRepository)
+		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, new(MockClassRepository), mockTournamentRepo)
+		return h, mockTeamRepo, mockUserRepo, mockTournamentRepo
 	}
 
 	request := func(h *handler.BarcodeHandler, body any) (*httptest.ResponseRecorder, map[string]interface{}) {
@@ -158,7 +159,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	}
 
 	t.Run("Success - Check in round from MyID barcode", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
 
 		displayName := "山田 太郎"
 		user := &models.User{ID: "user-1", Email: "s2301059@example.com", DisplayName: &displayName}
@@ -167,6 +168,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 100, 1, 2).Return(&models.MatchDB{ID: 100, Round: 2}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 3).Return(nil).Once()
@@ -175,7 +177,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       3,
+			MatchID:     100,
 		})
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -186,12 +188,14 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		assert.Equal(t, "H102301059", response["barcode_data"])
 		assert.Equal(t, "バスケットボール", response["sport_name"])
 		assert.Equal(t, float64(3), response["round"])
+		assert.Equal(t, float64(100), response["match_id"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
 	})
 
 	t.Run("Success - Trim barcode and match exact s-prefixed email local part", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
 
 		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
 		otherUser := &models.User{ID: "user-2", Email: "xs2301059@example.com"}
@@ -200,6 +204,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{otherUser, user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(nil).Once()
@@ -208,21 +213,22 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "  H102301059  ",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "H102301059", response["barcode_data"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
 	})
 
 	t.Run("Failure - Missing event or sport id", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
 			BarcodeData: "H102301059",
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -231,8 +237,8 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.AssertNotCalled(t, "GetTeamsByUserID")
 	})
 
-	t.Run("Failure - Missing round", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+	t.Run("Failure - Missing match", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
 			BarcodeData: "H102301059",
@@ -241,7 +247,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		})
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Equal(t, "ラウンドを指定してください", response["error"])
+		assert.Equal(t, "試合を選択してください", response["error"])
 		mockUserRepo.AssertNotCalled(t, "FindUsers")
 		mockTeamRepo.AssertNotCalled(t, "GetTeamsByUserID")
 	})
@@ -259,13 +265,13 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				h, mockTeamRepo, mockUserRepo := newHandler()
+				h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 				w, response := request(h, models.BarcodeCheckInRequest{
 					BarcodeData: tt.barcodeData,
 					EventID:     1,
 					SportID:     2,
-					Round:       1,
+					MatchID:     101,
 				})
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -277,7 +283,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	})
 
 	t.Run("Failure - User not found by exact s-prefixed email local part", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").
 			Return([]*models.User{{ID: "user-2", Email: "xs2301059@example.com"}}, nil).Once()
@@ -286,7 +292,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
@@ -296,7 +302,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	})
 
 	t.Run("Failure - Email local part without s prefix is not accepted", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").
 			Return([]*models.User{{ID: "user-2", Email: "2301059@example.com"}}, nil).Once()
@@ -305,7 +311,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
@@ -315,7 +321,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	})
 
 	t.Run("Failure - User lookup error", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return(nil, assert.AnError).Once()
 
@@ -323,7 +329,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -333,7 +339,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	})
 
 	t.Run("Failure - Student is not pre-entered for sport", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
 
 		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
@@ -344,19 +350,72 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 		assert.Equal(t, "このユーザーはこの競技に事前エントリーされていません", response["error"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertNotCalled(t, "GetMatchForEventSport")
 		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
 		mockTeamRepo.AssertNotCalled(t, "ConfirmTeamMember")
 	})
 
+	t.Run("Failure - Selected match does not belong to event sport", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 999, 1, 2).Return(nil, nil).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     2,
+			MatchID:     999,
+		})
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, "選択した試合がこの競技に存在しません", response["error"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "ConfirmTeamMember")
+		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
+	})
+
+	t.Run("Failure - Match verification error", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(nil, assert.AnError).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H102301059",
+			EventID:     1,
+			SportID:     2,
+			MatchID:     101,
+		})
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, "Failed to verify selected match", response["error"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+		mockTeamRepo.AssertNotCalled(t, "ConfirmTeamMember")
+		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
+	})
+
 	t.Run("Failure - Confirm team member error", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
 
 		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
@@ -364,6 +423,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(assert.AnError).Once()
 
@@ -371,18 +431,19 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "Failed to confirm team member", response["error"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
 		mockTeamRepo.AssertNotCalled(t, "CheckInRound")
 	})
 
 	t.Run("Failure - Check-in repository error", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
 
 		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
 		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
@@ -390,6 +451,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(assert.AnError).Once()
@@ -398,13 +460,14 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "Failed to check in round", response["error"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
 	})
 
 	t.Run("Success - Returns capacity warning after confirming team member", func(t *testing.T) {
@@ -413,7 +476,8 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 		mockClassRepo := new(MockClassRepository)
-		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, mockClassRepo)
+		mockTournamentRepo := new(MockTournamentRepository)
+		h := handler.NewBarcodeHandler(mockTeamRepo, mockSportRepo, mockUserRepo, mockEventRepo, mockClassRepo, mockTournamentRepo)
 
 		minCapacity := 3
 		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
@@ -422,6 +486,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
 		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 1).Return(nil).Once()
@@ -432,7 +497,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			BarcodeData: "H102301059",
 			EventID:     1,
 			SportID:     2,
-			Round:       1,
+			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -441,5 +506,6 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
 		mockClassRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
 	})
 }

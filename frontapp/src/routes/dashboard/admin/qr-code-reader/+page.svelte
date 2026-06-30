@@ -11,8 +11,9 @@
 	let activeEventId = $state(null);
 	let activeEventName = $state('');
 	let sports = $state([]);
+	let tournaments = $state([]);
 	let selectedSportId = $state('');
-	let selectedRound = $state('');
+	let selectedMatchId = $state('');
 	let manualBarcode = $state('');
 	let isScanning = $state(false);
 	let isVerifying = $state(false);
@@ -20,6 +21,28 @@
 
 	let selectedSport = $derived(
 		selectedSportId ? sports.find((sport) => `${sport.id}` === `${selectedSportId}`) : null
+	);
+	let selectedSportTournaments = $derived(
+		selectedSportId
+			? tournaments.filter((tournament) => `${tournament.sport_id}` === `${selectedSportId}`)
+			: []
+	);
+	let selectableMatches = $derived(
+		selectedSportTournaments.flatMap((tournament) => {
+			const data = getTournamentData(tournament);
+			return (data.matches ?? [])
+				.filter((match) => match.id)
+				.map((match) => ({
+					id: match.id,
+					label: getMatchLabel(tournament, match),
+					round: getMatchRound(match)
+				}));
+		})
+	);
+	let selectedMatch = $derived(
+		selectedMatchId
+			? selectableMatches.find((match) => `${match.id}` === `${selectedMatchId}`) || null
+			: null
 	);
 
 	onMount(() => {
@@ -50,14 +73,22 @@
 
 			if (!activeEventId) {
 				sports = [];
+				tournaments = [];
 				return;
 			}
 
-			const sportsResponse = await fetch(`/api/events/${activeEventId}/sports`, { credentials: 'include' });
+			const [sportsResponse, tournamentsResponse] = await Promise.all([
+				fetch(`/api/events/${activeEventId}/sports`, { credentials: 'include' }),
+				fetch(`/api/admin/events/${activeEventId}/tournaments`, { credentials: 'include' })
+			]);
 			if (!sportsResponse.ok) {
 				throw new Error('競技一覧の取得に失敗しました');
 			}
+			if (!tournamentsResponse.ok) {
+				throw new Error('試合一覧の取得に失敗しました');
+			}
 			sports = await sportsResponse.json();
+			tournaments = await tournamentsResponse.json();
 		} catch (err) {
 			errorMessage = err.message || '初期データの取得に失敗しました';
 		} finally {
@@ -66,7 +97,40 @@
 	}
 
 	function canVerify() {
-		return activeEventId !== null && selectedSportId !== '' && Number(selectedRound) > 0;
+		return activeEventId !== null && selectedSportId !== '' && selectedMatchId !== '';
+	}
+
+	function getTournamentData(tournament) {
+		if (!tournament?.data) {
+			return { rounds: [], matches: [] };
+		}
+		if (typeof tournament.data === 'string') {
+			try {
+				return JSON.parse(tournament.data);
+			} catch {
+				return { rounds: [], matches: [] };
+			}
+		}
+		return tournament.data;
+	}
+
+	function getMatchRound(match) {
+		return Number(match?.roundIndex ?? 0) + 1;
+	}
+
+	function getRoundName(tournament, match) {
+		const data = getTournamentData(tournament);
+		return data.rounds?.[match.roundIndex]?.name || `第${getMatchRound(match)}ラウンド`;
+	}
+
+	function getMatchLabel(tournament, match) {
+		const matchNumber = Number(match.order ?? 0) + 1;
+		return `${tournament.name} / ${getRoundName(tournament, match)} 第${matchNumber}試合`;
+	}
+
+	function handleSportChange(event) {
+		selectedSportId = event.currentTarget.value;
+		selectedMatchId = '';
 	}
 
 	async function verifyBarcode(barcodeData) {
@@ -76,7 +140,7 @@
 			return;
 		}
 		if (!canVerify()) {
-			errorMessage = '競技とラウンドを選択してください';
+			errorMessage = '競技と試合を選択してください';
 			return;
 		}
 
@@ -94,7 +158,7 @@
 					barcode_data: trimmedBarcode,
 					event_id: Number(activeEventId),
 					sport_id: Number(selectedSportId),
-					round: Number(selectedRound)
+					match_id: Number(selectedMatchId)
 				})
 			});
 
@@ -115,7 +179,7 @@
 
 	function startScan() {
 		if (!canVerify()) {
-			errorMessage = '競技とラウンドを選択してください';
+			errorMessage = '競技と試合を選択してください';
 			return;
 		}
 
@@ -197,7 +261,8 @@
 				<label for="sport-select" class="mb-2 block text-sm font-medium text-gray-700">競技</label>
 				<select
 					id="sport-select"
-					bind:value={selectedSportId}
+					value={selectedSportId}
+					onchange={handleSportChange}
 					disabled={isScanning || isVerifying}
 					class="w-full rounded border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
 				>
@@ -207,16 +272,20 @@
 					{/each}
 				</select>
 
-				<label for="round-input" class="mb-2 mt-4 block text-sm font-medium text-gray-700">ラウンド</label>
-				<input
-					id="round-input"
-					type="number"
-					min="1"
-					step="1"
-					bind:value={selectedRound}
-					disabled={isScanning || isVerifying}
+				<label for="match-select" class="mb-2 mt-4 block text-sm font-medium text-gray-700">試合</label>
+				<select
+					id="match-select"
+					bind:value={selectedMatchId}
+					disabled={isScanning || isVerifying || !selectedSportId}
 					class="w-full rounded border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-				/>
+				>
+					<option value="">
+						{selectedSportId ? '試合を選択してください' : '先に競技を選択してください'}
+					</option>
+					{#each selectableMatches as match (match.id)}
+						<option value={match.id}>{match.label}</option>
+					{/each}
+				</select>
 
 				<div
 					id="barcode-reader-region"
@@ -278,8 +347,9 @@
 				{#if selectedSport}
 					<p class="mt-4 text-sm text-gray-600">選択中: {selectedSport.name}</p>
 				{/if}
-				{#if Number(selectedRound) > 0}
-					<p class="mt-1 text-sm text-gray-600">ラウンド: {selectedRound}</p>
+				{#if selectedMatch}
+					<p class="mt-1 text-sm text-gray-600">試合: {selectedMatch.label}</p>
+					<p class="mt-1 text-sm text-gray-600">ラウンド: {selectedMatch.round}</p>
 				{/if}
 			</aside>
 		</div>

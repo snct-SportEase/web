@@ -17,19 +17,21 @@ type BarcodeHandler struct {
 	userRepo  repository.UserRepository
 	eventRepo repository.EventRepository
 	classRepo repository.ClassRepository
+	tournRepo repository.TournamentRepository
 }
 
 const myIDBarcodePrefix = "H10"
 const studentNumberLength = 7
 
 // NewBarcodeHandler creates a new instance of BarcodeHandler.
-func NewBarcodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *BarcodeHandler {
+func NewBarcodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository, tournRepo repository.TournamentRepository) *BarcodeHandler {
 	return &BarcodeHandler{
 		teamRepo:  teamRepo,
 		sportRepo: sportRepo,
 		userRepo:  userRepo,
 		eventRepo: eventRepo,
 		classRepo: classRepo,
+		tournRepo: tournRepo,
 	}
 }
 
@@ -64,8 +66,8 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "イベントIDと競技IDが必要です"})
 		return
 	}
-	if req.Round <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ラウンドを指定してください"})
+	if req.MatchID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "試合を選択してください"})
 		return
 	}
 
@@ -96,6 +98,21 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		return
 	}
 
+	match, err := h.tournRepo.GetMatchForEventSport(req.MatchID, req.EventID, req.SportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
+		return
+	}
+	if match == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "選択した試合がこの競技に存在しません"})
+		return
+	}
+	if match.Round < 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
+		return
+	}
+	round := match.Round + 1
+
 	teamDetails, err := h.teamRepo.GetTeamByClassAndSport(team.ClassID, req.SportID, req.EventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team details"})
@@ -111,7 +128,7 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		return
 	}
 
-	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, req.Round); err != nil {
+	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, round); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check in round"})
 		return
 	}
@@ -153,7 +170,8 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		"event_id":       req.EventID,
 		"sport_id":       req.SportID,
 		"sport_name":     team.SportName,
-		"round":          req.Round,
+		"round":          round,
+		"match_id":       req.MatchID,
 		"team_id":        team.ID,
 		"user_id":        user.ID,
 		"display_name":   displayName,

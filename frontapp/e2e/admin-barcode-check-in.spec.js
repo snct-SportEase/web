@@ -35,7 +35,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
 
   test('手入力したMyIDバーコードでラウンドチェックインできる', async ({ page }) => {
     await page.getByLabel('競技').selectOption('1');
-    await page.getByLabel('ラウンド').fill('2');
+    await page.getByLabel('試合').selectOption('1');
     await page.getByLabel('バーコード値').fill('H102301059');
 
     const checkInRequest = page.waitForRequest((request) => {
@@ -47,7 +47,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
       return body.barcode_data === 'H102301059'
         && body.event_id === 1
         && body.sport_id === 1
-        && body.round === 2;
+        && body.match_id === 1;
     });
 
     await page.getByRole('button', { name: 'チェックインする' }).click();
@@ -57,13 +57,13 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
     await expect(page.getByText('氏名: 山田太郎')).toBeVisible();
     await expect(page.getByText('学籍番号: 2301059')).toBeVisible();
     await expect(page.getByText('競技: バスケットボール')).toBeVisible();
-    await expect(page.getByText('ラウンド: 2').nth(1)).toBeVisible();
+    await expect(page.getByText('ラウンド: 1').nth(1)).toBeVisible();
     await expect(page.getByLabel('バーコード値')).toHaveValue('');
   });
 
   test('MyID形式ではないバーコードはrejectされる', async ({ page }) => {
     await page.getByLabel('競技').selectOption('1');
-    await page.getByLabel('ラウンド').fill('1');
+    await page.getByLabel('試合').selectOption('1');
     await page.getByLabel('バーコード値').fill('2301059');
 
     await page.getByRole('button', { name: 'チェックインする' }).click();
