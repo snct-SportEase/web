@@ -172,6 +172,12 @@ const defaultTournaments = () => ([
     name: 'バスケットボール',
     sport_id: 1,
     data: sampleTournamentData()
+  },
+  {
+    id: 2,
+    name: 'バスケットボール 敗者復活',
+    sport_id: 1,
+    data: sampleTournamentData()
   }
 ]);
 

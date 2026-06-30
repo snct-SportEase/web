@@ -28,12 +28,13 @@
 			: []
 	);
 	let selectableMatches = $derived(
-		selectedSportTournaments.flatMap((tournament) => {
+		selectedSportTournaments.flatMap((tournament, tournamentIndex) => {
 			const data = getTournamentData(tournament);
 			return (data.matches ?? [])
 				.filter((match) => match.id)
-				.map((match) => ({
+				.map((match, matchIndex) => ({
 					id: match.id,
+					value: `${tournament.id ?? tournamentIndex}:${match.id}:${matchIndex}`,
 					label: getMatchLabel(tournament, match),
 					round: getMatchRound(match)
 				}));
@@ -41,7 +42,7 @@
 	);
 	let selectedMatch = $derived(
 		selectedMatchId
-			? selectableMatches.find((match) => `${match.id}` === `${selectedMatchId}`) || null
+			? selectableMatches.find((match) => match.value === selectedMatchId) || null
 			: null
 	);
 
@@ -87,7 +88,7 @@
 			if (!tournamentsResponse.ok) {
 				throw new Error('試合一覧の取得に失敗しました');
 			}
-			sports = await sportsResponse.json();
+			sports = dedupeSportsByID(await sportsResponse.json());
 			tournaments = await tournamentsResponse.json();
 		} catch (err) {
 			errorMessage = err.message || '初期データの取得に失敗しました';
@@ -97,7 +98,19 @@
 	}
 
 	function canVerify() {
-		return activeEventId !== null && selectedSportId !== '' && selectedMatchId !== '';
+		return activeEventId !== null && selectedSportId !== '' && selectedMatch !== null;
+	}
+
+	function dedupeSportsByID(items) {
+		const seen = new Set();
+		return (items ?? []).filter((sport) => {
+			const key = `${sport?.id}`;
+			if (!key || seen.has(key)) {
+				return false;
+			}
+			seen.add(key);
+			return true;
+		});
 	}
 
 	function getTournamentData(tournament) {
@@ -158,7 +171,7 @@
 					barcode_data: trimmedBarcode,
 					event_id: Number(activeEventId),
 					sport_id: Number(selectedSportId),
-					match_id: Number(selectedMatchId)
+					match_id: Number(selectedMatch.id)
 				})
 			});
 
@@ -267,7 +280,7 @@
 					class="w-full rounded border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
 				>
 					<option value="">競技を選択してください</option>
-					{#each sports as sport (sport.id)}
+					{#each sports as sport, index (`${sport.id}:${index}`)}
 						<option value={sport.id}>{sport.name}</option>
 					{/each}
 				</select>
@@ -282,8 +295,8 @@
 					<option value="">
 						{selectedSportId ? '試合を選択してください' : '先に競技を選択してください'}
 					</option>
-					{#each selectableMatches as match (match.id)}
-						<option value={match.id}>{match.label}</option>
+					{#each selectableMatches as match (match.value)}
+						<option value={match.value}>{match.label}</option>
 					{/each}
 				</select>
 

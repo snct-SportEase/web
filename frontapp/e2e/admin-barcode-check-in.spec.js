@@ -35,7 +35,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
 
   test('手入力したMyIDバーコードでラウンドチェックインできる', async ({ page }) => {
     await page.getByLabel('競技').selectOption('1');
-    await page.getByLabel('試合').selectOption('1');
+    await page.getByLabel('試合').selectOption({ index: 1 });
     await page.getByLabel('バーコード値').fill('H102301059');
 
     const checkInRequest = page.waitForRequest((request) => {
@@ -63,7 +63,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
 
   test('MyID形式ではないバーコードはrejectされる', async ({ page }) => {
     await page.getByLabel('競技').selectOption('1');
-    await page.getByLabel('試合').selectOption('1');
+    await page.getByLabel('試合').selectOption({ index: 1 });
     await page.getByLabel('バーコード値').fill('2301059');
 
     await page.getByRole('button', { name: 'チェックインする' }).click();
