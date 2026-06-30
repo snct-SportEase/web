@@ -586,6 +586,20 @@ func TestTeamRepository_ConfirmTeamMember(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("exists check error after 0 rows affected", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "user-1").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(existsQ)).WithArgs(10, "user-1").
+			WillReturnError(errors.New("exists check error"))
+
+		err := repo.ConfirmTeamMember(10, "user-1")
+		assert.ErrorContains(t, err, "exists check error")
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("db error", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
