@@ -247,19 +247,33 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 	})
 
 	t.Run("Failure - Invalid MyID barcode format", func(t *testing.T) {
-		h, mockTeamRepo, mockUserRepo := newHandler()
+		tests := []struct {
+			name        string
+			barcodeData string
+		}{
+			{name: "missing H10 prefix", barcodeData: "2301059"},
+			{name: "student number is too short", barcodeData: "H10230105"},
+			{name: "student number is too long", barcodeData: "H1023010599"},
+			{name: "student number contains non-digit", barcodeData: "H10230105A"},
+		}
 
-		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "2301059",
-			EventID:     1,
-			SportID:     2,
-			Round:       1,
-		})
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				h, mockTeamRepo, mockUserRepo := newHandler()
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Equal(t, "バーコード形式が不正です", response["error"])
-		mockUserRepo.AssertNotCalled(t, "FindUsers")
-		mockTeamRepo.AssertNotCalled(t, "GetTeamsByUserID")
+				w, response := request(h, models.BarcodeCheckInRequest{
+					BarcodeData: tt.barcodeData,
+					EventID:     1,
+					SportID:     2,
+					Round:       1,
+				})
+
+				assert.Equal(t, http.StatusBadRequest, w.Code)
+				assert.Equal(t, "バーコード形式が不正です", response["error"])
+				mockUserRepo.AssertNotCalled(t, "FindUsers")
+				mockTeamRepo.AssertNotCalled(t, "GetTeamsByUserID")
+			})
+		}
 	})
 
 	t.Run("Failure - User not found by exact s-prefixed email local part", func(t *testing.T) {

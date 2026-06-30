@@ -20,6 +20,7 @@ type BarcodeHandler struct {
 }
 
 const myIDBarcodePrefix = "H10"
+const studentNumberLength = 7
 
 // NewBarcodeHandler creates a new instance of BarcodeHandler.
 func NewBarcodeHandler(teamRepo repository.TeamRepository, sportRepo repository.SportRepository, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *BarcodeHandler {
@@ -173,8 +174,8 @@ func parseMyIDBarcode(barcodeData string) (string, error) {
 	}
 
 	studentNumber := strings.TrimPrefix(barcode, myIDBarcodePrefix)
-	if studentNumber == "" {
-		return "", fmt.Errorf("student number is empty")
+	if len(studentNumber) != studentNumberLength {
+		return "", fmt.Errorf("student number must be %d digits", studentNumberLength)
 	}
 
 	for _, char := range studentNumber {
