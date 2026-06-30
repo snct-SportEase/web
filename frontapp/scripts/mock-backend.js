@@ -209,8 +209,6 @@ let noonMatches = [];
 let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let rainyModeSettings = [];
-let barcodeSequence = 0;
-let barcodeActiveTokens = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -259,48 +257,6 @@ function sendJson(res, status, body) {
 function sendResponse(res, status, body, headers = {}) {
   res.writeHead(status, headers);
   res.end(body);
-}
-
-function encodeBase64Url(value) {
-  return Buffer.from(value).toString('base64url');
-}
-
-function decodeBase64Url(value) {
-  return Buffer.from(value, 'base64url').toString('utf8');
-}
-
-function barcodeKey(userId, eventId, sportId) {
-  return `${userId}:${eventId}:${sportId}`;
-}
-
-function buildMockBarcodeResponse(eventId, sportId) {
-  barcodeSequence += 1;
-  const timestamp = Math.floor(Date.now() / 1000);
-  const expiresAt = timestamp + 10;
-  const userId = rootUser.id;
-  const displayName = rootUser.display_name;
-  const sportName = sportId === 1 ? 'バスケットボール' : 'バレーボール';
-  const token = `mock-token-${barcodeSequence}`;
-
-  barcodeActiveTokens.set(barcodeKey(userId, eventId, sportId), token);
-
-  const payload = {
-    token,
-    data: {
-      event_id: eventId,
-      sport_id: sportId,
-      sport_name: sportName,
-      user_id: userId,
-      display_name: displayName,
-      timestamp,
-      expires_at: expiresAt
-    }
-  };
-
-  return {
-    barcode_data: encodeBase64Url(JSON.stringify(payload)),
-    expires_at: expiresAt
-  };
 }
 
 function readJson(req) {
@@ -383,8 +339,6 @@ createServer(async (req, res) => {
     noonPointsSummary = [];
     noonTemplateRuns = [];
     rainyModeSettings = [];
-    barcodeSequence = 0;
-    barcodeActiveTokens = new Map();
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
     return;
@@ -572,76 +526,40 @@ createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/barcode/generate' && req.method === 'POST') {
+  if (url.pathname === '/api/barcode/check-in' && req.method === 'POST') {
     const body = await readJson(req);
-    sendJson(res, 200, buildMockBarcodeResponse(body.event_id, body.sport_id));
-    return;
-  }
+    const barcode = String(body.barcode_data ?? '').trim();
+    const eventId = Number(body.event_id);
+    const sportId = Number(body.sport_id);
+    const round = Number(body.round);
 
-  if (url.pathname === '/api/barcode/verify' && req.method === 'POST') {
-    const body = await readJson(req);
-
-    if (body.event_id || body.sport_id || String(body.barcode_data ?? '').trim().startsWith('H10')) {
-      const barcode = String(body.barcode_data).trim();
-      if (!/^H10\d+$/.test(barcode)) {
-        sendJson(res, 400, { error: 'バーコード形式が不正です' });
-        return;
-      }
-
-      const sport = sports.find((item) => item.id === Number(body.sport_id));
-      sendJson(res, 200, {
-        valid: true,
-        event_id: Number(body.event_id),
-        sport_id: Number(body.sport_id),
-        sport_name: sport?.name ?? 'バスケットボール',
-        user_id: studentUser.id,
-        display_name: studentUser.display_name,
-        student_number: barcode.slice(3),
-        barcode_data: barcode
-      });
+    if (!eventId || !sportId) {
+      sendJson(res, 400, { error: 'イベントIDと競技IDが必要です' });
+      return;
+    }
+    if (!round || round <= 0) {
+      sendJson(res, 400, { error: 'ラウンドを指定してください' });
+      return;
+    }
+    if (!/^H10\d+$/.test(barcode)) {
+      sendJson(res, 400, { error: 'バーコード形式が不正です' });
       return;
     }
 
-    try {
-      const combined = JSON.parse(decodeBase64Url(body.barcode_data ?? ''));
-      const token = combined?.token;
-      const data = combined?.data;
-
-      if (!token) {
-        sendJson(res, 400, { error: 'Invalid barcode token' });
-        return;
-      }
-
-      const activeToken = barcodeActiveTokens.get(barcodeKey(data.user_id, data.event_id, data.sport_id));
-      if (!activeToken || activeToken !== token) {
-        sendJson(res, 400, { error: 'バーコードは無効または期限切れです' });
-        return;
-      }
-
-      const now = Math.floor(Date.now() / 1000);
-      if (now > data.expires_at) {
-        sendJson(res, 400, {
-          error: 'バーコードの有効期限が切れています',
-          expired: true,
-          expires_at: data.expires_at
-        });
-        return;
-      }
-
-      sendJson(res, 200, {
-        valid: true,
-        event_id: data.event_id,
-        sport_id: data.sport_id,
-        sport_name: data.sport_name,
-        user_id: data.user_id,
-        display_name: data.display_name,
-        timestamp: data.timestamp,
-        expires_at: data.expires_at,
-        remaining_time: Math.max(0, data.expires_at - now)
-      });
-    } catch {
-      sendJson(res, 400, { error: 'Invalid barcode data' });
-    }
+    const sport = sports.find((item) => item.id === sportId);
+    sendJson(res, 200, {
+      valid: true,
+      checked_in: true,
+      event_id: eventId,
+      sport_id: sportId,
+      sport_name: sport?.name ?? 'バスケットボール',
+      round,
+      team_id: 101,
+      user_id: studentUser.id,
+      display_name: studentUser.display_name,
+      student_number: barcode.slice(3),
+      barcode_data: barcode
+    });
     return;
   }
 

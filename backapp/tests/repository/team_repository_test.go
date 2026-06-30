@@ -694,3 +694,37 @@ func TestTeamRepository_GetConfirmedTeamMembersCount(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
+
+// ─── CheckInRound ──────────────────────────────────────────────────────────
+
+func TestTeamRepository_CheckInRound(t *testing.T) {
+	const q = `
+		INSERT INTO round_check_ins (event_id, sport_id, round, user_id, team_id)
+		VALUES (?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE checked_in_at = checked_in_at
+	`
+
+	t.Run("success", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).
+			WithArgs(1, 2, 3, "user-1", 10).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		assert.NoError(t, repo.CheckInRound(10, "user-1", 1, 2, 3))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).
+			WithArgs(1, 2, 3, "user-1", 10).
+			WillReturnError(errors.New("db error"))
+
+		assert.Error(t, repo.CheckInRound(10, "user-1", 1, 2, 3))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}

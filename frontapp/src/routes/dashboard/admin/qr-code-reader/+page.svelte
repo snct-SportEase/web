@@ -12,6 +12,7 @@
 	let activeEventName = $state('');
 	let sports = $state([]);
 	let selectedSportId = $state('');
+	let selectedRound = $state('');
 	let manualBarcode = $state('');
 	let isScanning = $state(false);
 	let isVerifying = $state(false);
@@ -23,7 +24,7 @@
 
 	onMount(() => {
 		loadInitialData();
-		Html5Qrcode.getCameras().catch((err) => {
+		Html5BarcodeScanner.getCameras().catch((err) => {
 			errorMessage = `カメラの取得に失敗しました: ${err}`;
 		});
 
@@ -65,7 +66,7 @@
 	}
 
 	function canVerify() {
-		return activeEventId !== null && selectedSportId !== '';
+		return activeEventId !== null && selectedSportId !== '' && Number(selectedRound) > 0;
 	}
 
 	async function verifyBarcode(barcodeData) {
@@ -75,7 +76,7 @@
 			return;
 		}
 		if (!canVerify()) {
-			errorMessage = '競技を選択してください';
+			errorMessage = '競技とラウンドを選択してください';
 			return;
 		}
 
@@ -83,7 +84,7 @@
 		errorMessage = '';
 
 		try {
-			const response = await fetch('/api/barcode/verify', {
+			const response = await fetch('/api/barcode/check-in', {
 				method: 'POST',
 				credentials: 'include',
 				headers: {
@@ -92,7 +93,8 @@
 				body: JSON.stringify({
 					barcode_data: trimmedBarcode,
 					event_id: Number(activeEventId),
-					sport_id: Number(selectedSportId)
+					sport_id: Number(selectedSportId),
+					round: Number(selectedRound)
 				})
 			});
 
@@ -113,7 +115,7 @@
 
 	function startScan() {
 		if (!canVerify()) {
-			errorMessage = '競技を選択してください';
+			errorMessage = '競技とラウンドを選択してください';
 			return;
 		}
 
@@ -205,6 +207,17 @@
 					{/each}
 				</select>
 
+				<label for="round-input" class="mb-2 mt-4 block text-sm font-medium text-gray-700">ラウンド</label>
+				<input
+					id="round-input"
+					type="number"
+					min="1"
+					step="1"
+					bind:value={selectedRound}
+					disabled={isScanning || isVerifying}
+					class="w-full rounded border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+				/>
+
 				<div
 					id="barcode-reader-region"
 					class="mt-6 min-h-48 w-full overflow-hidden rounded border-2 border-gray-300 bg-gray-50"
@@ -258,12 +271,15 @@
 						disabled={!canVerify() || isVerifying || manualBarcode.trim() === ''}
 						class="w-full rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
 					>
-						{isVerifying ? '確認中...' : '本登録する'}
+						{isVerifying ? 'チェックイン中...' : 'チェックインする'}
 					</button>
 				</form>
 
 				{#if selectedSport}
 					<p class="mt-4 text-sm text-gray-600">選択中: {selectedSport.name}</p>
+				{/if}
+				{#if Number(selectedRound) > 0}
+					<p class="mt-1 text-sm text-gray-600">ラウンド: {selectedRound}</p>
 				{/if}
 			</aside>
 		</div>
@@ -272,17 +288,18 @@
 	{#if verificationResult}
 		{#if verificationResult.success}
 			<div class="mt-6 rounded border border-green-400 bg-green-100 p-4 text-green-800">
-				<p class="font-bold">本登録しました</p>
+				<p class="font-bold">ラウンドチェックインしました</p>
 				<p>氏名: {verificationResult.data.display_name || '未設定'}</p>
 				<p>学籍番号: {verificationResult.data.student_number}</p>
 				<p>競技: {verificationResult.data.sport_name}</p>
+				<p>ラウンド: {verificationResult.data.round}</p>
 				{#if verificationResult.data.capacity_warning}
 					<p class="mt-2 font-semibold">{verificationResult.data.capacity_warning}</p>
 				{/if}
 			</div>
 		{:else}
 			<div class="mt-6 rounded border border-red-400 bg-red-100 p-4 text-red-700">
-				<p class="font-bold">本登録できませんでした</p>
+				<p class="font-bold">チェックインできませんでした</p>
 				<p>{verificationResult.message}</p>
 			</div>
 		{/if}

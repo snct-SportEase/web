@@ -1,12 +1,10 @@
 package handler_test
 
 import (
-	"backapp/internal/handler"
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -292,6 +290,11 @@ func (m *MockTeamRepository) GetConfirmedTeamMembersCount(teamID int) (int, erro
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockTeamRepository) CheckInRound(teamID int, userID string, eventID int, sportID int, round int) error {
+	args := m.Called(teamID, userID, eventID, sportID, round)
+	return args.Error(0)
+}
+
 func (m *MockTeamRepository) CreateTeamsBulk(teams []*models.Team) error {
 	args := m.Called(teams)
 	return args.Error(0)
@@ -300,27 +303,6 @@ func (m *MockTeamRepository) CreateTeamsBulk(teams []*models.Team) error {
 type MockTournamentRepository struct {
 	mock.Mock
 }
-
-type MockBarcodeTokenStore struct {
-	mock.Mock
-}
-
-func (m *MockBarcodeTokenStore) SaveActiveToken(userID string, eventID, sportID int, token string, ttl time.Duration) error {
-	args := m.Called(userID, eventID, sportID, token, ttl)
-	return args.Error(0)
-}
-
-func (m *MockBarcodeTokenStore) GetActiveToken(userID string, eventID, sportID int) (string, error) {
-	args := m.Called(userID, eventID, sportID)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockBarcodeTokenStore) ConsumeActiveToken(userID string, eventID, sportID int, token string) (bool, error) {
-	args := m.Called(userID, eventID, sportID, token)
-	return args.Bool(0), args.Error(1)
-}
-
-var _ handler.BarcodeTokenStore = (*MockBarcodeTokenStore)(nil)
 
 func (m *MockTournamentRepository) SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {
 	args := m.Called(eventID, sportID, sportName, tournamentData, teams)

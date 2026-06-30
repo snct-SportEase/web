@@ -22,6 +22,7 @@ type TeamRepository interface {
 	ConfirmTeamMember(teamID int, userID string) error
 	GetConfirmedTeamMembers(teamID int) ([]*models.User, error)
 	GetConfirmedTeamMembersCount(teamID int) (int, error)
+	CheckInRound(teamID int, userID string, eventID int, sportID int, round int) error
 	CreateTeamsBulk(teams []*models.Team) error
 }
 
@@ -372,6 +373,17 @@ func (r *teamRepository) GetConfirmedTeamMembersCount(teamID int) (int, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+// CheckInRound records that a pre-entered student checked in for a specific event/sport round.
+func (r *teamRepository) CheckInRound(teamID int, userID string, eventID int, sportID int, round int) error {
+	query := `
+		INSERT INTO round_check_ins (event_id, sport_id, round, user_id, team_id)
+		VALUES (?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE checked_in_at = checked_in_at
+	`
+	_, err := r.db.Exec(query, eventID, sportID, round, userID, teamID)
+	return err
 }
 
 func (r *teamRepository) CreateTeamsBulk(teams []*models.Team) error {

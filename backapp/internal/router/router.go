@@ -119,13 +119,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			events.GET("/:id/sports", sportHandler.GetSportsByEventHandler)
 		}
 
-		// Participation confirmation routes accessible to authenticated users
+		// MyID barcode check-in routes accessible to authenticated users
 		barcode := api.Group("/barcode")
 		{
 			barcode.Use(middleware.AuthMiddleware(userRepo))
 			barcode.GET("/teams", barcodeHandler.GetUserTeamsHandler)
-			barcode.POST("/generate", barcodeHandler.GenerateBarcodeHandler)
-			barcode.POST("/verify", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), barcodeHandler.VerifyBarcodeHandler)
+			barcode.POST("/check-in", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), barcodeHandler.CheckInRoundHandler)
 		}
 
 		student := api.Group("/student")

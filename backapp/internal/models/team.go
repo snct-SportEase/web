@@ -21,32 +21,10 @@ type TeamWithSport struct {
 	SportName string `json:"sport_name"`
 }
 
-// BarcodeRequest represents a request to generate a barcode
-type BarcodeRequest struct {
-	EventID int `json:"event_id"`
-	SportID int `json:"sport_id"`
-}
-
-// BarcodeResponse represents a barcode generation response
-type BarcodeResponse struct {
-	BarcodeData string `json:"barcode_data"`
-	ExpiresAt   int64  `json:"expires_at"`
-}
-
-// BarcodeData represents the data encoded in the barcode
-type BarcodeData struct {
-	EventID     int    `json:"event_id"`
-	SportID     int    `json:"sport_id"`
-	SportName   string `json:"sport_name"`
-	UserID      string `json:"user_id"`
-	DisplayName string `json:"display_name"`
-	Timestamp   int64  `json:"timestamp"`
-	ExpiresAt   int64  `json:"expires_at"`
-}
-
-// BarcodeVerifyRequest represents a request to verify a barcode
-type BarcodeVerifyRequest struct {
+// BarcodeCheckInRequest represents a request to check in a student to a round with a MyID barcode.
+type BarcodeCheckInRequest struct {
 	BarcodeData string `json:"barcode_data"`
 	EventID     int    `json:"event_id"`
 	SportID     int    `json:"sport_id"`
+	Round       int    `json:"round"`
 }
