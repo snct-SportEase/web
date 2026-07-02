@@ -6,16 +6,17 @@ const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
     baseURL: `http://localhost:${appPort}`,
     trace: 'on-first-retry',
     launchOptions: chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined
   },
+  // The mock backend keeps shared in-memory state, so run E2E serially in every environment.
+  workers: 1,
   projects: [
     {
       name: 'chromium',

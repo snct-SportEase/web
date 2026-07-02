@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import {
 		Html5Qrcode as Html5BarcodeScanner,
 		Html5QrcodeSupportedFormats as Html5BarcodeSupportedFormats
@@ -106,7 +107,7 @@
 	}
 
 	function dedupeSportsByID(items) {
-		const seen = new Set();
+		const seen = new SvelteSet();
 		return (items ?? []).filter((sport) => {
 			const key = `${sport?.id}`;
 			if (!key || seen.has(key)) {
