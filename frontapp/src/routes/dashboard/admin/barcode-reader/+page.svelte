@@ -1,12 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import {
-		Html5Qrcode as Html5BarcodeScanner,
-		Html5QrcodeSupportedFormats as Html5BarcodeSupportedFormats
-	} from 'html5-qrcode';
 
-	let html5BarcodeScanner = $state();
+	const supportedBarcodeFormats = ['code_39', 'code_128', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e'];
+
+	let barcodeVideo = $state();
+	let barcodeStream = null;
+	let barcodeScanFrame = null;
 	let errorMessage = $state('');
 	let verificationResult = $state(null);
 	let activeEventId = $state(null);
@@ -53,9 +53,6 @@
 
 	onMount(() => {
 		loadInitialData();
-		Html5BarcodeScanner.getCameras().catch((err) => {
-			errorMessage = `カメラの取得に失敗しました: ${err}`;
-		});
 
 		return () => {
 			stopScan();
@@ -273,56 +270,96 @@
 		}
 	}
 
-	function startScan() {
+	async function startScan() {
 		if (!canVerify()) {
 			errorMessage = '競技と試合を選択してください';
+			return;
+		}
+		if (isScanning) {
 			return;
 		}
 
 		errorMessage = '';
 		verificationResult = null;
 
-		html5BarcodeScanner = new Html5BarcodeScanner('barcode-reader-region', {
-			formatsToSupport: [
-				Html5BarcodeSupportedFormats.CODE_39,
-				Html5BarcodeSupportedFormats.CODE_128,
-				Html5BarcodeSupportedFormats.EAN_13,
-				Html5BarcodeSupportedFormats.EAN_8,
-				Html5BarcodeSupportedFormats.ITF,
-				Html5BarcodeSupportedFormats.UPC_A,
-				Html5BarcodeSupportedFormats.UPC_E
-			]
-		});
+		try {
+			const barcodeDetector = await createBarcodeDetector();
+			if (!navigator.mediaDevices?.getUserMedia) {
+				throw new Error('このブラウザではカメラを利用できません。手入力を使用してください');
+			}
 
-		html5BarcodeScanner
-			.start(
-				{ facingMode: 'environment' },
-				{
-					fps: 10,
-					qrbox: { width: 320, height: 140 }
-				},
-				async (decodedText) => {
-					await stopScan();
-					await verifyBarcode(decodedText);
-				},
-				() => {}
-			)
-			.then(() => {
-				isScanning = true;
-			})
-			.catch((err) => {
-				errorMessage = `スキャナーの開始に失敗しました: ${err}`;
-				isScanning = false;
+			barcodeStream = await navigator.mediaDevices.getUserMedia({
+				video: {
+					facingMode: { ideal: 'environment' }
+				}
 			});
+			if (!barcodeVideo) {
+				throw new Error('バーコード読み取り領域を初期化できませんでした');
+			}
+			barcodeVideo.srcObject = barcodeStream;
+			await barcodeVideo.play();
+			isScanning = true;
+			scanBarcodeFrame(barcodeDetector);
+		} catch (err) {
+			await stopScan();
+			errorMessage = err.message || `スキャナーの開始に失敗しました: ${err}`;
+		}
+	}
+
+	async function createBarcodeDetector() {
+		if (typeof window === 'undefined' || !('BarcodeDetector' in window)) {
+			throw new Error('このブラウザはバーコード読み取りに対応していません。手入力を使用してください');
+		}
+
+		const detectorClass = window.BarcodeDetector;
+		let formats = supportedBarcodeFormats;
+		if (typeof detectorClass.getSupportedFormats === 'function') {
+			const browserFormats = await detectorClass.getSupportedFormats();
+			formats = supportedBarcodeFormats.filter((format) => browserFormats.includes(format));
+		}
+		if (formats.length === 0) {
+			throw new Error('このブラウザは対応するバーコード形式を読み取れません。手入力を使用してください');
+		}
+
+		return new detectorClass({ formats });
+	}
+
+	async function scanBarcodeFrame(barcodeDetector) {
+		if (!isScanning || !barcodeVideo) {
+			return;
+		}
+
+		try {
+			if (barcodeVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+				const detectedBarcodes = await barcodeDetector.detect(barcodeVideo);
+				const detectedValue = detectedBarcodes.find((barcode) => barcode.rawValue)?.rawValue;
+				if (detectedValue) {
+					await stopScan();
+					await verifyBarcode(detectedValue);
+					return;
+				}
+			}
+		} catch {
+			await stopScan();
+			errorMessage = 'バーコード読み取りに失敗しました。手入力を使用してください';
+			return;
+		}
+
+		barcodeScanFrame = window.requestAnimationFrame(() => scanBarcodeFrame(barcodeDetector));
 	}
 
 	async function stopScan() {
-		if (html5BarcodeScanner?.isScanning) {
-			try {
-				await html5BarcodeScanner.stop();
-			} catch (err) {
-				console.error(`Error stopping scanner: ${err}`);
-			}
+		if (barcodeScanFrame !== null) {
+			window.cancelAnimationFrame(barcodeScanFrame);
+			barcodeScanFrame = null;
+		}
+		if (barcodeStream) {
+			barcodeStream.getTracks().forEach((track) => track.stop());
+			barcodeStream = null;
+		}
+		if (barcodeVideo) {
+			barcodeVideo.pause();
+			barcodeVideo.srcObject = null;
 		}
 		isScanning = false;
 	}
@@ -387,7 +424,14 @@
 				<div
 					id="barcode-reader-region"
 					class="mt-6 min-h-48 w-full overflow-hidden rounded border-2 border-gray-300 bg-gray-50"
-				></div>
+				>
+					<video
+						bind:this={barcodeVideo}
+						class="h-full min-h-48 w-full object-cover"
+						playsinline
+						muted
+					></video>
+				</div>
 
 				<div class="mt-4 flex flex-wrap gap-3">
 					<button
