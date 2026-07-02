@@ -108,14 +108,31 @@
 
 	function dedupeSportsByID(items) {
 		const seen = new SvelteSet();
-		return (items ?? []).filter((sport) => {
-			const key = `${sport?.id}`;
-			if (!key || seen.has(key)) {
-				return false;
-			}
-			seen.add(key);
-			return true;
-		});
+		return (items ?? [])
+			.map(normalizeSport)
+			.filter(Boolean)
+			.filter((sport) => {
+				const key = `${sport?.id}`;
+				if (!sport?.id || seen.has(key)) {
+					return false;
+				}
+				seen.add(key);
+				return true;
+			});
+	}
+
+	function normalizeSport(sport) {
+		const id = sport?.id ?? sport?.sport_id;
+		const name = sport?.name ?? sport?.sport_name;
+		if (id === undefined || id === null || !name) {
+			return null;
+		}
+
+		return {
+			...sport,
+			id,
+			name
+		};
 	}
 
 	function getTournamentData(tournament) {

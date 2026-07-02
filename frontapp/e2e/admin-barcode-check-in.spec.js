@@ -26,7 +26,7 @@ async function setupAdminBarcodePage({ page, context, request }) {
     path: '/'
   }]);
 
-  await page.goto('/dashboard/admin/qr-code-reader');
+  await page.goto('/dashboard/admin/barcode-reader');
   await expect(page.getByRole('heading', { name: 'MyIDバーコード読み取り' })).toBeVisible();
 }
 

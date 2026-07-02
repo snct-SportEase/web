@@ -69,7 +69,7 @@
     { title: 'ロール管理', description: 'ユーザーロールの付与・削除', href: '/dashboard/admin/role-management' },
     { title: '出席登録', description: '参加者の出席を記録', href: '/dashboard/admin/attendance-management' },
     { title: '試合結果入力', description: 'スコアと勝敗を登録', href: '/dashboard/admin/insert-matche-result' },
-    { title: 'バーコード読み取り', description: 'MyIDでラウンドチェックイン', href: '/dashboard/admin/qr-code-reader' },
+    { title: 'バーコード読み取り', description: 'MyIDでラウンドチェックイン', href: '/dashboard/admin/barcode-reader' },
     { title: '競技詳細登録', description: '競技ルールや資料の管理', href: '/dashboard/admin/sport-details-registration' }
   ];
 
