@@ -94,6 +94,58 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 			assert.Equal(t, http.SameSiteLaxMode, oauthStateCookie.SameSite)
 		}
 	})
+
+	t.Run("redirects invalid callback state to frontend and clears state cookie", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{
+			FrontendURL: "http://localhost:3300",
+		}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/auth/google/callback?state=query-state", nil)
+		c.Request.AddCookie(&http.Cookie{Name: "oauthstate", Value: "cookie-state"})
+
+		authHandler.GoogleCallback(c)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+		assert.Equal(t, "http://localhost:3300/?error=invalid_state", w.Header().Get("Location"))
+
+		var clearedCookie *http.Cookie
+		for _, cookie := range w.Result().Cookies() {
+			if cookie.Name == "oauthstate" {
+				clearedCookie = cookie
+				break
+			}
+		}
+
+		if assert.NotNil(t, clearedCookie) {
+			assert.Equal(t, -1, clearedCookie.MaxAge)
+			assert.Equal(t, "/", clearedCookie.Path)
+			assert.True(t, clearedCookie.HttpOnly)
+			assert.Equal(t, http.SameSiteLaxMode, clearedCookie.SameSite)
+		}
+	})
+
+	t.Run("redirects google callback errors to frontend", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{
+			FrontendURL: "http://localhost:3300",
+		}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/auth/google/callback?error=access_denied", nil)
+
+		authHandler.GoogleCallback(c)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+		assert.Equal(t, "http://localhost:3300/?error=access_denied", w.Header().Get("Location"))
+	})
 }
 
 func TestAuthHandler_UpdateUserClassRepByRoot(t *testing.T) {

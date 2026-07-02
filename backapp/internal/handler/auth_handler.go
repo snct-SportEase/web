@@ -14,6 +14,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -63,11 +64,27 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 }
 
 func (h *AuthHandler) GoogleCallback(c *gin.Context) {
-	oauthState, _ := c.Cookie("oauthstate")
-	if subtle.ConstantTimeCompare([]byte(c.Query("state")), []byte(oauthState)) != 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
+	if oauthError := c.Query("error"); oauthError != "" {
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error="+url.QueryEscape(oauthError))
 		return
 	}
+
+	oauthState, cookieErr := c.Cookie("oauthstate")
+	if subtle.ConstantTimeCompare([]byte(c.Query("state")), []byte(oauthState)) != 1 {
+		log.Printf(
+			"[auth] invalid oauth state: cookie_present=%v request_host=%s forwarded_host=%s forwarded_proto=%s query_state_len=%d cookie_state_len=%d",
+			cookieErr == nil,
+			c.Request.Host,
+			c.Request.Header.Get("X-Forwarded-Host"),
+			c.Request.Header.Get("X-Forwarded-Proto"),
+			len(c.Query("state")),
+			len(oauthState),
+		)
+		clearOauthStateCookie(c.Writer, c.Request)
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=invalid_state")
+		return
+	}
+	clearOauthStateCookie(c.Writer, c.Request)
 
 	code := c.Query("code")
 	token, err := h.oauth2Config.Exchange(context.Background(), code)
@@ -576,6 +593,19 @@ func setSessionTokenCookie(w http.ResponseWriter, r *http.Request, value string,
 		Name:     "session_token",
 		Value:    value,
 		Expires:  expiration,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   shouldUseSecureCookie(r),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func clearOauthStateCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauthstate",
+		Value:    "",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   shouldUseSecureCookie(r),

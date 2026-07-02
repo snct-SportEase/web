@@ -24,6 +24,9 @@
       case 'line_inapp_browser_unsupported':
         errorMessage = 'LINEブラウザではGoogleログインができません。SafariまたはChromeなどの外部ブラウザで開いてからサインインしてください。';
         break;
+      case 'invalid_state':
+        errorMessage = 'ログイン状態の確認に失敗しました。ログイン画面を開いたホストと戻り先URLが異なるか、古いログインURLを開いた可能性があります。もう一度Googleでサインインしてください。';
+        break;
       default:
         errorMessage = 'ログインに失敗しました。もう一度お試しください。';
     }
