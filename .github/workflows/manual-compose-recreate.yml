@@ -26,6 +26,8 @@ jobs:
 
             cd "$HOME/SportEase"
 
+            docker compose -f docker-compose.production.yml up -d sportease-db
+
             mkdir -p "$HOME/db-backups"
             docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
               > "$HOME/db-backups/sportease_before_manual_recreate_$(date +%Y%m%d_%H%M%S).sql"

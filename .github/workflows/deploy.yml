@@ -129,6 +129,8 @@ jobs:
             git fetch origin
             git merge origin/main
 
+            docker compose -f docker-compose.production.yml up -d sportease-db
+
             mkdir -p "$HOME/db-backups"
             docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
               > "$HOME/db-backups/sportease_before_deploy_$(date +%Y%m%d_%H%M%S).sql"
