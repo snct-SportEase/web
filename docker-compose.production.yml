@@ -40,7 +40,6 @@ services:
       - "127.0.0.1:3306:3306"
     volumes:
       - db-data:/var/lib/mysql
-      - ./backapp/db/migrations:/docker-entrypoint-initdb.d
       - ./backapp/db/conf.d:/etc/mysql/conf.d
     networks:
       - spotease-internal
@@ -50,6 +49,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  migrate:
+    image: migrate/migrate:latest
+    profiles:
+      - migration
+    volumes:
+      - ./backapp/db/migrations:/migrations:ro
+    depends_on:
+      sportease-db:
+        condition: service_healthy
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "mysql://${DB_USER}:${DB_PASSWORD}@tcp(sportease-db:3306)/${DB_DATABASE}?multiStatements=true",
+        "up"
+      ]
+    networks:
+      - spotease-internal
 
   sportease-redis:
     image: redis:7-alpine

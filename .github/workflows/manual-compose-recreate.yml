@@ -22,5 +22,36 @@ jobs:
           timeout: 30m
           command_timeout: 30m
           script: |
+            set -e
+
             cd "$HOME/SportEase"
+
+            mkdir -p "$HOME/db-backups"
+            docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
+              > "$HOME/db-backups/sportease_before_manual_recreate_$(date +%Y%m%d_%H%M%S).sql"
+
+            docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" -e "
+              CREATE TABLE IF NOT EXISTS schema_migrations (version bigint not null primary key, dirty boolean not null);
+              INSERT INTO schema_migrations (version, dirty)
+              SELECT
+                CASE
+                  WHEN EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = DATABASE()
+                      AND table_name = '\''round_check_ins'\''
+                  ) THEN 3
+                  ELSE 2
+                END,
+                false
+              WHERE NOT EXISTS (SELECT 1 FROM schema_migrations)
+                AND EXISTS (
+                  SELECT 1
+                  FROM information_schema.tables
+                  WHERE table_schema = DATABASE()
+                    AND table_name = '\''guide_documents'\''
+                );
+            "'
+
+            docker compose -f docker-compose.production.yml --profile migration run --rm migrate
             docker compose -f docker-compose.production.yml up -d --build --force-recreate
