@@ -110,11 +110,80 @@ npm run dev -- --host --port 5000
 ブラウザから `http://localhost:5000` にアクセスし、Googleアカウントでログインします。ホワイトリストに登録されていないメールアドレスは拒否されます。
 
 ### 4. Docker Composeでの起動
+初回起動時、またはDBスキーマ変更を取り込む場合は、先にマイグレーションを実行します。
+
 ```bash
 cd /home/saku0512/Desktop/develop/SportEase/webapp
+docker compose --profile migration run --rm migrate
 docker compose up --build
 ```
 Traefikが80/443/3300番ポートを公開し、`localhost` でフロントエンド（3300番エントリポイント）、`/api` プレフィックスでバックエンドが利用可能になります。
+
+## DBマイグレーション
+
+DBスキーマは `golang-migrate` 形式のSQLで管理します。マイグレーションファイルは `backapp/db/migrations/` に配置し、`000001_xxx.up.sql` / `000001_xxx.down.sql` のペアで追加します。
+
+通常の `docker compose up -d` ではマイグレーションは自動実行されません。明示的に実行する場合は `migration` profile を指定します。
+
+```bash
+docker compose -f docker-compose.production.yml --profile migration run --rm migrate
+```
+
+適用済みバージョンはDB内の `schema_migrations` テーブルで確認できます。
+
+```bash
+docker compose -f docker-compose.production.yml exec sportease-db \
+  mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_DATABASE" \
+  -e "SELECT * FROM schema_migrations;"
+```
+
+### 本番DBへの反映手順
+
+まず最新コードを取得します。
+
+```bash
+git pull origin main
+```
+
+本番DBをバックアップします。
+
+```bash
+mkdir -p ~/db-backups
+
+docker compose -f docker-compose.production.yml exec sportease-db \
+  mysqldump -u root -p"$DB_ROOT_PASSWORD" "$DB_DATABASE" \
+  > ~/db-backups/sportease_before_migrate_$(date +%Y%m%d_%H%M%S).sql
+```
+
+既存本番DBに初めて `golang-migrate` を導入する場合、すでに手動適用済みのスキーマを再実行しないように、初回だけベースラインを登録します。`000001_initial_schema` と `000002_add_guide_documents` が適用済みで、`000003_add_round_check_ins` が未適用のDBでは version `2` を登録します。
+
+```bash
+docker compose -f docker-compose.production.yml exec sportease-db \
+  mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_DATABASE" \
+  -e "CREATE TABLE IF NOT EXISTS schema_migrations (version bigint not null primary key, dirty boolean not null); REPLACE INTO schema_migrations (version, dirty) VALUES (2, false);"
+```
+
+未適用のマイグレーションだけを適用します。
+
+```bash
+docker compose -f docker-compose.production.yml --profile migration run --rm migrate
+```
+
+適用状況を確認します。
+
+```bash
+docker compose -f docker-compose.production.yml exec sportease-db \
+  mysql -u root -p"$DB_ROOT_PASSWORD" "$DB_DATABASE" \
+  -e "SELECT * FROM schema_migrations;"
+```
+
+最後にアプリを更新します。
+
+```bash
+docker compose -f docker-compose.production.yml up -d --build
+```
+
+`down` はデータ削除を伴う可能性があるため、本番環境では緊急時以外実行しないでください。
 
 ## テスト実行
 - フロントエンド: `npm run test`（単体テスト）、`npm run test:e2e`（Playwright）

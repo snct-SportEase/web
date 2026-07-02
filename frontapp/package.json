@@ -49,7 +49,6 @@
 		"html5-qrcode": "^2.3.8",
 		"isomorphic-dompurify": "^2.31.0",
 		"marked": "^16.4.0",
-		"qrcode": "^1.5.4",
 		"svelte-dnd-action": "^0.9.65"
 	}
 }

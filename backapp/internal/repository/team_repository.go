@@ -22,6 +22,8 @@ type TeamRepository interface {
 	ConfirmTeamMember(teamID int, userID string) error
 	GetConfirmedTeamMembers(teamID int) ([]*models.User, error)
 	GetConfirmedTeamMembersCount(teamID int) (int, error)
+	CheckInRound(teamID int, userID string, eventID int, sportID int, matchID int, round int) error
+	GetMatchCheckIns(eventID int, sportID int, matchID int) ([]*models.MatchCheckInMember, error)
 	CreateTeamsBulk(teams []*models.Team) error
 }
 
@@ -311,7 +313,14 @@ func (r *teamRepository) ConfirmTeamMember(teamID int, userID string) error {
 		return err
 	}
 	if rowsAffected == 0 {
-		return sql.ErrNoRows // Team member not found
+		var exists int
+		err := r.db.QueryRow("SELECT COUNT(*) FROM team_members WHERE team_id = ? AND user_id = ?", teamID, userID).Scan(&exists)
+		if err != nil {
+			return err
+		}
+		if exists == 0 {
+			return sql.ErrNoRows // Team member not found
+		}
 	}
 	return nil
 }
@@ -365,6 +374,79 @@ func (r *teamRepository) GetConfirmedTeamMembersCount(teamID int) (int, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+// CheckInRound records that a pre-entered student checked in for a specific event/sport match round.
+func (r *teamRepository) CheckInRound(teamID int, userID string, eventID int, sportID int, matchID int, round int) error {
+	query := `
+		INSERT INTO round_check_ins (event_id, sport_id, match_id, round, user_id, team_id)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE checked_in_at = checked_in_at
+	`
+	_, err := r.db.Exec(query, eventID, sportID, matchID, round, userID, teamID)
+	return err
+}
+
+// GetMatchCheckIns returns students checked in for a selected match.
+func (r *teamRepository) GetMatchCheckIns(eventID int, sportID int, matchID int) ([]*models.MatchCheckInMember, error) {
+	query := `
+		SELECT
+			rci.user_id,
+			u.email,
+			u.display_name,
+			t.class_id,
+			c.name AS class_name,
+			rci.team_id,
+			t.name AS team_name,
+			rci.event_id,
+			rci.sport_id,
+			rci.match_id,
+			rci.round,
+			rci.checked_in_at
+		FROM round_check_ins rci
+		JOIN users u ON u.id = rci.user_id
+		JOIN teams t ON t.id = rci.team_id
+		JOIN classes c ON c.id = t.class_id
+		WHERE rci.event_id = ? AND rci.sport_id = ? AND rci.match_id = ?
+		ORDER BY rci.checked_in_at DESC, u.display_name ASC, u.email ASC
+	`
+	rows, err := r.db.Query(query, eventID, sportID, matchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []*models.MatchCheckInMember
+	for rows.Next() {
+		member := &models.MatchCheckInMember{}
+		var displayName sql.NullString
+		if err := rows.Scan(
+			&member.UserID,
+			&member.Email,
+			&displayName,
+			&member.ClassID,
+			&member.ClassName,
+			&member.TeamID,
+			&member.TeamName,
+			&member.EventID,
+			&member.SportID,
+			&member.MatchID,
+			&member.Round,
+			&member.CheckedInAt,
+		); err != nil {
+			return nil, err
+		}
+		if displayName.Valid {
+			member.DisplayName = &displayName.String
+		}
+		members = append(members, member)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return members, nil
 }
 
 func (r *teamRepository) CreateTeamsBulk(teams []*models.Team) error {

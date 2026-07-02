@@ -20,13 +20,17 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26.4'
           check-latest: true
           cache-dependency-path: 'backapp/go.sum'
 
       - name: Install dependencies
         working-directory: ./backapp
         run: go mod download
+
+      - name: Run all package tests
+        working-directory: ./backapp
+        run: go test -v ./...
 
       - name: Run unit tests
         working-directory: ./backapp
@@ -92,13 +96,16 @@ jobs:
       - name: Check Formatting & Lint
         working-directory: ./frontapp
         run: npm run lint
-        continue-on-error: true
 
       - name: Run Vitest
         working-directory: ./frontapp
         run: npm run test
         env:
           CI: 'true'
+
+      - name: Build Frontend
+        working-directory: ./frontapp
+        run: npm run build
 
       - name: Run Playwright E2E
         working-directory: ./frontapp
@@ -122,10 +129,43 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           timeout: 30m
           script: |
+            set -e
+
             cd $HOME/SportEase
 
             git fetch origin
             git merge origin/main
+
+            docker compose -f docker-compose.production.yml up -d sportease-db
+
+            mkdir -p "$HOME/db-backups"
+            docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
+              > "$HOME/db-backups/sportease_before_deploy_$(date +%Y%m%d_%H%M%S).sql"
+
+            docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" -e "
+              CREATE TABLE IF NOT EXISTS schema_migrations (version bigint not null primary key, dirty boolean not null);
+              INSERT INTO schema_migrations (version, dirty)
+              SELECT
+                CASE
+                  WHEN EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = DATABASE()
+                      AND table_name = '\''round_check_ins'\''
+                  ) THEN 3
+                  ELSE 2
+                END,
+                false
+              WHERE NOT EXISTS (SELECT 1 FROM schema_migrations)
+                AND EXISTS (
+                  SELECT 1
+                  FROM information_schema.tables
+                  WHERE table_schema = DATABASE()
+                    AND table_name = '\''guide_documents'\''
+                );
+            "'
+
+            docker compose -f docker-compose.production.yml --profile migration run --rm migrate
 
             docker compose -f docker-compose.production.yml build --no-cache
             docker compose -f docker-compose.production.yml up -d --build

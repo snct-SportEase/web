@@ -17,6 +17,7 @@ type TournamentRepository interface {
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 	GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error)
+	GetMatchForEventSport(matchID int, eventID int, sportID int) (*models.MatchDB, error)
 	GetTeamsByTournamentID(tournamentID int) ([]*models.Team, error)
 	CountTeamsBySportForEvent(eventID int) (map[int]int, error)
 	GetMatchesForTeam(eventID int, teamID int) ([]*models.MatchDetail, error)
@@ -656,6 +657,70 @@ func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.Ma
 	var loserBracketBlock sql.NullString
 	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?", matchID)
 	if err := row.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch, &m.IsLoserBracketMatch, &loserBracketRound, &loserBracketBlock, &m.RainyModeStartTime); err != nil {
+		return nil, err
+	}
+	if loserBracketRound.Valid {
+		m.LoserBracketRound = loserBracketRound
+	}
+	if loserBracketBlock.Valid {
+		m.LoserBracketBlock = loserBracketBlock
+	}
+	return &m, nil
+}
+
+func (r *tournamentRepository) GetMatchForEventSport(matchID int, eventID int, sportID int) (*models.MatchDB, error) {
+	var m models.MatchDB
+	var loserBracketRound sql.NullInt64
+	var loserBracketBlock sql.NullString
+	row := r.db.QueryRow(`
+		SELECT
+			m.id,
+			m.tournament_id,
+			m.round,
+			m.match_number_in_round,
+			m.team1_id,
+			m.team2_id,
+			m.team1_score,
+			m.team2_score,
+			CASE
+				WHEN m.team1_score > m.team2_score THEN m.team1_id
+				WHEN m.team2_score > m.team1_score THEN m.team2_id
+				ELSE NULL
+			END AS winner_team_id,
+			m.status,
+			m.next_match_id,
+			m.match_start_time,
+			m.is_bronze_match,
+			m.is_loser_bracket_match,
+			m.loser_bracket_round,
+			m.loser_bracket_block,
+			m.rainy_mode_start_time
+		FROM matches m
+		JOIN tournaments t ON m.tournament_id = t.id
+		WHERE m.id = ? AND t.event_id = ? AND t.sport_id = ?
+	`, matchID, eventID, sportID)
+	if err := row.Scan(
+		&m.ID,
+		&m.TournamentID,
+		&m.Round,
+		&m.MatchNumberInRound,
+		&m.Team1ID,
+		&m.Team2ID,
+		&m.Team1Score,
+		&m.Team2Score,
+		&m.WinnerID,
+		&m.Status,
+		&m.NextMatchID,
+		&m.StartTime,
+		&m.IsBronzeMatch,
+		&m.IsLoserBracketMatch,
+		&loserBracketRound,
+		&loserBracketBlock,
+		&m.RainyModeStartTime,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if loserBracketRound.Valid {

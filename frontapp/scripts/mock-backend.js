@@ -24,6 +24,7 @@ const studentUser = {
     { id: 4, name: 'judge' }
   ]
 };
+const studentTeamId = 101;
 
 const adminUser = {
   id: 'user-2',
@@ -137,11 +138,12 @@ const sampleTournamentData = () => ({
   ],
   matches: [
     {
+      id: 1,
       roundIndex: 0,
       order: 0,
       sides: [
-        { contestantId: 'c0', scores: [{ mainScore: 3 }], isWinner: true },
-        { contestantId: 'c1', scores: [{ mainScore: 1 }] }
+        { contestantId: 'c0', teamId: studentTeamId, scores: [{ mainScore: 3 }], isWinner: true },
+        { contestantId: 'c1', teamId: 102, scores: [{ mainScore: 1 }] }
       ]
     }
   ],
@@ -168,6 +170,12 @@ const defaultTournaments = () => ([
   {
     id: 1,
     name: 'バスケットボール',
+    sport_id: 1,
+    data: sampleTournamentData()
+  },
+  {
+    id: 2,
+    name: 'バスケットボール 敗者復活',
     sport_id: 1,
     data: sampleTournamentData()
   }
@@ -203,14 +211,13 @@ let guideDocuments = [
 ];
 let defaultGroups = defaultDefaultGroups();
 let tournaments = defaultTournaments();
+let barcodeCheckIns = [];
 let noonSession = null;
 let noonGroups = [];
 let noonMatches = [];
 let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let rainyModeSettings = [];
-let qrCodeSequence = 0;
-let qrCodeActiveTokens = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -259,48 +266,6 @@ function sendJson(res, status, body) {
 function sendResponse(res, status, body, headers = {}) {
   res.writeHead(status, headers);
   res.end(body);
-}
-
-function encodeBase64Url(value) {
-  return Buffer.from(value).toString('base64url');
-}
-
-function decodeBase64Url(value) {
-  return Buffer.from(value, 'base64url').toString('utf8');
-}
-
-function qrCodeKey(userId, eventId, sportId) {
-  return `${userId}:${eventId}:${sportId}`;
-}
-
-function buildMockQRCodeResponse(eventId, sportId) {
-  qrCodeSequence += 1;
-  const timestamp = Math.floor(Date.now() / 1000);
-  const expiresAt = timestamp + 10;
-  const userId = rootUser.id;
-  const displayName = rootUser.display_name;
-  const sportName = sportId === 1 ? 'バスケットボール' : 'バレーボール';
-  const token = `mock-token-${qrCodeSequence}`;
-
-  qrCodeActiveTokens.set(qrCodeKey(userId, eventId, sportId), token);
-
-  const payload = {
-    token,
-    data: {
-      event_id: eventId,
-      sport_id: sportId,
-      sport_name: sportName,
-      user_id: userId,
-      display_name: displayName,
-      timestamp,
-      expires_at: expiresAt
-    }
-  };
-
-  return {
-    qr_code_data: encodeBase64Url(JSON.stringify(payload)),
-    expires_at: expiresAt
-  };
 }
 
 function readJson(req) {
@@ -377,14 +342,13 @@ createServer(async (req, res) => {
     ];
     defaultGroups = defaultDefaultGroups();
     tournaments = defaultTournaments();
+    barcodeCheckIns = [];
     noonSession = null;
     noonGroups = [];
     noonMatches = [];
     noonPointsSummary = [];
     noonTemplateRuns = [];
     rainyModeSettings = [];
-    qrCodeSequence = 0;
-    qrCodeActiveTokens = new Map();
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
     return;
@@ -558,10 +522,10 @@ createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/qrcode/teams' && req.method === 'GET') {
+  if (url.pathname === '/api/barcode/teams' && req.method === 'GET') {
     sendJson(res, 200, [
       {
-        id: 101,
+        id: studentTeamId,
         name: 'Team A',
         class_id: 1,
         event_id: 1,
@@ -572,55 +536,100 @@ createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/qrcode/generate' && req.method === 'POST') {
+  if (url.pathname === '/api/barcode/check-in' && req.method === 'POST') {
     const body = await readJson(req);
-    sendJson(res, 200, buildMockQRCodeResponse(body.event_id, body.sport_id));
+    const barcode = String(body.barcode_data ?? '').trim();
+    const eventId = Number(body.event_id);
+    const sportId = Number(body.sport_id);
+    const matchId = Number(body.match_id);
+
+    if (!eventId || !sportId) {
+      sendJson(res, 400, { error: 'イベントIDと競技IDが必要です' });
+      return;
+    }
+    if (!matchId || matchId <= 0) {
+      sendJson(res, 400, { error: '試合を選択してください' });
+      return;
+    }
+    if (!/^H10\d{7}$/.test(barcode)) {
+      sendJson(res, 400, { error: 'バーコード形式が不正です' });
+      return;
+    }
+
+    const tournament = tournaments.find((item) => item.sport_id === sportId);
+    const match = tournament?.data?.matches?.find((item) => item.id === matchId);
+    if (!match) {
+      sendJson(res, 400, { error: '選択した試合がこの競技に存在しません' });
+      return;
+    }
+    if (!match.sides?.some((side) => Number(side?.teamId) === studentTeamId)) {
+      sendJson(res, 403, { error: '読み取った学生のチームは選択した試合に出場していません' });
+      return;
+    }
+
+    const sport = sports.find((item) => item.id === sportId);
+    const round = Number(match.roundIndex ?? 0) + 1;
+    const existingCheckIn = barcodeCheckIns.find((item) =>
+      item.event_id === eventId
+      && item.sport_id === sportId
+      && item.match_id === matchId
+      && item.user_id === studentUser.id
+    );
+    if (!existingCheckIn) {
+      barcodeCheckIns = [
+        {
+          user_id: studentUser.id,
+          email: 's2301059@sendai-nct.jp',
+          display_name: studentUser.display_name,
+          class_id: 1,
+          class_name: '1A',
+          team_id: studentTeamId,
+          team_name: 'Team A',
+          event_id: eventId,
+          sport_id: sportId,
+          match_id: matchId,
+          round,
+          checked_in_at: new Date().toISOString()
+        },
+        ...barcodeCheckIns
+      ];
+    }
+    sendJson(res, 200, {
+      valid: true,
+      checked_in: true,
+      confirmed: true,
+      event_id: eventId,
+      sport_id: sportId,
+      sport_name: sport?.name ?? 'バスケットボール',
+      round,
+      match_id: matchId,
+      team_id: studentTeamId,
+      user_id: studentUser.id,
+      display_name: studentUser.display_name,
+      student_number: barcode.slice(3),
+      barcode_data: barcode
+    });
     return;
   }
 
-  if (url.pathname === '/api/qrcode/verify' && req.method === 'POST') {
-    const body = await readJson(req);
-
-    try {
-      const combined = JSON.parse(decodeBase64Url(body.qr_code_data ?? ''));
-      const token = combined?.token;
-      const data = combined?.data;
-
-      if (!token) {
-        sendJson(res, 400, { error: 'Invalid QR code token' });
-        return;
-      }
-
-      const activeToken = qrCodeActiveTokens.get(qrCodeKey(data.user_id, data.event_id, data.sport_id));
-      if (!activeToken || activeToken !== token) {
-        sendJson(res, 400, { error: 'QRコードは無効または期限切れです' });
-        return;
-      }
-
-      const now = Math.floor(Date.now() / 1000);
-      if (now > data.expires_at) {
-        sendJson(res, 400, {
-          error: 'QRコードの有効期限が切れています',
-          expired: true,
-          expires_at: data.expires_at
-        });
-        return;
-      }
-
-      sendJson(res, 200, {
-        valid: true,
-        event_id: data.event_id,
-        sport_id: data.sport_id,
-        sport_name: data.sport_name,
-        user_id: data.user_id,
-        display_name: data.display_name,
-        timestamp: data.timestamp,
-        expires_at: data.expires_at,
-        remaining_time: Math.max(0, data.expires_at - now)
-      });
-    } catch {
-      sendJson(res, 400, { error: 'Invalid QR code data' });
+  const barcodeMatchCheckInsMatch = url.pathname.match(/^\/api\/barcode\/matches\/(\d+)\/check-ins$/);
+  if (barcodeMatchCheckInsMatch && req.method === 'GET') {
+    const matchId = Number(barcodeMatchCheckInsMatch[1]);
+    const eventId = Number(url.searchParams.get('event_id'));
+    const sportId = Number(url.searchParams.get('sport_id'));
+    const tournament = tournaments.find((item) => item.sport_id === sportId);
+    const match = tournament?.data?.matches?.find((item) => item.id === matchId);
+    if (!match) {
+      sendJson(res, 400, { error: '選択した試合がこの競技に存在しません' });
+      return;
     }
+
+    const members = barcodeCheckIns.filter((item) =>
+      item.event_id === eventId
+      && item.sport_id === sportId
+      && item.match_id === matchId
+    );
+    sendJson(res, 200, { members, count: members.length });
     return;
   }
 
@@ -646,7 +655,14 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/events/1/sports' && req.method === 'GET') {
-    sendJson(res, 200, eventSports);
+    sendJson(res, 200, eventSports.map((eventSport) => {
+      const sport = sports.find((item) => item.id === eventSport.sport_id);
+      return {
+        ...eventSport,
+        id: eventSport.sport_id,
+        name: sport?.name ?? `競技${eventSport.sport_id}`
+      };
+    }));
     return;
   }
 
@@ -1144,6 +1160,6 @@ createServer(async (req, res) => {
   sendJson(res, 404, {
     error: `Mock backend route not found: ${req.method} ${url.pathname}`
   });
-}).listen(port, () => {
-  console.log(`Mock backend listening on port ${port}`);
+}).listen(port, '127.0.0.1', () => {
+  console.log(`Mock backend listening on http://127.0.0.1:${port}`);
 });

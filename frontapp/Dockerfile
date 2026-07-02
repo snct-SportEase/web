@@ -11,7 +11,17 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Stage 2: Production stage
+# Stage 2: E2E test stage
+FROM builder AS e2e
+
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+CMD ["npm", "run", "test:e2e"]
+
+# Stage 3: Production stage
 FROM node:20-alpine AS production
 
 WORKDIR /app
