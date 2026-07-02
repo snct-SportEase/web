@@ -10,6 +10,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -41,7 +42,7 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
 			RedirectURL:  cfg.GoogleRedirectURL,
-			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
+			Scopes:       []string{"openid", "email", "https://www.googleapis.com/auth/userinfo.email"},
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  "https://accounts.google.com/o/oauth2/auth",
 				TokenURL: "https://oauth2.googleapis.com/token",
@@ -94,39 +95,20 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	req, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+	email, err := fetchGoogleUserEmail(context.Background(), token.AccessToken)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create userinfo request"})
-		return
-	}
-	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info"})
-		return
-	}
-	defer response.Body.Close()
-
-	data, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Printf("failed to read userinfo response: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
-		return
-	}
-
-	var userInfo struct {
-		Email string `json:"email"`
-	}
-	if err := json.Unmarshal(data, &userInfo); err != nil {
-		log.Printf("failed to parse userinfo: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
-		return
+		log.Printf("failed to fetch google userinfo, falling back to id_token: %v", err)
+		email, err = emailFromGoogleIDToken(token.Extra("id_token"), h.cfg.GoogleClientID)
+		if err != nil {
+			log.Printf("failed to read email from google id_token: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+			return
+		}
 	}
 
 	// ドメイン制限
 	allowedDomains := []string{"sendai-nct.jp", "sendai-nct.ac.jp"}
-	parts := strings.Split(userInfo.Email, "@")
+	parts := strings.Split(email, "@")
 	if len(parts) != 2 || parts[1] == "" {
 		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=domain_not_allowed")
 		return
@@ -144,7 +126,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userRepo.GetUserByEmail(userInfo.Email)
+	user, err := h.userRepo.GetUserByEmail(email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user by email"})
 		return
@@ -153,13 +135,13 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	if user == nil {
 		// 新規ユーザー: InitRootUserと一致する場合はrootロール、それ以外はstudent
 		role := "student"
-		if h.cfg != nil && h.cfg.InitRootUser == userInfo.Email {
+		if h.cfg != nil && h.cfg.InitRootUser == email {
 			role = "root"
 		}
 
 		newUser := &models.User{
 			ID:                uuid.New().String(),
-			Email:             userInfo.Email,
+			Email:             email,
 			IsProfileComplete: false,
 		}
 		if err := h.userRepo.CreateUser(newUser, role); err != nil {
@@ -181,6 +163,106 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	log.Printf("[auth] Session created for user %s, secure=%v, origin=%s", user.Email, shouldUseSecureCookie(c.Request), c.Request.RemoteAddr)
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
+}
+
+func fetchGoogleUserEmail(ctx context.Context, accessToken string) (string, error) {
+	if accessToken == "" {
+		return "", fmt.Errorf("access token is empty")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+	if err != nil {
+		return "", fmt.Errorf("create userinfo request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("userinfo request failed: %w", err)
+	}
+	defer response.Body.Close()
+
+	data, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil {
+		return "", fmt.Errorf("read userinfo response: %w", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("userinfo returned %s: %s", response.Status, strings.TrimSpace(string(data)))
+	}
+
+	var userInfo struct {
+		Email string `json:"email"`
+	}
+	if err := json.Unmarshal(data, &userInfo); err != nil {
+		return "", fmt.Errorf("parse userinfo response: %w", err)
+	}
+	if userInfo.Email == "" {
+		return "", fmt.Errorf("userinfo response did not include email")
+	}
+
+	return userInfo.Email, nil
+}
+
+func emailFromGoogleIDToken(rawIDToken any, expectedAudience string) (string, error) {
+	idToken, ok := rawIDToken.(string)
+	if !ok || idToken == "" {
+		return "", fmt.Errorf("id_token is missing")
+	}
+
+	parts := strings.Split(idToken, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("id_token has invalid format")
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("decode id_token payload: %w", err)
+	}
+
+	var claims struct {
+		Email         string          `json:"email"`
+		EmailVerified bool            `json:"email_verified"`
+		Audience      json.RawMessage `json:"aud"`
+		ExpiresAt     int64           `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return "", fmt.Errorf("parse id_token payload: %w", err)
+	}
+
+	if claims.Email == "" {
+		return "", fmt.Errorf("id_token did not include email")
+	}
+	if !claims.EmailVerified {
+		return "", fmt.Errorf("id_token email is not verified")
+	}
+	if claims.ExpiresAt != 0 && time.Now().Unix() > claims.ExpiresAt {
+		return "", fmt.Errorf("id_token is expired")
+	}
+	if expectedAudience != "" && !idTokenAudienceMatches(claims.Audience, expectedAudience) {
+		return "", fmt.Errorf("id_token audience does not match client id")
+	}
+
+	return claims.Email, nil
+}
+
+func idTokenAudienceMatches(rawAudience json.RawMessage, expectedAudience string) bool {
+	var audience string
+	if err := json.Unmarshal(rawAudience, &audience); err == nil {
+		return audience == expectedAudience
+	}
+
+	var audiences []string
+	if err := json.Unmarshal(rawAudience, &audiences); err != nil {
+		return false
+	}
+
+	for _, audience := range audiences {
+		if audience == expectedAudience {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *AuthHandler) GetUser(c *gin.Context) {
