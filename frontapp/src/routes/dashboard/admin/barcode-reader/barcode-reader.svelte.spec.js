@@ -4,11 +4,13 @@ import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
 
 function minutesFromNow(minutes) {
-	const date = new Date(Date.now() + minutes * 60 * 1000);
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-		date.getDate()
-	).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(
-		date.getMinutes()
+	// Match start times are registered as JST wall-clock values.
+	const jstOffsetMs = 9 * 60 * 60 * 1000;
+	const date = new Date(Date.now() + minutes * 60 * 1000 + jstOffsetMs);
+	return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(
+		date.getUTCDate()
+	).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}:${String(
+		date.getUTCMinutes()
 	).padStart(2, '0')}:00`;
 }
 
