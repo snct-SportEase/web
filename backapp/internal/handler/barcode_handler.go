@@ -219,6 +219,8 @@ func (h *BarcodeHandler) GetMatchCheckInsHandler(c *gin.Context) {
 
 	selectedMatchIDs := parseMatchIDsQuery(matchID, c.Query("match_ids"))
 	members := make([]*models.MatchCheckInMember, 0)
+	matchTeamIDs := make([]int, 0)
+	seenTeamIDs := make(map[int]bool)
 	for _, selectedMatchID := range selectedMatchIDs {
 		match, err := h.tournRepo.GetMatchForEventSport(selectedMatchID, eventID, sportID)
 		if err != nil {
@@ -229,6 +231,13 @@ func (h *BarcodeHandler) GetMatchCheckInsHandler(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "選択した試合がこの競技に存在しません"})
 			return
 		}
+		for _, teamID := range getMatchTeamIDs(match) {
+			if seenTeamIDs[teamID] {
+				continue
+			}
+			seenTeamIDs[teamID] = true
+			matchTeamIDs = append(matchTeamIDs, teamID)
+		}
 
 		matchMembers, err := h.teamRepo.GetMatchCheckIns(eventID, sportID, selectedMatchID)
 		if err != nil {
@@ -238,10 +247,74 @@ func (h *BarcodeHandler) GetMatchCheckInsHandler(c *gin.Context) {
 		members = append(members, matchMembers...)
 	}
 
+	uncheckedMembers, err := h.buildUncheckedMatchMembers(eventID, sportID, matchTeamIDs, members)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match members"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"members": members,
-		"count":   len(members),
+		"members":            members,
+		"count":              len(members),
+		"checked_in_members": members,
+		"checked_in_count":   len(members),
+		"unchecked_members":  uncheckedMembers,
+		"unchecked_count":    len(uncheckedMembers),
 	})
+}
+
+func (h *BarcodeHandler) buildUncheckedMatchMembers(eventID int, sportID int, teamIDs []int, checkedMembers []*models.MatchCheckInMember) ([]*models.MatchCheckInMember, error) {
+	uncheckedMembers := make([]*models.MatchCheckInMember, 0)
+	if len(teamIDs) == 0 {
+		return uncheckedMembers, nil
+	}
+
+	teamMembersByTeamID, err := h.teamRepo.GetTeamMembersByTeamIDs(teamIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	checkedUserIDs := make(map[string]bool, len(checkedMembers))
+	for _, member := range checkedMembers {
+		if member != nil {
+			checkedUserIDs[member.UserID] = true
+		}
+	}
+
+	for _, teamID := range teamIDs {
+		for _, user := range teamMembersByTeamID[teamID] {
+			if user == nil || checkedUserIDs[user.ID] {
+				continue
+			}
+
+			classID := 0
+			if user.ClassID != nil {
+				classID = *user.ClassID
+			}
+			uncheckedMembers = append(uncheckedMembers, &models.MatchCheckInMember{
+				UserID:      user.ID,
+				Email:       user.Email,
+				DisplayName: user.DisplayName,
+				ClassID:     classID,
+				TeamID:      teamID,
+				EventID:     eventID,
+				SportID:     sportID,
+			})
+		}
+	}
+
+	return uncheckedMembers, nil
+}
+
+func getMatchTeamIDs(match *models.MatchDB) []int {
+	teamIDs := make([]int, 0, 2)
+	if match.Team1ID.Valid {
+		teamIDs = append(teamIDs, int(match.Team1ID.Int64))
+	}
+	if match.Team2ID.Valid {
+		teamIDs = append(teamIDs, int(match.Team2ID.Int64))
+	}
+	return teamIDs
 }
 
 func normalizeMatchIDs(primaryMatchID int, matchIDs []int) []int {

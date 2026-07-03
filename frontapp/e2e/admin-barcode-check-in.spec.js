@@ -53,15 +53,29 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
     await page.getByRole('button', { name: 'チェックインする' }).click();
 
     await checkInRequest;
-    await expect(page.getByText('ラウンドチェックインを完了しました')).toBeVisible();
+    const successDialog = page.getByRole('dialog', { name: 'ラウンドチェックインを完了しました' });
+    await expect(successDialog).toBeVisible();
     await expect(page.getByText('氏名: 山田太郎')).toBeVisible();
     await expect(page.getByText('学籍番号: 2301059')).toBeVisible();
     await expect(page.getByText('競技: バスケットボール')).toBeVisible();
     await expect(page.getByText('ラウンド: 1').nth(1)).toBeVisible();
     await expect(page.getByLabel('バーコード値')).toHaveValue('');
+    await successDialog.getByRole('button', { name: '閉じる' }).click();
     await expect(page.getByText('この試合のチェックイン済み')).toBeVisible();
     await expect(page.getByText('1 人')).toBeVisible();
     await expect(page.getByText('s2301059@sendai-nct.jp')).toBeVisible();
+
+    await page.getByRole('button', { name: 'チェックイン済み（1人）' }).click();
+    const checkedDialog = page.getByRole('dialog', { name: 'チェックイン済みの学生' });
+    await expect(checkedDialog).toBeVisible();
+    await expect(checkedDialog.getByText('山田太郎')).toBeVisible();
+    await checkedDialog.getByRole('button', { name: '閉じる' }).click();
+
+    await page.getByRole('button', { name: '未チェックイン（1人）' }).click();
+    const uncheckedDialog = page.getByRole('dialog', { name: '未チェックインの学生' });
+    await expect(uncheckedDialog).toBeVisible();
+    await expect(uncheckedDialog.getByText('佐藤花子')).toBeVisible();
+    await uncheckedDialog.getByRole('button', { name: '閉じる' }).click();
   });
 
   test('MyID形式ではないバーコードはrejectされる', async ({ page }) => {

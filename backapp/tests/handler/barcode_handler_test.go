@@ -768,19 +768,47 @@ func TestBarcodeHandler_GetMatchCheckInsHandler(t *testing.T) {
 				MatchID:     101,
 			},
 		}
+		thirdName := "鈴木一郎"
+		fourthName := "高橋次郎"
+		classID := 1
 
-		mockTournamentRepo.On("GetMatchForEventSport", 100, 1, 2).Return(&models.MatchDB{ID: 100, Round: 0}, nil).Once()
-		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 100, 1, 2).Return(&models.MatchDB{
+			ID:      100,
+			Round:   0,
+			Team1ID: sql.NullInt64{Int64: 10, Valid: true},
+			Team2ID: sql.NullInt64{Int64: 20, Valid: true},
+		}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{
+			ID:      101,
+			Round:   0,
+			Team1ID: sql.NullInt64{Int64: 30, Valid: true},
+			Team2ID: sql.NullInt64{Int64: 40, Valid: true},
+		}, nil).Once()
 		mockTeamRepo.On("GetMatchCheckIns", 1, 2, 100).Return(firstMembers, nil).Once()
 		mockTeamRepo.On("GetMatchCheckIns", 1, 2, 101).Return(secondMembers, nil).Once()
+		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{10, 20, 30, 40}).Return(map[int][]*models.User{
+			10: {
+				{ID: "user-1", DisplayName: &firstName, ClassID: &classID},
+				{ID: "user-3", Email: "s2301060@sendai-nct.jp", DisplayName: &thirdName, ClassID: &classID},
+			},
+			30: {
+				{ID: "user-2", DisplayName: &secondName, ClassID: &classID},
+				{ID: "user-4", Email: "s2301061@sendai-nct.jp", DisplayName: &fourthName, ClassID: &classID},
+			},
+		}, nil).Once()
 
 		w, response := request(h, "100", "event_id=1&sport_id=2&match_ids=100,101")
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, float64(2), response["count"])
+		assert.Equal(t, float64(2), response["checked_in_count"])
+		assert.Equal(t, float64(2), response["unchecked_count"])
 		responseMembers, ok := response["members"].([]interface{})
 		assert.True(t, ok)
 		assert.Len(t, responseMembers, 2)
+		uncheckedMembers, ok := response["unchecked_members"].([]interface{})
+		assert.True(t, ok)
+		assert.Len(t, uncheckedMembers, 2)
 		mockTeamRepo.AssertExpectations(t)
 		mockTournamentRepo.AssertExpectations(t)
 	})
@@ -808,6 +836,25 @@ func TestBarcodeHandler_GetMatchCheckInsHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "Failed to get match check-ins", response["error"])
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("Failure - Team members repository error", func(t *testing.T) {
+		h, mockTeamRepo, mockTournamentRepo := newHandler()
+
+		mockTournamentRepo.On("GetMatchForEventSport", 100, 1, 2).Return(&models.MatchDB{
+			ID:      100,
+			Round:   2,
+			Team1ID: sql.NullInt64{Int64: 10, Valid: true},
+		}, nil).Once()
+		mockTeamRepo.On("GetMatchCheckIns", 1, 2, 100).Return([]*models.MatchCheckInMember{}, nil).Once()
+		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{10}).Return(nil, assert.AnError).Once()
+
+		w, response := request(h, "100", "event_id=1&sport_id=2")
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, "Failed to get match members", response["error"])
 		mockTeamRepo.AssertExpectations(t)
 		mockTournamentRepo.AssertExpectations(t)
 	})

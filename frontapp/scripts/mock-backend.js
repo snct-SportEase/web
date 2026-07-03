@@ -618,8 +618,14 @@ createServer(async (req, res) => {
     const eventId = Number(url.searchParams.get('event_id'));
     const sportId = Number(url.searchParams.get('sport_id'));
     const tournament = tournaments.find((item) => item.sport_id === sportId);
-    const match = tournament?.data?.matches?.find((item) => item.id === matchId);
-    if (!match) {
+    const selectedMatchIds = (url.searchParams.get('match_ids') ?? `${matchId}`)
+      .split(',')
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const selectedMatches = selectedMatchIds.map((selectedMatchId) =>
+      tournament?.data?.matches?.find((item) => item.id === selectedMatchId)
+    );
+    if (selectedMatches.some((match) => !match)) {
       sendJson(res, 400, { error: '選択した試合がこの競技に存在しません' });
       return;
     }
@@ -627,9 +633,50 @@ createServer(async (req, res) => {
     const members = barcodeCheckIns.filter((item) =>
       item.event_id === eventId
       && item.sport_id === sportId
-      && item.match_id === matchId
+      && selectedMatchIds.includes(item.match_id)
     );
-    sendJson(res, 200, { members, count: members.length });
+    const checkedUserIds = new Set(members.map((item) => item.user_id));
+    const assignedMembers = selectedMatches.flatMap((match) =>
+      (match?.sides ?? [])
+        .map((side) => Number(side?.teamId))
+        .filter((teamId) => teamId > 0)
+        .map((teamId) => {
+          if (teamId === studentTeamId) {
+            return {
+              user_id: studentUser.id,
+              email: 's2301059@sendai-nct.jp',
+              display_name: studentUser.display_name,
+              class_id: 1,
+              class_name: '1A',
+              team_id: studentTeamId,
+              team_name: 'Team A',
+              event_id: eventId,
+              sport_id: sportId
+            };
+          }
+
+          return {
+            user_id: `team-${teamId}-user`,
+            email: `team-${teamId}@sendai-nct.jp`,
+            display_name: '佐藤花子',
+            class_id: 2,
+            class_name: '1B',
+            team_id: teamId,
+            team_name: 'Team B',
+            event_id: eventId,
+            sport_id: sportId
+          };
+        })
+    );
+    const uncheckedMembers = assignedMembers.filter((member) => !checkedUserIds.has(member.user_id));
+    sendJson(res, 200, {
+      members,
+      count: members.length,
+      checked_in_members: members,
+      checked_in_count: members.length,
+      unchecked_members: uncheckedMembers,
+      unchecked_count: uncheckedMembers.length
+    });
     return;
   }
 

@@ -22,9 +22,12 @@
 	let isVerifying = $state(false);
 	let loading = $state(true);
 	let matchCheckIns = $state([]);
+	let checkedInMembers = $state([]);
+	let uncheckedMembers = $state([]);
 	let matchCheckInCount = $state(0);
 	let checkInsLoading = $state(false);
 	let checkInsError = $state('');
+	let checkInStatusModalMode = $state(null);
 	let currentTime = $state(Date.now());
 
 	let selectedSport = $derived(
@@ -106,6 +109,9 @@
 	function handleKeydown(event) {
 		if (event.key === 'Escape' && verificationResult) {
 			closeResultModal();
+		}
+		if (event.key === 'Escape' && checkInStatusModalMode) {
+			closeCheckInStatusModal();
 		}
 	}
 
@@ -214,6 +220,7 @@
 		const matchIds = entries.map((entry) => entry.match.id);
 		const matchupLabels = entries.map((entry) => entry.matchupLabel).filter(Boolean);
 		const matchupSummary = matchupLabels.join(', ');
+		const teamNamesById = getTeamNamesById(entries);
 		const sortIndex = Math.min(...entries.map((entry) => entry.sortIndex));
 		const startTimeMs = getSelectionStartTimeMs(entries);
 		const opensAtMs = startTimeMs === null ? null : startTimeMs - matchSelectionOpenOffsetMs;
@@ -230,6 +237,7 @@
 				summaryLabel,
 				matchupLabel: matchupSummary,
 				matchupLabels,
+				teamNamesById,
 				round: timedGroup.round,
 				isSelectable,
 				opensAtMs,
@@ -246,6 +254,7 @@
 			summaryLabel: baseLabel,
 			matchupLabel: matchupSummary,
 			matchupLabels,
+			teamNamesById,
 			round: getMatchRound(firstEntry.match),
 			isSelectable,
 			opensAtMs,
@@ -255,6 +264,19 @@
 
 	function getMatchStartTime(match) {
 		return match?.startTime || match?.rainyModeStartTime || '';
+	}
+
+	function getTeamNamesById(entries) {
+		return entries.reduce((names, entry) => {
+			const sides = Array.isArray(entry.match?.sides) ? entry.match.sides : [];
+			sides.forEach((side) => {
+				if (!side?.teamId) {
+					return;
+				}
+				names[String(side.teamId)] = getSideName(entry.data, side);
+			});
+			return names;
+		}, {});
 	}
 
 	function getSelectionStartTimeMs(entries) {
@@ -269,13 +291,12 @@
 	}
 
 	function parseMatchStartTimeMs(value) {
-		const trimmedValue = String(value || '').trim();
-		if (!trimmedValue) {
+		const parts = parseRegisteredJstDateTime(value);
+		if (!parts) {
 			return null;
 		}
 
-		const parsedTime = new Date(trimmedValue.replace(' ', 'T')).getTime();
-		return Number.isNaN(parsedTime) ? null : parsedTime;
+		return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour - 9, parts.minute, parts.second);
 	}
 
 	function formatMatchSelectionOpensAt(value) {
@@ -284,27 +305,29 @@
 		}
 
 		return new Date(value).toLocaleTimeString('ja-JP', {
+			timeZone: 'Asia/Tokyo',
 			hour: '2-digit',
 			minute: '2-digit'
 		});
 	}
 
 	function getMatchStartTimeKey(match) {
-		const value = String(getMatchStartTime(match) || '').trim();
+		const rawValue = getMatchStartTime(match);
+		const value = String(rawValue || '').trim();
 		if (!value) {
 			return '';
 		}
 
-		const date = new Date(value.replace(' ', 'T'));
-		if (Number.isNaN(date.getTime())) {
+		const parts = parseRegisteredJstDateTime(rawValue);
+		if (!parts) {
 			return value;
 		}
 
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		const hour = String(date.getHours()).padStart(2, '0');
-		const minute = String(date.getMinutes()).padStart(2, '0');
+		const year = parts.year;
+		const month = String(parts.month).padStart(2, '0');
+		const day = String(parts.day).padStart(2, '0');
+		const hour = String(parts.hour).padStart(2, '0');
+		const minute = String(parts.minute).padStart(2, '0');
 		return `${year}-${month}-${day}T${hour}:${minute}`;
 	}
 
@@ -319,15 +342,36 @@
 			return timeOnlyMatch[1];
 		}
 
-		const date = new Date(value.replace(' ', 'T'));
-		if (Number.isNaN(date.getTime())) {
+		const parts = parseRegisteredJstDateTime(value);
+		if (!parts) {
 			return value;
 		}
 
-		return date.toLocaleTimeString('ja-JP', {
-			hour: '2-digit',
-			minute: '2-digit'
-		});
+		return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+	}
+
+	function parseRegisteredJstDateTime(value) {
+		const trimmedValue = String(value || '').trim();
+		if (!trimmedValue) {
+			return null;
+		}
+
+		const match = trimmedValue.match(
+			/^(\d{4})-(\d{1,2})-(\d{1,2})(?:T|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?/
+		);
+		if (!match) {
+			return null;
+		}
+
+		const [, year, month, day, hour, minute, second = '0'] = match;
+		return {
+			year: Number(year),
+			month: Number(month),
+			day: Number(day),
+			hour: Number(hour),
+			minute: Number(minute),
+			second: Number(second)
+		};
 	}
 
 	function getMatchLabel(tournament, match) {
@@ -378,6 +422,8 @@
 
 	function clearMatchCheckIns() {
 		matchCheckIns = [];
+		checkedInMembers = [];
+		uncheckedMembers = [];
 		matchCheckInCount = 0;
 		checkInsError = '';
 	}
@@ -405,11 +451,15 @@
 			if (!response.ok) {
 				throw new Error(data.error || 'チェックイン済み一覧の取得に失敗しました');
 			}
-			matchCheckIns = data.members || [];
-			matchCheckInCount = data.count || matchCheckIns.length;
+			checkedInMembers = data.checked_in_members || data.members || [];
+			uncheckedMembers = data.unchecked_members || [];
+			matchCheckIns = checkedInMembers;
+			matchCheckInCount = data.checked_in_count ?? data.count ?? matchCheckIns.length;
 		} catch (err) {
 			checkInsError = err.message || 'チェックイン済み一覧の取得に失敗しました';
 			matchCheckIns = [];
+			checkedInMembers = [];
+			uncheckedMembers = [];
 			matchCheckInCount = 0;
 		} finally {
 			checkInsLoading = false;
@@ -590,12 +640,99 @@
 
 	function resetScanner() {
 		verificationResult = null;
+		checkInStatusModalMode = null;
 		errorMessage = '';
 		manualBarcode = '';
 	}
 
 	function closeResultModal() {
 		verificationResult = null;
+	}
+
+	function openCheckInStatusModal(mode) {
+		if (!selectedMatch) {
+			return;
+		}
+		checkInStatusModalMode = mode;
+	}
+
+	function closeCheckInStatusModal() {
+		checkInStatusModalMode = null;
+	}
+
+	function getCheckInStatusModalTitle() {
+		return checkInStatusModalMode === 'unchecked'
+			? '未チェックインの学生'
+			: 'チェックイン済みの学生';
+	}
+
+	function getCheckInStatusModalMembers() {
+		return checkInStatusModalMode === 'unchecked' ? uncheckedMembers : checkedInMembers;
+	}
+
+	function getCheckInStatusClassGroups() {
+		const groups = new SvelteMap();
+
+		for (const member of [...checkedInMembers, ...uncheckedMembers]) {
+			const key = getMemberGroupKey(member);
+			if (!groups.has(key)) {
+				groups.set(key, {
+					key,
+					name: getMemberClassName(member),
+					checked: [],
+					unchecked: []
+				});
+			}
+		}
+
+		for (const member of checkedInMembers) {
+			groups.get(getMemberGroupKey(member))?.checked.push(member);
+		}
+		for (const member of uncheckedMembers) {
+			groups.get(getMemberGroupKey(member))?.unchecked.push(member);
+		}
+
+		return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'ja-JP'));
+	}
+
+	function getCheckInStatusGroupMembers(group) {
+		return checkInStatusModalMode === 'unchecked' ? group.unchecked : group.checked;
+	}
+
+	function getCheckInStatusGroupCountLabel(group) {
+		const totalCount = group.checked.length + group.unchecked.length;
+		if (checkInStatusModalMode === 'unchecked') {
+			return `未チェックイン: ${group.unchecked.length} / ${totalCount}人`;
+		}
+		return `チェックイン済み: ${group.checked.length} / ${totalCount}人`;
+	}
+
+	function getMemberDisplayName(member) {
+		return member?.display_name || member?.email || '未設定';
+	}
+
+	function getMemberGroupKey(member) {
+		return `${member?.class_id ?? 'unknown'}:${member?.team_id ?? 'unknown'}:${getMemberClassName(member)}`;
+	}
+
+	function getMemberClassName(member) {
+		return (
+			member?.class_name ||
+			selectedMatch?.teamNamesById?.[String(member?.team_id)] ||
+			member?.team_name ||
+			'クラス未設定'
+		);
+	}
+
+	function getMemberMeta(member) {
+		const values = [];
+		if (member?.team_name && member.team_name !== member?.class_name) {
+			values.push(member.team_name);
+		}
+		if (member?.email) {
+			values.push(member.email);
+		}
+		return values.join(' / ');
 	}
 </script>
 
@@ -607,6 +744,35 @@
 			<p class="text-gray-500">読み込み中...</p>
 		</div>
 	{:else}
+		{#if selectedMatch}
+			<div class="mb-4 rounded bg-white p-4 shadow-sm">
+				<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+					<div>
+						<p class="text-sm text-gray-500">選択中の試合</p>
+						<p class="text-base font-semibold text-gray-900">{selectedMatch.summaryLabel}</p>
+					</div>
+					<div class="grid grid-cols-1 gap-2 sm:grid-cols-2 md:min-w-80">
+						<button
+							type="button"
+							onclick={() => openCheckInStatusModal('checked')}
+							disabled={checkInsLoading}
+							class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-500"
+						>
+							チェックイン済み（{checkedInMembers.length}人）
+						</button>
+						<button
+							type="button"
+							onclick={() => openCheckInStatusModal('unchecked')}
+							disabled={checkInsLoading}
+							class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-500"
+						>
+							未チェックイン（{uncheckedMembers.length}人）
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
 			<section class="rounded bg-white p-6 shadow-sm">
 				<div class="mb-4">
@@ -809,6 +975,96 @@
 					<button
 						type="button"
 						onclick={closeResultModal}
+						class="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+					>
+						閉じる
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if checkInStatusModalMode}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+			role="presentation"
+			onclick={closeCheckInStatusModal}
+		>
+			<div
+				class="max-h-[85vh] w-full max-w-lg overflow-hidden rounded bg-white shadow-xl"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="check-in-status-title"
+				tabindex="-1"
+				onclick={(event) => event.stopPropagation()}
+				onkeydown={(event) => event.stopPropagation()}
+			>
+				<div class="border-b border-gray-200 p-6">
+					<div class="flex items-center justify-between gap-4">
+						<h2 id="check-in-status-title" class="text-lg font-semibold text-gray-900">
+							{getCheckInStatusModalTitle()}
+						</h2>
+						<span class="text-sm text-gray-600">{getCheckInStatusModalMembers().length} 人</span>
+					</div>
+					{#if selectedMatch}
+						<p class="mt-1 text-sm text-gray-600">{selectedMatch.summaryLabel}</p>
+					{/if}
+				</div>
+
+				<div class="max-h-[55vh] overflow-y-auto p-6">
+					{#if getCheckInStatusClassGroups().length === 0}
+						<p class="text-sm text-gray-500">
+							{checkInStatusModalMode === 'unchecked'
+								? '未チェックインの学生はいません'
+								: 'チェックイン済みの学生はいません'}
+						</p>
+					{:else}
+						<div class="space-y-3">
+							{#each getCheckInStatusClassGroups() as group (group.key)}
+								<section class="rounded border border-gray-200">
+									<div class="border-b border-gray-200 bg-gray-50 px-3 py-2">
+										<div class="flex items-center justify-between gap-3">
+											<h3 class="text-sm font-semibold text-gray-900">{group.name}</h3>
+											<span class="text-xs font-medium text-gray-600">
+												{getCheckInStatusGroupCountLabel(group)}
+											</span>
+										</div>
+									</div>
+									{#if getCheckInStatusGroupMembers(group).length === 0}
+										<p class="px-3 py-2 text-sm text-gray-500">
+											{checkInStatusModalMode === 'unchecked'
+												? '未チェックインの学生はいません'
+												: 'チェックイン済みの学生はいません'}
+										</p>
+									{:else}
+										<ul class="divide-y divide-gray-200">
+											{#each getCheckInStatusGroupMembers(group) as member (`${member.user_id}:${member.team_id}`)}
+												<li class="px-3 py-2">
+													<p class="text-sm font-medium text-gray-900">
+														{getMemberDisplayName(member)}
+													</p>
+													{#if getMemberMeta(member)}
+														<p class="text-xs text-gray-600">{getMemberMeta(member)}</p>
+													{/if}
+													{#if checkInStatusModalMode === 'checked' && formatCheckedInAt(member.checked_in_at)}
+														<p class="text-xs text-gray-500">
+															{formatCheckedInAt(member.checked_in_at)}
+														</p>
+													{/if}
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</section>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<div class="flex justify-end border-t border-gray-200 p-4">
+					<button
+						type="button"
+						onclick={closeCheckInStatusModal}
 						class="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
 					>
 						閉じる

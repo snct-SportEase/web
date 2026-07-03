@@ -22,6 +22,7 @@ function jsonResponse(body, ok = true) {
 describe('Barcode Reader Page', () => {
 	let fetchMock;
 	let checkInResponse;
+	let matchCheckInsResponse;
 	let matchStartTime;
 
 	beforeEach(() => {
@@ -29,6 +30,43 @@ describe('Barcode Reader Page', () => {
 		checkInResponse = {
 			ok: false,
 			body: { error: 'まだあなたのクラスはこの試合にチェックインできません' }
+		};
+		matchCheckInsResponse = {
+			members: [
+				{
+					user_id: 'user-1',
+					email: 's2301059@sendai-nct.jp',
+					display_name: '山田 太郎',
+					class_name: '1-1',
+					team_name: '1-1',
+					team_id: 11,
+					checked_in_at: '2026-07-03T09:55:00Z'
+				}
+			],
+			count: 1,
+			checked_in_members: [
+				{
+					user_id: 'user-1',
+					email: 's2301059@sendai-nct.jp',
+					display_name: '山田 太郎',
+					class_name: '1-1',
+					team_name: '1-1',
+					team_id: 11,
+					checked_in_at: '2026-07-03T09:55:00Z'
+				}
+			],
+			checked_in_count: 1,
+			unchecked_members: [
+				{
+					user_id: 'user-2',
+					email: 's2301060@sendai-nct.jp',
+					display_name: '佐藤 花子',
+					class_name: '1-2',
+					team_name: '1-2',
+					team_id: 12
+				}
+			],
+			unchecked_count: 1
 		};
 		fetchMock = vi.fn((url) => {
 			if (url === '/api/events/active') {
@@ -94,6 +132,10 @@ describe('Barcode Reader Page', () => {
 				return jsonResponse(checkInResponse.body, checkInResponse.ok);
 			}
 
+			if (String(url).startsWith('/api/barcode/matches/31/check-ins?')) {
+				return jsonResponse(matchCheckInsResponse);
+			}
+
 			return jsonResponse({});
 		});
 
@@ -150,6 +192,47 @@ describe('Barcode Reader Page', () => {
 		expect(matchOption?.disabled).toBe(true);
 		expect(matchOption?.textContent).toContain('から選択可');
 		await expect.element(page.getByRole('button', { name: 'チェックインする' })).toBeDisabled();
+	});
+
+	it('タイムゾーン付きの開始時刻も登録済みJST時刻のまま表示する', async () => {
+		matchStartTime = '2026-07-03T10:00:00Z';
+
+		render(Page);
+
+		await page.getByLabelText('競技').selectOptions('7');
+
+		const matchOption = document.querySelector('#match-select option[value="time:31-32"]');
+		expect(matchOption?.textContent).toContain('決勝 10:00開始試合');
+		expect(matchOption?.textContent).not.toContain('19:00開始試合');
+	});
+
+	it('チェックイン済みと未チェックインの学生をモーダルで確認できる', async () => {
+		render(Page);
+
+		await page.getByLabelText('競技').selectOptions('7');
+		await page.getByLabelText('試合').selectOptions('time:31-32');
+
+		await page.getByRole('button', { name: 'チェックイン済み（1人）' }).click();
+		const checkedDialog = page.getByRole('dialog', { name: 'チェックイン済みの学生' });
+		await expect.element(checkedDialog).toBeInTheDocument();
+		await expect.element(checkedDialog.getByText('1-1')).toBeInTheDocument();
+		await expect.element(checkedDialog.getByText('チェックイン済み: 1 / 1人')).toBeInTheDocument();
+		await expect.element(checkedDialog.getByText('チェックイン済み: 0 / 1人')).toBeInTheDocument();
+		await expect.element(checkedDialog.getByText('山田 太郎')).toBeInTheDocument();
+		await page.getByRole('button', { name: '閉じる' }).click();
+
+		await page.getByRole('button', { name: '未チェックイン（1人）' }).click();
+		const uncheckedDialog = page.getByRole('dialog', { name: '未チェックインの学生' });
+		await expect.element(uncheckedDialog).toBeInTheDocument();
+		await expect.element(uncheckedDialog.getByText('1-2')).toBeInTheDocument();
+		await expect.element(uncheckedDialog.getByText('未チェックイン: 0 / 1人')).toBeInTheDocument();
+		await expect.element(uncheckedDialog.getByText('未チェックイン: 1 / 1人')).toBeInTheDocument();
+		await expect.element(uncheckedDialog.getByText('佐藤 花子')).toBeInTheDocument();
+		await page.getByRole('button', { name: '閉じる' }).click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: '未チェックインの学生' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('チェックイン失敗をモーダルで表示できる', async () => {
