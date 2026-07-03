@@ -288,6 +288,24 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 		assert.NoError(t, repo.AssignSportToEvent(&esOther))
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+
+	t.Run("custom other location allows duplicate location", func(t *testing.T) {
+		repo, mock, close := setupSport(t)
+		defer close()
+
+		esOther := *es
+		esOther.Location = "other:中庭ステージ"
+
+		mock.ExpectQuery(regexp.QuoteMeta(checkDupSportQ)).WithArgs(1, 3).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+		// No location check for custom "other:<name>" locations.
+		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
+			WithArgs(esOther.EventID, esOther.SportID, esOther.Description, esOther.Rules, esOther.RulesType, esOther.RulesPdfURL, esOther.Location, esOther.MinCapacity, esOther.MaxCapacity).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		assert.NoError(t, repo.AssignSportToEvent(&esOther))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 // ─── DeleteSportFromEvent ──────────────────────────────────────────────────

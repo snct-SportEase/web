@@ -47,6 +47,21 @@
     return sport?.sport_name || '不明な競技';
   }
 
+  function displayLocation(location) {
+    if (typeof location === 'string' && location.startsWith('other:')) {
+      return location.slice('other:'.length);
+    }
+
+    const labels = {
+      gym1: '第一体育館',
+      gym2: '第二体育館',
+      ground: 'グラウンド',
+      noon_game: 'グラウンド',
+      other: 'その他'
+    };
+    return labels[location] || location;
+  }
+
   function openRulesModal(sport) {
     // PDFの場合は別タブで開く
     if (sport.rules_type === 'pdf' && sport.rules_pdf_url) {
@@ -80,17 +95,7 @@
           {/if}
           <div class="mt-auto pt-4 border-t border-gray-200">
             <p class="text-gray-700 text-sm mb-2"><strong>場所:</strong>
-              {#if sport.location === 'gym1'}
-                <span>第一体育館</span>
-              {:else if sport.location === 'gym2'}
-                <span>第二体育館</span>
-              {:else if sport.location === 'ground'}
-                <span>グラウンド</span>
-              {:else if sport.location === 'noon_game'}
-                <span>グラウンド</span>
-              {:else}
-                <span>{sport.location}</span>
-              {/if}
+              <span>{displayLocation(sport.location)}</span>
             </p>
             <div>
               <button

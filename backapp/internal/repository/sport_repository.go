@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"strings"
 )
 
 // SportRepository defines the interface for sport and event_sport related database operations.
@@ -131,8 +132,8 @@ func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) erro
 		return errors.New("この競技はすでにこの大会に割り当てられています。")
 	}
 
-	// Prevent duplicate locations, except for 'other'
-	if eventSport.Location != "other" {
+	// Prevent duplicate locations, except for 'other' and custom "other:<name>" locations.
+	if !isOtherLocation(eventSport.Location) {
 		query := "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND location = ?"
 		err := r.db.QueryRow(query, eventSport.EventID, eventSport.Location).Scan(&count)
 		if err != nil {
@@ -149,6 +150,10 @@ func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) erro
 		log.Printf("Error inserting EventSport: %v", err)
 	}
 	return err
+}
+
+func isOtherLocation(location string) bool {
+	return location == "other" || strings.HasPrefix(location, "other:")
 }
 
 // DeleteSportFromEvent removes the assignment of a sport from an event.

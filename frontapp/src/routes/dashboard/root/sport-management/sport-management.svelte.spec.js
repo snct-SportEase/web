@@ -162,4 +162,38 @@ describe('Sport Management Page', () => {
     await expect.element(page.getByRole('cell', { name: 'バスケットボール' })).toBeInTheDocument();
     await expect.element(page.getByRole('cell', { name: 'gym1' })).toBeInTheDocument();
   });
+
+  it('場所がその他のとき具体的な場所を入力して表示できること', async () => {
+    render(Page);
+
+    await page.getByLabelText('割り当てる競技').selectOptions('2');
+    await page.getByLabelText('場所').selectOptions('other');
+    await page.getByLabelText('具体的な開催地').fill('中庭ステージ');
+    await page.getByRole('button', { name: '大会に競技を割り当てる' }).click();
+
+    const assignCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/admin/events/1/sports' && options?.method === 'POST';
+    });
+
+    expect(assignCall).toBeTruthy();
+    expect(JSON.parse(assignCall[1].body)).toEqual(expect.objectContaining({
+      sport_id: 2,
+      location: 'other:中庭ステージ'
+    }));
+    await expect.element(page.getByRole('cell', { name: '中庭ステージ' })).toBeInTheDocument();
+  });
+
+  it('場所がその他で具体的な場所が空のときは割り当てないこと', async () => {
+    render(Page);
+
+    await page.getByLabelText('割り当てる競技').selectOptions('2');
+    await page.getByLabelText('場所').selectOptions('other');
+    await page.getByRole('button', { name: '大会に競技を割り当てる' }).click();
+
+    expect(alertMock).toHaveBeenCalledWith('具体的な場所を入力してください。');
+    const assignCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/admin/events/1/sports' && options?.method === 'POST';
+    });
+    expect(assignCall).toBeFalsy();
+  });
 });
