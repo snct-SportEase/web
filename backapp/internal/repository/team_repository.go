@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 var ErrRoundAlreadyCheckedIn = errors.New("round already checked in")
@@ -384,16 +386,20 @@ func (r *teamRepository) CheckInRound(teamID int, userID string, eventID int, sp
 	query := `
 		INSERT INTO round_check_ins (event_id, sport_id, match_id, round, user_id, team_id)
 		VALUES (?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE checked_in_at = checked_in_at
 	`
-	result, err := r.db.Exec(query, eventID, sportID, matchID, round, userID, teamID)
+	_, err := r.db.Exec(query, eventID, sportID, matchID, round, userID, teamID)
 	if err != nil {
+		if isMySQLDuplicateEntryError(err) {
+			return ErrRoundAlreadyCheckedIn
+		}
 		return err
 	}
-	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
-		return ErrRoundAlreadyCheckedIn
-	}
-	return err
+	return nil
+}
+
+func isMySQLDuplicateEntryError(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
 }
 
 // GetMatchCheckIns returns students checked in for a selected match.

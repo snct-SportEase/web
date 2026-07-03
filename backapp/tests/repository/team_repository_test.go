@@ -11,6 +11,7 @@ import (
 	"backapp/internal/repository"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -701,7 +702,6 @@ func TestTeamRepository_CheckInRound(t *testing.T) {
 	const q = `
 		INSERT INTO round_check_ins (event_id, sport_id, match_id, round, user_id, team_id)
 		VALUES (?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE checked_in_at = checked_in_at
 	`
 
 	t.Run("success", func(t *testing.T) {
@@ -722,7 +722,7 @@ func TestTeamRepository_CheckInRound(t *testing.T) {
 
 		mock.ExpectExec(regexp.QuoteMeta(q)).
 			WithArgs(1, 2, 100, 3, "user-1", 10).
-			WillReturnResult(sqlmock.NewResult(1, 0))
+			WillReturnError(&mysql.MySQLError{Number: 1062, Message: "Duplicate entry"})
 
 		err := repo.CheckInRound(10, "user-1", 1, 2, 100, 3)
 		assert.ErrorIs(t, err, repository.ErrRoundAlreadyCheckedIn)
