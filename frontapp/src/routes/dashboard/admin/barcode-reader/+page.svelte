@@ -783,14 +783,14 @@
 				<label for="sport-select" class="mb-2 block text-sm font-medium text-gray-700">競技</label>
 				<select
 					id="sport-select"
-					value={selectedSportId}
+					bind:value={selectedSportId}
 					onchange={handleSportChange}
 					disabled={isScanning || isVerifying}
 					class="w-full rounded border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
 				>
 					<option value="">競技を選択してください</option>
 					{#each sports as sport, index (`${sport.id}:${index}`)}
-						<option value={sport.id}>{sport.name}</option>
+						<option value={`${sport.id}`}>{sport.name}</option>
 					{/each}
 				</select>
 

@@ -163,6 +163,9 @@ describe('Barcode Reader Page', () => {
 		await page.getByLabelText('競技').selectOptions('7');
 
 		await expect.element(page.getByText('選択中: バスケットボール')).toBeInTheDocument();
+		const sportSelect = document.querySelector('#sport-select');
+		expect(sportSelect?.value).toBe('7');
+		expect(sportSelect?.selectedOptions?.[0]?.textContent?.trim()).toBe('バスケットボール');
 		const matchOption = document.querySelector('#match-select option[value="time:31-32"]');
 		expect(matchOption?.textContent).toContain('決勝');
 		expect(matchOption?.textContent).toContain('開始試合（1-1 vs 1-2, 1-3 vs 1-4）');
