@@ -41,8 +41,10 @@
 
 	onMount(() => {
 		loadInitialData();
+		window.addEventListener('keydown', handleKeydown);
 
 		return () => {
+			window.removeEventListener('keydown', handleKeydown);
 			stopScan();
 		};
 	});
@@ -89,6 +91,12 @@
 
 	function canVerify() {
 		return activeEventId !== null && selectedSportId !== '' && selectedMatch !== null;
+	}
+
+	function handleKeydown(event) {
+		if (event.key === 'Escape' && verificationResult && !verificationResult.success) {
+			closeFailureModal();
+		}
 	}
 
 	function dedupeSportsByID(items) {
@@ -386,19 +394,21 @@
 		errorMessage = '';
 
 		try {
+			const payload = {
+				barcode_data: trimmedBarcode,
+				event_id: Number(activeEventId),
+				sport_id: Number(selectedSportId),
+				match_id: Number(selectedMatch.id),
+				match_ids: selectedMatch.matchIds.map(Number)
+			};
+
 			const response = await fetch('/api/barcode/check-in', {
 				method: 'POST',
 				credentials: 'include',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({
-					barcode_data: trimmedBarcode,
-					event_id: Number(activeEventId),
-					sport_id: Number(selectedSportId),
-					match_id: Number(selectedMatch.id),
-					match_ids: selectedMatch.matchIds.map(Number)
-				})
+				body: JSON.stringify(payload)
 			});
 
 			const result = await response.json();
@@ -408,9 +418,11 @@
 				manualBarcode = '';
 				await loadMatchCheckIns();
 			} else {
+				console.error('Barcode check-in failed:', result);
 				verificationResult = { success: false, message: result.error };
 			}
-		} catch {
+		} catch (err) {
+			console.error('Barcode check-in request failed:', err);
 			verificationResult = { success: false, message: 'バーコードの確認中にエラーが発生しました' };
 		} finally {
 			isVerifying = false;
@@ -520,6 +532,12 @@
 		verificationResult = null;
 		errorMessage = '';
 		manualBarcode = '';
+	}
+
+	function closeFailureModal() {
+		if (verificationResult && !verificationResult.success) {
+			verificationResult = null;
+		}
 	}
 </script>
 
@@ -693,24 +711,49 @@
 		</div>
 	{/if}
 
-	{#if verificationResult}
-		{#if verificationResult.success}
-			<div class="mt-6 rounded border border-green-400 bg-green-100 p-4 text-green-800">
-				<p class="font-bold">参加本登録とラウンドチェックインを完了しました</p>
-				<p>氏名: {verificationResult.data.display_name || '未設定'}</p>
-				<p>学籍番号: {verificationResult.data.student_number}</p>
-				<p>競技: {verificationResult.data.sport_name}</p>
-				<p>ラウンド: {verificationResult.data.round}</p>
-				{#if verificationResult.data.capacity_warning}
-					<p class="mt-2 font-semibold">{verificationResult.data.capacity_warning}</p>
-				{/if}
+	{#if verificationResult?.success}
+		<div class="mt-6 rounded border border-green-400 bg-green-100 p-4 text-green-800">
+			<p class="font-bold">参加本登録とラウンドチェックインを完了しました</p>
+			<p>氏名: {verificationResult.data.display_name || '未設定'}</p>
+			<p>学籍番号: {verificationResult.data.student_number}</p>
+			<p>競技: {verificationResult.data.sport_name}</p>
+			<p>ラウンド: {verificationResult.data.round}</p>
+			{#if verificationResult.data.capacity_warning}
+				<p class="mt-2 font-semibold">{verificationResult.data.capacity_warning}</p>
+			{/if}
+		</div>
+	{/if}
+
+	{#if verificationResult && !verificationResult.success}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+			role="presentation"
+			onclick={closeFailureModal}
+		>
+			<div
+				class="w-full max-w-md rounded bg-white p-6 shadow-xl"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="check-in-failure-title"
+				tabindex="-1"
+				onclick={(event) => event.stopPropagation()}
+				onkeydown={(event) => event.stopPropagation()}
+			>
+				<h2 id="check-in-failure-title" class="text-lg font-semibold text-gray-900">
+					チェックインできませんでした
+				</h2>
+				<p class="mt-3 text-sm leading-6 text-gray-700">{verificationResult.message}</p>
+				<div class="mt-6 flex justify-end">
+					<button
+						type="button"
+						onclick={closeFailureModal}
+						class="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+					>
+						閉じる
+					</button>
+				</div>
 			</div>
-		{:else}
-			<div class="mt-6 rounded border border-red-400 bg-red-100 p-4 text-red-700">
-				<p class="font-bold">チェックインできませんでした</p>
-				<p>{verificationResult.message}</p>
-			</div>
-		{/if}
+		</div>
 	{/if}
 
 	{#if errorMessage}

@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
 
-function jsonResponse(body) {
+function jsonResponse(body, ok = true) {
 	return Promise.resolve({
-		ok: true,
+		ok,
 		json: () => Promise.resolve(body)
 	});
 }
@@ -74,6 +74,10 @@ describe('Barcode Reader Page', () => {
 				]);
 			}
 
+			if (url === '/api/barcode/check-in') {
+				return jsonResponse({ error: 'まだあなたのクラスはこの試合にチェックインできません' }, false);
+			}
+
 			return jsonResponse({});
 		});
 
@@ -114,5 +118,27 @@ describe('Barcode Reader Page', () => {
 				String(url).includes('/api/barcode/matches/31/check-ins?event_id=1&sport_id=7&match_ids=31%2C32')
 			)
 		).toBe(true);
+	});
+
+	it('チェックイン失敗をモーダルで表示できる', async () => {
+		render(Page);
+
+		await page.getByLabelText('競技').selectOptions('7');
+		await page.getByLabelText('試合').selectOptions('time:31-32');
+		await page.getByLabelText('バーコード値').fill('H1023010590');
+		await page.getByRole('button', { name: 'チェックインする' }).click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'チェックインできませんでした' }))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByText('まだあなたのクラスはこの試合にチェックインできません'))
+			.toBeInTheDocument();
+
+		await page.getByRole('button', { name: '閉じる' }).click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'チェックインできませんでした' }))
+			.not.toBeInTheDocument();
 	});
 });

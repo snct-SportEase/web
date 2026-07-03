@@ -111,7 +111,7 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		return
 	}
 	if match == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "読み取った学生のチームは選択した試合に出場していません"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "まだあなたのクラスはこの試合にチェックインできません"})
 		return
 	}
 	round := match.Round + 1
@@ -266,22 +266,27 @@ func parseMatchIDsQuery(primaryMatchID int, rawMatchIDs string) []int {
 
 func parseMyIDBarcode(barcodeData string) (string, error) {
 	barcode := strings.TrimSpace(barcodeData)
+	if len(barcode) >= 2 && strings.HasPrefix(barcode, "*") && strings.HasSuffix(barcode, "*") {
+		barcode = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(barcode, "*"), "*"))
+	}
+	barcode = strings.ToUpper(barcode)
+
 	if !strings.HasPrefix(barcode, myIDBarcodePrefix) {
 		return "", fmt.Errorf("invalid MyID barcode prefix")
 	}
 
-	studentNumber := strings.TrimPrefix(barcode, myIDBarcodePrefix)
-	if len(studentNumber) != studentNumberLength {
-		return "", fmt.Errorf("student number must be %d digits", studentNumberLength)
+	studentNumberWithCheckDigit := strings.TrimPrefix(barcode, myIDBarcodePrefix)
+	if len(studentNumberWithCheckDigit) != studentNumberLength+1 {
+		return "", fmt.Errorf("student number must be %d digits plus a check digit", studentNumberLength)
 	}
 
-	for _, char := range studentNumber {
+	for _, char := range studentNumberWithCheckDigit {
 		if char < '0' || char > '9' {
 			return "", fmt.Errorf("student number must be numeric")
 		}
 	}
 
-	return studentNumber, nil
+	return studentNumberWithCheckDigit[:studentNumberLength], nil
 }
 
 func (h *BarcodeHandler) findUserByStudentNumber(studentNumber string) (*models.User, error) {

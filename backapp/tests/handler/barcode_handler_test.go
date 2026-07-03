@@ -175,7 +175,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 100, 3).Return(nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     100,
@@ -186,7 +186,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		assert.Equal(t, true, response["confirmed"])
 		assert.Equal(t, true, response["checked_in"])
 		assert.Equal(t, "2301059", response["student_number"])
-		assert.Equal(t, "H102301059", response["barcode_data"])
+		assert.Equal(t, "H1023010590", response["barcode_data"])
 		assert.Equal(t, "バスケットボール", response["sport_name"])
 		assert.Equal(t, float64(3), response["round"])
 		assert.Equal(t, float64(100), response["match_id"])
@@ -211,14 +211,70 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 101, 1).Return(nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "  H102301059  ",
+			BarcodeData: "  H1023010590  ",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, "H102301059", response["barcode_data"])
+		assert.Equal(t, "H1023010590", response["barcode_data"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - Accept Code 39 start and stop asterisks", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, ClassID: 1, EventID: 1, SportID: 2, SportName: "バスケットボール"}
+		teamDetails := &models.Team{ID: 10, ClassID: 1, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0, Team1ID: sql.NullInt64{Int64: 10, Valid: true}}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
+		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 101, 1).Return(nil).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "*h1023010590*",
+			EventID:     1,
+			SportID:     2,
+			MatchID:     101,
+		})
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "2301059", response["student_number"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - Ignore Code 39 trailing check digit", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, ClassID: 1, EventID: 1, SportID: 2, SportName: "バスケットボール"}
+		teamDetails := &models.Team{ID: 10, ClassID: 1, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0, Team1ID: sql.NullInt64{Int64: 10, Valid: true}}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 1, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
+		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 101, 1).Return(nil).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H1023010590",
+			EventID:     1,
+			SportID:     2,
+			MatchID:     101,
+		})
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "2301059", response["student_number"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
 		mockTournamentRepo.AssertExpectations(t)
@@ -240,7 +296,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.On("CheckInRound", 30, "user-1", 1, 2, 102, 1).Return(nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -258,7 +314,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			MatchID:     101,
 		})
 
@@ -272,7 +328,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		h, mockTeamRepo, mockUserRepo, _ := newHandler()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 		})
@@ -288,9 +344,11 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			name        string
 			barcodeData string
 		}{
-			{name: "missing H10 prefix", barcodeData: "2301059"},
+			{name: "missing check digit", barcodeData: "H102301059"},
+			{name: "student number only", barcodeData: "2301059"},
+			{name: "student number only with check digit", barcodeData: "23010590"},
 			{name: "student number is too short", barcodeData: "H10230105"},
-			{name: "student number is too long", barcodeData: "H1023010599"},
+			{name: "student number is too long", barcodeData: "H10230105999"},
 			{name: "student number contains non-digit", barcodeData: "H10230105A"},
 		}
 
@@ -320,7 +378,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			Return([]*models.User{{ID: "user-2", Email: "xs2301059@example.com"}}, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -339,7 +397,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			Return([]*models.User{{ID: "user-2", Email: "2301059@example.com"}}, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -357,7 +415,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockUserRepo.On("FindUsers", "s2301059", "email").Return(nil, assert.AnError).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -378,7 +436,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 			Return([]*models.TeamWithSport{{ID: 10, EventID: 1, SportID: 9}}, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -404,7 +462,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTournamentRepo.On("GetMatchForEventSport", 999, 1, 2).Return(nil, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     999,
@@ -430,7 +488,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(nil, assert.AnError).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -461,14 +519,14 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		}, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
-		assert.Equal(t, "読み取った学生のチームは選択した試合に出場していません", response["error"])
+		assert.Equal(t, "まだあなたのクラスはこの試合にチェックインできません", response["error"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
 		mockTournamentRepo.AssertExpectations(t)
@@ -488,14 +546,14 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0}, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
 		})
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
-		assert.Equal(t, "読み取った学生のチームは選択した試合に出場していません", response["error"])
+		assert.Equal(t, "まだあなたのクラスはこの試合にチェックインできません", response["error"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
 		mockTournamentRepo.AssertExpectations(t)
@@ -518,7 +576,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(assert.AnError).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -547,7 +605,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 101, 1).Return(assert.AnError).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
@@ -584,7 +642,7 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 		mockClassRepo.On("GetClassByID", 1).Return(&models.Class{Name: "1A"}, nil).Once()
 
 		w, response := request(h, models.BarcodeCheckInRequest{
-			BarcodeData: "H102301059",
+			BarcodeData: "H1023010590",
 			EventID:     1,
 			SportID:     2,
 			MatchID:     101,
