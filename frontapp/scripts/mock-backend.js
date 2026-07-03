@@ -551,7 +551,7 @@ createServer(async (req, res) => {
       sendJson(res, 400, { error: '試合を選択してください' });
       return;
     }
-    if (!/^H10\d{7}$/.test(barcode)) {
+    if (!/^H10\d{8}$/.test(barcode)) {
       sendJson(res, 400, { error: 'バーコード形式が不正です' });
       return;
     }
@@ -606,7 +606,7 @@ createServer(async (req, res) => {
       team_id: studentTeamId,
       user_id: studentUser.id,
       display_name: studentUser.display_name,
-      student_number: barcode.slice(3),
+      student_number: barcode.slice(3, 10),
       barcode_data: barcode
     });
     return;

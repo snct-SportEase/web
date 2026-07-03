@@ -36,7 +36,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
   test('手入力したMyIDバーコードでラウンドチェックインできる', async ({ page }) => {
     await page.getByLabel('競技').selectOption('1');
     await page.getByLabel('試合').selectOption({ index: 1 });
-    await page.getByLabel('バーコード値').fill('H102301059');
+    await page.getByLabel('バーコード値').fill('H1023010590');
 
     const checkInRequest = page.waitForRequest((request) => {
       if (!request.url().endsWith('/api/barcode/check-in') || request.method() !== 'POST') {
@@ -44,7 +44,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
       }
 
       const body = JSON.parse(request.postData() ?? '{}');
-      return body.barcode_data === 'H102301059'
+      return body.barcode_data === 'H1023010590'
         && body.event_id === 1
         && body.sport_id === 1
         && body.match_id === 1;
@@ -53,7 +53,7 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
     await page.getByRole('button', { name: 'チェックインする' }).click();
 
     await checkInRequest;
-    await expect(page.getByText('参加本登録とラウンドチェックインを完了しました')).toBeVisible();
+    await expect(page.getByText('ラウンドチェックインを完了しました')).toBeVisible();
     await expect(page.getByText('氏名: 山田太郎')).toBeVisible();
     await expect(page.getByText('学籍番号: 2301059')).toBeVisible();
     await expect(page.getByText('競技: バスケットボール')).toBeVisible();
