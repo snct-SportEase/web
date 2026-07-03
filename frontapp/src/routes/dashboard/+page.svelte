@@ -12,6 +12,8 @@
   let form = $derived(data.form);
   
   let showPWAInstallGuide = $state(false);
+  let shortcutSettingsOpen = $state(false);
+  let hiddenShortcutHrefs = $state(new Set());
   let activeEvent = $state(null);
   let competitionGuidelinesUrl = $state(null);
   let relayMatches = $state([]);
@@ -19,6 +21,8 @@
   let relayInfoError = $state('');
 
   onMount(async () => {
+    loadShortcutPreferences();
+
     try {
       const response = await fetch('/api/events/active');
       if (response.ok) {
@@ -86,10 +90,28 @@
     ...(isAdmin ? [{ title: 'Adminメニュー', shortcuts: adminShortcuts }] : []),
     ...(isStudent ? [{ title: 'Studentメニュー', shortcuts: studentShortcuts }] : [])
   ]);
+  let visibleShortcutSections = $derived(
+    shortcutSections
+      .map((section) => ({
+        ...section,
+        shortcuts: section.shortcuts.filter((shortcut) => !hiddenShortcutHrefs.has(shortcut.href))
+      }))
+      .filter((section) => section.shortcuts.length > 0)
+  );
+  let hiddenShortcutCount = $derived(
+    shortcutSections.reduce(
+      (count, section) =>
+        count + section.shortcuts.filter((shortcut) => hiddenShortcutHrefs.has(shortcut.href)).length,
+      0
+    )
+  );
+  let shortcutStorageKey = $derived(
+    `sportease.dashboard.hiddenShortcuts.${user?.id || user?.email || 'anonymous'}`
+  );
 
-  const classMembers = data.members ?? [];
-  const progressEntries = data.progress ?? [];
-  const classInfo = data.classInfo;
+  let classMembers = $derived(data.members ?? []);
+  let progressEntries = $derived(data.progress ?? []);
+  let classInfo = $derived(data.classInfo);
 
   function memberDisplayName(member) {
     if (member?.display_name) return member.display_name;
@@ -176,6 +198,48 @@
     if (detail?.entry_resolved_name) return detail.entry_resolved_name;
     const entry = match?.entries?.find((item) => String(item.id) === String(detail?.entry_id));
     return entryName(entry);
+  }
+
+  function loadShortcutPreferences() {
+    try {
+      const raw = window.localStorage.getItem(shortcutStorageKey);
+      if (!raw) {
+        hiddenShortcutHrefs = new Set();
+        return;
+      }
+
+      const values = JSON.parse(raw);
+      hiddenShortcutHrefs = new Set(
+        Array.isArray(values) ? values.filter((value) => typeof value === 'string') : []
+      );
+    } catch (error) {
+      console.error('Failed to load shortcut visibility preferences:', error);
+      hiddenShortcutHrefs = new Set();
+    }
+  }
+
+  function saveShortcutPreferences(nextHiddenShortcutHrefs) {
+    try {
+      window.localStorage.setItem(shortcutStorageKey, JSON.stringify([...nextHiddenShortcutHrefs]));
+    } catch (error) {
+      console.error('Failed to save shortcut visibility preferences:', error);
+    }
+  }
+
+  function toggleShortcutVisibility(href) {
+    const nextHiddenShortcutHrefs = new Set(hiddenShortcutHrefs);
+    if (nextHiddenShortcutHrefs.has(href)) {
+      nextHiddenShortcutHrefs.delete(href);
+    } else {
+      nextHiddenShortcutHrefs.add(href);
+    }
+    hiddenShortcutHrefs = nextHiddenShortcutHrefs;
+    saveShortcutPreferences(nextHiddenShortcutHrefs);
+  }
+
+  function showAllShortcuts() {
+    hiddenShortcutHrefs = new Set();
+    saveShortcutPreferences(hiddenShortcutHrefs);
   }
 </script>
 
@@ -283,8 +347,23 @@
   />
 
   <section class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-2xl font-semibold text-gray-900">ショートカット</h2>
+      {#if shortcutSections.length > 0}
+        <button
+          type="button"
+          onclick={() => shortcutSettingsOpen = !shortcutSettingsOpen}
+          class="inline-flex items-center rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50"
+          aria-expanded={shortcutSettingsOpen}
+        >
+          表示設定
+          {#if hiddenShortcutCount > 0}
+            <span class="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+              {hiddenShortcutCount}
+            </span>
+          {/if}
+        </button>
+      {/if}
     </div>
 
     {#if shortcutSections.length === 0}
@@ -292,8 +371,52 @@
         現在アクセス可能なショートカットはありません。
       </p>
     {:else}
+      {#if shortcutSettingsOpen}
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="text-lg font-semibold text-gray-800">ショートカット表示設定</h3>
+            <button
+              type="button"
+              onclick={showAllShortcuts}
+              disabled={hiddenShortcutCount === 0}
+              class="rounded-md border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              すべて表示
+            </button>
+          </div>
+          <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {#each shortcutSections as section (section.title)}
+              <fieldset class="space-y-3 rounded-md border border-gray-100 bg-gray-50 p-4">
+                <legend class="px-1 text-sm font-semibold text-gray-700">{section.title}</legend>
+                <div class="space-y-2">
+                  {#each section.shortcuts as shortcut (shortcut.href)}
+                    <label class="flex items-start gap-3 rounded-md px-2 py-2 text-sm text-gray-700 transition hover:bg-white">
+                      <input
+                        type="checkbox"
+                        class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        checked={!hiddenShortcutHrefs.has(shortcut.href)}
+                        onchange={() => toggleShortcutVisibility(shortcut.href)}
+                      />
+                      <span>
+                        <span class="block font-medium text-gray-900">{shortcut.title}</span>
+                        <span class="block text-xs text-gray-500">{shortcut.description}</span>
+                      </span>
+                    </label>
+                  {/each}
+                </div>
+              </fieldset>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
       <div class="space-y-6">
-        {#each shortcutSections as section (section.title)}
+        {#if visibleShortcutSections.length === 0}
+          <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            表示中のショートカットはありません。
+          </p>
+        {/if}
+        {#each visibleShortcutSections as section (section.title)}
           <div class="space-y-3">
             <h3 class="text-lg font-semibold text-gray-800">{section.title}</h3>
             <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
