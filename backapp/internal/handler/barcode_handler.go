@@ -269,7 +269,7 @@ func (h *BarcodeHandler) buildUncheckedMatchMembers(eventID int, sportID int, te
 		return uncheckedMembers, nil
 	}
 
-	teamMembersByTeamID, err := h.teamRepo.GetTeamMembersByTeamIDs(teamIDs)
+	teamMembersByTeamID, err := h.teamRepo.GetMatchTeamMembersByTeamIDs(teamIDs, eventID, sportID)
 	if err != nil {
 		return nil, err
 	}
@@ -282,24 +282,11 @@ func (h *BarcodeHandler) buildUncheckedMatchMembers(eventID int, sportID int, te
 	}
 
 	for _, teamID := range teamIDs {
-		for _, user := range teamMembersByTeamID[teamID] {
-			if user == nil || checkedUserIDs[user.ID] {
+		for _, member := range teamMembersByTeamID[teamID] {
+			if member == nil || checkedUserIDs[member.UserID] {
 				continue
 			}
-
-			classID := 0
-			if user.ClassID != nil {
-				classID = *user.ClassID
-			}
-			uncheckedMembers = append(uncheckedMembers, &models.MatchCheckInMember{
-				UserID:      user.ID,
-				Email:       user.Email,
-				DisplayName: user.DisplayName,
-				ClassID:     classID,
-				TeamID:      teamID,
-				EventID:     eventID,
-				SportID:     sportID,
-			})
+			uncheckedMembers = append(uncheckedMembers, member)
 		}
 	}
 

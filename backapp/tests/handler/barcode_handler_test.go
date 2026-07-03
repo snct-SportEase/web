@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBarcodeHandler_GetUserTeamsHandler(t *testing.T) {
@@ -770,7 +771,6 @@ func TestBarcodeHandler_GetMatchCheckInsHandler(t *testing.T) {
 		}
 		thirdName := "鈴木一郎"
 		fourthName := "高橋次郎"
-		classID := 1
 
 		mockTournamentRepo.On("GetMatchForEventSport", 100, 1, 2).Return(&models.MatchDB{
 			ID:      100,
@@ -786,14 +786,14 @@ func TestBarcodeHandler_GetMatchCheckInsHandler(t *testing.T) {
 		}, nil).Once()
 		mockTeamRepo.On("GetMatchCheckIns", 1, 2, 100).Return(firstMembers, nil).Once()
 		mockTeamRepo.On("GetMatchCheckIns", 1, 2, 101).Return(secondMembers, nil).Once()
-		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{10, 20, 30, 40}).Return(map[int][]*models.User{
+		mockTeamRepo.On("GetMatchTeamMembersByTeamIDs", []int{10, 20, 30, 40}, 1, 2).Return(map[int][]*models.MatchCheckInMember{
 			10: {
-				{ID: "user-1", DisplayName: &firstName, ClassID: &classID},
-				{ID: "user-3", Email: "s2301060@sendai-nct.jp", DisplayName: &thirdName, ClassID: &classID},
+				{UserID: "user-1", DisplayName: &firstName, ClassID: 1, ClassName: "1A", TeamID: 10, TeamName: "1A", EventID: 1, SportID: 2},
+				{UserID: "user-3", Email: "s2301060@sendai-nct.jp", DisplayName: &thirdName, ClassID: 1, ClassName: "1A", TeamID: 10, TeamName: "1A", EventID: 1, SportID: 2},
 			},
 			30: {
-				{ID: "user-2", DisplayName: &secondName, ClassID: &classID},
-				{ID: "user-4", Email: "s2301061@sendai-nct.jp", DisplayName: &fourthName, ClassID: &classID},
+				{UserID: "user-2", DisplayName: &secondName, ClassID: 2, ClassName: "2A", TeamID: 30, TeamName: "2A", EventID: 1, SportID: 2},
+				{UserID: "user-4", Email: "s2301061@sendai-nct.jp", DisplayName: &fourthName, ClassID: 2, ClassName: "2A", TeamID: 30, TeamName: "2A", EventID: 1, SportID: 2},
 			},
 		}, nil).Once()
 
@@ -809,6 +809,10 @@ func TestBarcodeHandler_GetMatchCheckInsHandler(t *testing.T) {
 		uncheckedMembers, ok := response["unchecked_members"].([]interface{})
 		assert.True(t, ok)
 		assert.Len(t, uncheckedMembers, 2)
+		firstUnchecked, ok := uncheckedMembers[0].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "1A", firstUnchecked["class_name"])
+		assert.Equal(t, "1A", firstUnchecked["team_name"])
 		mockTeamRepo.AssertExpectations(t)
 		mockTournamentRepo.AssertExpectations(t)
 	})
@@ -849,7 +853,7 @@ func TestBarcodeHandler_GetMatchCheckInsHandler(t *testing.T) {
 			Team1ID: sql.NullInt64{Int64: 10, Valid: true},
 		}, nil).Once()
 		mockTeamRepo.On("GetMatchCheckIns", 1, 2, 100).Return([]*models.MatchCheckInMember{}, nil).Once()
-		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{10}).Return(nil, assert.AnError).Once()
+		mockTeamRepo.On("GetMatchTeamMembersByTeamIDs", []int{10}, 1, 2).Return(nil, assert.AnError).Once()
 
 		w, response := request(h, "100", "event_id=1&sport_id=2")
 

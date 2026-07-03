@@ -295,6 +295,14 @@ func (m *MockTeamRepository) CheckInRound(teamID int, userID string, eventID int
 	return args.Error(0)
 }
 
+func (m *MockTeamRepository) GetMatchTeamMembersByTeamIDs(teamIDs []int, eventID int, sportID int) (map[int][]*models.MatchCheckInMember, error) {
+	args := m.Called(teamIDs, eventID, sportID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[int][]*models.MatchCheckInMember), args.Error(1)
+}
+
 func (m *MockTeamRepository) GetMatchCheckIns(eventID int, sportID int, matchID int) ([]*models.MatchCheckInMember, error) {
 	args := m.Called(eventID, sportID, matchID)
 	if args.Get(0) == nil {

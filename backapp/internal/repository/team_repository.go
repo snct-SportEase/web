@@ -28,6 +28,7 @@ type TeamRepository interface {
 	GetConfirmedTeamMembers(teamID int) ([]*models.User, error)
 	GetConfirmedTeamMembersCount(teamID int) (int, error)
 	CheckInRound(teamID int, userID string, eventID int, sportID int, matchID int, round int) error
+	GetMatchTeamMembersByTeamIDs(teamIDs []int, eventID int, sportID int) (map[int][]*models.MatchCheckInMember, error)
 	GetMatchCheckIns(eventID int, sportID int, matchID int) ([]*models.MatchCheckInMember, error)
 	CreateTeamsBulk(teams []*models.Team) error
 }
@@ -400,6 +401,74 @@ func (r *teamRepository) CheckInRound(teamID int, userID string, eventID int, sp
 func isMySQLDuplicateEntryError(err error) bool {
 	var mysqlErr *mysql.MySQLError
 	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
+}
+
+// GetMatchTeamMembersByTeamIDs returns team members with class/team labels for match check-in status.
+func (r *teamRepository) GetMatchTeamMembersByTeamIDs(teamIDs []int, eventID int, sportID int) (map[int][]*models.MatchCheckInMember, error) {
+	result := make(map[int][]*models.MatchCheckInMember)
+	if len(teamIDs) == 0 {
+		return result, nil
+	}
+
+	placeholders := make([]string, len(teamIDs))
+	args := make([]interface{}, 0, len(teamIDs))
+	for _, teamID := range teamIDs {
+		placeholders[len(args)] = "?"
+		args = append(args, teamID)
+	}
+
+	query := `
+		SELECT
+			tm.team_id,
+			u.id,
+			u.email,
+			u.display_name,
+			t.class_id,
+			c.name AS class_name,
+			t.name AS team_name
+		FROM team_members tm
+		JOIN users u ON u.id = tm.user_id
+		JOIN teams t ON t.id = tm.team_id
+		JOIN classes c ON c.id = t.class_id
+		WHERE tm.team_id IN (` + strings.Join(placeholders, ",") + `)
+		ORDER BY c.name ASC, t.name ASC, u.display_name ASC, u.email ASC
+	`
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var teamID int
+		member := &models.MatchCheckInMember{
+			EventID: eventID,
+			SportID: sportID,
+		}
+		var displayName sql.NullString
+		if err := rows.Scan(
+			&teamID,
+			&member.UserID,
+			&member.Email,
+			&displayName,
+			&member.ClassID,
+			&member.ClassName,
+			&member.TeamName,
+		); err != nil {
+			return nil, err
+		}
+		if displayName.Valid {
+			member.DisplayName = &displayName.String
+		}
+		member.TeamID = teamID
+		result[teamID] = append(result[teamID], member)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // GetMatchCheckIns returns students checked in for a selected match.

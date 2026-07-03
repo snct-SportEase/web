@@ -742,6 +742,77 @@ func TestTeamRepository_CheckInRound(t *testing.T) {
 	})
 }
 
+// ─── GetMatchTeamMembersByTeamIDs ─────────────────────────────────────────
+
+func TestTeamRepository_GetMatchTeamMembersByTeamIDs(t *testing.T) {
+	const q = `
+		SELECT
+			tm.team_id,
+			u.id,
+			u.email,
+			u.display_name,
+			t.class_id,
+			c.name AS class_name,
+			t.name AS team_name
+		FROM team_members tm
+		JOIN users u ON u.id = tm.user_id
+		JOIN teams t ON t.id = tm.team_id
+		JOIN classes c ON c.id = t.class_id
+		WHERE tm.team_id IN (?,?)
+		ORDER BY c.name ASC, t.name ASC, u.display_name ASC, u.email ASC
+	`
+
+	t.Run("success - includes class and team labels", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		rows := sqlmock.NewRows([]string{
+			"team_id", "id", "email", "display_name", "class_id", "class_name", "team_name",
+		}).
+			AddRow(10, "user-1", "s2301059@sendai-nct.jp", "山田太郎", 1, "1A", "1A").
+			AddRow(20, "user-2", "s2301060@sendai-nct.jp", nil, 2, "2A", "2A")
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(10, 20).WillReturnRows(rows)
+
+		membersByTeamID, err := repo.GetMatchTeamMembersByTeamIDs([]int{10, 20}, 1, 2)
+
+		require.NoError(t, err)
+		require.Len(t, membersByTeamID[10], 1)
+		assert.Equal(t, "user-1", membersByTeamID[10][0].UserID)
+		assert.Equal(t, "1A", membersByTeamID[10][0].ClassName)
+		assert.Equal(t, "1A", membersByTeamID[10][0].TeamName)
+		assert.Equal(t, 1, membersByTeamID[10][0].EventID)
+		assert.Equal(t, 2, membersByTeamID[10][0].SportID)
+		require.Len(t, membersByTeamID[20], 1)
+		assert.Nil(t, membersByTeamID[20][0].DisplayName)
+		assert.Equal(t, "2A", membersByTeamID[20][0].ClassName)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("empty teamIDs returns empty map without querying DB", func(t *testing.T) {
+		repo, _, close := setupTeam(t)
+		defer close()
+
+		membersByTeamID, err := repo.GetMatchTeamMembersByTeamIDs([]int{}, 1, 2)
+
+		assert.NoError(t, err)
+		assert.Empty(t, membersByTeamID)
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectQuery("FROM team_members tm").WillReturnError(errors.New("db error"))
+
+		membersByTeamID, err := repo.GetMatchTeamMembersByTeamIDs([]int{10}, 1, 2)
+
+		assert.Error(t, err)
+		assert.Nil(t, membersByTeamID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 // ─── GetMatchCheckIns ──────────────────────────────────────────────────────
 
 func TestTeamRepository_GetMatchCheckIns(t *testing.T) {
