@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import ProfileSetupModal from '$lib/components/ProfileSetupModal.svelte';
   import EventSetupModal from '$lib/components/EventSetupModal.svelte';
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
@@ -13,7 +14,7 @@
   
   let showPWAInstallGuide = $state(false);
   let shortcutSettingsOpen = $state(false);
-  let hiddenShortcutHrefs = $state(new Set());
+  let hiddenShortcutHrefs = new SvelteSet();
   let activeEvent = $state(null);
   let competitionGuidelinesUrl = $state(null);
   let relayMatches = $state([]);
@@ -204,17 +205,20 @@
     try {
       const raw = window.localStorage.getItem(shortcutStorageKey);
       if (!raw) {
-        hiddenShortcutHrefs = new Set();
+        hiddenShortcutHrefs.clear();
         return;
       }
 
       const values = JSON.parse(raw);
-      hiddenShortcutHrefs = new Set(
-        Array.isArray(values) ? values.filter((value) => typeof value === 'string') : []
-      );
+      hiddenShortcutHrefs.clear();
+      if (Array.isArray(values)) {
+        values
+          .filter((value) => typeof value === 'string')
+          .forEach((value) => hiddenShortcutHrefs.add(value));
+      }
     } catch (error) {
       console.error('Failed to load shortcut visibility preferences:', error);
-      hiddenShortcutHrefs = new Set();
+      hiddenShortcutHrefs.clear();
     }
   }
 
@@ -227,18 +231,16 @@
   }
 
   function toggleShortcutVisibility(href) {
-    const nextHiddenShortcutHrefs = new Set(hiddenShortcutHrefs);
-    if (nextHiddenShortcutHrefs.has(href)) {
-      nextHiddenShortcutHrefs.delete(href);
+    if (hiddenShortcutHrefs.has(href)) {
+      hiddenShortcutHrefs.delete(href);
     } else {
-      nextHiddenShortcutHrefs.add(href);
+      hiddenShortcutHrefs.add(href);
     }
-    hiddenShortcutHrefs = nextHiddenShortcutHrefs;
-    saveShortcutPreferences(nextHiddenShortcutHrefs);
+    saveShortcutPreferences(hiddenShortcutHrefs);
   }
 
   function showAllShortcuts() {
-    hiddenShortcutHrefs = new Set();
+    hiddenShortcutHrefs.clear();
     saveShortcutPreferences(hiddenShortcutHrefs);
   }
 </script>
