@@ -11,6 +11,7 @@ import (
 	"backapp/internal/repository"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -546,6 +547,7 @@ func TestTeamRepository_GetTeamCapacity(t *testing.T) {
 
 func TestTeamRepository_ConfirmTeamMember(t *testing.T) {
 	const q = "UPDATE team_members SET is_confirmed = true WHERE team_id = ? AND user_id = ?"
+	const existsQ = "SELECT COUNT(*) FROM team_members WHERE team_id = ? AND user_id = ?"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
@@ -558,15 +560,44 @@ func TestTeamRepository_ConfirmTeamMember(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("already confirmed - 0 rows affected but member exists returns nil", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "user-1").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(existsQ)).WithArgs(10, "user-1").
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+		assert.NoError(t, repo.ConfirmTeamMember(10, "user-1"))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("member not found - 0 rows affected returns ErrNoRows", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
 
 		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "ghost-user").
 			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(existsQ)).WithArgs(10, "ghost-user").
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
 		err := repo.ConfirmTeamMember(10, "ghost-user")
 		assert.ErrorIs(t, err, sql.ErrNoRows)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("exists check error after 0 rows affected", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "user-1").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta(existsQ)).WithArgs(10, "user-1").
+			WillReturnError(errors.New("exists check error"))
+
+		err := repo.ConfirmTeamMember(10, "user-1")
+		assert.ErrorContains(t, err, "exists check error")
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -661,6 +692,188 @@ func TestTeamRepository_GetConfirmedTeamMembersCount(t *testing.T) {
 		count, err := repo.GetConfirmedTeamMembersCount(10)
 		assert.Error(t, err)
 		assert.Equal(t, 0, count)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// ─── CheckInRound ──────────────────────────────────────────────────────────
+
+func TestTeamRepository_CheckInRound(t *testing.T) {
+	const q = `
+		INSERT INTO round_check_ins (event_id, sport_id, match_id, round, user_id, team_id)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	t.Run("success", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).
+			WithArgs(1, 2, 100, 3, "user-1", 10).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		assert.NoError(t, repo.CheckInRound(10, "user-1", 1, 2, 100, 3))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("already checked in", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).
+			WithArgs(1, 2, 100, 3, "user-1", 10).
+			WillReturnError(&mysql.MySQLError{Number: 1062, Message: "Duplicate entry"})
+
+		err := repo.CheckInRound(10, "user-1", 1, 2, 100, 3)
+		assert.ErrorIs(t, err, repository.ErrRoundAlreadyCheckedIn)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).
+			WithArgs(1, 2, 100, 3, "user-1", 10).
+			WillReturnError(errors.New("db error"))
+
+		assert.Error(t, repo.CheckInRound(10, "user-1", 1, 2, 100, 3))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// ─── GetMatchTeamMembersByTeamIDs ─────────────────────────────────────────
+
+func TestTeamRepository_GetMatchTeamMembersByTeamIDs(t *testing.T) {
+	const q = `
+		SELECT
+			tm.team_id,
+			u.id,
+			u.email,
+			u.display_name,
+			t.class_id,
+			c.name AS class_name,
+			t.name AS team_name
+		FROM team_members tm
+		JOIN users u ON u.id = tm.user_id
+		JOIN teams t ON t.id = tm.team_id
+		JOIN classes c ON c.id = t.class_id
+		WHERE tm.team_id IN (?,?)
+		ORDER BY c.name ASC, t.name ASC, u.display_name ASC, u.email ASC
+	`
+
+	t.Run("success - includes class and team labels", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		rows := sqlmock.NewRows([]string{
+			"team_id", "id", "email", "display_name", "class_id", "class_name", "team_name",
+		}).
+			AddRow(10, "user-1", "s2301059@sendai-nct.jp", "山田太郎", 1, "1A", "1A").
+			AddRow(20, "user-2", "s2301060@sendai-nct.jp", nil, 2, "2A", "2A")
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(10, 20).WillReturnRows(rows)
+
+		membersByTeamID, err := repo.GetMatchTeamMembersByTeamIDs([]int{10, 20}, 1, 2)
+
+		require.NoError(t, err)
+		require.Len(t, membersByTeamID[10], 1)
+		assert.Equal(t, "user-1", membersByTeamID[10][0].UserID)
+		assert.Equal(t, "1A", membersByTeamID[10][0].ClassName)
+		assert.Equal(t, "1A", membersByTeamID[10][0].TeamName)
+		assert.Equal(t, 1, membersByTeamID[10][0].EventID)
+		assert.Equal(t, 2, membersByTeamID[10][0].SportID)
+		require.Len(t, membersByTeamID[20], 1)
+		assert.Nil(t, membersByTeamID[20][0].DisplayName)
+		assert.Equal(t, "2A", membersByTeamID[20][0].ClassName)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("empty teamIDs returns empty map without querying DB", func(t *testing.T) {
+		repo, _, close := setupTeam(t)
+		defer close()
+
+		membersByTeamID, err := repo.GetMatchTeamMembersByTeamIDs([]int{}, 1, 2)
+
+		assert.NoError(t, err)
+		assert.Empty(t, membersByTeamID)
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectQuery("FROM team_members tm").WillReturnError(errors.New("db error"))
+
+		membersByTeamID, err := repo.GetMatchTeamMembersByTeamIDs([]int{10}, 1, 2)
+
+		assert.Error(t, err)
+		assert.Nil(t, membersByTeamID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// ─── GetMatchCheckIns ──────────────────────────────────────────────────────
+
+func TestTeamRepository_GetMatchCheckIns(t *testing.T) {
+	const q = `
+		SELECT
+			rci.user_id,
+			u.email,
+			u.display_name,
+			t.class_id,
+			c.name AS class_name,
+			rci.team_id,
+			t.name AS team_name,
+			rci.event_id,
+			rci.sport_id,
+			rci.match_id,
+			rci.round,
+			rci.checked_in_at
+		FROM round_check_ins rci
+		JOIN users u ON u.id = rci.user_id
+		JOIN teams t ON t.id = rci.team_id
+		JOIN classes c ON c.id = t.class_id
+		WHERE rci.event_id = ? AND rci.sport_id = ? AND rci.match_id = ?
+		ORDER BY rci.checked_in_at DESC, u.display_name ASC, u.email ASC
+	`
+
+	t.Run("success", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		checkedInAt := time.Date(2026, 7, 1, 9, 30, 0, 0, time.UTC)
+		rows := sqlmock.NewRows([]string{
+			"user_id", "email", "display_name", "class_id", "class_name", "team_id", "team_name", "event_id", "sport_id", "match_id", "round", "checked_in_at",
+		}).AddRow("user-1", "s2301059@sendai-nct.jp", "山田太郎", 1, "1A", 10, "1A", 1, 2, 100, 3, checkedInAt)
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1, 2, 100).WillReturnRows(rows)
+
+		members, err := repo.GetMatchCheckIns(1, 2, 100)
+
+		require.NoError(t, err)
+		require.Len(t, members, 1)
+		assert.Equal(t, "user-1", members[0].UserID)
+		assert.Equal(t, "s2301059@sendai-nct.jp", members[0].Email)
+		require.NotNil(t, members[0].DisplayName)
+		assert.Equal(t, "山田太郎", *members[0].DisplayName)
+		assert.Equal(t, 10, members[0].TeamID)
+		assert.Equal(t, 100, members[0].MatchID)
+		assert.Equal(t, 3, members[0].Round)
+		assert.Equal(t, checkedInAt, members[0].CheckedInAt)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1, 2, 100).WillReturnError(errors.New("db error"))
+
+		members, err := repo.GetMatchCheckIns(1, 2, 100)
+
+		assert.Error(t, err)
+		assert.Nil(t, members)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }

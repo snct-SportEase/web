@@ -955,7 +955,8 @@
     try {
       const response = await fetch(`/api/root/events/${selectedEventId}/rainy-mode/settings`);
       if (response.ok) {
-        const allSettings = await response.json();
+        const payload = await response.json();
+        const allSettings = Array.isArray(payload) ? payload : [];
         // Filter settings for current sport
         const sportSettings = allSettings.filter(s => s.sport_id == selectedSportId);
         

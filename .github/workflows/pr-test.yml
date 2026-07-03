@@ -38,13 +38,16 @@ jobs:
       - name: Check Formatting & Lint
         working-directory: ./frontapp
         run: npm run lint
-        continue-on-error: true
 
       - name: Run Vitest
         working-directory: ./frontapp
         run: npm run test
         env:
           CI: 'true'
+
+      - name: Build Frontend
+        working-directory: ./frontapp
+        run: npm run build
 
       - name: Run Playwright E2E
         working-directory: ./frontapp

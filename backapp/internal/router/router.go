@@ -54,7 +54,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
-	qrCodeHandler := handler.NewQRCodeHandler(teamRepo, sportRepo, userRepo, eventRepo, classRepo)
+	barcodeHandler := handler.NewBarcodeHandler(teamRepo, sportRepo, userRepo, eventRepo, classRepo, tournRepo)
 
 	classTeamHandler := handler.NewClassTeamHandler(classRepo, teamRepo, userRepo, eventRepo, sportRepo)
 
@@ -119,13 +119,13 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			events.GET("/:id/sports", sportHandler.GetSportsByEventHandler)
 		}
 
-		// QR Code routes accessible to authenticated users
-		qrcode := api.Group("/qrcode")
+		// MyID barcode check-in routes accessible to authenticated users
+		barcode := api.Group("/barcode")
 		{
-			qrcode.Use(middleware.AuthMiddleware(userRepo))
-			qrcode.GET("/teams", qrCodeHandler.GetUserTeamsHandler)
-			qrcode.POST("/generate", qrCodeHandler.GenerateQRCodeHandler)
-			qrcode.POST("/verify", middleware.RateLimit(20, time.Minute), qrCodeHandler.VerifyQRCodeHandler)
+			barcode.Use(middleware.AuthMiddleware(userRepo))
+			barcode.GET("/teams", barcodeHandler.GetUserTeamsHandler)
+			barcode.POST("/check-in", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), barcodeHandler.CheckInRoundHandler)
+			barcode.GET("/matches/:match_id/check-ins", middleware.RoleRequired("admin", "root"), barcodeHandler.GetMatchCheckInsHandler)
 		}
 
 		student := api.Group("/student")

@@ -69,7 +69,7 @@
     { title: 'ロール管理', description: 'ユーザーロールの付与・削除', href: '/dashboard/admin/role-management' },
     { title: '出席登録', description: '参加者の出席を記録', href: '/dashboard/admin/attendance-management' },
     { title: '試合結果入力', description: 'スコアと勝敗を登録', href: '/dashboard/admin/insert-matche-result' },
-    { title: 'QRコードツール', description: '大会QRの発行と読み取り', href: '/dashboard/admin/qr-code-reader' },
+    { title: 'バーコード読み取り', description: 'MyIDでラウンドチェックイン', href: '/dashboard/admin/barcode-reader' },
     { title: '競技詳細登録', description: '競技ルールや資料の管理', href: '/dashboard/admin/sport-details-registration' }
   ];
 
@@ -78,8 +78,7 @@
     { title: 'クラス情報', description: 'クラスの出席と試合状況', href: '/dashboard/student/class-info' },
     { title: '通知一覧', description: '配信された通知を確認', href: '/dashboard/student/notification' },
     { title: '通知申請', description: 'rootへの通知依頼を送信', href: '/dashboard/student/notification-request' },
-    { title: '競技詳細', description: '競技のルール・日程を確認', href: '/dashboard/student/sport-info' },
-    { title: 'QRコード発行', description: '参加証QRコードを生成', href: '/dashboard/student/issueqr-code' }
+    { title: '競技詳細', description: '競技のルール・日程を確認', href: '/dashboard/student/sport-info' }
   ];
 
   let shortcutSections = $derived([
