@@ -3,6 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
 
+function minutesFromNow(minutes) {
+	const date = new Date(Date.now() + minutes * 60 * 1000);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+		date.getDate()
+	).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(
+		date.getMinutes()
+	).padStart(2, '0')}:00`;
+}
+
 function jsonResponse(body, ok = true) {
 	return Promise.resolve({
 		ok,
@@ -13,8 +22,10 @@ function jsonResponse(body, ok = true) {
 describe('Barcode Reader Page', () => {
 	let fetchMock;
 	let checkInResponse;
+	let matchStartTime;
 
 	beforeEach(() => {
+		matchStartTime = minutesFromNow(9);
 		checkInResponse = {
 			ok: false,
 			body: { error: 'まだあなたのクラスはこの試合にチェックインできません' }
@@ -51,7 +62,7 @@ describe('Barcode Reader Page', () => {
 									id: 31,
 									roundIndex: 0,
 									order: 0,
-									startTime: '2026-07-03T10:00:00',
+									startTime: matchStartTime,
 									sides: [
 										{ contestantId: 'c0', teamId: 11 },
 										{ contestantId: 'c1', teamId: 12 }
@@ -61,7 +72,7 @@ describe('Barcode Reader Page', () => {
 									id: 32,
 									roundIndex: 0,
 									order: 1,
-									startTime: '2026-07-03T10:00:00',
+									startTime: matchStartTime,
 									sides: [
 										{ contestantId: 'c2', teamId: 13 },
 										{ contestantId: 'c3', teamId: 14 }
@@ -108,11 +119,14 @@ describe('Barcode Reader Page', () => {
 		await page.getByLabelText('競技').selectOptions('7');
 
 		await expect.element(page.getByText('選択中: バスケットボール')).toBeInTheDocument();
-		await expect.element(page.getByRole('option', { name: '決勝 10:00開始試合（1-1 vs 1-2, 1-3 vs 1-4）' })).toBeInTheDocument();
+		const matchOption = document.querySelector('#match-select option[value="time:31-32"]');
+		expect(matchOption?.textContent).toContain('決勝');
+		expect(matchOption?.textContent).toContain('開始試合（1-1 vs 1-2, 1-3 vs 1-4）');
+		expect(matchOption?.disabled).toBe(false);
 
 		await page.getByLabelText('試合').selectOptions('time:31-32');
 
-		await expect.element(page.getByText('試合: 決勝 10:00開始試合')).toBeInTheDocument();
+		expect(document.body.textContent).toContain('試合: 決勝');
 		const matchupItems = Array.from(document.querySelectorAll('li')).map((item) =>
 			item.textContent?.trim()
 		);
@@ -123,6 +137,19 @@ describe('Barcode Reader Page', () => {
 				String(url).includes('/api/barcode/matches/31/check-ins?event_id=1&sport_id=7&match_ids=31%2C32')
 			)
 		).toBe(true);
+	});
+
+	it('開始10分より前の試合は選択できない', async () => {
+		matchStartTime = minutesFromNow(12);
+
+		render(Page);
+
+		await page.getByLabelText('競技').selectOptions('7');
+
+		const matchOption = document.querySelector('#match-select option[value="time:31-32"]');
+		expect(matchOption?.disabled).toBe(true);
+		expect(matchOption?.textContent).toContain('から選択可');
+		await expect.element(page.getByRole('button', { name: 'チェックインする' })).toBeDisabled();
 	});
 
 	it('チェックイン失敗をモーダルで表示できる', async () => {

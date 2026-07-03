@@ -3,10 +3,12 @@
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	const supportedBarcodeFormats = ['code_39', 'code_128', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e'];
+	const matchSelectionOpenOffsetMs = 10 * 60 * 1000;
 
 	let barcodeVideo = $state();
 	let barcodeStream = null;
 	let barcodeScanFrame = null;
+	let selectionClockInterval = null;
 	let errorMessage = $state('');
 	let verificationResult = $state(null);
 	let activeEventId = $state(null);
@@ -23,6 +25,7 @@
 	let matchCheckInCount = $state(0);
 	let checkInsLoading = $state(false);
 	let checkInsError = $state('');
+	let currentTime = $state(Date.now());
 
 	let selectedSport = $derived(
 		selectedSportId ? sports.find((sport) => `${sport.id}` === `${selectedSportId}`) : null
@@ -32,7 +35,7 @@
 			? tournaments.filter((tournament) => `${tournament.sport_id}` === `${selectedSportId}`)
 			: []
 	);
-	let selectableMatches = $derived(buildMatchSelections(selectedSportTournaments));
+	let selectableMatches = $derived(buildMatchSelections(selectedSportTournaments, currentTime));
 	let selectedMatch = $derived(
 		selectedMatchId
 			? selectableMatches.find((match) => match.value === selectedMatchId) || null
@@ -42,9 +45,16 @@
 	onMount(() => {
 		loadInitialData();
 		window.addEventListener('keydown', handleKeydown);
+		selectionClockInterval = window.setInterval(() => {
+			currentTime = Date.now();
+		}, 1000);
 
 		return () => {
 			window.removeEventListener('keydown', handleKeydown);
+			if (selectionClockInterval !== null) {
+				window.clearInterval(selectionClockInterval);
+				selectionClockInterval = null;
+			}
 			stopScan();
 		};
 	});
@@ -90,7 +100,7 @@
 	}
 
 	function canVerify() {
-		return activeEventId !== null && selectedSportId !== '' && selectedMatch !== null;
+		return activeEventId !== null && selectedSportId !== '' && selectedMatch?.isSelectable === true;
 	}
 
 	function handleKeydown(event) {
@@ -151,7 +161,7 @@
 		return data.rounds?.[match.roundIndex]?.name || `第${getMatchRound(match)}ラウンド`;
 	}
 
-	function buildMatchSelections(tournamentsForSport) {
+	function buildMatchSelections(tournamentsForSport, nowMs) {
 		const timedGroups = new SvelteMap();
 		const selections = [];
 
@@ -174,7 +184,7 @@
 					};
 
 					if (!startKey) {
-						selections.push(createMatchSelection([entry]));
+						selections.push(createMatchSelection([entry], null, nowMs));
 						return;
 					}
 
@@ -193,18 +203,22 @@
 		});
 
 		for (const group of timedGroups.values()) {
-			selections.push(createMatchSelection(group.entries, group));
+			selections.push(createMatchSelection(group.entries, group, nowMs));
 		}
 
 		return selections.sort((a, b) => a.sortIndex - b.sortIndex);
 	}
 
-	function createMatchSelection(entries, timedGroup = null) {
+	function createMatchSelection(entries, timedGroup = null, nowMs = Date.now()) {
 		const firstEntry = entries[0];
 		const matchIds = entries.map((entry) => entry.match.id);
 		const matchupLabels = entries.map((entry) => entry.matchupLabel).filter(Boolean);
 		const matchupSummary = matchupLabels.join(', ');
 		const sortIndex = Math.min(...entries.map((entry) => entry.sortIndex));
+		const startTimeMs = getSelectionStartTimeMs(entries);
+		const opensAtMs = startTimeMs === null ? null : startTimeMs - matchSelectionOpenOffsetMs;
+		const isSelectable = opensAtMs === null || nowMs >= opensAtMs;
+		const lockedLabel = isSelectable ? '' : `（${formatMatchSelectionOpensAt(opensAtMs)}から選択可）`;
 
 		if (timedGroup) {
 			const summaryLabel = `${timedGroup.roundName} ${timedGroup.startLabel}開始試合`;
@@ -212,30 +226,67 @@
 				id: matchIds[0],
 				matchIds,
 				value: `time:${matchIds.join('-')}`,
-				label: matchupSummary ? `${summaryLabel}（${matchupSummary}）` : summaryLabel,
+				label: `${matchupSummary ? `${summaryLabel}（${matchupSummary}）` : summaryLabel}${lockedLabel}`,
 				summaryLabel,
 				matchupLabel: matchupSummary,
 				matchupLabels,
 				round: timedGroup.round,
+				isSelectable,
+				opensAtMs,
 				sortIndex
 			};
 		}
 
+		const baseLabel = getMatchLabel(firstEntry.tournament, firstEntry.match);
 		return {
 			id: firstEntry.match.id,
 			matchIds,
 			value: `${firstEntry.tournament.id ?? 0}:${firstEntry.match.id}:${sortIndex}`,
-			label: getMatchLabel(firstEntry.tournament, firstEntry.match),
-			summaryLabel: getMatchLabel(firstEntry.tournament, firstEntry.match),
+			label: `${baseLabel}${lockedLabel}`,
+			summaryLabel: baseLabel,
 			matchupLabel: matchupSummary,
 			matchupLabels,
 			round: getMatchRound(firstEntry.match),
+			isSelectable,
+			opensAtMs,
 			sortIndex
 		};
 	}
 
 	function getMatchStartTime(match) {
 		return match?.startTime || match?.rainyModeStartTime || '';
+	}
+
+	function getSelectionStartTimeMs(entries) {
+		const startTimes = entries
+			.map((entry) => parseMatchStartTimeMs(getMatchStartTime(entry.match)))
+			.filter((value) => value !== null);
+
+		if (startTimes.length === 0) {
+			return null;
+		}
+		return Math.min(...startTimes);
+	}
+
+	function parseMatchStartTimeMs(value) {
+		const trimmedValue = String(value || '').trim();
+		if (!trimmedValue) {
+			return null;
+		}
+
+		const parsedTime = new Date(trimmedValue.replace(' ', 'T')).getTime();
+		return Number.isNaN(parsedTime) ? null : parsedTime;
+	}
+
+	function formatMatchSelectionOpensAt(value) {
+		if (value === null) {
+			return '';
+		}
+
+		return new Date(value).toLocaleTimeString('ja-JP', {
+			hour: '2-digit',
+			minute: '2-digit'
+		});
 	}
 
 	function getMatchStartTimeKey(match) {
@@ -319,7 +370,9 @@
 	}
 
 	async function handleMatchChange(event) {
-		selectedMatchId = event.currentTarget.value;
+		const nextMatchId = event.currentTarget.value;
+		const nextMatch = selectableMatches.find((match) => match.value === nextMatchId);
+		selectedMatchId = nextMatch?.isSelectable === false ? '' : nextMatchId;
 		await loadMatchCheckIns();
 	}
 
@@ -587,7 +640,7 @@
 						{selectedSportId ? '試合を選択してください' : '先に競技を選択してください'}
 					</option>
 					{#each selectableMatches as match (match.value)}
-						<option value={match.value}>{match.label}</option>
+						<option value={match.value} disabled={!match.isSelectable}>{match.label}</option>
 					{/each}
 				</select>
 
