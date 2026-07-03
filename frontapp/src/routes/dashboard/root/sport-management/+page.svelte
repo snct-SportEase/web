@@ -14,6 +14,7 @@
         description: '',
         rules: '',
         location: 'other',
+        other_location: '',
         rules_type: 'markdown', // Add default rules_type
     });
 
@@ -32,7 +33,7 @@
     let usedLocations = $derived(eventSports
         ? eventSports
               .map(es => es.location)
-              .filter(loc => loc !== 'other' && loc !== 'noon_game')
+              .filter(loc => loc !== 'other' && !isOtherLocation(loc) && loc !== 'noon_game')
         : []);
 
     // この画面で扱うのは「通常競技」のみ（noon_game は別画面で管理）
@@ -168,8 +169,13 @@
             alert('割り当てる競技を選択してください。');
             return;
         }
+        if (newAssignment.location === 'other' && !newAssignment.other_location.trim()) {
+            alert('具体的な場所を入力してください。');
+            return;
+        }
 
         isAssigning = true; // 処理開始
+        const location = buildAssignmentLocation();
         
         try {
             // /api/admin/events/:id/sports は管理者権限が必要
@@ -177,8 +183,11 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...newAssignment,
                     sport_id: parseInt(newAssignment.sport_id, 10),
+                    description: newAssignment.description,
+                    rules: newAssignment.rules,
+                    location,
+                    rules_type: newAssignment.rules_type,
                 }),
             });
             if (!response.ok) {
@@ -195,6 +204,7 @@
                 description: '', 
                 rules: '', 
                 location: 'other',
+                other_location: '',
                 rules_type: 'markdown'
             };
             
@@ -240,6 +250,40 @@
     function getSportName(sportId) {
         const sport = allSports.find(s => s.id === sportId);
         return sport ? sport.name : '不明な競技';
+    }
+
+    function isOtherLocation(location) {
+        return typeof location === 'string' && location.startsWith('other:');
+    }
+
+    function buildAssignmentLocation() {
+        if (newAssignment.location !== 'other') {
+            return newAssignment.location;
+        }
+
+        return `other:${newAssignment.other_location.trim()}`;
+    }
+
+    function displayLocation(location) {
+        if (isOtherLocation(location)) {
+            return location.slice('other:'.length);
+        }
+
+        if (location === 'other') {
+            return 'その他';
+        }
+
+        return location;
+    }
+
+    function locationOptionLabel(location) {
+        const labels = {
+            gym1: 'gym1',
+            gym2: 'gym2',
+            ground: 'ground',
+            other: 'その他'
+        };
+        return labels[location] || location;
     }
 
     function startEditCapacity(eventId, sportId) {
@@ -375,11 +419,24 @@
                             <select id="location-select" bind:value={newAssignment.location} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 {#each allLocations as loc (loc)}
                                     <option value={loc} disabled={usedLocations.includes(loc)}>
-                                        {loc} {usedLocations.includes(loc) ? '(使用中)' : ''}
+                                        {locationOptionLabel(loc)} {usedLocations.includes(loc) ? '(使用中)' : ''}
                                     </option>
                                 {/each}
                             </select>
                         </div>
+
+                        {#if newAssignment.location === 'other'}
+                            <div>
+                                <label for="other-location" class="block text-sm font-medium text-gray-700 mb-1">具体的な開催地</label>
+                                <input
+                                    id="other-location"
+                                    type="text"
+                                    bind:value={newAssignment.other_location}
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    placeholder="例: 中庭ステージ、武道場、教室棟前"
+                                />
+                            </div>
+                        {/if}
                         
                         <!-- 概要 -->
                         <div>
@@ -422,7 +479,7 @@
                                     {#each visibleEventSports as es (es.sport_id)}
                                         <tr class="border-t hover:bg-gray-50">
                                             <td class="px-4 py-3 font-medium text-gray-900">{getSportName(es.sport_id)}</td>
-                                            <td class="px-4 py-3 text-gray-600">{es.location}</td>
+                                            <td class="px-4 py-3 text-gray-600">{displayLocation(es.location)}</td>
                                             <td class="px-4 py-3 text-gray-600 truncate max-w-xs">{es.description || '概要なし'}</td>
                                             <td class="px-4 py-3">
                                                 {#if editingCapacity && editingCapacity.event_id === es.event_id && editingCapacity.sport_id === es.sport_id}
