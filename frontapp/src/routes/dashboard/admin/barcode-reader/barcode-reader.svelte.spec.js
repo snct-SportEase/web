@@ -41,7 +41,21 @@ describe('Barcode Reader Page', () => {
 						name: 'バスケットボール',
 						data: JSON.stringify({
 							rounds: [{ name: '決勝' }],
-							matches: [{ id: 31, roundIndex: 0, order: 0 }]
+							matches: [
+								{
+									id: 31,
+									roundIndex: 0,
+									order: 0,
+									sides: [
+										{ contestantId: 'c0', teamId: 11 },
+										{ contestantId: 'c1', teamId: 12 }
+									]
+								}
+							],
+							contestants: {
+								c0: { players: [{ title: '1-1' }] },
+								c1: { players: [{ title: '1-2' }] }
+							}
 						})
 					}
 				]);
@@ -72,6 +86,10 @@ describe('Barcode Reader Page', () => {
 		await page.getByLabelText('競技').selectOptions('7');
 
 		await expect.element(page.getByText('選択中: バスケットボール')).toBeInTheDocument();
-		await expect.element(page.getByRole('option', { name: 'バスケットボール / 決勝 第1試合' })).toBeInTheDocument();
+		await expect.element(page.getByRole('option', { name: 'バスケットボール / 決勝 第1試合（1-1 vs 1-2）' })).toBeInTheDocument();
+
+		await page.getByLabelText('試合').selectOptions('3:31:0');
+
+		await expect.element(page.getByText('対戦: 1-1 vs 1-2')).toBeInTheDocument();
 	});
 });

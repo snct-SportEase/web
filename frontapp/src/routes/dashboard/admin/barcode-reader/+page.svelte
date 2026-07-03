@@ -41,6 +41,7 @@
 					id: match.id,
 					value: `${tournament.id ?? tournamentIndex}:${match.id}:${matchIndex}`,
 					label: getMatchLabel(tournament, match),
+					matchupLabel: getMatchupLabel(getTournamentData(tournament), match),
 					round: getMatchRound(match)
 				}));
 		})
@@ -157,7 +158,35 @@
 
 	function getMatchLabel(tournament, match) {
 		const matchNumber = Number(match.order ?? 0) + 1;
-		return `${tournament.name} / ${getRoundName(tournament, match)} 第${matchNumber}試合`;
+		const matchupLabel = getMatchupLabel(getTournamentData(tournament), match);
+		const baseLabel = `${tournament.name} / ${getRoundName(tournament, match)} 第${matchNumber}試合`;
+		return matchupLabel ? `${baseLabel}（${matchupLabel}）` : baseLabel;
+	}
+
+	function getMatchupLabel(tournamentData, match) {
+		const sides = Array.isArray(match?.sides) ? match.sides : [];
+		if (sides.length === 0) {
+			return '';
+		}
+
+		const teamNames = sides.slice(0, 2).map((side) => getSideName(tournamentData, side));
+		if (teamNames.every((name) => name === '未定')) {
+			return '';
+		}
+
+		return `${teamNames[0] ?? '未定'} vs ${teamNames[1] ?? '未定'}`;
+	}
+
+	function getSideName(tournamentData, side) {
+		if (!side) {
+			return '未定';
+		}
+		if (side.title) {
+			return side.title;
+		}
+
+		const contestant = tournamentData?.contestants?.[side.contestantId];
+		return contestant?.players?.[0]?.title || '未定';
 	}
 
 	function handleSportChange(event) {
@@ -490,6 +519,9 @@
 				{/if}
 				{#if selectedMatch}
 					<p class="mt-1 text-sm text-gray-600">試合: {selectedMatch.label}</p>
+					{#if selectedMatch.matchupLabel}
+						<p class="mt-1 text-sm text-gray-600">対戦: {selectedMatch.matchupLabel}</p>
+					{/if}
 					<p class="mt-1 text-sm text-gray-600">ラウンド: {selectedMatch.round}</p>
 				{/if}
 
