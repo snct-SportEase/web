@@ -1,7 +1,8 @@
-package middleware
+package middleware_test
 
 import (
 	"backapp/internal/config"
+	"backapp/internal/middleware"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +14,7 @@ func performCORSRequest(appEnv, origin string) *httptest.ResponseRecorder {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(CORSMiddleware(&config.Config{
+	router.Use(middleware.CORSMiddleware(&config.Config{
 		FrontendURL: "https://frontend.example",
 		AppEnv:      appEnv,
 	}))
