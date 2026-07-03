@@ -2,12 +2,18 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { fileURLToPath } from 'node:url';
 
 const backendUrl = process.env.PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:8080';
 const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	resolve: {
+		alias: {
+			$src: fileURLToPath(new URL('./src', import.meta.url))
+		}
+	},
 	server: {
 		proxy: {
 			'/api': {
@@ -37,7 +43,7 @@ export default defineConfig({
 						instances: [{ browser: 'chromium' }],
 						headless: true
 					},
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}', 'tests/pwa.spec.js'],
+					include: ['tests/unit/**/*.svelte.{test,spec}.{js,ts}', 'tests/pwa.spec.js'],
 					exclude: ['src/lib/server/**'],
 					setupFiles: ['./vitest-setup-client.js'],
 					// Timeout for browser operations
@@ -49,8 +55,8 @@ export default defineConfig({
 				test: {
 					name: 'server',
 					environment: 'node',
-					include: ['src/**/*.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+					include: ['tests/unit/**/*.{test,spec}.{js,ts}'],
+					exclude: ['tests/unit/**/*.svelte.{test,spec}.{js,ts}']
 				}
 			}
 		]
