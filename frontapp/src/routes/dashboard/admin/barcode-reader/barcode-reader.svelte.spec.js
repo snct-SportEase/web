@@ -12,8 +12,13 @@ function jsonResponse(body, ok = true) {
 
 describe('Barcode Reader Page', () => {
 	let fetchMock;
+	let checkInResponse;
 
 	beforeEach(() => {
+		checkInResponse = {
+			ok: false,
+			body: { error: 'まだあなたのクラスはこの試合にチェックインできません' }
+		};
 		fetchMock = vi.fn((url) => {
 			if (url === '/api/events/active') {
 				return jsonResponse({
@@ -75,7 +80,7 @@ describe('Barcode Reader Page', () => {
 			}
 
 			if (url === '/api/barcode/check-in') {
-				return jsonResponse({ error: 'まだあなたのクラスはこの試合にチェックインできません' }, false);
+				return jsonResponse(checkInResponse.body, checkInResponse.ok);
 			}
 
 			return jsonResponse({});
@@ -139,6 +144,37 @@ describe('Barcode Reader Page', () => {
 
 		await expect
 			.element(page.getByRole('dialog', { name: 'チェックインできませんでした' }))
+			.not.toBeInTheDocument();
+	});
+
+	it('チェックイン成功をモーダルで表示できる', async () => {
+		checkInResponse = {
+			ok: true,
+			body: {
+				display_name: '山田 太郎',
+				student_number: '2301059',
+				sport_name: 'バスケットボール',
+				round: 1
+			}
+		};
+
+		render(Page);
+
+		await page.getByLabelText('競技').selectOptions('7');
+		await page.getByLabelText('試合').selectOptions('time:31-32');
+		await page.getByLabelText('バーコード値').fill('H1023010590');
+		await page.getByRole('button', { name: 'チェックインする' }).click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'ラウンドチェックインを完了しました' }))
+			.toBeInTheDocument();
+		await expect.element(page.getByText('氏名: 山田 太郎')).toBeInTheDocument();
+		await expect.element(page.getByText('学籍番号: 2301059')).toBeInTheDocument();
+
+		await page.getByRole('button', { name: '閉じる' }).click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'ラウンドチェックインを完了しました' }))
 			.not.toBeInTheDocument();
 	});
 });

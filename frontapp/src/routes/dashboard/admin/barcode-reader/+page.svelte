@@ -94,8 +94,8 @@
 	}
 
 	function handleKeydown(event) {
-		if (event.key === 'Escape' && verificationResult && !verificationResult.success) {
-			closeFailureModal();
+		if (event.key === 'Escape' && verificationResult) {
+			closeResultModal();
 		}
 	}
 
@@ -534,10 +534,8 @@
 		manualBarcode = '';
 	}
 
-	function closeFailureModal() {
-		if (verificationResult && !verificationResult.success) {
-			verificationResult = null;
-		}
+	function closeResultModal() {
+		verificationResult = null;
 	}
 </script>
 
@@ -711,42 +709,46 @@
 		</div>
 	{/if}
 
-	{#if verificationResult?.success}
-		<div class="mt-6 rounded border border-green-400 bg-green-100 p-4 text-green-800">
-			<p class="font-bold">参加本登録とラウンドチェックインを完了しました</p>
-			<p>氏名: {verificationResult.data.display_name || '未設定'}</p>
-			<p>学籍番号: {verificationResult.data.student_number}</p>
-			<p>競技: {verificationResult.data.sport_name}</p>
-			<p>ラウンド: {verificationResult.data.round}</p>
-			{#if verificationResult.data.capacity_warning}
-				<p class="mt-2 font-semibold">{verificationResult.data.capacity_warning}</p>
-			{/if}
-		</div>
-	{/if}
-
-	{#if verificationResult && !verificationResult.success}
+	{#if verificationResult}
 		<div
 			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
 			role="presentation"
-			onclick={closeFailureModal}
+			onclick={closeResultModal}
 		>
 			<div
 				class="w-full max-w-md rounded bg-white p-6 shadow-xl"
 				role="dialog"
 				aria-modal="true"
-				aria-labelledby="check-in-failure-title"
+				aria-labelledby="check-in-result-title"
 				tabindex="-1"
 				onclick={(event) => event.stopPropagation()}
 				onkeydown={(event) => event.stopPropagation()}
 			>
-				<h2 id="check-in-failure-title" class="text-lg font-semibold text-gray-900">
-					チェックインできませんでした
-				</h2>
-				<p class="mt-3 text-sm leading-6 text-gray-700">{verificationResult.message}</p>
+				{#if verificationResult.success}
+					<h2 id="check-in-result-title" class="text-lg font-semibold text-gray-900">
+						ラウンドチェックインを完了しました
+					</h2>
+					<div class="mt-3 space-y-1 text-sm leading-6 text-gray-700">
+						<p>氏名: {verificationResult.data.display_name || '未設定'}</p>
+						<p>学籍番号: {verificationResult.data.student_number}</p>
+						<p>競技: {verificationResult.data.sport_name}</p>
+						<p>ラウンド: {verificationResult.data.round}</p>
+						{#if verificationResult.data.capacity_warning}
+							<p class="mt-2 font-semibold text-amber-700">
+								{verificationResult.data.capacity_warning}
+							</p>
+						{/if}
+					</div>
+				{:else}
+					<h2 id="check-in-result-title" class="text-lg font-semibold text-gray-900">
+						チェックインできませんでした
+					</h2>
+					<p class="mt-3 text-sm leading-6 text-gray-700">{verificationResult.message}</p>
+				{/if}
 				<div class="mt-6 flex justify-end">
 					<button
 						type="button"
-						onclick={closeFailureModal}
+						onclick={closeResultModal}
 						class="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
 					>
 						閉じる
