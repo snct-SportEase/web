@@ -3,6 +3,7 @@ package handler_test
 import (
 	"backapp/internal/handler"
 	"backapp/internal/models"
+	"backapp/internal/repository"
 	"bytes"
 	"database/sql"
 	"encoding/json"
@@ -613,6 +614,35 @@ func TestBarcodeHandler_CheckInRoundHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "Failed to check in round", response["error"])
+		mockUserRepo.AssertExpectations(t)
+		mockTeamRepo.AssertExpectations(t)
+		mockTournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("Failure - Already checked in", func(t *testing.T) {
+		h, mockTeamRepo, mockUserRepo, mockTournamentRepo := newHandler()
+
+		user := &models.User{ID: "user-1", Email: "s2301059@example.com"}
+		team := &models.TeamWithSport{ID: 10, EventID: 1, SportID: 2}
+		teamDetails := &models.Team{ID: 10, EventID: 1, SportID: 2}
+
+		mockUserRepo.On("FindUsers", "s2301059", "email").Return([]*models.User{user}, nil).Once()
+		mockTeamRepo.On("GetTeamsByUserID", "user-1").Return([]*models.TeamWithSport{team}, nil).Once()
+		mockTournamentRepo.On("GetMatchForEventSport", 101, 1, 2).Return(&models.MatchDB{ID: 101, Round: 0, Team1ID: sql.NullInt64{Int64: 10, Valid: true}}, nil).Once()
+		mockTeamRepo.On("GetTeamByClassAndSport", 0, 2, 1).Return(teamDetails, nil).Once()
+		mockTeamRepo.On("ConfirmTeamMember", 10, "user-1").Return(nil).Once()
+		mockTeamRepo.On("CheckInRound", 10, "user-1", 1, 2, 101, 1).Return(repository.ErrRoundAlreadyCheckedIn).Once()
+
+		w, response := request(h, models.BarcodeCheckInRequest{
+			BarcodeData: "H1023010590",
+			EventID:     1,
+			SportID:     2,
+			MatchID:     101,
+		})
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Equal(t, "チェックイン済みです", response["error"])
+		assert.Equal(t, true, response["already_checked_in"])
 		mockUserRepo.AssertExpectations(t)
 		mockTeamRepo.AssertExpectations(t)
 		mockTournamentRepo.AssertExpectations(t)

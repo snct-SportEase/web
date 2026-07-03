@@ -3,8 +3,11 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"errors"
 	"strings"
 )
+
+var ErrRoundAlreadyCheckedIn = errors.New("round already checked in")
 
 type TeamRepository interface {
 	CreateTeam(team *models.Team) (int64, error)
@@ -383,7 +386,13 @@ func (r *teamRepository) CheckInRound(teamID int, userID string, eventID int, sp
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE checked_in_at = checked_in_at
 	`
-	_, err := r.db.Exec(query, eventID, sportID, matchID, round, userID, teamID)
+	result, err := r.db.Exec(query, eventID, sportID, matchID, round, userID, teamID)
+	if err != nil {
+		return err
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return ErrRoundAlreadyCheckedIn
+	}
 	return err
 }
 

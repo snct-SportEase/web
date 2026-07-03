@@ -147,6 +147,33 @@ describe('Barcode Reader Page', () => {
 			.not.toBeInTheDocument();
 	});
 
+	it('チェックイン済みをモーダルで表示できる', async () => {
+		checkInResponse = {
+			ok: false,
+			body: {
+				error: 'チェックイン済みです',
+				already_checked_in: true
+			}
+		};
+
+		render(Page);
+
+		await page.getByLabelText('競技').selectOptions('7');
+		await page.getByLabelText('試合').selectOptions('time:31-32');
+		await page.getByLabelText('バーコード値').fill('H1023010590');
+		await page.getByRole('button', { name: 'チェックインする' }).click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'チェックイン済みです' }))
+			.toBeInTheDocument();
+
+		await page.getByRole('button', { name: '閉じる' }).click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'チェックイン済みです' }))
+			.not.toBeInTheDocument();
+	});
+
 	it('チェックイン成功をモーダルで表示できる', async () => {
 		checkInResponse = {
 			ok: true,

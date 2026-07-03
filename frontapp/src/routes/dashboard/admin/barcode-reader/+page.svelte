@@ -419,7 +419,14 @@
 				await loadMatchCheckIns();
 			} else {
 				console.error('Barcode check-in failed:', result);
-				verificationResult = { success: false, message: result.error };
+				verificationResult = {
+					success: false,
+					alreadyCheckedIn: Boolean(result.already_checked_in),
+					message: result.error
+				};
+				if (result.already_checked_in) {
+					await loadMatchCheckIns();
+				}
 			}
 		} catch (err) {
 			console.error('Barcode check-in request failed:', err);
@@ -741,7 +748,7 @@
 					</div>
 				{:else}
 					<h2 id="check-in-result-title" class="text-lg font-semibold text-gray-900">
-						チェックインできませんでした
+						{verificationResult.alreadyCheckedIn ? 'チェックイン済みです' : 'チェックインできませんでした'}
 					</h2>
 					<p class="mt-3 text-sm leading-6 text-gray-700">{verificationResult.message}</p>
 				{/if}

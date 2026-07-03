@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -132,6 +133,13 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 	}
 
 	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, match.ID, round); err != nil {
+		if errors.Is(err, repository.ErrRoundAlreadyCheckedIn) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":              "チェックイン済みです",
+				"already_checked_in": true,
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check in round"})
 		return
 	}

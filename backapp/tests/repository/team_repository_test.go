@@ -716,6 +716,19 @@ func TestTeamRepository_CheckInRound(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("already checked in", func(t *testing.T) {
+		repo, mock, close := setupTeam(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).
+			WithArgs(1, 2, 100, 3, "user-1", 10).
+			WillReturnResult(sqlmock.NewResult(1, 0))
+
+		err := repo.CheckInRound(10, "user-1", 1, 2, 100, 3)
+		assert.ErrorIs(t, err, repository.ErrRoundAlreadyCheckedIn)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("db error", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
