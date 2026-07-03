@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { load } from './+page.server.js';
+import { load } from '$src/routes/dashboard/student/my-page/+page.server.js';
 
 const makeRequest = () =>
 	new Request('http://localhost/dashboard/student/my-page', {

@@ -1,7 +1,7 @@
 import { page } from '@vitest/browser/context';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import Page from './+page.svelte';
+import Page from '$src/routes/dashboard/root/notification/+page.svelte';
 
 vi.mock('$app/stores', () => ({
   page: {

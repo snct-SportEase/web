@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import config from '../svelte.config.js';
+import config from '../../svelte.config.js';
 
 describe('SvelteKit CSRF configuration', () => {
 	it('keeps cross-origin form submissions blocked by default', () => {

@@ -1,7 +1,7 @@
 import { page } from '@vitest/browser/context';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import Page from './+page.svelte';
+import Page from '$src/routes/dashboard/root/event-management/+page.svelte';
 
 const originalCreateElement = document.createElement.bind(document);
 

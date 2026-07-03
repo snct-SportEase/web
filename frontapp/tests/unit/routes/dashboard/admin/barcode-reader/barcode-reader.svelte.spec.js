@@ -1,7 +1,7 @@
 import { page } from '@vitest/browser/context';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import Page from './+page.svelte';
+import Page from '$src/routes/dashboard/admin/barcode-reader/+page.svelte';
 
 function minutesFromNow(minutes) {
 	// Match start times are registered as JST wall-clock values.

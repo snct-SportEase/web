@@ -6,7 +6,7 @@
  */
 
 import { spawn, spawnSync } from 'child_process';
-import { argv } from 'process';
+import { argv, execPath } from 'process';
 
 // Check if we're in a CI environment
 const isCI = process.env.CI === 'true';
@@ -28,7 +28,7 @@ if (isCI && !skipPlaywrightInstall) {
 }
 
 const args = argv.slice(2);
-const child = spawn('npm', ['run', 'test:unit', '--', ...args], {
+const child = spawn(execPath, ['./node_modules/vitest/vitest.mjs', ...args], {
 	stdio: 'pipe'
 });
 

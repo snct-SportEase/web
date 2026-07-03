@@ -1,7 +1,7 @@
 import { page } from '@vitest/browser/context';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import Page from './+page.svelte';
+import Page from '$src/routes/dashboard/admin/class-management/+page.svelte';
 
 describe('Class Management Page', () => {
   it('作成済みの昼競技に対応する競技マスタを選択肢に表示する', async () => {

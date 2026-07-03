@@ -1,7 +1,7 @@
 import { page } from '@vitest/browser/context';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import NotificationSettings from './NotificationSettings.svelte';
+import NotificationSettings from '$src/lib/components/NotificationSettings.svelte';
 
 class NotificationMock {}
 
