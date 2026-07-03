@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	const supportedBarcodeFormats = ['code_39', 'code_128', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e'];
 
@@ -32,20 +32,7 @@
 			? tournaments.filter((tournament) => `${tournament.sport_id}` === `${selectedSportId}`)
 			: []
 	);
-	let selectableMatches = $derived(
-		selectedSportTournaments.flatMap((tournament, tournamentIndex) => {
-			const data = getTournamentData(tournament);
-			return (data.matches ?? [])
-				.filter((match) => match.id)
-				.map((match, matchIndex) => ({
-					id: match.id,
-					value: `${tournament.id ?? tournamentIndex}:${match.id}:${matchIndex}`,
-					label: getMatchLabel(tournament, match),
-					matchupLabel: getMatchupLabel(getTournamentData(tournament), match),
-					round: getMatchRound(match)
-				}));
-		})
-	);
+	let selectableMatches = $derived(buildMatchSelections(selectedSportTournaments));
 	let selectedMatch = $derived(
 		selectedMatchId
 			? selectableMatches.find((match) => match.value === selectedMatchId) || null
@@ -156,6 +143,134 @@
 		return data.rounds?.[match.roundIndex]?.name || `第${getMatchRound(match)}ラウンド`;
 	}
 
+	function buildMatchSelections(tournamentsForSport) {
+		const timedGroups = new SvelteMap();
+		const selections = [];
+
+		tournamentsForSport.forEach((tournament, tournamentIndex) => {
+			const data = getTournamentData(tournament);
+			(data.matches ?? [])
+				.filter((match) => match.id)
+				.forEach((match, matchIndex) => {
+					const startKey = getMatchStartTimeKey(match);
+					const startLabel = getMatchStartTimeLabel(match);
+					const entry = {
+						tournament,
+						data,
+						match,
+						matchupLabel: getMatchupLabel(data, match),
+						sortIndex:
+							tournamentIndex * 100000 +
+							Number(match.roundIndex ?? 0) * 1000 +
+							Number(match.order ?? matchIndex)
+					};
+
+					if (!startKey) {
+						selections.push(createMatchSelection([entry]));
+						return;
+					}
+
+					const roundName = getRoundName(tournament, match);
+					const groupKey = `${Number(match.roundIndex ?? 0)}:${startKey}`;
+					if (!timedGroups.has(groupKey)) {
+						timedGroups.set(groupKey, {
+							round: getMatchRound(match),
+							roundName,
+							startLabel,
+							entries: []
+						});
+					}
+					timedGroups.get(groupKey).entries.push(entry);
+				});
+		});
+
+		for (const group of timedGroups.values()) {
+			selections.push(createMatchSelection(group.entries, group));
+		}
+
+		return selections.sort((a, b) => a.sortIndex - b.sortIndex);
+	}
+
+	function createMatchSelection(entries, timedGroup = null) {
+		const firstEntry = entries[0];
+		const matchIds = entries.map((entry) => entry.match.id);
+		const matchupLabels = entries.map((entry) => entry.matchupLabel).filter(Boolean);
+		const matchupSummary = matchupLabels.join(', ');
+		const sortIndex = Math.min(...entries.map((entry) => entry.sortIndex));
+
+		if (timedGroup) {
+			const summaryLabel = `${timedGroup.roundName} ${timedGroup.startLabel}開始試合`;
+			return {
+				id: matchIds[0],
+				matchIds,
+				value: `time:${matchIds.join('-')}`,
+				label: matchupSummary ? `${summaryLabel}（${matchupSummary}）` : summaryLabel,
+				summaryLabel,
+				matchupLabel: matchupSummary,
+				matchupLabels,
+				round: timedGroup.round,
+				sortIndex
+			};
+		}
+
+		return {
+			id: firstEntry.match.id,
+			matchIds,
+			value: `${firstEntry.tournament.id ?? 0}:${firstEntry.match.id}:${sortIndex}`,
+			label: getMatchLabel(firstEntry.tournament, firstEntry.match),
+			summaryLabel: getMatchLabel(firstEntry.tournament, firstEntry.match),
+			matchupLabel: matchupSummary,
+			matchupLabels,
+			round: getMatchRound(firstEntry.match),
+			sortIndex
+		};
+	}
+
+	function getMatchStartTime(match) {
+		return match?.startTime || match?.rainyModeStartTime || '';
+	}
+
+	function getMatchStartTimeKey(match) {
+		const value = String(getMatchStartTime(match) || '').trim();
+		if (!value) {
+			return '';
+		}
+
+		const date = new Date(value.replace(' ', 'T'));
+		if (Number.isNaN(date.getTime())) {
+			return value;
+		}
+
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		const hour = String(date.getHours()).padStart(2, '0');
+		const minute = String(date.getMinutes()).padStart(2, '0');
+		return `${year}-${month}-${day}T${hour}:${minute}`;
+	}
+
+	function getMatchStartTimeLabel(match) {
+		const value = String(getMatchStartTime(match) || '').trim();
+		if (!value) {
+			return '';
+		}
+
+		const timeOnlyMatch = value.match(/^(\d{1,2}:\d{2})/);
+		if (timeOnlyMatch) {
+			return timeOnlyMatch[1];
+		}
+
+		const date = new Date(value.replace(' ', 'T'));
+		if (Number.isNaN(date.getTime())) {
+			return value;
+		}
+
+		return date.toLocaleTimeString('ja-JP', {
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
 	function getMatchLabel(tournament, match) {
 		const matchNumber = Number(match.order ?? 0) + 1;
 		const matchupLabel = getMatchupLabel(getTournamentData(tournament), match);
@@ -216,10 +331,12 @@
 		checkInsError = '';
 
 		try {
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const params = new URLSearchParams({
 				event_id: String(activeEventId),
 				sport_id: String(selectedSportId)
 			});
+			params.set('match_ids', selectedMatch.matchIds.join(','));
 			const response = await fetch(`/api/barcode/matches/${selectedMatch.id}/check-ins?${params}`, {
 				credentials: 'include'
 			});
@@ -279,7 +396,8 @@
 					barcode_data: trimmedBarcode,
 					event_id: Number(activeEventId),
 					sport_id: Number(selectedSportId),
-					match_id: Number(selectedMatch.id)
+					match_id: Number(selectedMatch.id),
+					match_ids: selectedMatch.matchIds.map(Number)
 				})
 			});
 
@@ -518,16 +636,25 @@
 					<p class="mt-4 text-sm text-gray-600">選択中: {selectedSport.name}</p>
 				{/if}
 				{#if selectedMatch}
-					<p class="mt-1 text-sm text-gray-600">試合: {selectedMatch.label}</p>
-					{#if selectedMatch.matchupLabel}
-						<p class="mt-1 text-sm text-gray-600">対戦: {selectedMatch.matchupLabel}</p>
+					<p class="mt-1 text-sm text-gray-600">試合: {selectedMatch.summaryLabel}</p>
+					{#if selectedMatch.matchupLabels.length > 0}
+						<div class="mt-1 text-sm text-gray-600">
+							<p>対戦:</p>
+							<ul class="mt-1 space-y-1">
+								{#each selectedMatch.matchupLabels as matchupLabel (matchupLabel)}
+									<li>{matchupLabel}</li>
+								{/each}
+							</ul>
+						</div>
 					{/if}
 					<p class="mt-1 text-sm text-gray-600">ラウンド: {selectedMatch.round}</p>
 				{/if}
 
 				<div class="mt-6 border-t border-gray-200 pt-4">
 					<div class="mb-3 flex items-center justify-between">
-						<h3 class="text-base font-semibold text-gray-900">この試合のチェックイン済み</h3>
+						<h3 class="text-base font-semibold text-gray-900">
+							{selectedMatch?.matchIds?.length > 1 ? 'この時間帯のチェックイン済み' : 'この試合のチェックイン済み'}
+						</h3>
 						<span class="text-sm text-gray-600">{matchCheckInCount} 人</span>
 					</div>
 

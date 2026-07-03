@@ -67,7 +67,9 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "イベントIDと競技IDが必要です"})
 		return
 	}
-	if req.MatchID <= 0 {
+
+	selectedMatchIDs := normalizeMatchIDs(req.MatchID, req.MatchIDs)
+	if len(selectedMatchIDs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "試合を選択してください"})
 		return
 	}
@@ -99,20 +101,16 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		return
 	}
 
-	match, err := h.tournRepo.GetMatchForEventSport(req.MatchID, req.EventID, req.SportID)
+	match, selectionValid, err := h.findMatchingSelectedMatch(selectedMatchIDs, req.EventID, req.SportID, team.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
 		return
 	}
-	if match == nil {
+	if !selectionValid {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "選択した試合がこの競技に存在しません"})
 		return
 	}
-	if match.Round < 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
-		return
-	}
-	if !isTeamInMatch(team.ID, match) {
+	if match == nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "読み取った学生のチームは選択した試合に出場していません"})
 		return
 	}
@@ -133,7 +131,7 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		return
 	}
 
-	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, req.MatchID, round); err != nil {
+	if err := h.teamRepo.CheckInRound(team.ID, user.ID, req.EventID, req.SportID, match.ID, round); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check in round"})
 		return
 	}
@@ -176,7 +174,8 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 		"sport_id":       req.SportID,
 		"sport_name":     team.SportName,
 		"round":          round,
-		"match_id":       req.MatchID,
+		"match_id":       match.ID,
+		"match_ids":      selectedMatchIDs,
 		"team_id":        team.ID,
 		"user_id":        user.ID,
 		"display_name":   displayName,
@@ -210,26 +209,59 @@ func (h *BarcodeHandler) GetMatchCheckInsHandler(c *gin.Context) {
 		return
 	}
 
-	match, err := h.tournRepo.GetMatchForEventSport(matchID, eventID, sportID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
-		return
-	}
-	if match == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "選択した試合がこの競技に存在しません"})
-		return
-	}
+	selectedMatchIDs := parseMatchIDsQuery(matchID, c.Query("match_ids"))
+	members := make([]*models.MatchCheckInMember, 0)
+	for _, selectedMatchID := range selectedMatchIDs {
+		match, err := h.tournRepo.GetMatchForEventSport(selectedMatchID, eventID, sportID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify selected match"})
+			return
+		}
+		if match == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "選択した試合がこの競技に存在しません"})
+			return
+		}
 
-	members, err := h.teamRepo.GetMatchCheckIns(eventID, sportID, matchID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match check-ins"})
-		return
+		matchMembers, err := h.teamRepo.GetMatchCheckIns(eventID, sportID, selectedMatchID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get match check-ins"})
+			return
+		}
+		members = append(members, matchMembers...)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"members": members,
 		"count":   len(members),
 	})
+}
+
+func normalizeMatchIDs(primaryMatchID int, matchIDs []int) []int {
+	seen := make(map[int]bool)
+	normalized := make([]int, 0, len(matchIDs)+1)
+	for _, matchID := range append([]int{primaryMatchID}, matchIDs...) {
+		if matchID <= 0 || seen[matchID] {
+			continue
+		}
+		seen[matchID] = true
+		normalized = append(normalized, matchID)
+	}
+	return normalized
+}
+
+func parseMatchIDsQuery(primaryMatchID int, rawMatchIDs string) []int {
+	if rawMatchIDs == "" {
+		return []int{primaryMatchID}
+	}
+
+	matchIDs := make([]int, 0)
+	for _, rawID := range strings.Split(rawMatchIDs, ",") {
+		matchID, err := strconv.Atoi(strings.TrimSpace(rawID))
+		if err == nil {
+			matchIDs = append(matchIDs, matchID)
+		}
+	}
+	return normalizeMatchIDs(primaryMatchID, matchIDs)
 }
 
 func parseMyIDBarcode(barcodeData string) (string, error) {
@@ -282,6 +314,26 @@ func (h *BarcodeHandler) findPreEnteredTeam(userID string, eventID int, sportID 
 	}
 
 	return nil, nil
+}
+
+func (h *BarcodeHandler) findMatchingSelectedMatch(matchIDs []int, eventID int, sportID int, teamID int) (*models.MatchDB, bool, error) {
+	for _, matchID := range matchIDs {
+		match, err := h.tournRepo.GetMatchForEventSport(matchID, eventID, sportID)
+		if err != nil {
+			return nil, true, err
+		}
+		if match == nil {
+			return nil, false, nil
+		}
+		if match.Round < 0 {
+			return nil, true, fmt.Errorf("invalid match round")
+		}
+		if isTeamInMatch(teamID, match) {
+			return match, true, nil
+		}
+	}
+
+	return nil, true, nil
 }
 
 func isTeamInMatch(teamID int, match *models.MatchDB) bool {

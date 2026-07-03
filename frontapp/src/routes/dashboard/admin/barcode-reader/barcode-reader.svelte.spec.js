@@ -46,15 +46,28 @@ describe('Barcode Reader Page', () => {
 									id: 31,
 									roundIndex: 0,
 									order: 0,
+									startTime: '2026-07-03T10:00:00',
 									sides: [
 										{ contestantId: 'c0', teamId: 11 },
 										{ contestantId: 'c1', teamId: 12 }
+									]
+								},
+								{
+									id: 32,
+									roundIndex: 0,
+									order: 1,
+									startTime: '2026-07-03T10:00:00',
+									sides: [
+										{ contestantId: 'c2', teamId: 13 },
+										{ contestantId: 'c3', teamId: 14 }
 									]
 								}
 							],
 							contestants: {
 								c0: { players: [{ title: '1-1' }] },
-								c1: { players: [{ title: '1-2' }] }
+								c1: { players: [{ title: '1-2' }] },
+								c2: { players: [{ title: '1-3' }] },
+								c3: { players: [{ title: '1-4' }] }
 							}
 						})
 					}
@@ -86,10 +99,20 @@ describe('Barcode Reader Page', () => {
 		await page.getByLabelText('競技').selectOptions('7');
 
 		await expect.element(page.getByText('選択中: バスケットボール')).toBeInTheDocument();
-		await expect.element(page.getByRole('option', { name: 'バスケットボール / 決勝 第1試合（1-1 vs 1-2）' })).toBeInTheDocument();
+		await expect.element(page.getByRole('option', { name: '決勝 10:00開始試合（1-1 vs 1-2, 1-3 vs 1-4）' })).toBeInTheDocument();
 
-		await page.getByLabelText('試合').selectOptions('3:31:0');
+		await page.getByLabelText('試合').selectOptions('time:31-32');
 
-		await expect.element(page.getByText('対戦: 1-1 vs 1-2')).toBeInTheDocument();
+		await expect.element(page.getByText('試合: 決勝 10:00開始試合')).toBeInTheDocument();
+		const matchupItems = Array.from(document.querySelectorAll('li')).map((item) =>
+			item.textContent?.trim()
+		);
+		expect(matchupItems).toContain('1-1 vs 1-2');
+		expect(matchupItems).toContain('1-3 vs 1-4');
+		expect(
+			fetchMock.mock.calls.some(([url]) =>
+				String(url).includes('/api/barcode/matches/31/check-ins?event_id=1&sport_id=7&match_ids=31%2C32')
+			)
+		).toBe(true);
 	});
 });

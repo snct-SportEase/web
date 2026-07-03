@@ -29,6 +29,7 @@ type BarcodeCheckInRequest struct {
 	EventID     int    `json:"event_id"`
 	SportID     int    `json:"sport_id"`
 	MatchID     int    `json:"match_id"`
+	MatchIDs    []int  `json:"match_ids"`
 }
 
 // MatchCheckInMember represents a student checked in for a selected match.
