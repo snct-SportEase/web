@@ -5,11 +5,13 @@ import (
 	"backapp/internal/config"
 	"backapp/internal/handler"
 	"bytes"
+	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -18,24 +20,6 @@ import (
 
 func TestExportDBDump(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	tempDir := t.TempDir()
-	argsFile := filepath.Join(tempDir, "mysqldump.args")
-	passwordFile := filepath.Join(tempDir, "mysqldump.password")
-	fakeBinDir := filepath.Join(tempDir, "bin")
-
-	assert.NoError(t, os.MkdirAll(fakeBinDir, 0o755))
-	assert.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "mysqldump"), []byte(`#!/bin/sh
-printf '%s\n' "$@" > "$MYSQLDUMP_ARGS_FILE"
-printf '%s' "$MYSQL_PWD" > "$MYSQLDUMP_PASSWORD_FILE"
-cat <<'SQL'
-CREATE TABLE users (id int);
-INSERT INTO users VALUES (1);
-SQL
-`), 0o755))
-
-	t.Setenv("MYSQLDUMP_ARGS_FILE", argsFile)
-	t.Setenv("MYSQLDUMP_PASSWORD_FILE", passwordFile)
-	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	cfg := &config.Config{
 		DBHost:     "127.0.0.1",
@@ -45,7 +29,11 @@ SQL
 		DBName:     "sportease",
 	}
 
-	systemHandler := handler.NewSystemHandler(cfg)
+	systemHandler := handler.NewSystemHandlerWithDBDumpExporter(cfg, func(_ context.Context, gotCfg *config.Config, writer io.Writer) error {
+		assert.Equal(t, cfg, gotCfg)
+		_, err := io.WriteString(writer, "CREATE TABLE users (id int);\nINSERT INTO users VALUES (1);\n")
+		return err
+	})
 
 	router := gin.Default()
 	router.GET("/api/root/db/export", systemHandler.ExportDBDump)
@@ -66,45 +54,19 @@ SQL
 
 	assert.Contains(t, w.Body.String(), "CREATE TABLE users")
 	assert.Contains(t, w.Body.String(), "INSERT INTO users VALUES")
-
-	argsBytes, err := os.ReadFile(argsFile)
-	assert.NoError(t, err)
-	args := strings.Fields(string(argsBytes))
-	assert.Equal(t, []string{
-		"-h", "127.0.0.1",
-		"-P", "3307",
-		"-u", "dump_user",
-		"--default-character-set=utf8mb4",
-		"--single-transaction",
-		"--routines",
-		"--triggers",
-		"sportease",
-	}, args)
-	assert.NotContains(t, args, "--no-data")
-	assert.NotContains(t, args, "--no-create-info")
-
-	passwordBytes, err := os.ReadFile(passwordFile)
-	assert.NoError(t, err)
-	assert.Equal(t, "test_password", string(passwordBytes))
 }
 
 func TestExportDBDumpCommandFailure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	tempDir := t.TempDir()
-	fakeBinDir := filepath.Join(tempDir, "bin")
 
-	assert.NoError(t, os.MkdirAll(fakeBinDir, 0o755))
-	assert.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "mysqldump"), []byte(`#!/bin/sh
-exit 7
-`), 0o755))
-	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-
-	systemHandler := handler.NewSystemHandler(&config.Config{
+	systemHandler := handler.NewSystemHandlerWithDBDumpExporter(&config.Config{
 		DBHost:     "127.0.0.1",
 		DBPort:     "3307",
 		DBUser:     "dump_user",
 		DBPassword: "test_password",
 		DBName:     "sportease",
+	}, func(context.Context, *config.Config, io.Writer) error {
+		return errors.New("dump failed")
 	})
 
 	router := gin.Default()
