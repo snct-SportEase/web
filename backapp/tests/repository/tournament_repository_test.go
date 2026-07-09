@@ -99,6 +99,58 @@ func TestTournamentRepository_GetTournamentsByEventID(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestTournamentRepository_GetTournamentSportNamesByEventID(t *testing.T) {
+	query := regexp.QuoteMeta(`
+		SELECT DISTINCT s.name
+		FROM tournaments t
+		JOIN sports s ON s.id = t.sport_id
+		WHERE t.event_id = ?
+		ORDER BY s.name
+	`)
+
+	t.Run("JOINで競技名だけを取得する", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewTournamentRepository(db)
+
+		mock.ExpectQuery(query).
+			WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"name"}).
+				AddRow("サッカー").
+				AddRow("バスケットボール"))
+
+		sportNames, err := r.GetTournamentSportNamesByEventID(1)
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"サッカー", "バスケットボール"}, sportNames)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("対象トーナメントがない場合は空配列を返す", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewTournamentRepository(db)
+
+		mock.ExpectQuery(query).
+			WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"name"}))
+
+		sportNames, err := r.GetTournamentSportNamesByEventID(1)
+
+		assert.NoError(t, err)
+		assert.Empty(t, sportNames)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 func TestTournamentRepository_GetTournamentsByEventID_InferWinnerForTie(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
