@@ -201,6 +201,118 @@ func TestStatisticsHandler_GetClassScoreTrends(t *testing.T) {
 	})
 }
 
+func TestStatisticsHandler_GetRealtimeEventProgress(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("JOIN取得用メソッドで競技名ごとの進行状況を返す", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockTournRepo := new(MockTournamentRepository)
+
+		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockTournRepo.On("GetTournamentSportNamesByEventID", 1).Return([]string{"サッカー", "バスケットボール"}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/statistics/progress", nil)
+
+		h.GetRealtimeEventProgress(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]string
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, map[string]string{
+			"サッカー":     "進行中",
+			"バスケットボール": "進行中",
+		}, resp)
+
+		mockTournRepo.AssertNotCalled(t, "GetTournamentsByEventID", mock.Anything)
+		mockSportRepo.AssertNotCalled(t, "GetSportByID", mock.Anything)
+		mockEventRepo.AssertExpectations(t)
+		mockTournRepo.AssertExpectations(t)
+	})
+
+	t.Run("競技名が0件なら空オブジェクトを返す", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockTournRepo := new(MockTournamentRepository)
+
+		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockTournRepo.On("GetTournamentSportNamesByEventID", 1).Return([]string{}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/statistics/progress", nil)
+
+		h.GetRealtimeEventProgress(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]string
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Empty(t, resp)
+
+		mockTournRepo.AssertNotCalled(t, "GetTournamentsByEventID", mock.Anything)
+		mockSportRepo.AssertNotCalled(t, "GetSportByID", mock.Anything)
+		mockEventRepo.AssertExpectations(t)
+		mockTournRepo.AssertExpectations(t)
+	})
+
+	t.Run("アクティブイベント取得エラー時に500を返す", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockTournRepo := new(MockTournamentRepository)
+
+		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(0, assert.AnError).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/statistics/progress", nil)
+
+		h.GetRealtimeEventProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		mockTournRepo.AssertNotCalled(t, "GetTournamentSportNamesByEventID", mock.Anything)
+		mockTournRepo.AssertNotCalled(t, "GetTournamentsByEventID", mock.Anything)
+		mockSportRepo.AssertNotCalled(t, "GetSportByID", mock.Anything)
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("競技名取得エラー時に500を返す", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockTournRepo := new(MockTournamentRepository)
+
+		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockTournRepo.On("GetTournamentSportNamesByEventID", 1).Return(nil, assert.AnError).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/statistics/progress", nil)
+
+		h.GetRealtimeEventProgress(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		mockTournRepo.AssertNotCalled(t, "GetTournamentsByEventID", mock.Anything)
+		mockSportRepo.AssertNotCalled(t, "GetSportByID", mock.Anything)
+		mockEventRepo.AssertExpectations(t)
+		mockTournRepo.AssertExpectations(t)
+	})
+}
+
 func TestStatisticsHandler_GetOverallAttendanceRate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
