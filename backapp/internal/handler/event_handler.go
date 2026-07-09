@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
@@ -442,41 +443,53 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 		return
 	}
 
-	log.Printf("[event-notification] %d件の購読に対してPush通知を送信します\n", len(subs))
+	log.Printf("[event-notification] %d件の購読に対してPush通知を送信します (ants pool)\n", len(subs))
+	var wg sync.WaitGroup
 	for i, sub := range subs {
-		subscription := &webpush.Subscription{
-			Endpoint: sub.Endpoint,
-			Keys: webpush.Keys{
-				Auth:   sub.AuthKey,
-				P256dh: sub.P256dhKey,
-			},
-		}
-
-		log.Printf("[event-notification] [%d/%d] Push送信試行: userID=%s, endpoint=%s\n", i+1, len(subs), sub.UserID, sub.Endpoint)
-
-		resp, err := webpush.SendNotification(payload, subscription, &webpush.Options{
-			Subscriber:      "mailto:notifications@sportease.local",
-			VAPIDPublicKey:  h.vapidPublicKey,
-			VAPIDPrivateKey: h.vapidPrivateKey,
-			TTL:             60,
-		})
-
-		if err != nil {
-			log.Printf("[event-notification] [%d/%d] Push送信に失敗しました: userID=%s, endpoint=%s, error=%v\n", i+1, len(subs), sub.UserID, sub.Endpoint, err)
-			continue
-		}
-
-		if resp != nil {
-			if resp.StatusCode >= 400 {
-				bodyBytes, _ := io.ReadAll(resp.Body)
-				log.Printf("[event-notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode, string(bodyBytes))
-				cleanupExpiredPushSubscription(h.notificationRepo, sub, resp.StatusCode, "event-notification")
-			} else {
-				log.Printf("[event-notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", i+1, len(subs), sub.UserID, sub.Endpoint, resp.StatusCode)
+		index, s := i, sub
+		wg.Add(1)
+		// WebPush送信は外部HTTP待ちが支配的なので、既存のworker poolで購読ごとに並行送信する。
+		err := repository.GlobalAnts.Submit(func() {
+			defer wg.Done()
+			subscription := &webpush.Subscription{
+				Endpoint: s.Endpoint,
+				Keys: webpush.Keys{
+					Auth:   s.AuthKey,
+					P256dh: s.P256dhKey,
+				},
 			}
-			resp.Body.Close()
+
+			log.Printf("[event-notification] [%d/%d] Push送信試行: userID=%s, endpoint=%s\n", index+1, len(subs), s.UserID, s.Endpoint)
+
+			resp, err := webpush.SendNotification(payload, subscription, &webpush.Options{
+				Subscriber:      "mailto:notifications@sportease.local",
+				VAPIDPublicKey:  h.vapidPublicKey,
+				VAPIDPrivateKey: h.vapidPrivateKey,
+				TTL:             60,
+			})
+
+			if err != nil {
+				log.Printf("[event-notification] [%d/%d] Push送信に失敗しました: userID=%s, endpoint=%s, error=%v\n", index+1, len(subs), s.UserID, s.Endpoint, err)
+				return
+			}
+
+			if resp != nil {
+				defer resp.Body.Close()
+				if resp.StatusCode >= 400 {
+					bodyBytes, _ := io.ReadAll(resp.Body)
+					log.Printf("[event-notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode, string(bodyBytes))
+					cleanupExpiredPushSubscription(h.notificationRepo, s, resp.StatusCode, "event-notification")
+				} else {
+					log.Printf("[event-notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode)
+				}
+			}
+		})
+		if err != nil {
+			log.Printf("[event-notification] ants worker pool submission failed: %v\n", err)
+			wg.Done()
 		}
 	}
+	wg.Wait()
 	log.Printf("[event-notification] 通知送信完了: notificationID=%d\n", notificationID)
 }
 

@@ -71,6 +71,14 @@ func (m *MockClassRepository) GetClassScoresByEvent(eventID int) ([]*models.Clas
 	return args.Get(0).([]*models.ClassScore), args.Error(1)
 }
 
+func (m *MockClassRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*models.ClassScore, error) {
+	args := m.Called(eventIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[int][]*models.ClassScore), args.Error(1)
+}
+
 func (m *MockClassRepository) UpdateClassRanks(eventID int) error {
 	args := m.Called(eventID)
 	return args.Error(0)
@@ -341,6 +349,14 @@ func (m *MockTournamentRepository) GetTournamentsByEventID(eventID int) ([]*mode
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*models.Tournament), args.Error(1)
+}
+
+func (m *MockTournamentRepository) GetTournamentSportNamesByEventID(eventID int) ([]string, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func (m *MockTournamentRepository) GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error) {

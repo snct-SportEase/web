@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 type ClassHandler struct {
@@ -274,20 +275,28 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return
 	}
 
-	teams, err := h.teamRepo.GetTeamsByClassID(class.ID, activeEventID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get teams"})
-		return
-	}
-	noonGameTeams, err := h.teamRepo.GetNoonGameTeamsByClassID(class.ID, activeEventID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get noon game teams"})
-		return
-	}
-
-	members, err := h.classRepo.GetClassMembers(class.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class members"})
+	var teams []*models.TeamWithSport
+	var noonGameTeams []*models.TeamWithSport
+	var members []*models.User
+	var g errgroup.Group
+	// 3つのDB読み取りは互いに依存しないため、待ち時間を重ねる。
+	g.Go(func() error {
+		var err error
+		teams, err = h.teamRepo.GetTeamsByClassID(class.ID, activeEventID)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		noonGameTeams, err = h.teamRepo.GetNoonGameTeamsByClassID(class.ID, activeEventID)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		members, err = h.classRepo.GetClassMembers(class.ID)
+		return err
+	})
+	if err := g.Wait(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class progress data"})
 		return
 	}
 

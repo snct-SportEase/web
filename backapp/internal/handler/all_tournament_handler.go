@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 type TournamentHandler struct {
@@ -72,82 +73,106 @@ func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context)
 		return
 	}
 
-	generatedTournaments := make([]models.GeneratedTournament, 0)
-
-	for _, eventSport := range sports {
-		// 昼競技(noon_game)は /noon-game で別管理するため、トーナメント生成対象から除外
-		if eventSport.Location == "noon_game" {
-			continue
-		}
-		roundBusyClasses := make(map[int]map[int]bool)
-		sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
-		if err != nil {
-			continue // Log this error
-		}
-
-		teams, err := h.sportRepo.GetTeamsBySportID(sport.ID)
-		if err != nil {
-			continue // Log this error
-		}
-
-		tournamentData, shuffledTeams, err := generateTournamentStructure(teams, roundBusyClasses)
-		if err != nil {
-			continue
-		}
-
-		// Convert []*models.Team to []models.Team
-		teamsSlice := make([]models.Team, len(shuffledTeams))
-		for i, t := range shuffledTeams {
-			if t != nil {
-				teamsSlice[i] = *t
-			}
-		}
-
-		// 本戦トーナメントを追加
-		generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
-			EventID:        eventID,
-			SportID:        sport.ID,
-			SportName:      sport.Name,
-			TournamentData: *tournamentData,
-			ShuffledTeams:  teamsSlice,
+	// 競技ごとのDB読み取りと構造生成は独立しているため、上限付きで並行化する。
+	// results に index で格納して、レスポンス順は GetSportsByEventID の順序を保つ。
+	results := make([][]models.GeneratedTournament, len(sports))
+	var g errgroup.Group
+	g.SetLimit(4)
+	for i, eventSport := range sports {
+		i, eventSport := i, eventSport
+		g.Go(func() error {
+			results[i] = h.generateTournamentsPreviewForSport(eventID, eventSport)
+			return nil
 		})
+	}
+	if err := g.Wait(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tournament previews"})
+		return
+	}
 
-		// gym2の場合は敗者戦A/Bブロックトーナメントも生成
-		if eventSport.Location == "gym2" {
-			// 本戦の一回戦の試合を確認（8試合である必要がある）
-			var firstRoundMatches []models.Match
-			for _, match := range tournamentData.Matches {
-				if match.RoundIndex == 0 && !match.IsBronzeMatch {
-					firstRoundMatches = append(firstRoundMatches, match)
-				}
-			}
-
-			// 一回戦は8試合（16チーム）である必要がある
-			if len(firstRoundMatches) == 8 {
-				// 敗者戦Aブロックトーナメント
-				loserBracketA := generateLoserBracketTournament("A")
-				generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
-					EventID:        eventID,
-					SportID:        sport.ID,
-					SportName:      fmt.Sprintf("%s Tournament - 敗者戦Aブロック", sport.Name),
-					TournamentData: *loserBracketA,
-					ShuffledTeams:  []models.Team{}, // 敗者戦は試合後に決定
-				})
-
-				// 敗者戦Bブロックトーナメント
-				loserBracketB := generateLoserBracketTournament("B")
-				generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
-					EventID:        eventID,
-					SportID:        sport.ID,
-					SportName:      fmt.Sprintf("%s Tournament - 敗者戦Bブロック", sport.Name),
-					TournamentData: *loserBracketB,
-					ShuffledTeams:  []models.Team{}, // 敗者戦は試合後に決定
-				})
-			}
-		}
+	generatedTournaments := make([]models.GeneratedTournament, 0)
+	for _, tournaments := range results {
+		generatedTournaments = append(generatedTournaments, tournaments...)
 	}
 
 	c.JSON(http.StatusOK, generatedTournaments)
+}
+
+func (h *TournamentHandler) generateTournamentsPreviewForSport(eventID int, eventSport *models.EventSport) []models.GeneratedTournament {
+	generatedTournaments := make([]models.GeneratedTournament, 0, 3)
+
+	// 昼競技(noon_game)は /noon-game で別管理するため、トーナメント生成対象から除外
+	if eventSport.Location == "noon_game" {
+		return generatedTournaments
+	}
+	roundBusyClasses := make(map[int]map[int]bool)
+	sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
+	if err != nil {
+		return generatedTournaments
+	}
+
+	teams, err := h.sportRepo.GetTeamsBySportID(sport.ID)
+	if err != nil {
+		return generatedTournaments
+	}
+
+	tournamentData, shuffledTeams, err := generateTournamentStructure(teams, roundBusyClasses)
+	if err != nil {
+		return generatedTournaments
+	}
+
+	// Convert []*models.Team to []models.Team
+	teamsSlice := make([]models.Team, len(shuffledTeams))
+	for i, t := range shuffledTeams {
+		if t != nil {
+			teamsSlice[i] = *t
+		}
+	}
+
+	// 本戦トーナメントを追加
+	generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
+		EventID:        eventID,
+		SportID:        sport.ID,
+		SportName:      sport.Name,
+		TournamentData: *tournamentData,
+		ShuffledTeams:  teamsSlice,
+	})
+
+	// gym2の場合は敗者戦A/Bブロックトーナメントも生成
+	if eventSport.Location == "gym2" {
+		// 本戦の一回戦の試合を確認（8試合である必要がある）
+		var firstRoundMatches []models.Match
+		for _, match := range tournamentData.Matches {
+			if match.RoundIndex == 0 && !match.IsBronzeMatch {
+				firstRoundMatches = append(firstRoundMatches, match)
+			}
+		}
+
+		// 一回戦は8試合（16チーム）である必要がある
+		if len(firstRoundMatches) == 8 {
+			// 敗者戦Aブロックトーナメント
+			loserBracketA := generateLoserBracketTournament("A")
+			generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
+				EventID:        eventID,
+				SportID:        sport.ID,
+				SportName:      fmt.Sprintf("%s Tournament - 敗者戦Aブロック", sport.Name),
+				TournamentData: *loserBracketA,
+				ShuffledTeams:  []models.Team{}, // 敗者戦は試合後に決定
+			})
+
+			// 敗者戦Bブロックトーナメント
+			loserBracketB := generateLoserBracketTournament("B")
+			generatedTournaments = append(generatedTournaments, models.GeneratedTournament{
+				EventID:        eventID,
+				SportID:        sport.ID,
+				SportName:      fmt.Sprintf("%s Tournament - 敗者戦Bブロック", sport.Name),
+				TournamentData: *loserBracketB,
+				ShuffledTeams:  []models.Team{}, // 敗者戦は試合後に決定
+			})
+		}
+	}
+
+	return generatedTournaments
 }
 
 func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
@@ -237,61 +262,33 @@ func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {
 		return
 	}
 
-	for _, eventSport := range sports {
-		// 昼競技(noon_game)は /noon-game で別管理するため、トーナメント生成対象から除外
-		if eventSport.Location == "noon_game" {
-			continue
-		}
-		roundBusyClasses := make(map[int]map[int]bool)
-		sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
-		if err != nil {
-			continue
-		}
+	results := make([][]models.GeneratedTournament, len(sports))
+	var g errgroup.Group
+	g.SetLimit(4)
+	for i, eventSport := range sports {
+		i, eventSport := i, eventSport
+		g.Go(func() error {
+			results[i] = h.generateTournamentsPreviewForSport(eventID, eventSport)
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tournaments"})
+		return
+	}
 
-		teams, err := h.sportRepo.GetTeamsBySportID(sport.ID)
-		if err != nil {
-			continue
-		}
-
-		tournamentData, shuffledTeams, err := generateTournamentStructure(teams, roundBusyClasses)
-		if err != nil {
-			continue
-		}
-
-		// 本戦トーナメントを保存
-		err = h.tournRepo.SaveTournament(eventID, sport.ID, sport.Name, tournamentData, shuffledTeams)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + sport.Name})
-			return
-		}
-
-		// gym2の場合は敗者戦A/Bブロックトーナメントも生成
-		if eventSport.Location == "gym2" {
-			// 本戦の一回戦の試合を確認（8試合である必要がある）
-			var firstRoundMatches []models.Match
-			for _, match := range tournamentData.Matches {
-				if match.RoundIndex == 0 && !match.IsBronzeMatch {
-					firstRoundMatches = append(firstRoundMatches, match)
-				}
+	// 保存はDB書き込みのため直列に行う。生成結果はindex順に走査して従来の順序を保つ。
+	for _, tournaments := range results {
+		for _, tournament := range tournaments {
+			shuffledTeamsPtr := make([]*models.Team, len(tournament.ShuffledTeams))
+			for i := range tournament.ShuffledTeams {
+				shuffledTeamsPtr[i] = &tournament.ShuffledTeams[i]
 			}
 
-			// 一回戦は8試合（16チーム）である必要がある
-			if len(firstRoundMatches) == 8 {
-				// 敗者戦Aブロックトーナメント
-				loserBracketA := generateLoserBracketTournament("A")
-				err = h.tournRepo.SaveTournament(eventID, sport.ID, fmt.Sprintf("%s Tournament - 敗者戦Aブロック", sport.Name), loserBracketA, []*models.Team{})
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket A tournament for sport " + sport.Name})
-					return
-				}
-
-				// 敗者戦Bブロックトーナメント
-				loserBracketB := generateLoserBracketTournament("B")
-				err = h.tournRepo.SaveTournament(eventID, sport.ID, fmt.Sprintf("%s Tournament - 敗者戦Bブロック", sport.Name), loserBracketB, []*models.Team{})
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save loser bracket B tournament for sport " + sport.Name})
-					return
-				}
+			err := h.tournRepo.SaveTournament(tournament.EventID, tournament.SportID, tournament.SportName, &tournament.TournamentData, shuffledTeamsPtr)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save tournament for sport " + tournament.SportName})
+				return
 			}
 		}
 	}

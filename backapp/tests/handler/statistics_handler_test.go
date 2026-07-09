@@ -48,6 +48,7 @@ func TestStatisticsHandler_GetClassScoreTrends(t *testing.T) {
 		// スコア取得は呼ばれないこと
 		mockEventRepo.AssertNotCalled(t, "GetAllEvents")
 		mockClassRepo.AssertNotCalled(t, "GetClassScoresByEvent", mock.Anything)
+		mockClassRepo.AssertNotCalled(t, "GetClassScoresByEvents", mock.Anything)
 		mockEventRepo.AssertExpectations(t)
 	})
 
@@ -77,7 +78,7 @@ func TestStatisticsHandler_GetClassScoreTrends(t *testing.T) {
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
 		mockEventRepo.On("GetEventByID", 1).Return(activeEvent, nil).Once()
 		mockEventRepo.On("GetAllEvents").Return(events, nil).Once()
-		mockClassRepo.On("GetClassScoresByEvent", 1).Return(scores, nil).Once()
+		mockClassRepo.On("GetClassScoresByEvents", []int{1}).Return(map[int][]*models.ClassScore{1: scores}, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
