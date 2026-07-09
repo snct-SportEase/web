@@ -16,6 +16,7 @@ type TournamentRepository interface {
 	DeleteTournamentsByEventID(eventID int) error
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
+	GetTournamentSportNamesByEventID(eventID int) ([]string, error)
 	GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error)
 	GetMatchForEventSport(matchID int, eventID int, sportID int) (*models.MatchDB, error)
 	GetTeamsByTournamentID(tournamentID int) ([]*models.Team, error)
@@ -44,6 +45,37 @@ type matchWinnerLookup struct {
 
 func NewTournamentRepository(db *sql.DB) TournamentRepository {
 	return &tournamentRepository{db: db}
+}
+
+//	GetTournamentSportNamesByEventID は、進捗概要に必要なスポーツ名のみを返す。
+//
+// これにより、呼び出し元が試合データを必要としない場合に、トーナメントの全対戦表を生成する必要がなくなります。
+func (r *tournamentRepository) GetTournamentSportNamesByEventID(eventID int) ([]string, error) {
+	rows, err := r.db.Query(`
+		SELECT DISTINCT s.name
+		FROM tournaments t
+		JOIN sports s ON s.id = t.sport_id
+		WHERE t.event_id = ?
+		ORDER BY s.name
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sportNames := make([]string, 0)
+	for rows.Next() {
+		var sportName string
+		if err := rows.Scan(&sportName); err != nil {
+			return nil, err
+		}
+		sportNames = append(sportNames, sportName)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return sportNames, nil
 }
 
 func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.Tournament, error) {
@@ -1103,6 +1135,9 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 
 	roundMatchIDs := make([][]int64, len(tournamentData.Rounds))
 	matchMetas := map[int64]models.Match{}
+	insertedMatches := make([]models.Match, 0, len(tournamentData.Matches))
+	matchValuePlaceholders := make([]string, 0, len(tournamentData.Matches))
+	matchArgs := make([]interface{}, 0, len(tournamentData.Matches)*10)
 
 	for _, match := range tournamentData.Matches {
 		var team1ID, team2ID sql.NullInt64
@@ -1132,8 +1167,8 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 		} else {
 			loserBracketBlock = nil
 		}
-		res, err := tx.Exec(
-			"INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		matchValuePlaceholders = append(matchValuePlaceholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		matchArgs = append(matchArgs,
 			tournamentID,
 			match.RoundIndex,
 			match.Order,
@@ -1145,25 +1180,45 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 			loserBracketRound,
 			loserBracketBlock,
 		)
+		insertedMatches = append(insertedMatches, match)
+	}
+
+	if len(insertedMatches) > 0 {
+		res, err := tx.Exec(
+			"INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block) VALUES "+strings.Join(matchValuePlaceholders, ","),
+			matchArgs...,
+		)
 		if err != nil {
 			tx.Rollback()
 			return err
 		}
-		matchID, err := res.LastInsertId()
+
+		firstMatchID, err := res.LastInsertId()
 		if err != nil {
 			tx.Rollback()
 			return err
 		}
-		if match.RoundIndex < len(roundMatchIDs) {
+
+		// MySQL returns the first auto-increment id for a multi-row INSERT.
+		// The inserted rows are assigned consecutive ids in VALUES order, so we can build bracket links without per-row INSERTs.
+		for i, match := range insertedMatches {
+			matchID := firstMatchID + int64(i)
+			if match.RoundIndex < 0 {
+				continue
+			}
+			if match.RoundIndex >= len(roundMatchIDs) {
+				continue
+			}
 			roundMatchIDs[match.RoundIndex] = append(roundMatchIDs[match.RoundIndex], matchID)
 			matchMetas[matchID] = match
 		}
 	}
 
-	// roundMatchIDsが空でない場合のみ処理
-	if len(roundMatchIDs) == 0 {
-		return tx.Commit()
+	type nextMatchLink struct {
+		matchID     int64
+		nextMatchID int64
 	}
+	nextMatchLinks := make([]nextMatchLink, 0)
 
 	for i := 0; i < len(roundMatchIDs)-1; i++ {
 		for j, matchID := range roundMatchIDs[i] {
@@ -1191,11 +1246,7 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 					}
 				}
 				if nextMatchID != 0 {
-					_, err := tx.Exec("UPDATE matches SET next_match_id = ? WHERE id = ?", nextMatchID, matchID)
-					if err != nil {
-						tx.Rollback()
-						return err
-					}
+					nextMatchLinks = append(nextMatchLinks, nextMatchLink{matchID: matchID, nextMatchID: nextMatchID})
 				}
 			} else if match.IsLoserBracketMatch {
 				// 敗者戦二回戦の試合には次の試合なし（10点獲得で終了）
@@ -1204,13 +1255,31 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 				// 本戦の試合の場合は従来通り
 				if i+1 < len(roundMatchIDs) && j/2 < len(roundMatchIDs[i+1]) {
 					nextMatchID := roundMatchIDs[i+1][j/2]
-					_, err := tx.Exec("UPDATE matches SET next_match_id = ? WHERE id = ?", nextMatchID, matchID)
-					if err != nil {
-						tx.Rollback()
-						return err
-					}
+					nextMatchLinks = append(nextMatchLinks, nextMatchLink{matchID: matchID, nextMatchID: nextMatchID})
 				}
 			}
+		}
+	}
+
+	if len(nextMatchLinks) > 0 {
+		caseParts := make([]string, 0, len(nextMatchLinks))
+		updateArgs := make([]interface{}, 0, len(nextMatchLinks)*3)
+		whereArgs := make([]interface{}, 0, len(nextMatchLinks))
+		for _, link := range nextMatchLinks {
+			caseParts = append(caseParts, "WHEN ? THEN ?")
+			updateArgs = append(updateArgs, link.matchID, link.nextMatchID)
+			whereArgs = append(whereArgs, link.matchID)
+		}
+		updateArgs = append(updateArgs, whereArgs...)
+
+		query := fmt.Sprintf(
+			"UPDATE matches SET next_match_id = CASE id %s END WHERE id IN (%s)",
+			strings.Join(caseParts, " "),
+			strings.TrimRight(strings.Repeat("?,", len(whereArgs)), ","),
+		)
+		if _, err := tx.Exec(query, updateArgs...); err != nil {
+			tx.Rollback()
+			return err
 		}
 	}
 

@@ -1,9 +1,12 @@
 package repository_test
 
 import (
+	"database/sql"
+	"errors"
 	"regexp"
 	"testing"
 
+	"backapp/internal/models"
 	"backapp/internal/repository"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -183,6 +186,149 @@ func TestTournamentRepository_GetTournamentsByEventID_InferWinnerForTie(t *testi
 	assert.Contains(t, string(tournaments[0].Data), `"isWinner":true`)
 	assert.Contains(t, string(tournaments[0].Data), `IE5`)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func tournamentIntPtr(v int) *int {
+	return &v
+}
+
+func TestTournamentRepository_SaveTournament_BulkInsertsMatchesAndBulkUpdatesNextMatch(t *testing.T) {
+	const insertMatchesSQL = "INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?),(?, ?, ?, ?, ?, ?, ?, ?, ?, ?),(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+
+	t.Run("main bracket matches are inserted once and next links are updated once", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewTournamentRepository(db)
+
+		tournamentData := &models.TournamentData{
+			Rounds: []models.Round{{Name: "Round 1"}, {Name: "Final"}},
+			Matches: []models.Match{
+				{RoundIndex: 0, Order: 0, Sides: []models.Side{{ContestantID: "c0"}, {ContestantID: "c1"}}},
+				{RoundIndex: 0, Order: 1, Sides: []models.Side{{ContestantID: "c2"}, {ContestantID: "c3"}}},
+				{RoundIndex: 1, Order: 0},
+			},
+		}
+		teams := []*models.Team{
+			{ID: 1},
+			{ID: 2},
+			{ID: 3},
+			{ID: 4},
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO tournaments (name, event_id, sport_id) VALUES (?, ?, ?)")).
+			WithArgs("Basketball Tournament", 1, 2).
+			WillReturnResult(sqlmock.NewResult(10, 1))
+		mock.ExpectExec(regexp.QuoteMeta(insertMatchesSQL)).
+			WithArgs(
+				int64(10), 0, 0, sql.NullInt64{Int64: 1, Valid: true}, sql.NullInt64{Int64: 2, Valid: true}, "pending", false, false, nil, nil,
+				int64(10), 0, 1, sql.NullInt64{Int64: 3, Valid: true}, sql.NullInt64{Int64: 4, Valid: true}, "pending", false, false, nil, nil,
+				int64(10), 1, 0, sql.NullInt64{}, sql.NullInt64{}, "pending", false, false, nil, nil,
+			).
+			WillReturnResult(sqlmock.NewResult(100, 3))
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET next_match_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END WHERE id IN (?,?)")).
+			WithArgs(int64(100), int64(102), int64(101), int64(102), int64(100), int64(101)).
+			WillReturnResult(sqlmock.NewResult(0, 2))
+		mock.ExpectCommit()
+
+		err = r.SaveTournament(1, 2, "Basketball", tournamentData, teams)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("loser bracket first round matches link to same block second round match", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewTournamentRepository(db)
+
+		tournamentData := &models.TournamentData{
+			Rounds: []models.Round{{Name: "一回戦"}, {Name: "二回戦"}},
+			Matches: []models.Match{
+				{RoundIndex: 0, Order: 0, IsLoserBracketMatch: true, LoserBracketRound: tournamentIntPtr(1), LoserBracketBlock: "A"},
+				{RoundIndex: 0, Order: 1, IsLoserBracketMatch: true, LoserBracketRound: tournamentIntPtr(1), LoserBracketBlock: "A"},
+				{RoundIndex: 1, Order: 0, IsLoserBracketMatch: true, LoserBracketRound: tournamentIntPtr(2), LoserBracketBlock: "A"},
+			},
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO tournaments (name, event_id, sport_id) VALUES (?, ?, ?)")).
+			WithArgs("Basketball Tournament - 敗者戦Aブロック", 1, 2).
+			WillReturnResult(sqlmock.NewResult(20, 1))
+		mock.ExpectExec(regexp.QuoteMeta(insertMatchesSQL)).
+			WithArgs(
+				int64(20), 0, 0, sql.NullInt64{}, sql.NullInt64{}, "pending", false, true, 1, "A",
+				int64(20), 0, 1, sql.NullInt64{}, sql.NullInt64{}, "pending", false, true, 1, "A",
+				int64(20), 1, 0, sql.NullInt64{}, sql.NullInt64{}, "pending", false, true, 2, "A",
+			).
+			WillReturnResult(sqlmock.NewResult(200, 3))
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET next_match_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END WHERE id IN (?,?)")).
+			WithArgs(int64(200), int64(202), int64(201), int64(202), int64(200), int64(201)).
+			WillReturnResult(sqlmock.NewResult(0, 2))
+		mock.ExpectCommit()
+
+		err = r.SaveTournament(1, 2, "Basketball Tournament - 敗者戦Aブロック", tournamentData, []*models.Team{})
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("no matches inserts tournament only", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewTournamentRepository(db)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO tournaments (name, event_id, sport_id) VALUES (?, ?, ?)")).
+			WithArgs("Empty Tournament", 1, 2).
+			WillReturnResult(sqlmock.NewResult(30, 1))
+		mock.ExpectCommit()
+
+		err = r.SaveTournament(1, 2, "Empty", &models.TournamentData{}, []*models.Team{})
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("bulk match insert error rolls back", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		r := repository.NewTournamentRepository(db)
+		insertErr := errors.New("insert matches failed")
+
+		tournamentData := &models.TournamentData{
+			Rounds: []models.Round{{Name: "Round 1"}},
+			Matches: []models.Match{
+				{RoundIndex: 0, Order: 0},
+			},
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO tournaments (name, event_id, sport_id) VALUES (?, ?, ?)")).
+			WithArgs("Basketball Tournament", 1, 2).
+			WillReturnResult(sqlmock.NewResult(40, 1))
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")).
+			WithArgs(int64(40), 0, 0, sql.NullInt64{}, sql.NullInt64{}, "pending", false, false, nil, nil).
+			WillReturnError(insertErr)
+		mock.ExpectRollback()
+
+		err = r.SaveTournament(1, 2, "Basketball", tournamentData, []*models.Team{})
+		assert.ErrorIs(t, err, insertErr)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestTournamentRepository_UpdateMatchResult(t *testing.T) {

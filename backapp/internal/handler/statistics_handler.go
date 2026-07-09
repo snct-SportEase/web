@@ -115,13 +115,21 @@ func (h *StatisticsHandler) GetClassScoreTrends(c *gin.Context) {
 		return
 	}
 
+	eventIDs := make([]int, 0, len(events))
+	for _, event := range events {
+		eventIDs = append(eventIDs, event.ID)
+	}
+
+	// イベントごとのスコア取得を1回のIN句クエリにまとめ、統計画面のN+1を避ける。
+	scoresByEventID, err := h.classRepo.GetClassScoresByEvents(eventIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class scores"})
+		return
+	}
+
 	result := make(map[string][]*models.ClassScore)
 	for _, event := range events {
-		scores, err := h.classRepo.GetClassScoresByEvent(event.ID)
-		if err != nil {
-			continue
-		}
-		result[event.Name] = scores
+		result[event.Name] = scoresByEventID[event.ID]
 	}
 
 	c.JSON(http.StatusOK, result)
@@ -134,19 +142,16 @@ func (h *StatisticsHandler) GetRealtimeEventProgress(c *gin.Context) {
 		return
 	}
 
-	tournaments, err := h.tournRepo.GetTournamentsByEventID(eventID)
+	// 進捗表示ではトーナメント詳細の組み立ては不要なので、sport名だけJOINで軽く取得する。
+	sportNames, err := h.tournRepo.GetTournamentSportNamesByEventID(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get tournaments"})
 		return
 	}
 
 	progress := make(map[string]string)
-	for _, tourn := range tournaments {
-		sport, err := h.sportRepo.GetSportByID(tourn.SportID)
-		if err != nil {
-			continue
-		}
-		progress[sport.Name] = "進行中" // Assuming status
+	for _, sportName := range sportNames {
+		progress[sportName] = "進行中" // Assuming status
 	}
 
 	c.JSON(http.StatusOK, progress)

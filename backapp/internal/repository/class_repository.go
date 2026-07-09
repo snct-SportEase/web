@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 type ClassRepository interface {
@@ -14,6 +15,7 @@ type ClassRepository interface {
 	UpdateStudentCounts(eventID int, counts map[int]int) error
 	CreateClasses(eventID int, classNames []string) error
 	GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error)
+	GetClassScoresByEvents(eventIDs []int) (map[int][]*models.ClassScore, error)
 	UpdateClassRanks(eventID int) error
 	GetClassByRepRole(userID string, eventID int) (*models.Class, error)
 	GetClassMembers(classID int) ([]*models.User, error)
@@ -312,6 +314,130 @@ func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassSco
 	}
 
 	return scores, nil
+}
+
+func (r *classRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*models.ClassScore, error) {
+	result := make(map[int][]*models.ClassScore, len(eventIDs))
+	if len(eventIDs) == 0 {
+		return result, nil
+	}
+
+	// eventIDs は呼び出し側で取得した数値IDのみなので、プレースホルダでIN句を組み立てる。
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(eventIDs)), ",")
+	args := make([]interface{}, 0, len(eventIDs))
+	for _, id := range eventIDs {
+		args = append(args, id)
+		result[id] = []*models.ClassScore{}
+	}
+
+	sportMaps := make(map[int]map[string]string, len(eventIDs))
+	sportRows, err := r.db.Query(fmt.Sprintf(`
+		SELECT es.event_id, es.location, s.name
+		FROM event_sports es
+		JOIN sports s ON es.sport_id = s.id
+		WHERE es.event_id IN (%s)
+	`, placeholders), args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sport mappings: %w", err)
+	}
+	defer sportRows.Close()
+
+	for sportRows.Next() {
+		var eventID int
+		var location, sportName string
+		if err := sportRows.Scan(&eventID, &location, &sportName); err != nil {
+			return nil, fmt.Errorf("failed to scan sport mapping: %w", err)
+		}
+		if sportMaps[eventID] == nil {
+			sportMaps[eventID] = make(map[string]string)
+		}
+		sportMaps[eventID][location] = sportName
+	}
+	if err = sportRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating sport mappings: %w", err)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			cs.id,
+			cs.event_id,
+			cs.class_id,
+			c.name as class_name,
+			e.season,
+			cs.initial_points,
+			cs.survey_points,
+			cs.attendance_points,
+			cs.gym1_win1_points,
+			cs.gym1_win2_points,
+			cs.gym1_win3_points,
+			cs.gym1_champion_points,
+			cs.gym2_win1_points,
+			cs.gym2_win2_points,
+			cs.gym2_win3_points,
+			cs.gym2_champion_points,
+			cs.gym2_loser_bracket_champion_points,
+			cs.ground_win1_points,
+			cs.ground_win2_points,
+			cs.ground_win3_points,
+			cs.ground_champion_points,
+			cs.noon_game_points,
+			cs.total_points_current_event,
+			cs.rank_current_event,
+			cs.total_points_overall,
+			cs.rank_overall
+		FROM class_scores cs
+		JOIN classes c ON cs.class_id = c.id
+		JOIN events e ON cs.event_id = e.id
+		WHERE cs.event_id IN (%s)
+		ORDER BY cs.event_id, cs.rank_overall, cs.rank_current_event
+	`, placeholders)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		score := &models.ClassScore{}
+		if err := rows.Scan(
+			&score.ID,
+			&score.EventID,
+			&score.ClassID,
+			&score.ClassName,
+			&score.Season,
+			&score.InitialPoints,
+			&score.SurveyPoints,
+			&score.AttendancePoints,
+			&score.Gym1Win1Points,
+			&score.Gym1Win2Points,
+			&score.Gym1Win3Points,
+			&score.Gym1ChampionPoints,
+			&score.Gym2Win1Points,
+			&score.Gym2Win2Points,
+			&score.Gym2Win3Points,
+			&score.Gym2ChampionPoints,
+			&score.Gym2LoserBracketChampionPoints,
+			&score.GroundWin1Points,
+			&score.GroundWin2Points,
+			&score.GroundWin3Points,
+			&score.GroundChampionPoints,
+			&score.NoonGamePoints,
+			&score.TotalPointsCurrentEvent,
+			&score.RankCurrentEvent,
+			&score.TotalPointsOverall,
+			&score.RankOverall,
+		); err != nil {
+			return nil, err
+		}
+		score.SportNames = sportMaps[score.EventID]
+		result[score.EventID] = append(result[score.EventID], score)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (r *classRepository) UpdateClassRanks(eventID int) error {
