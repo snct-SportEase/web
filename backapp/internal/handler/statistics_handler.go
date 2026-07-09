@@ -129,7 +129,11 @@ func (h *StatisticsHandler) GetClassScoreTrends(c *gin.Context) {
 
 	result := make(map[string][]*models.ClassScore)
 	for _, event := range events {
-		result[event.Name] = scoresByEventID[event.ID]
+		scores := scoresByEventID[event.ID]
+		if scores == nil {
+			scores = []*models.ClassScore{}
+		}
+		result[event.Name] = scores
 	}
 
 	c.JSON(http.StatusOK, result)
