@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 )
@@ -20,11 +21,8 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	// カレントディレクトリから.envを読み込む（デフォルト）
-	// 失敗した場合、開発の利便性のために親ディレクトリからの読み込みを試行する
-	if err := godotenv.Load(); err != nil {
-		godotenv.Load("../../.env")
-	}
+	loadEnv()
+
 	cfg := &Config{
 		DBHost:             os.Getenv("DB_HOST"),
 		DBPort:             os.Getenv("DB_PORT"),
@@ -47,4 +45,45 @@ func Load() (*Config, error) {
 		RedisAddr:          os.Getenv("REDIS_ADDR"),
 	}
 	return cfg, nil
+}
+
+func loadEnv() {
+	root, err := findProjectRoot()
+	if err != nil {
+		return
+	}
+	_ = godotenv.Load(filepath.Join(root, ".env"))
+}
+
+func findProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		if hasProjectRootMarker(dir) {
+			return dir, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", os.ErrNotExist
+		}
+		dir = parent
+	}
+}
+
+func hasProjectRootMarker(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "backapp", "go.mod")); err != nil {
+		return false
+	}
+
+	composeFiles := []string{"docker-compose.yml", "docker-compose.production.yml"}
+	for _, file := range composeFiles {
+		if _, err := os.Stat(filepath.Join(dir, file)); err == nil {
+			return true
+		}
+	}
+	return false
 }

@@ -85,7 +85,6 @@ services:
       context: ./backapp
     container_name: sportease-backapp
     env_file:
-      - ./backapp/.env
       - .env
     environment:
       DB_HOST: sportease-db

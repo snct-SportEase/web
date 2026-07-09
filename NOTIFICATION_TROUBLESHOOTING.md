@@ -151,7 +151,7 @@ fetch('/api/notifications/debug', { credentials: 'include' })
 **症状**: ブラウザコンソールに `missing-vapid-key` エラー
 **解決方法**: 
 - フロントエンドの `.env` に `PUBLIC_WEBPUSH_PUBLIC_KEY` を設定
-- バックエンドの `.env` に `WEBPUSH_PUBLIC_KEY` と `WEBPUSH_PRIVATE_KEY` を設定
+- プロジェクトルートの `.env` に `WEBPUSH_PUBLIC_KEY` と `WEBPUSH_PRIVATE_KEY` を設定
 - 本番環境の環境変数も同様に設定
 
 ### 問題2: HTTPSでない

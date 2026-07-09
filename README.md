@@ -101,7 +101,7 @@ cd /home/saku0512/Desktop/develop/SportEase/webapp/backapp
 go mod download
 go run cmd/server/main.go
 ```
-MySQLを別途用意し、`.env` に記載した接続情報で参照できるようにしてください。初回起動時に初期rootユーザー・イベント・クラス情報が自動作成されます。
+MySQLを別途用意し、プロジェクトルートの `.env` に記載した接続情報で参照できるようにしてください。初回起動時に初期rootユーザー・イベント・クラス情報が自動作成されます。
 
 #### フロントエンド（SvelteKit）
 ```bash
