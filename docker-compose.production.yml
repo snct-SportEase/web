@@ -94,6 +94,9 @@ services:
       sportease-redis:
         condition: service_healthy
     environment:
+      - DB_HOST=sportease-db
+      - DB_PORT=3306
+      - REDIS_ADDR=sportease-redis:6379
       - APP_ENV=production
     networks:
       - spotease-public

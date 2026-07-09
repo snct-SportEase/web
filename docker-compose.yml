@@ -85,7 +85,12 @@ services:
       context: ./backapp
     container_name: sportease-backapp
     env_file:
+      - ./backapp/.env
       - .env
+    environment:
+      DB_HOST: sportease-db
+      DB_PORT: "3306"
+      REDIS_ADDR: sportease-redis:6379
     volumes:
       - uploads-data:/app/uploads
     depends_on:
