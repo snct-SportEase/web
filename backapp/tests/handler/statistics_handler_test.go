@@ -98,6 +98,88 @@ func TestStatisticsHandler_GetClassScoreTrends(t *testing.T) {
 		mockClassRepo.AssertExpectations(t)
 	})
 
+	t.Run("複数イベントのスコアを一括取得しスコアなしイベントは空配列で返す", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockTournRepo := new(MockTournamentRepository)
+
+		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
+
+		activeEvent := &models.Event{
+			ID:         1,
+			Name:       "2026春季スポーツ大会",
+			HideScores: false,
+		}
+
+		events := []*models.Event{
+			{ID: 1, Name: "2026春季スポーツ大会"},
+			{ID: 2, Name: "2026秋季スポーツ大会"},
+		}
+
+		scores := []*models.ClassScore{
+			{ClassName: "1-A", TotalPointsCurrentEvent: 100},
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockEventRepo.On("GetEventByID", 1).Return(activeEvent, nil).Once()
+		mockEventRepo.On("GetAllEvents").Return(events, nil).Once()
+		mockClassRepo.On("GetClassScoresByEvents", []int{1, 2}).Return(map[int][]*models.ClassScore{1: scores}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/statistics/scores", nil)
+
+		h.GetClassScoreTrends(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string][]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Len(t, resp["2026春季スポーツ大会"], 1)
+		assert.Empty(t, resp["2026秋季スポーツ大会"])
+
+		mockClassRepo.AssertNotCalled(t, "GetClassScoresByEvent", mock.Anything)
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("イベントが0件でも空オブジェクトを返す", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockTournRepo := new(MockTournamentRepository)
+
+		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
+
+		activeEvent := &models.Event{
+			ID:         1,
+			Name:       "2026春季スポーツ大会",
+			HideScores: false,
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
+		mockEventRepo.On("GetEventByID", 1).Return(activeEvent, nil).Once()
+		mockEventRepo.On("GetAllEvents").Return([]*models.Event{}, nil).Once()
+		mockClassRepo.On("GetClassScoresByEvents", []int{}).Return(map[int][]*models.ClassScore{}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/statistics/scores", nil)
+
+		h.GetClassScoreTrends(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string][]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Empty(t, resp)
+
+		mockClassRepo.AssertNotCalled(t, "GetClassScoresByEvent", mock.Anything)
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
 	t.Run("アクティブイベント取得エラー時に500を返す", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockClassRepo := new(MockClassRepository)
