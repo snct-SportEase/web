@@ -3,5 +3,8 @@
     "@commitlint/cli": "^20.0.0",
     "@commitlint/config-conventional": "^20.5.0",
     "husky": "^8.0.3"
+  },
+  "overrides": {
+    "ajv": "8.20.0"
   }
 }
