@@ -52,10 +52,12 @@
 [notification] 通知送信開始: notificationID=1, title=..., targetRoles=[...]
 [notification] 対象ユーザー数: X, userIDs=[...]
 [notification] 購読情報数: X
-[notification] X件の購読に対してPush通知を送信します
+[notification] X件の購読に対してPush通知を送信します (ants pool)
 [notification] [1/X] Push送信試行: userID=..., endpoint=...
 [notification] [1/X] Push送信成功: userID=..., endpoint=..., status=201
 ```
+
+アンケート公開通知は `event_handler.go` から送信されるため、同じ内容が `[event-notification]` prefix で出力されます。
 
 **よくある問題**：
 - `VAPIDキーが設定されていないためPush通知をスキップします` → 環境変数を確認
@@ -94,6 +96,8 @@ navigator.serviceWorker.getRegistrations().then(registrations => {
 - `[notification] ユーザー抽出に失敗しました`
 - `[notification] 購読情報の取得に失敗しました`
 - `[notification] Push送信に失敗しました`
+
+アンケート公開通知の場合は、上記の `[notification]` を `[event-notification]` に読み替えて確認します。
 
 ### ステップ4: データベースの確認
 ```sql
@@ -205,4 +209,3 @@ openssl ec -in vapid_private_key.pem -pubout -out vapid_public_key.pem
 ## デバッグ用コードの追加
 
 通知設定コンポーネントにデバッグ情報を表示する機能を追加することを推奨します。
-
