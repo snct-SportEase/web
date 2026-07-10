@@ -174,10 +174,10 @@ services:
 networks:
   spotease-public:
     name: sportease-public
-    driver: bridge
+    external: true
   spotease-internal:
     name: sportease-internal
-    driver: bridge
+    external: true
 
 volumes:
   db-data:
