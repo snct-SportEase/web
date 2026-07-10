@@ -329,7 +329,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Assign class representative role on first completion
+	// Assign the class membership role on first completion
 	if isFirstCompletion {
 		activeEventID, err := h.eventRepo.GetActiveEvent()
 		if err != nil {
@@ -351,7 +351,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 			roleName := class.Name + "_rep"
 			if err := h.userRepo.UpdateUserRole(user.ID, roleName, &activeEventID); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign class representative role"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign class role"})
 				return
 			}
 		}
@@ -541,11 +541,11 @@ func (h *AuthHandler) UpdateUserClassRepByRoot(c *gin.Context) {
 	roleName := class.Name + "_rep"
 	if err := h.userRepo.ReplaceClassRepRole(req.UserID, roleName, req.ClassID, &activeEventID); err != nil {
 		log.Printf("ReplaceClassRepRole error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to replace class representative role"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to replace class role"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Class representative role replaced successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Class role replaced successfully"})
 }
 
 // PromoteUserByRoot はroot権限でユーザーのマスタロールを交換する

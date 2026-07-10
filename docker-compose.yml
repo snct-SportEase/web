@@ -68,6 +68,74 @@ services:
     networks:
       - spotease-internal
 
+  demo-schema:
+    image: mysql:8.0
+    profiles:
+      - demo
+    environment:
+      MYSQL_PWD: ${DB_PASSWORD}
+    volumes:
+      - ./backapp/db/demo:/demo:ro
+    depends_on:
+      sportease-db:
+        condition: service_healthy
+    command:
+      [
+        "mysql",
+        "--host=sportease-db",
+        "--port=3306",
+        "--user=${DB_USER}",
+        "--default-character-set=utf8mb4",
+        "${DB_DATABASE}",
+        "--execute=source /demo/prepare-schema.sql"
+      ]
+    networks:
+      - spotease-internal
+
+  demo-migrate:
+    image: migrate/migrate:latest
+    profiles:
+      - demo
+    volumes:
+      - ./backapp/db/migrations:/migrations:ro
+    depends_on:
+      demo-schema:
+        condition: service_completed_successfully
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "mysql://${DB_USER}:${DB_PASSWORD}@tcp(sportease-db:3306)/${DB_DATABASE}?multiStatements=true",
+        "up"
+      ]
+    networks:
+      - spotease-internal
+
+  demo-data:
+    image: mysql:8.0
+    profiles:
+      - demo
+    environment:
+      MYSQL_PWD: ${DB_PASSWORD}
+    volumes:
+      - ./backapp/db/demo:/demo:ro
+    depends_on:
+      sportease-db:
+        condition: service_healthy
+      demo-migrate:
+        condition: service_completed_successfully
+    command:
+      [
+        "mysql",
+        "--host=sportease-db",
+        "--port=3306",
+        "--user=${DB_USER}",
+        "--default-character-set=utf8mb4",
+        "${DB_DATABASE}",
+        "--execute=source /demo/demo.sql"
+      ]
+    networks:
+      - spotease-internal
+
   sportease-redis:
     image: redis:7-alpine
     container_name: sportease-redis
@@ -92,6 +160,7 @@ services:
       REDIS_ADDR: sportease-redis:6379
     volumes:
       - uploads-data:/app/uploads
+      - ./latex/how-to-use:/app/uploads/demo:ro
     depends_on:
       sportease-db:
         condition: service_healthy
