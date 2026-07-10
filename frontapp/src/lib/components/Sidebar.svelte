@@ -5,6 +5,8 @@
   import { env as publicEnv } from '$env/dynamic/public';
   import { notificationBadgeCount, refreshNotificationBadge } from '$lib/stores/notificationBadgeStore.js';
   import { pushSubscriptionStatus, updatePushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
+  import { isPWAInstalled } from '$lib/utils/pwa.js';
+  import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
 
   /** @type {import('@sveltejs/kit').MaybePromise<import('../../routes/$types').LayoutData>} */
   let { user } = $props();
@@ -18,6 +20,8 @@
   const isRoot = hasRole('root');
   const canSeeNotifications = isStudent || isAdmin || isRoot;
   const vapidKeySet = browser ? (publicEnv.PUBLIC_WEBPUSH_PUBLIC_KEY ?? publicEnv.PUBLIC_WEBPUSH_KEY ?? '') !== '' : false;
+  let isPWA = $state(true);
+  let shouldShowPWASetupBadge = $derived(canSeeNotifications && !isPWA);
   let shouldShowPushSetupBadge = $derived(
     canSeeNotifications &&
     $pushSubscriptionStatus.loaded &&
@@ -28,6 +32,8 @@
 
   onMount(() => {
     if (!canSeeNotifications) return;
+
+    isPWA = isPWAInstalled();
 
     const refreshBadge = () => {
       refreshNotificationBadge(user, { initializeSeen: true }).catch((error) => {
@@ -133,6 +139,11 @@
   function handleLinkClick() {
     isSidebarOpen.set(false);
   }
+
+  function handlePWASetupClick() {
+    openPWAInstallDialog();
+    isSidebarOpen.set(false);
+  }
 </script>
 
 <aside class="w-full md:w-64 bg-gray-800 text-white flex flex-col transition-all duration-300 fixed md:relative inset-y-0 left-0 z-50 md:z-auto" class:closed={!$isSidebarOpen}>
@@ -149,10 +160,19 @@
       <svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
     </button>
   </div>
+  {#if shouldShowPWASetupBadge}
+    <button
+      type="button"
+      class="mx-3 mb-2 rounded-md border border-sky-300 bg-sky-100 px-3 py-2 text-center text-sm font-semibold text-sky-900 hover:bg-sky-200"
+      onclick={handlePWASetupClick}
+    >
+      PWA未設定
+    </button>
+  {/if}
   {#if shouldShowPushSetupBadge}
     <a
       href="/dashboard"
-      class="mx-3 mb-2 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-200"
+      class="mx-3 mb-2 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-center text-sm font-semibold text-amber-900 hover:bg-amber-200"
       onclick={handleLinkClick}
     >
       {$pushSubscriptionStatus.permission === 'denied' ? '通知拒否中' : '通知未設定'}

@@ -1,6 +1,7 @@
 <script>
   import '../app.css';
   import Sidebar from '$lib/components/Sidebar.svelte';
+  import PWAInstallPromptModal from '$lib/components/PWAInstallPromptModal.svelte';
   import { page } from '$app/stores';
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
@@ -86,4 +87,5 @@
   <main class="main-content">
     {@render children?.()}
   </main>
+  <PWAInstallPromptModal />
 </div>

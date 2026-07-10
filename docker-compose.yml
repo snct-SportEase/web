@@ -6,21 +6,12 @@ services:
       # - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - --entrypoints.local3300.address=:3300
-      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.myresolver.acme.email=${LETSENCRYPT_EMAIL}" # IMPORTANT: Change this in .env file!
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.local3300.address=:3300"
     ports:
-      - "80:80"
-      - "443:443"
+      - "3300:3300"
       # - "8080:8080" # Traefik Dashboard
-      - "3300:3300" # Frontapp"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - "./letsencrypt:/letsencrypt"
     networks:
       - spotease-public
     restart: unless-stopped
@@ -179,9 +170,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web_spotease-public"
-      - "traefik.http.routers.uploads-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/uploads`)"
-      - "traefik.http.routers.uploads-https.entrypoints=websecure"
-      - "traefik.http.routers.uploads-https.tls.certresolver=myresolver"
       - "traefik.http.routers.uploads.rule=(Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/uploads`)"
       - "traefik.http.routers.uploads.entrypoints=local3300"
       - "traefik.http.services.uploads.loadbalancer.server.port=8080"
@@ -195,6 +183,8 @@ services:
     environment:
       - BACKEND_URL=http://sportease-backapp:8080
       - BODY_SIZE_LIMIT=10M
+      - PROTOCOL_HEADER=x-forwarded-proto
+      - HOST_HEADER=x-forwarded-host
     depends_on:
       sportease-backapp:
         condition: service_healthy
@@ -212,24 +202,11 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=web_spotease-public"
 
-      # nitsche-gyouji.com用（80/443）
-      - "traefik.http.routers.frontend-http.rule=Host(`nitsche-gyouji.com`)"
-      - "traefik.http.routers.frontend-http.entrypoints=web"
-
-      #localhost:3300用
+      # localhost開発環境用（HTTP/3300番のみ）
       - "traefik.http.routers.frontend-localhost.rule=Host(`localhost`) || Host(`127.0.0.1`)"
       - "traefik.http.routers.frontend-localhost.entrypoints=local3300"
 
-      # 2. HTTPからHTTPSへリダイレクトするミドルウェアを定義・適用
-      - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-
-      # 3. 既存のHTTPS用ルーター（nitsche-gyouji.comのみ）
-      - "traefik.http.routers.frontend-https.rule=Host(`nitsche-gyouji.com`)"
-      - "traefik.http.routers.frontend-https.entrypoints=websecure"
-      - "traefik.http.routers.frontend-https.tls.certresolver=myresolver"
-
-      # サービス設定（変更なし）
+      # サービス設定
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
 
 networks:

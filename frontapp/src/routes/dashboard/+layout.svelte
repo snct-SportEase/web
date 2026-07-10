@@ -7,6 +7,7 @@
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { pushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
+  import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
 
   let { children } = $props();
   let { data } = $page;
@@ -15,7 +16,9 @@
   let showEditDisplayNameModal = $state(false);
   let showPWANotification = $state(false);
   let isMobile = $state(false);
+  let isPWA = $state(true);
   let canSeeNotifications = $derived(user?.roles?.some(role => ['student', 'admin', 'root'].includes(role.name)));
+  let shouldShowPWASetupBadge = $derived(canSeeNotifications && !isPWA);
   let shouldShowPushSetupBadge = $derived(
     canSeeNotifications &&
     $pushSubscriptionStatus.loaded &&
@@ -26,6 +29,8 @@
   
   onMount(() => {
     if (browser) {
+      isPWA = isPWAInstalled();
+
       // 初回ログイン時のみ通知を表示（localStorageで管理）
       const hasSeenNotification = localStorage.getItem('pwa-notification-seen');
       if (!hasSeenNotification && (isPWAInstalled() || isPWAInstallable())) {
@@ -121,6 +126,15 @@
           <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800">Dashboard</h1></a>
         </div>
         <div class="flex items-center pointer-events-auto">
+          {#if shouldShowPWASetupBadge}
+            <button
+              type="button"
+              onclick={openPWAInstallDialog}
+              class="mr-3 rounded-md border border-sky-300 bg-sky-100 px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-200"
+            >
+              PWA未設定
+            </button>
+          {/if}
           {#if shouldShowPushSetupBadge}
             <a
               href="/dashboard"
