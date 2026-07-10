@@ -1,15 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { error } from '@sveltejs/kit';
-  import RulesDisplayModal from '$lib/components/RulesDisplayModal.svelte';
 
   let eventSports = $state([]);
-
-  let showRulesModal = $state(false);
-  let selectedRulesType = $state('');
-  let selectedRulesContent = $state('');
-  let selectedRulesPdfUrl = $state('');
-  let selectedSportName = $state('');
 
   onMount(async () => {
     try {
@@ -62,23 +55,8 @@
     return labels[location] || location;
   }
 
-  function openRulesModal(sport) {
-    // PDFの場合は別タブで開く
-    if (sport.rules_type === 'pdf' && sport.rules_pdf_url) {
-      window.open(sport.rules_pdf_url, '_blank');
-      return;
-    }
-    
-    // マークダウンの場合はモーダルを開く
-    selectedSportName = getSportName(sport);
-    selectedRulesType = sport.rules_type;
-    selectedRulesContent = sport.rules;
-    selectedRulesPdfUrl = sport.rules_pdf_url;
-    showRulesModal = true;
-  }
-
-  function closeRulesModal() {
-    showRulesModal = false;
+  function openRulesPdf(pdfUrl) {
+    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
   }
 </script>
 
@@ -97,14 +75,16 @@
             <p class="text-gray-700 text-sm mb-2"><strong>場所:</strong>
               <span>{displayLocation(sport.location)}</span>
             </p>
-            <div>
-              <button
-                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                onclick={() => openRulesModal(sport)}
-              >
-                ルールを見る
-              </button>
-            </div>
+            {#if sport.rules_pdf_url}
+              <div>
+                <button
+                  class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onclick={() => openRulesPdf(sport.rules_pdf_url)}
+                >
+                  ルールPDFを見る
+                </button>
+              </div>
+            {/if}
           </div>
         </div>
       {/each}
@@ -116,12 +96,3 @@
     </div>
   {/if}
 </div>
-
-<RulesDisplayModal
-  bind:showModal={showRulesModal}
-  rulesType={selectedRulesType}
-  rulesContent={selectedRulesContent}
-  rulesPdfUrl={selectedRulesPdfUrl}
-  sportName={selectedSportName}
-  onclose={closeRulesModal}
-/>

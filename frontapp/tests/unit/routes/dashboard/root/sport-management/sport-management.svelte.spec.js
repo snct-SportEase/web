@@ -63,9 +63,10 @@ describe('Sport Management Page', () => {
           event_id: 1,
           sport_id: body.sport_id,
           description: body.description ?? '',
-          rules: body.rules ?? '',
+          rules: body.rules ?? null,
           location: body.location ?? 'other',
-          rules_type: body.rules_type ?? 'markdown'
+          rules_type: body.rules_type ?? 'pdf',
+          rules_pdf_url: body.rules_pdf_url ?? null
         };
         assignedSports = [...assignedSports, nextAssignedSport];
 
@@ -142,7 +143,6 @@ describe('Sport Management Page', () => {
     await page.getByLabelText('割り当てる競技').selectOptions('1');
     await page.getByLabelText('場所').selectOptions('gym1');
     await page.getByLabelText('概要 (任意)').fill('屋内メイン競技');
-    await page.getByLabelText('ルール詳細 (任意)').fill('# バスケットボール');
     await page.getByRole('button', { name: '大会に競技を割り当てる' }).click();
 
     const assignCall = fetchMock.mock.calls.find(([url, options]) => {
@@ -154,8 +154,9 @@ describe('Sport Management Page', () => {
       sport_id: 1,
       location: 'gym1',
       description: '屋内メイン競技',
-      rules: '# バスケットボール',
-      rules_type: 'markdown'
+      rules: null,
+      rules_type: 'pdf',
+      rules_pdf_url: null
     }));
     expect(alertMock).toHaveBeenCalledWith('競技を大会に割り当てました。');
     await expect.element(page.getByText('割り当て済み競技一覧 (1件)')).toBeInTheDocument();

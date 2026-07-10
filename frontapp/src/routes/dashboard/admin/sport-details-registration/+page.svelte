@@ -5,49 +5,11 @@
 <script>
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { marked } from 'marked';
-  import SafeHtml from '$lib/components/SafeHtml.svelte';
-
-  const colorExtension = {
-    name: 'colorText',
-    level: 'inline',
-    start(src) {
-      return src.match(/##|#color\(/)?.index;
-    },
-    tokenizer(src) {
-      const redRule = /^##(.*?)##/;
-      let match = redRule.exec(src);
-      if (match) {
-        return {
-          type: 'colorText',
-          raw: match[0],
-          text: this.lexer.inlineTokens(match[1]),
-          color: 'red'
-        };
-      }
-
-      const customColorRule = /^#color\((#[0-9a-fA-F]{3,6}),\s*(.*?)\)/;
-      match = customColorRule.exec(src);
-      if (match) {
-        return {
-          type: 'colorText',
-          raw: match[0],
-          text: this.lexer.inlineTokens(match[2]),
-          color: match[1]
-        };
-      }
-    },
-    renderer(token) {
-      return `<span data-mk-color="${token.color}">${this.parser.parseInline(token.text)}</span>`;
-    }
-  };
-
-  marked.use({ extensions: [colorExtension] });
 
   let sports = $state([]);
   let selectedEventId = $state(null);
   let selectedSportId = $state(null);
-  let sportDetails = $state({ description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null });
+  let sportDetails = $state({ description: '', rules_pdf_url: null });
   let capacityMode = $state('bulk'); // 'bulk' or 'per-class'
   let minCapacity = $state(null);
   let maxCapacity = $state(null);
@@ -67,17 +29,9 @@
   let matchStartTimes = $state({});
   let bulkRainyModeStartTime = $state('');
   let matchRainyModeStartTimes = $state({});
-  let rulesTextarea = $state();
-  let previewDiv = $state();
-  let markdownPreviewHtml = $derived(
-    sportDetails.rules_type === 'markdown'
-      ? marked.parse(sportDetails.rules || '')
-      : ''
-  );
   let selectedPdfFile = $state(null);
   let pdfPreviewUrl = $state(null);
   let activeEventName = $state('');
-  let customColor = $state('#000000');
   let isRainyMode = $state(false);
 
   onMount(async () => {
@@ -166,14 +120,12 @@
       const details = await res.json();
       sportDetails = {
         description: details.description || '',
-        rules: details.rules || '',
-        rules_type: details.rules_type || 'markdown',
         rules_pdf_url: details.rules_pdf_url || null
       };
       minCapacity = details.min_capacity ?? null;
       maxCapacity = details.max_capacity ?? null;
     } else {
-      sportDetails = { description: '', rules: '', rules_type: 'markdown', rules_pdf_url: null };
+      sportDetails = { description: '', rules_pdf_url: null };
       minCapacity = null;
       maxCapacity = null;
     }
@@ -340,12 +292,12 @@
 
     let detailsToSave = {
       description: sportDetails.description,
-      rules_type: sportDetails.rules_type,
-      rules: sportDetails.rules_type === 'markdown' ? sportDetails.rules : null,
-      rules_pdf_url: sportDetails.rules_type === 'pdf' ? sportDetails.rules_pdf_url : null,
+      rules_type: 'pdf',
+      rules: null,
+      rules_pdf_url: sportDetails.rules_pdf_url,
     };
 
-    if (detailsToSave.rules_type === 'pdf' && selectedPdfFile) {
+    if (selectedPdfFile) {
       const newPdfUrl = await uploadPdf();
       if (newPdfUrl) {
         detailsToSave.rules_pdf_url = newPdfUrl;
@@ -576,282 +528,6 @@
     } catch {
         console.error("Invalid date format for startTime:", isoString);
         return '';
-    }
-  }
-
-  async function handlePaste(event) {
-    const items = (event.clipboardData || event.originalEvent.clipboardData).items;
-    for (const item of items) {
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
-        event.preventDefault();
-        const blob = item.getAsFile();
-        const formData = new FormData();
-        formData.append('image', blob);
-
-        try {
-          const res = await fetch('/api/admin/images', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            const imageUrl = data.url;
-            const textarea = event.target;
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = textarea.value;
-            const before = text.substring(0, start);
-            const after = text.substring(end, text.length);
-            const markdownImage = `\n![pasted-image](${imageUrl})\n`;
-            sportDetails.rules = before + markdownImage + after;
-            // Move cursor after the inserted image
-            setTimeout(() => {
-              textarea.selectionStart = textarea.selectionEnd = start + markdownImage.length;
-            }, 0);
-          } else {
-            const error = await res.json();
-            alert(`Image upload failed: ${error.error}`);
-          }
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          alert('Image upload failed.');
-        }
-      }
-    }
-  }
-
-  async function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file || !file.type.startsWith('image/')) {
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('image', file);
-
-    try {
-      const res = await fetch('/api/admin/images', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const imageUrl = data.url;
-        const altText = file.name.split('.')[0]; // use filename without extension as alt text
-        const markdownImage = `\n![${altText}](${imageUrl})\n`;
-
-        const start = rulesTextarea.selectionStart;
-        const end = rulesTextarea.selectionEnd;
-        const text = rulesTextarea.value;
-        const before = text.substring(0, start);
-        const after = text.substring(end, text.length);
-        
-        sportDetails.rules = before + markdownImage + after;
-
-        // Move cursor after the inserted image
-        setTimeout(() => {
-          rulesTextarea.selectionStart = rulesTextarea.selectionEnd = start + markdownImage.length;
-          rulesTextarea.focus();
-        }, 0);
-
-      } else {
-        const error = await res.json();
-        alert(`Image upload failed: ${error.error}`);
-      }
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      alert('Image upload failed.');
-    }
-
-    // Reset file input
-    event.target.value = '';
-  }
-
-  function syncScroll() {
-    if (!rulesTextarea || !previewDiv) return;
-    const percentage = rulesTextarea.scrollTop / (rulesTextarea.scrollHeight - rulesTextarea.clientHeight);
-    previewDiv.scrollTop = percentage * (previewDiv.scrollHeight - previewDiv.clientHeight);
-  }
-
-  function applyMarkdown(prefix, suffix = '') {
-    if (!rulesTextarea) return;
-
-    const start = rulesTextarea.selectionStart;
-    const end = rulesTextarea.selectionEnd;
-    const selectedText = sportDetails.rules.substring(start, end);
-    const newText = `${prefix}${selectedText}${suffix}`;
-    
-    sportDetails.rules = 
-      sportDetails.rules.substring(0, start) + 
-      newText + 
-      sportDetails.rules.substring(end);
-
-    // Wait for Svelte to update the textarea value
-    setTimeout(() => {
-      rulesTextarea.focus();
-      if (selectedText) {
-        // If text was selected, select the newly formatted text
-        rulesTextarea.selectionStart = start;
-        rulesTextarea.selectionEnd = start + newText.length;
-      } else {
-        // If no text was selected, place cursor in the middle
-        rulesTextarea.selectionStart = start + prefix.length;
-        rulesTextarea.selectionEnd = start + prefix.length;
-      }
-    }, 0);
-  }
-
-  function addLink() {
-    if (!rulesTextarea) return;
-    const url = prompt('Enter the URL:');
-    if (url) {
-      const start = rulesTextarea.selectionStart;
-      const end = rulesTextarea.selectionEnd;
-      const selectedText = sportDetails.rules.substring(start, end) || 'link text';
-      const newText = `[${selectedText}](${url})`;
-      
-      sportDetails.rules = 
-        sportDetails.rules.substring(0, start) + 
-        newText + 
-        sportDetails.rules.substring(end);
-
-      setTimeout(() => {
-        rulesTextarea.focus();
-        if (selectedText === 'link text') {
-          rulesTextarea.selectionStart = start + 1;
-          rulesTextarea.selectionEnd = start + 1 + 'link text'.length;
-        } else {
-          rulesTextarea.selectionStart = start + newText.length;
-          rulesTextarea.selectionEnd = start + newText.length;
-        }
-      }, 0);
-    }
-  }
-
-  function addList() {
-    if (!rulesTextarea) return;
-
-    const start = rulesTextarea.selectionStart;
-    const end = rulesTextarea.selectionEnd;
-    const selectedText = sportDetails.rules.substring(start, end);
-
-    const lines = selectedText.split('\n');
-    const newText = lines.map(line => `- ${line}`).join('\n');
-
-    sportDetails.rules = 
-      sportDetails.rules.substring(0, start) + 
-      newText + 
-      sportDetails.rules.substring(end);
-    
-    setTimeout(() => {
-      rulesTextarea.focus();
-      rulesTextarea.selectionStart = start;
-      rulesTextarea.selectionEnd = start + newText.length;
-    }, 0);
-  }
-
-  function applyHeading(level) {
-    if (!rulesTextarea) return;
-
-    const prefix = '#'.repeat(level) + ' ';
-    const cursorPos = rulesTextarea.selectionStart;
-    const text = sportDetails.rules;
-    
-    let lineStart = text.lastIndexOf('\n', cursorPos - 1) + 1;
-    let lineEnd = text.indexOf('\n', cursorPos);
-    if (lineEnd === -1) lineEnd = text.length;
-
-    const originalLine = text.substring(lineStart, lineEnd);
-    let newLine;
-    let change;
-
-    // Remove any existing heading
-    const lineWithoutHeading = originalLine.replace(/^#+\s*/, '');
-    const currentPrefixLength = originalLine.length - lineWithoutHeading.length;
-
-    if (originalLine.startsWith(prefix)) {
-      // Toggle off
-      newLine = lineWithoutHeading;
-      change = -prefix.length;
-    } else {
-      // Apply new heading
-      newLine = prefix + lineWithoutHeading;
-      change = prefix.length - currentPrefixLength;
-    }
-
-    sportDetails.rules = text.substring(0, lineStart) + newLine + text.substring(lineEnd);
-
-    setTimeout(() => {
-      rulesTextarea.focus();
-      rulesTextarea.selectionStart = rulesTextarea.selectionEnd = cursorPos + change;
-    }, 0);
-  }
-
-  function addTable() {
-    if (!rulesTextarea) return;
-    const tableTemplate = '\n| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |\n| Cell 3   | Cell 4   |\n';
-    
-    const start = rulesTextarea.selectionStart;
-    const end = rulesTextarea.selectionEnd;
-    
-    sportDetails.rules = 
-      sportDetails.rules.substring(0, start) + 
-      tableTemplate + 
-      sportDetails.rules.substring(end);
-
-    setTimeout(() => {
-      rulesTextarea.focus();
-      rulesTextarea.selectionStart = rulesTextarea.selectionEnd = start + tableTemplate.length;
-    }, 0);
-  }
-
-  function applyCustomColor() {
-    if (!rulesTextarea) return;
-    const prefix = `#color(${customColor}, `;
-    const suffix = `)`
-    applyMarkdown(prefix, suffix);
-  }
-
-  function handleKeydown(event) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      const textarea = event.target;
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = textarea.value;
-
-      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-      const currentLineToCursor = text.substring(lineStart, start);
-      
-      const listPrefixRegex = /^(\s*-\s)/;
-      const listMatch = currentLineToCursor.match(listPrefixRegex);
-
-      if (listMatch) {
-        const lineEnd = text.indexOf('\n', start);
-        const currentLine = text.substring(lineStart, lineEnd === -1 ? text.length : lineEnd);
-
-        if (currentLine.trim() === '-') {
-          event.preventDefault();
-          // Remove the list item line
-          const before = text.substring(0, lineStart);
-          const after = text.substring(lineEnd === -1 ? text.length : lineEnd + 1);
-          sportDetails.rules = before + after;
-          setTimeout(() => {
-            textarea.selectionStart = textarea.selectionEnd = before.length;
-          }, 0);
-        } else {
-          // If list item has content, create a new list item on new line
-          event.preventDefault();
-          const prefix = listMatch[0]; // e.g., "  - "
-          const newText = '\n' + prefix;
-          
-          sportDetails.rules = text.substring(0, start) + newText + text.substring(end);
-          setTimeout(() => {
-            textarea.selectionStart = textarea.selectionEnd = start + newText.length;
-          }, 0);
-        }
-      }
     }
   }
 
@@ -1364,58 +1040,17 @@
       </div>
 
       <div class="mb-4">
-        <h2 class="text-xl font-semibold mb-2">ルール詳細</h2>
-        <div class="flex gap-4 mb-2">
-          <label class="flex items-center">
-            <input type="radio" bind:group={sportDetails.rules_type} value="markdown" class="mr-1">
-            Markdown
-          </label>
-          <label class="flex items-center">
-            <input type="radio" bind:group={sportDetails.rules_type} value="pdf" class="mr-1">
-            PDF
-          </label>
+        <h2 class="text-xl font-semibold mb-2">ルールPDF</h2>
+        <p class="mb-3 text-sm text-gray-600">競技要項など、ルールを記載したPDFを登録してください。</p>
+        <div class="flex flex-col gap-4">
+          <label class="sr-only" for="rules-pdf">ルールPDF</label>
+          <input id="rules-pdf" type="file" accept="application/pdf,.pdf" onchange={handlePdfFileSelect} class="file-input file-input-bordered w-full max-w-xs">
+          {#if pdfPreviewUrl || sportDetails.rules_pdf_url}
+            <div class="border rounded-md h-96">
+              <embed src={pdfPreviewUrl || sportDetails.rules_pdf_url} type="application/pdf" width="100%" height="100%">
+            </div>
+          {/if}
         </div>
-
-        {#if sportDetails.rules_type === 'markdown'}
-          <div>
-            <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
-              <button onclick={() => applyMarkdown('**', '**')} class="px-3 py-1 font-bold">B</button>
-              <button onclick={() => applyMarkdown('*', '*')} class="px-3 py-1 italic">I</button>
-              <button onclick={() => applyHeading(1)} class="px-3 py-1 font-bold">H1</button>
-              <button onclick={() => applyHeading(2)} class="px-3 py-1 font-bold">H2</button>
-              <button onclick={() => applyHeading(3)} class="px-3 py-1 font-bold">H3</button>
-              <button onclick={addLink} class="px-3 py-1">Link</button>
-              <button onclick={addList} class="px-3 py-1">List</button>
-              <button onclick={addTable} class="px-3 py-1">Table</button>
-              <button onclick={() => applyMarkdown('##', '##')} class="px-3 py-1 text-red-600 font-bold">Red</button>
-              <div class="flex items-center gap-2 border border-gray-300 rounded-md p-1">
-                <input type="color" bind:value={customColor} class="w-8 h-7 p-0 border-none cursor-pointer" title="Select a color">
-                <button onclick={applyCustomColor} class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm hover:bg-gray-300">Apply</button>
-              </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <textarea bind:value={sportDetails.rules} bind:this={rulesTextarea} onscroll={syncScroll} onpaste={handlePaste} onkeydown={handleKeydown} rows="10" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md h-96 overflow-y-scroll"></textarea>
-              <SafeHtml
-                bind:element={previewDiv}
-                class="prose border p-4 rounded-md h-96 overflow-y-scroll"
-                html={markdownPreviewHtml}
-              />
-            </div>
-            <input type="file" id="image-upload" accept="image/*" class="hidden" onchange={handleFileSelect}>
-            <button onclick={() => { if (browser) { const el = document.getElementById('image-upload'); if (el) el.click(); } }} class="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm">
-              画像アップロード
-            </button>
-          </div>
-        {:else}
-          <div class="flex flex-col gap-4">
-            <input type="file" accept=".pdf" onchange={handlePdfFileSelect} class="file-input file-input-bordered w-full max-w-xs">
-            {#if pdfPreviewUrl || sportDetails.rules_pdf_url}
-              <div class="border rounded-md h-96">
-                <embed src={pdfPreviewUrl || sportDetails.rules_pdf_url} type="application/pdf" width="100%" height="100%">
-              </div>
-            {/if}
-          </div>
-        {/if}
       </div>
 
       <div class="flex justify-end mb-4">

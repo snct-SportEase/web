@@ -61,8 +61,8 @@ describe('Sport Details Registration Page', () => {
       if (url === '/api/admin/events/1/sports/1/details') {
         return jsonResponse({
           description: '',
-          rules: '',
-          rules_type: 'markdown',
+          rules: null,
+          rules_type: 'pdf',
           rules_pdf_url: null,
           min_capacity: null,
           max_capacity: null
@@ -107,6 +107,29 @@ describe('Sport Details Registration Page', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('ルールはMarkdownではなくPDFだけを登録できる', async () => {
+    render(Page);
+
+    await expect.element(page.getByRole('option', { name: 'バスケットボール' })).toBeInTheDocument();
+    await page.getByLabelText('競技選択').selectOptions('1');
+
+    await expect.element(page.getByRole('heading', { name: 'ルールPDF' })).toBeInTheDocument();
+    await expect.element(page.getByText('Markdown')).not.toBeInTheDocument();
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+
+    const saveCall = fetchMock.mock.calls.find(([url, options]) => {
+      return url === '/api/admin/events/1/sports/1/details' && options?.method === 'PUT';
+    });
+
+    expect(saveCall).toBeTruthy();
+    expect(JSON.parse(saveCall[1].body)).toEqual({
+      description: '',
+      rules_type: 'pdf',
+      rules: null,
+      rules_pdf_url: null
+    });
   });
 
   it('一括設定の雨天時定員を保存できる', async () => {
