@@ -151,7 +151,7 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 func TestAuthHandler_UpdateUserClassRepByRoot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("replaces class representative role", func(t *testing.T) {
+	t.Run("replaces class role", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 		mockClassRepo := new(MockClassRepository)
@@ -174,7 +174,7 @@ func TestAuthHandler_UpdateUserClassRepByRoot(t *testing.T) {
 		authHandler.UpdateUserClassRepByRoot(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.JSONEq(t, `{"message":"Class representative role replaced successfully"}`, w.Body.String())
+		assert.JSONEq(t, `{"message":"Class role replaced successfully"}`, w.Body.String())
 		mockEventRepo.AssertExpectations(t)
 		mockClassRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)

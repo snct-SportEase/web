@@ -18,7 +18,7 @@ import (
 func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("Success - Class Rep Assigns Team Members", func(t *testing.T) {
+	t.Run("Success - User With Class Role Assigns Team Members", func(t *testing.T) {
 		// Setup mocks
 		mockClassRepo := new(MockClassRepository)
 		mockTeamRepo := new(MockTeamRepository)
@@ -33,7 +33,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		r := gin.Default()
 		r.POST("/assign", h.AssignTeamMembersHandler)
 
-		// Mock current user (class rep)
+		// Mock current user with the class role
 		currentUser := &models.User{
 			ID: "rep-user-id",
 			Roles: []models.Role{

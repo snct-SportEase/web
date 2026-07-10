@@ -271,7 +271,7 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return
 	}
 	if class == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Class representative role is required"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Class role is required"})
 		return
 	}
 

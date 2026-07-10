@@ -531,7 +531,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockTeamRepo.AssertNotCalled(t, "GetTeamsByClassID", mock.Anything, mock.Anything)
 	})
 
-	t.Run("user is not a class rep", func(t *testing.T) {
+	t.Run("user does not have the required class role", func(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()

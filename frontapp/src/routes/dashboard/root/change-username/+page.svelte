@@ -196,7 +196,7 @@ import { onMount } from 'svelte';
       closeEditModal();
 
     } catch (error) {
-      console.error('Error changing class rep:', error);
+      console.error('Error changing class role:', error);
       alert('エラーが発生しました');
     }
   }
