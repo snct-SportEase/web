@@ -1,6 +1,6 @@
 <!--
   This file is for the Sport Details Registration page.
-  It allows admins to register and update sport details, including overview, rules, and match start times.
+  It allows admins to register and update sport details, including overview, rules PDFs, and match start times.
 -->
 <script>
   import { onMount } from 'svelte';
@@ -292,8 +292,6 @@
 
     let detailsToSave = {
       description: sportDetails.description,
-      rules_type: 'pdf',
-      rules: null,
       rules_pdf_url: sportDetails.rules_pdf_url,
     };
 

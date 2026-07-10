@@ -159,15 +159,14 @@ SET @soccer_id = (SELECT MIN(id) FROM sports WHERE name = 'デモサッカー');
 SET @noon_sport_id = (SELECT MIN(id) FROM sports WHERE name = '学年対抗リレー');
 
 INSERT INTO event_sports (
-    event_id, sport_id, description, rules, location, min_capacity, max_capacity
+    event_id, sport_id, description, location, min_capacity, max_capacity
 ) VALUES
-(@demo_event_id, @basketball_id, '進行中の試合を含む8チーム制デモ競技', '試合時間は前後半各10分です。', 'gym1', 5, 10),
-(@demo_event_id, @volleyball_id, '開始前の4チーム制デモ競技', '3セットマッチ、2セット先取です。', 'gym2', 6, 12),
-(@demo_event_id, @soccer_id, 'チーム編成・参加者管理確認用の屋外競技', '前後半各15分、同点時はPK戦です。', 'ground', 8, 15),
-(@demo_event_id, @noon_sport_id, '昼競技のグループ・結果登録確認用', '順位に応じてクラス得点を付与します。', 'noon_game', 1, 40)
+(@demo_event_id, @basketball_id, '進行中の試合を含む8チーム制デモ競技', 'gym1', 5, 10),
+(@demo_event_id, @volleyball_id, '開始前の4チーム制デモ競技', 'gym2', 6, 12),
+(@demo_event_id, @soccer_id, 'チーム編成・参加者管理確認用の屋外競技', 'ground', 8, 15),
+(@demo_event_id, @noon_sport_id, '昼競技のグループ・結果登録確認用', 'noon_game', 1, 40)
 ON DUPLICATE KEY UPDATE
     description = VALUES(description),
-    rules = VALUES(rules),
     location = VALUES(location),
     min_capacity = VALUES(min_capacity),
     max_capacity = VALUES(max_capacity);

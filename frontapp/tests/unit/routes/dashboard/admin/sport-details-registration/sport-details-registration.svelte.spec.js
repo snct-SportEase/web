@@ -61,8 +61,6 @@ describe('Sport Details Registration Page', () => {
       if (url === '/api/admin/events/1/sports/1/details') {
         return jsonResponse({
           description: '',
-          rules: null,
-          rules_type: 'pdf',
           rules_pdf_url: null,
           min_capacity: null,
           max_capacity: null
@@ -126,8 +124,6 @@ describe('Sport Details Registration Page', () => {
     expect(saveCall).toBeTruthy();
     expect(JSON.parse(saveCall[1].body)).toEqual({
       description: '',
-      rules_type: 'pdf',
-      rules: null,
       rules_pdf_url: null
     });
   });

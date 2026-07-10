@@ -26,16 +26,12 @@ describe('Student Sport Info Page', () => {
             sport_name: 'バスケットボール',
             description: '屋内競技',
             location: 'gym1',
-            rules: '# 旧ルール',
-            rules_type: 'markdown',
             rules_pdf_url: '/uploads/rules/basketball.pdf'
           },
           {
             sport_id: 2,
             sport_name: 'バレーボール',
             location: 'gym2',
-            rules: '# 旧ルール',
-            rules_type: 'markdown',
             rules_pdf_url: null
           }
         ]);
@@ -57,7 +53,6 @@ describe('Student Sport Info Page', () => {
 
     const pdfButton = page.getByRole('button', { name: 'ルールPDFを見る' });
     await expect.element(pdfButton).toBeInTheDocument();
-    await expect.element(page.getByText('旧ルール')).not.toBeInTheDocument();
 
     await pdfButton.click();
 

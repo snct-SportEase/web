@@ -55,8 +55,7 @@ func TestNoonGameHandler_UpsertSession_SyncsNoonGameSport(t *testing.T) {
 			return eventSport != nil &&
 				eventSport.EventID == eventID &&
 				eventSport.SportID == 7 &&
-				eventSport.Location == "noon_game" &&
-				eventSport.RulesType == "markdown"
+				eventSport.Location == "noon_game"
 		})).
 		Return(nil).
 		Once()

@@ -14,8 +14,6 @@ async function setupAdminBarcodePage({ page, context, request }) {
       sport_id: 1,
       location: 'gym1',
       description: '屋内競技',
-      rules: '',
-      rules_type: 'markdown'
     }
   });
 

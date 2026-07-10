@@ -163,10 +163,7 @@
                 body: JSON.stringify({
                     sport_id: parseInt(newAssignment.sport_id, 10),
                     description: newAssignment.description,
-                    rules: null,
-                    location,
-                    rules_type: 'pdf',
-                    rules_pdf_url: null,
+                    location
                 }),
             });
             if (!response.ok) {

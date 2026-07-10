@@ -89,14 +89,11 @@ test.describe('競技情報登録・管理 (root)', () => {
 
     const request = await assignRequest;
     const body = JSON.parse(request.postData() ?? '{}');
-    expect(body).toEqual(expect.objectContaining({
+    expect(body).toEqual({
       sport_id: 1,
       location: 'gym1',
-      description: '屋内メイン競技',
-      rules: null,
-      rules_type: 'pdf',
-      rules_pdf_url: null
-    }));
+      description: '屋内メイン競技'
+    });
 
     await expect(page.getByLabel('割り当てる競技')).toHaveValue('');
     await expect(page.getByLabel('場所')).toHaveValue('other');

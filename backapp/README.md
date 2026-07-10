@@ -50,10 +50,7 @@ CREATE TABLE events (
 -- 競技（スポーツ）テーブル
 CREATE TABLE sports (
     id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    rules TEXT,
-    location sport_location NOT NULL
+    name TEXT NOT NULL
 );
 
 -- チームテーブル

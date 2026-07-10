@@ -63,9 +63,7 @@ describe('Sport Management Page', () => {
           event_id: 1,
           sport_id: body.sport_id,
           description: body.description ?? '',
-          rules: body.rules ?? null,
           location: body.location ?? 'other',
-          rules_type: body.rules_type ?? 'pdf',
           rules_pdf_url: body.rules_pdf_url ?? null
         };
         assignedSports = [...assignedSports, nextAssignedSport];
@@ -150,14 +148,11 @@ describe('Sport Management Page', () => {
     });
 
     expect(assignCall).toBeTruthy();
-    expect(JSON.parse(assignCall[1].body)).toEqual(expect.objectContaining({
+    expect(JSON.parse(assignCall[1].body)).toEqual({
       sport_id: 1,
       location: 'gym1',
-      description: '屋内メイン競技',
-      rules: null,
-      rules_type: 'pdf',
-      rules_pdf_url: null
-    }));
+      description: '屋内メイン競技'
+    });
     expect(alertMock).toHaveBeenCalledWith('競技を大会に割り当てました。');
     await expect.element(page.getByText('割り当て済み競技一覧 (1件)')).toBeInTheDocument();
     await expect.element(page.getByRole('cell', { name: 'バスケットボール' })).toBeInTheDocument();

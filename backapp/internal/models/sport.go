@@ -12,8 +12,6 @@ type EventSport struct {
 	SportID     int     `json:"sport_id"`
 	SportName   string  `json:"sport_name,omitempty"`
 	Description *string `json:"description"`
-	Rules       *string `json:"rules"`
-	RulesType   string  `json:"rules_type"`
 	RulesPdfURL *string `json:"rules_pdf_url"`
 	Location    string  `json:"location"`
 	MinCapacity *int    `json:"min_capacity"`
