@@ -83,10 +83,9 @@ func (h *NoonGameHandler) syncNoonGameSport(eventID int, sessionName string) err
 	}
 
 	if err := h.sportRepo.AssignSportToEvent(&models.EventSport{
-		EventID:   eventID,
-		SportID:   sport.ID,
-		Location:  "noon_game",
-		RulesType: "markdown",
+		EventID:  eventID,
+		SportID:  sport.ID,
+		Location: "noon_game",
 	}); err != nil {
 		return fmt.Errorf("failed to assign noon game sport to event: %w", err)
 	}

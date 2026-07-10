@@ -2,8 +2,6 @@
     import { onMount, onDestroy } from 'svelte';
     import { afterNavigate } from '$app/navigation';
     import { activeEvent } from '$lib/stores/eventStore.js';
-    import { marked } from 'marked';
-    import SafeHtml from '$lib/components/SafeHtml.svelte';
 
     let allSports = $state([]);
     let eventSports = $state([]);
@@ -12,13 +10,9 @@
     let newAssignment = $state({
         sport_id: null,
         description: '',
-        rules: '',
         location: 'other',
         other_location: '',
-        rules_type: 'markdown', // Add default rules_type
     });
-
-    let assignmentPreviewHtml = $derived(marked.parse(newAssignment.rules || ''));
 
     let currentActiveEvent = $state(null);
     let editingCapacity = $state(null); // { event_id, sport_id } or null
@@ -88,22 +82,6 @@
         }
     });
 
-    // $: {
-    //     if (newAssignment.sport_id && allSports.length > 0) {
-    //         const sportName = getSportName(newAssignment.sport_id);
-    //         if (sportName !== '不明な競技') {
-    //             const isRuleEmpty = newAssignment.rules.trim() === '';
-                
-    //             // Find if the current rule is a default for ANY sport
-    //             const isRuleADefault = allSports.some(s => `# ${s.name}` === newAssignment.rules.trim());
-
-    //             if (isRuleEmpty || isRuleADefault) {
-    //                 newAssignment.rules = `# ${sportName}`;
-    //             }
-    //         }
-    //     }
-    // }
-    
     // --- Data Fetching Functions ---
 
     async function fetchAllSports() {
@@ -185,9 +163,7 @@
                 body: JSON.stringify({
                     sport_id: parseInt(newAssignment.sport_id, 10),
                     description: newAssignment.description,
-                    rules: newAssignment.rules,
-                    location,
-                    rules_type: newAssignment.rules_type,
+                    location
                 }),
             });
             if (!response.ok) {
@@ -198,14 +174,11 @@
             // 割り当て成功後、確実にリストを更新してからフォームをリセット
             await fetchEventSports(currentActiveEvent.id); // Refresh the list
             
-            // Reset form (rules_typeも含める)
             newAssignment = { 
                 sport_id: null, 
                 description: '', 
-                rules: '', 
                 location: 'other',
-                other_location: '',
-                rules_type: 'markdown'
+                other_location: ''
             };
             
             alert('競技を大会に割り当てました。');
@@ -442,18 +415,6 @@
                         <div>
                             <label for="description" class="block text-sm font-medium text-gray-700 mb-1">概要 (任意)</label>
                             <textarea id="description" bind:value={newAssignment.description} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-20" placeholder="競技の簡単な説明や備考"></textarea>
-                        </div>
-                        
-                        <!-- ルール -->
-                        <div>
-                            <label for="rules" class="block text-sm font-medium text-gray-700 mb-1">ルール詳細 (任意)</label>
-                            <textarea id="rules" bind:value={newAssignment.rules} class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-32" placeholder="競技のルール詳細をMarkdownで記述"></textarea>
-                        </div>
-
-                        <!-- プレビュー -->
-                        <div>
-                            <p class="block text-sm font-medium text-gray-700 mb-1">プレビュー</p>
-                            <SafeHtml class="prose mt-1 p-2 border rounded-md bg-gray-100 min-h-[8rem]" html={assignmentPreviewHtml} />
                         </div>
                         
                         <button onclick={assignSport} class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold w-full mt-4 transition duration-150 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={!newAssignment.sport_id || isAssigning}>

@@ -96,7 +96,7 @@ func (r *sportRepository) GetSportByName(name string) (*models.Sport, error) {
 // GetSportsByEventID retrieves all sports assigned to a specific event.
 func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport, error) {
 	query := `
-		SELECT es.event_id, es.sport_id, s.name, es.description, es.rules, es.rules_type, es.rules_pdf_url, es.location, es.min_capacity, es.max_capacity
+		SELECT es.event_id, es.sport_id, s.name, es.description, es.rules_pdf_url, es.location, es.min_capacity, es.max_capacity
 		FROM event_sports es
 		JOIN sports s ON es.sport_id = s.id
 		WHERE es.event_id = ?
@@ -111,7 +111,7 @@ func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport,
 	var eventSports []*models.EventSport
 	for rows.Next() {
 		eventSport := &models.EventSport{}
-		if err := rows.Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.SportName, &eventSport.Description, &eventSport.Rules, &eventSport.RulesType, &eventSport.RulesPdfURL, &eventSport.Location, &eventSport.MinCapacity, &eventSport.MaxCapacity); err != nil {
+		if err := rows.Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.SportName, &eventSport.Description, &eventSport.RulesPdfURL, &eventSport.Location, &eventSport.MinCapacity, &eventSport.MaxCapacity); err != nil {
 			return nil, err
 		}
 		eventSports = append(eventSports, eventSport)
@@ -144,8 +144,8 @@ func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) erro
 		}
 	}
 
-	query = "INSERT INTO event_sports (event_id, sport_id, description, rules, rules_type, rules_pdf_url, location, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	_, err = r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.Rules, eventSport.RulesType, eventSport.RulesPdfURL, eventSport.Location, eventSport.MinCapacity, eventSport.MaxCapacity)
+	query = "INSERT INTO event_sports (event_id, sport_id, description, rules_pdf_url, location, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	_, err = r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.RulesPdfURL, eventSport.Location, eventSport.MinCapacity, eventSport.MaxCapacity)
 	if err != nil {
 		log.Printf("Error inserting EventSport: %v", err)
 	}
@@ -200,16 +200,12 @@ func (r *sportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, error)
 }
 
 func (r *sportRepository) GetSportDetails(eventID int, sportID int) (*models.EventSport, error) {
-	query := "SELECT event_id, sport_id, description, rules, rules_type, rules_pdf_url, location, min_capacity, max_capacity FROM event_sports WHERE event_id = ? AND sport_id = ?"
+	query := "SELECT event_id, sport_id, description, rules_pdf_url, location, min_capacity, max_capacity FROM event_sports WHERE event_id = ? AND sport_id = ?"
 	eventSport := &models.EventSport{}
-	err := r.db.QueryRow(query, eventID, sportID).Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.Rules, &eventSport.RulesType, &eventSport.RulesPdfURL, &eventSport.Location, &eventSport.MinCapacity, &eventSport.MaxCapacity)
+	err := r.db.QueryRow(query, eventID, sportID).Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.Description, &eventSport.RulesPdfURL, &eventSport.Location, &eventSport.MinCapacity, &eventSport.MaxCapacity)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return &models.EventSport{
-				EventID:   eventID,
-				SportID:   sportID,
-				RulesType: "markdown",
-			}, nil
+			return &models.EventSport{EventID: eventID, SportID: sportID}, nil
 		}
 		return nil, err
 	}
@@ -217,7 +213,7 @@ func (r *sportRepository) GetSportDetails(eventID int, sportID int) (*models.Eve
 }
 
 func (r *sportRepository) UpdateSportDetails(eventID int, sportID int, details models.EventSport) error {
-	query := "UPDATE event_sports SET description = ?, rules = ?, rules_type = ?, rules_pdf_url = ?, min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ?"
-	_, err := r.db.Exec(query, details.Description, details.Rules, details.RulesType, details.RulesPdfURL, details.MinCapacity, details.MaxCapacity, eventID, sportID)
+	query := "UPDATE event_sports SET description = ?, rules_pdf_url = ?, min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ?"
+	_, err := r.db.Exec(query, details.Description, details.RulesPdfURL, details.MinCapacity, details.MaxCapacity, eventID, sportID)
 	return err
 }

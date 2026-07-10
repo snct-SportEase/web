@@ -21,13 +21,13 @@ func setupSport(t *testing.T) (repository.SportRepository, sqlmock.Sqlmock, func
 }
 
 var eventSportCols = []string{
-	"event_id", "sport_id", "sport_name", "description", "rules", "rules_type",
-	"rules_pdf_url", "location", "min_capacity", "max_capacity",
+	"event_id", "sport_id", "sport_name", "description", "rules_pdf_url", "location",
+	"min_capacity", "max_capacity",
 }
 
 var eventSportDetailCols = []string{
-	"event_id", "sport_id", "description", "rules", "rules_type",
-	"rules_pdf_url", "location", "min_capacity", "max_capacity",
+	"event_id", "sport_id", "description", "rules_pdf_url", "location", "min_capacity",
+	"max_capacity",
 }
 
 // ─── GetAllSports ──────────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ func intPtr(i int) *int {
 
 func TestSportRepository_GetSportsByEventID(t *testing.T) {
 	const q = `
-		SELECT es.event_id, es.sport_id, s.name, es.description, es.rules, es.rules_type, es.rules_pdf_url, es.location, es.min_capacity, es.max_capacity
+		SELECT es.event_id, es.sport_id, s.name, es.description, es.rules_pdf_url, es.location, es.min_capacity, es.max_capacity
 		FROM event_sports es
 		JOIN sports s ON es.sport_id = s.id
 		WHERE es.event_id = ?
@@ -181,8 +181,8 @@ func TestSportRepository_GetSportsByEventID(t *testing.T) {
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1).
 			WillReturnRows(sqlmock.NewRows(eventSportCols).
-				AddRow(1, 1, "バスケットボール", "desc", "rules", "markdown", nil, "gym1", 3, 8).
-				AddRow(1, 2, "サッカー", "desc2", "rules2", "markdown", nil, "ground", 5, 10))
+				AddRow(1, 1, "バスケットボール", "desc", nil, "gym1", 3, 8).
+				AddRow(1, 2, "サッカー", "desc2", nil, "ground", 5, 10))
 
 		sports, err := repo.GetSportsByEventID(1)
 		require.NoError(t, err)
@@ -223,9 +223,9 @@ func TestSportRepository_GetSportsByEventID(t *testing.T) {
 func TestSportRepository_AssignSportToEvent(t *testing.T) {
 	const checkDupSportQ = "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND sport_id = ?"
 	const checkDupLocQ = "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND location = ?"
-	const insertQ = "INSERT INTO event_sports (event_id, sport_id, description, rules, rules_type, rules_pdf_url, location, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	const insertQ = "INSERT INTO event_sports (event_id, sport_id, description, rules_pdf_url, location, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)"
 
-	es := &models.EventSport{EventID: 1, SportID: 3, Description: stringPtr("desc"), Rules: stringPtr("rules"), RulesType: "markdown", Location: "gym1", MinCapacity: intPtr(3), MaxCapacity: intPtr(8)}
+	es := &models.EventSport{EventID: 1, SportID: 3, Description: stringPtr("desc"), Location: "gym1", MinCapacity: intPtr(3), MaxCapacity: intPtr(8)}
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
@@ -236,7 +236,7 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(checkDupLocQ)).WithArgs(1, "gym1").
 			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
-			WithArgs(es.EventID, es.SportID, es.Description, es.Rules, es.RulesType, es.RulesPdfURL, es.Location, es.MinCapacity, es.MaxCapacity).
+			WithArgs(es.EventID, es.SportID, es.Description, es.RulesPdfURL, es.Location, es.MinCapacity, es.MaxCapacity).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		assert.NoError(t, repo.AssignSportToEvent(es))
@@ -282,7 +282,7 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		// No location check for "other"
 		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
-			WithArgs(esOther.EventID, esOther.SportID, esOther.Description, esOther.Rules, esOther.RulesType, esOther.RulesPdfURL, esOther.Location, esOther.MinCapacity, esOther.MaxCapacity).
+			WithArgs(esOther.EventID, esOther.SportID, esOther.Description, esOther.RulesPdfURL, esOther.Location, esOther.MinCapacity, esOther.MaxCapacity).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		assert.NoError(t, repo.AssignSportToEvent(&esOther))
@@ -300,7 +300,7 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		// No location check for custom "other:<name>" locations.
 		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
-			WithArgs(esOther.EventID, esOther.SportID, esOther.Description, esOther.Rules, esOther.RulesType, esOther.RulesPdfURL, esOther.Location, esOther.MinCapacity, esOther.MaxCapacity).
+			WithArgs(esOther.EventID, esOther.SportID, esOther.Description, esOther.RulesPdfURL, esOther.Location, esOther.MinCapacity, esOther.MaxCapacity).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		assert.NoError(t, repo.AssignSportToEvent(&esOther))
@@ -392,7 +392,7 @@ func TestSportRepository_GetTeamsBySportID(t *testing.T) {
 // ─── GetSportDetails ───────────────────────────────────────────────────────
 
 func TestSportRepository_GetSportDetails(t *testing.T) {
-	const q = "SELECT event_id, sport_id, description, rules, rules_type, rules_pdf_url, location, min_capacity, max_capacity FROM event_sports WHERE event_id = ? AND sport_id = ?"
+	const q = "SELECT event_id, sport_id, description, rules_pdf_url, location, min_capacity, max_capacity FROM event_sports WHERE event_id = ? AND sport_id = ?"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
@@ -400,7 +400,7 @@ func TestSportRepository_GetSportDetails(t *testing.T) {
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1, 1).
 			WillReturnRows(sqlmock.NewRows(eventSportDetailCols).
-				AddRow(1, 1, "desc", "rules", "markdown", nil, "gym1", 3, 8))
+				AddRow(1, 1, "desc", nil, "gym1", 3, 8))
 
 		es, err := repo.GetSportDetails(1, 1)
 		require.NoError(t, err)
@@ -409,7 +409,7 @@ func TestSportRepository_GetSportDetails(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
-	t.Run("not found returns default EventSport with markdown type", func(t *testing.T) {
+	t.Run("not found returns default EventSport", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
 
@@ -421,7 +421,6 @@ func TestSportRepository_GetSportDetails(t *testing.T) {
 		require.NotNil(t, es)
 		assert.Equal(t, 1, es.EventID)
 		assert.Equal(t, 99, es.SportID)
-		assert.Equal(t, "markdown", es.RulesType)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -441,15 +440,15 @@ func TestSportRepository_GetSportDetails(t *testing.T) {
 // ─── UpdateSportDetails ────────────────────────────────────────────────────
 
 func TestSportRepository_UpdateSportDetails(t *testing.T) {
-	const q = "UPDATE event_sports SET description = ?, rules = ?, rules_type = ?, rules_pdf_url = ?, min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ?"
+	const q = "UPDATE event_sports SET description = ?, rules_pdf_url = ?, min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ?"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
 
-		details := models.EventSport{Description: stringPtr("updated"), Rules: stringPtr("new rules"), RulesType: "markdown", MinCapacity: intPtr(5), MaxCapacity: intPtr(10)}
+		details := models.EventSport{Description: stringPtr("updated"), MinCapacity: intPtr(5), MaxCapacity: intPtr(10)}
 		mock.ExpectExec(regexp.QuoteMeta(q)).
-			WithArgs(details.Description, details.Rules, details.RulesType, details.RulesPdfURL, details.MinCapacity, details.MaxCapacity, 1, 1).
+			WithArgs(details.Description, details.RulesPdfURL, details.MinCapacity, details.MaxCapacity, 1, 1).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		assert.NoError(t, repo.UpdateSportDetails(1, 1, details))

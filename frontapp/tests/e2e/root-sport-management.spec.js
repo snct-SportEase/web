@@ -72,7 +72,6 @@ test.describe('競技情報登録・管理 (root)', () => {
     await page.getByLabel('割り当てる競技').selectOption('1');
     await page.getByLabel('場所').selectOption('gym1');
     await page.getByLabel('概要 (任意)').fill('屋内メイン競技');
-    await page.getByLabel('ルール詳細 (任意)').fill('# バスケットボール');
     await page.evaluate(() => {
       window.alert = () => {};
     });
@@ -90,17 +89,14 @@ test.describe('競技情報登録・管理 (root)', () => {
 
     const request = await assignRequest;
     const body = JSON.parse(request.postData() ?? '{}');
-    expect(body).toEqual(expect.objectContaining({
+    expect(body).toEqual({
       sport_id: 1,
       location: 'gym1',
-      description: '屋内メイン競技',
-      rules: '# バスケットボール',
-      rules_type: 'markdown'
-    }));
+      description: '屋内メイン競技'
+    });
 
     await expect(page.getByLabel('割り当てる競技')).toHaveValue('');
     await expect(page.getByLabel('場所')).toHaveValue('other');
     await expect(page.getByLabel('概要 (任意)')).toHaveValue('');
-    await expect(page.getByLabel('ルール詳細 (任意)')).toHaveValue('');
   });
 });

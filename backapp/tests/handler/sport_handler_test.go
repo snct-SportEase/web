@@ -37,8 +37,6 @@ func TestSportHandler_UpdateCapacityHandler(t *testing.T) {
 			EventID:     eventID,
 			SportID:     sportID,
 			Description: stringPtr("Test sport"),
-			Rules:       stringPtr("Test rules"),
-			RulesType:   "markdown",
 			Location:    "gym1",
 		}
 
@@ -91,10 +89,9 @@ func TestSportHandler_UpdateCapacityHandler(t *testing.T) {
 		minCapacity := 10
 
 		currentDetails := &models.EventSport{
-			EventID:   eventID,
-			SportID:   sportID,
-			RulesType: "markdown",
-			Location:  "gym1",
+			EventID:  eventID,
+			SportID:  sportID,
+			Location: "gym1",
 		}
 
 		reqBody := struct {
@@ -142,10 +139,9 @@ func TestSportHandler_UpdateCapacityHandler(t *testing.T) {
 		maxCapacity := 20
 
 		currentDetails := &models.EventSport{
-			EventID:   eventID,
-			SportID:   sportID,
-			RulesType: "markdown",
-			Location:  "gym1",
+			EventID:  eventID,
+			SportID:  sportID,
+			Location: "gym1",
 		}
 
 		reqBody := struct {
@@ -196,7 +192,6 @@ func TestSportHandler_UpdateCapacityHandler(t *testing.T) {
 			SportID:     sportID,
 			MinCapacity: intPtr(10),
 			MaxCapacity: intPtr(20),
-			RulesType:   "markdown",
 			Location:    "gym1",
 		}
 
@@ -437,10 +432,9 @@ func TestSportHandler_UpdateCapacityHandler(t *testing.T) {
 		maxCapacity := 20
 
 		currentDetails := &models.EventSport{
-			EventID:   eventID,
-			SportID:   sportID,
-			RulesType: "markdown",
-			Location:  "gym1",
+			EventID:  eventID,
+			SportID:  sportID,
+			Location: "gym1",
 		}
 
 		reqBody := struct {

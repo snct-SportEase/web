@@ -719,9 +719,7 @@ createServer(async (req, res) => {
       event_id: 1,
       sport_id: body.sport_id,
       description: body.description ?? '',
-      rules: body.rules ?? '',
       location: body.location ?? 'other',
-      rules_type: body.rules_type ?? 'markdown',
       rules_pdf_url: null,
       min_capacity: null,
       max_capacity: null
@@ -750,8 +748,6 @@ createServer(async (req, res) => {
 
     sendJson(res, 200, detail ?? {
       description: '',
-      rules: '',
-      rules_type: 'markdown',
       rules_pdf_url: null,
       min_capacity: null,
       max_capacity: null
