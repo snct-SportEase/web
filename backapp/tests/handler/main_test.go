@@ -84,14 +84,6 @@ func (m *MockClassRepository) UpdateClassRanks(eventID int) error {
 	return args.Error(0)
 }
 
-func (m *MockClassRepository) GetClassByRepRole(userID string, eventID int) (*models.Class, error) {
-	args := m.Called(userID, eventID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.Class), args.Error(1)
-}
-
 func (m *MockClassRepository) GetClassMembers(classID int) ([]*models.User, error) {
 	args := m.Called(classID)
 	if args.Get(0) == nil {
@@ -564,11 +556,6 @@ func (m *MockUserRepository) AddUserRoleIfNotExists(userID string, roleName stri
 
 func (m *MockUserRepository) ReplaceMasterRole(userID string, roleName string) error {
 	args := m.Called(userID, roleName)
-	return args.Error(0)
-}
-
-func (m *MockUserRepository) ReplaceClassRepRole(userID string, roleName string, classID int, eventID *int) error {
-	args := m.Called(userID, roleName, classID, eventID)
 	return args.Error(0)
 }
 

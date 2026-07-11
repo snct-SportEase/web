@@ -497,52 +497,6 @@ type PromoteUserRequest struct {
 	Role   string `json:"role"` // "student", "admin", or "root"
 }
 
-type UpdateUserClassRepRequest struct {
-	UserID  string `json:"user_id"`
-	ClassID int    `json:"class_id"`
-}
-
-func (h *AuthHandler) UpdateUserClassRepByRoot(c *gin.Context) {
-	var req UpdateUserClassRepRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if strings.TrimSpace(req.UserID) == "" || req.ClassID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id and class_id are required"})
-		return
-	}
-
-	activeEventID, err := h.eventRepo.GetActiveEvent()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
-		return
-	}
-
-	class, err := h.classRepo.GetClassByID(req.ClassID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
-		return
-	}
-	if class == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
-		return
-	}
-	if class.EventID != nil && *class.EventID != activeEventID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
-		return
-	}
-
-	roleName := class.Name + "_rep"
-	if err := h.userRepo.ReplaceClassRepRole(req.UserID, roleName, req.ClassID, &activeEventID); err != nil {
-		log.Printf("ReplaceClassRepRole error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to replace class role"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Class role replaced successfully"})
-}
-
 // PromoteUserByRoot はroot権限でユーザーのマスタロールを交換する
 func (h *AuthHandler) PromoteUserByRoot(c *gin.Context) {
 	var req PromoteUserRequest

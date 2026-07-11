@@ -105,7 +105,7 @@ func (h *ClassTeamHandler) resolveManagedClassForTeamOps(currentUser *models.Use
 	return managedClass, 0, ""
 }
 
-// GetManagedClassHandler returns the class that the current user can manage based on class_name_rep role
+// GetManagedClassHandler returns the current user's class, or all classes for admin/root.
 func (h *ClassTeamHandler) GetManagedClassHandler(c *gin.Context) {
 	userCtx, exists := c.Get("user")
 	if !exists {

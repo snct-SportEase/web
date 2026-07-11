@@ -460,7 +460,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 	})
 
 	t.Run("unauthorized - no user in context", func(t *testing.T) {
-		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
+		h, _, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -471,13 +471,12 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
-		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
 		mockTeamRepo.AssertNotCalled(t, "GetTeamsByClassID", mock.Anything, mock.Anything)
 		mockTournamentRepo.AssertNotCalled(t, "GetMatchesForTeams", mock.Anything, mock.Anything)
 	})
 
 	t.Run("GetActiveEvent returns error", func(t *testing.T) {
-		h, mockClassRepo, mockEventRepo, _, _ := newHandler()
+		h, _, mockEventRepo, _, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(0, errors.New("db error")).Once()
 
@@ -491,11 +490,10 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		mockEventRepo.AssertExpectations(t)
-		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
 	})
 
 	t.Run("no active event", func(t *testing.T) {
-		h, mockClassRepo, mockEventRepo, _, _ := newHandler()
+		h, _, mockEventRepo, _, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(0, nil).Once()
 
@@ -509,7 +507,6 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		mockEventRepo.AssertExpectations(t)
-		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
 	})
 
 	t.Run("GetClassByID returns error", func(t *testing.T) {

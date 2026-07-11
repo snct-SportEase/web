@@ -17,7 +17,6 @@ type ClassRepository interface {
 	GetClassScoresByEvent(eventID int) ([]*models.ClassScore, error)
 	GetClassScoresByEvents(eventIDs []int) (map[int][]*models.ClassScore, error)
 	UpdateClassRanks(eventID int) error
-	GetClassByRepRole(userID string, eventID int) (*models.Class, error)
 	GetClassMembers(classID int) ([]*models.User, error)
 	SetNoonGamePoints(eventID int, points map[int]int) error
 	SetSurveyPoints(eventID int, points map[int]int) error
@@ -443,33 +442,6 @@ func (r *classRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*mod
 func (r *classRepository) UpdateClassRanks(eventID int) error {
 	// class_scores is a VIEW, ranking is dynamic
 	return nil
-}
-
-// GetClassByRepRole gets the class that a user with class_name_rep role can manage
-func (r *classRepository) GetClassByRepRole(userID string, eventID int) (*models.Class, error) {
-	query := `
-		SELECT c.id, c.event_id, c.name, c.student_count, c.attend_count
-		FROM classes c
-		INNER JOIN user_roles ur ON ur.user_id = ?
-		INNER JOIN roles ro ON ur.role_id = ro.id
-		WHERE ro.name = CONCAT(c.name, '_rep') 
-		AND (ur.event_id = ? OR ur.event_id IS NULL)
-		AND c.event_id = ?
-		LIMIT 1
-	`
-	row := r.db.QueryRow(query, userID, eventID, eventID)
-
-	class := &models.Class{}
-	var eventIDPtr *int
-	err := row.Scan(&class.ID, &eventIDPtr, &class.Name, &class.StudentCount, &class.AttendCount)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // Class not found
-		}
-		return nil, err
-	}
-	class.EventID = eventIDPtr
-	return class, nil
 }
 
 // GetClassMembers gets all users in a class
