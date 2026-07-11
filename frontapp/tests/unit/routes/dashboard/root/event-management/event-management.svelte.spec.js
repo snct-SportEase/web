@@ -3,6 +3,16 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from '$src/routes/dashboard/root/event-management/+page.svelte';
 
+vi.mock('html2pdf.js', () => ({
+  default: () => ({
+    set: () => ({
+      from: () => ({
+        save: () => {}
+      })
+    })
+  })
+}));
+
 const originalCreateElement = document.createElement.bind(document);
 
 // Mock activeEvent store
