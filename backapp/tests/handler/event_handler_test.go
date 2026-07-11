@@ -64,6 +64,39 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 
+	t.Run("Success - Create Preparing Event", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		repo.On("CreateEvent", mock.MatchedBy(func(event *models.Event) bool {
+			return event.Status == models.EventStatusPreparing
+		})).Return(int64(1), nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events", bytes.NewBufferString(`{"name":"大会","year":2026,"season":"spring","status":"preparing"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.CreateEvent(c)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("Rejects Unknown Status", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events", bytes.NewBufferString(`{"name":"大会","year":2026,"season":"spring","status":"invalid"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.CreateEvent(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		repo.AssertNotCalled(t, "CreateEvent", mock.Anything)
+	})
+
 	t.Run("Success - Create Autumn Event with Spring Event existing", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockTournamentRepo := new(MockTournamentRepository)

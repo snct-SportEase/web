@@ -48,6 +48,18 @@ describe('Event Management Page', () => {
       survey_url: 'https://example.com/autumn-survey',
       hide_scores: false,
       duplicate_registration_threshold: 31
+    },
+    {
+      id: 3,
+      name: '2026春季スポーツ大会',
+      year: 2026,
+      season: 'spring',
+      start_date: null,
+      end_date: null,
+      status: 'preparing',
+      survey_url: null,
+      hide_scores: false,
+      duplicate_registration_threshold: 31
     }
   ];
 
@@ -265,8 +277,20 @@ describe('Event Management Page', () => {
       year: 2026,
       season: 'autumn',
       start_date: '2026-10-01',
-      end_date: '2026-10-02'
+      end_date: '2026-10-02',
+      status: 'preparing'
     }));
+  });
+
+  it('準備中の大会を一覧・編集画面に正しく表示すること', async () => {
+    render(Page);
+
+    await expect.element(page.getByText('準備中')).toBeInTheDocument();
+    await page.getByText('2026春季スポーツ大会').click();
+
+    const statusSelect = page.getByRole('combobox', { name: 'ステータス' });
+    await expect.element(statusSelect).toHaveValue('preparing');
+    await expect.element(page.getByRole('option', { name: '準備中 (Preparing)' })).toBeInTheDocument();
   });
 
   it('スコア非表示を有効にして保存するとhide_scores=trueで送信すること', async () => {

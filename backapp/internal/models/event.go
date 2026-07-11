@@ -2,6 +2,22 @@ package models
 
 import "time"
 
+const (
+	EventStatusPreparing = "preparing"
+	EventStatusUpcoming  = "upcoming"
+	EventStatusActive    = "active"
+	EventStatusArchived  = "archived"
+)
+
+func IsValidEventStatus(status string) bool {
+	switch status {
+	case EventStatusPreparing, EventStatusUpcoming, EventStatusActive, EventStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
 type Event struct {
 	ID                             int        `json:"id"`
 	Name                           string     `json:"name"`
