@@ -155,7 +155,7 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 機能 | 概要 | コンポーネント | E2E | 備考 |
 | :--- | :--- | :---: | :---: | :--- |
 | 大会の作成・編集 | 年度・シーズン・期間等の設定 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
-| 大会ステータス変更 | upcoming / active / archived の切り替え | ○ | ○ | 編集保存時の `status` 更新を確認済み |
+| 大会ステータス変更 | preparing / upcoming / active / archived の切り替え | ○ | ○ | 準備中の表示・保存と編集時の `status` 更新を確認済み |
 | 重複登録のクラス人数上限 | 大会ごとの2競技登録許可人数の設定 | ☓ | ☓ | バックエンドは `event_handler_test.go` と `class_team_handler_test.go` で境界値・登録制限を確認済み。フロントの自動テストは未整備 |
 | スコア非表示設定 | 学生へのスコア公開・非公開設定 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | アンケート通知配信 | アンケートURLの全体通知送信 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で通知送信フローを確認済み |
