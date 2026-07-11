@@ -3,6 +3,7 @@ package handler_test
 import (
 	"backapp/internal/config"
 	"backapp/internal/handler"
+	"backapp/internal/models"
 	"bytes"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,39 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+func TestAuthHandler_UpdateProfile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("rejects a class change after profile completion", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		currentClassID := 1
+		user := &models.User{
+			ID:                "user-1",
+			ClassID:           &currentClassID,
+			IsProfileComplete: true,
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/user/profile", bytes.NewBufferString(`{"display_name":"Updated","class_id":2}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		authHandler.UpdateProfile(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.JSONEq(t, `{"error":"Class cannot be changed after profile completion"}`, w.Body.String())
+		assert.Equal(t, currentClassID, *user.ClassID)
+		mockUserRepo.AssertNotCalled(t, "UpdateUser", mock.Anything)
+		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
+		mockClassRepo.AssertNotCalled(t, "GetClassByID", mock.Anything)
+	})
+}
 
 func TestAuthHandler_GoogleLogin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
