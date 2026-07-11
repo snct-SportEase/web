@@ -26,6 +26,9 @@ export default defineConfig({
 	ssr: {
 		noExternal: ['bracketry', 'marked', 'svelte-dnd-action', 'html2pdf.js']
 	},
+	optimizeDeps: {
+		include: ['html2pdf.js']
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
