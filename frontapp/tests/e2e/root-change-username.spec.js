@@ -102,16 +102,9 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('button[title="ロールを削除"]')).toHaveCount(0);
   });
 
-  test('クラス所属ロールを付け替えできる', async ({ page }) => {
+  test('クラス所属ロールの管理UIを表示しない', async ({ page }) => {
     await page.locator('tbody button').first().click({ force: true });
-    await expect(page.locator('#classRepSelect')).toBeVisible();
-    await page.locator('#classRepSelect').selectOption('2');
-    const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/users/class-rep') && request.method() === 'PUT');
-    await page.getByRole('button', { name: '変更・保存' }).click();
-    const req = await requestPromise;
-    expect(JSON.parse(req.postData() ?? '{}')).toEqual({
-      user_id: 'user-1',
-      class_id: 2
-    });
+    await expect(page.locator('#classRepSelect')).toHaveCount(0);
+    await expect(page.getByText('クラス所属の変更')).toHaveCount(0);
   });
 });

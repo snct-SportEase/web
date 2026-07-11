@@ -40,7 +40,6 @@ describe('Change Username Page', () => {
         class_id: 1,
         roles: [
           { id: 1, name: 'student' },
-          { id: 2, name: '1A_rep' },
           { id: 3, name: 'judge' }
         ]
       },
@@ -86,27 +85,6 @@ describe('Change Username Page', () => {
             roles: [
               ...user.roles.filter((role) => !masterRoles.includes(role.name)),
               { id: `master-${body.role}`, name: body.role }
-            ]
-          };
-        });
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
-      }
-
-      if (url === '/api/root/users/class-rep' && options.method === 'PUT') {
-        const body = JSON.parse(options.body);
-        const classes = [
-          { id: 1, name: '1A' },
-          { id: 2, name: '1B' }
-        ];
-        const targetClass = classes.find((cls) => cls.id === body.class_id);
-        users = users.map((user) => {
-          if (user.id !== body.user_id || !targetClass) return user;
-          return {
-            ...user,
-            class_id: body.class_id,
-            roles: [
-              ...user.roles.filter((role) => !role.name.endsWith('_rep')),
-              { id: `class-${body.class_id}`, name: `${targetClass.name}_rep` }
             ]
           };
         });
@@ -253,19 +231,11 @@ describe('Change Username Page', () => {
     await expect.element(page.getByTitle('ロールを削除')).not.toBeInTheDocument();
   });
 
-  it('クラス所属ロールを付け替えできる', async () => {
+  it('クラス所属ロールの管理UIを表示しない', async () => {
     render(Page);
 
     await page.getByRole('button', { name: '管理' }).first().click();
-    await page.getByLabelText('担当クラスを選択').selectOptions('2');
-    await page.getByRole('button', { name: '変更・保存' }).click();
-
-    const classRepCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/users/class-rep' && options?.method === 'PUT');
-    expect(classRepCall).toBeTruthy();
-    expect(JSON.parse(classRepCall[1].body)).toEqual({
-      user_id: 'user-1',
-      class_id: 2
-    });
-    await expect.element(page.getByRole('row', { name: /student1@sendai-nct\.jp.*1B_rep.*1B/ })).toBeInTheDocument();
+    await expect.element(page.getByLabelText('担当クラスを選択')).not.toBeInTheDocument();
+    await expect.element(page.getByText('クラス所属の変更')).not.toBeInTheDocument();
   });
 });
