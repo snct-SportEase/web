@@ -24,7 +24,8 @@ describe('Event Management Page', () => {
       end_date: '2025-04-02T00:00:00Z',
       status: 'upcoming',
       survey_url: 'https://example.com/survey',
-      hide_scores: false
+      hide_scores: false,
+      duplicate_registration_threshold: 31
     },
     {
       id: 2,
@@ -35,7 +36,8 @@ describe('Event Management Page', () => {
       end_date: '2025-10-02T00:00:00Z',
       status: 'upcoming',
       survey_url: 'https://example.com/autumn-survey',
-      hide_scores: false
+      hide_scores: false,
+      duplicate_registration_threshold: 31
     }
   ];
 
