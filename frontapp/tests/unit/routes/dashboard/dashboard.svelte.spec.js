@@ -26,7 +26,7 @@ function renderDashboard(user = rootUser) {
 				classes: [],
 				events: [{ id: 1, name: '2026春季スポーツ大会' }],
 				form: {},
-				isClassRep: false,
+				isClassMember: false,
 				className: null,
 				classInfo: null,
 				members: [],

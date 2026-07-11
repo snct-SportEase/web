@@ -22,6 +22,10 @@ import { onMount } from 'svelte';
   let errorMessage = $state('');
   const masterRoles = ['student', 'admin', 'root'];
 
+	function isLegacyClassRepresentativeRole(roleName) {
+		return roleName.endsWith('_rep');
+	}
+
   // 指数バックオフ付きのフェッチ関数
   async function fetchWithBackoff(url, options = {}, maxRetries = 5) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -161,9 +165,9 @@ import { onMount } from 'svelte';
       return;
     }
     
-	// _rep は廃止済みの旧ロールのため新規追加を拒否する
-    if (roleToAdd.endsWith('_rep')) {
-      alert('クラス所属ロール（_rep）は廃止されています。');
+	// 廃止済みのクラス代表ロールは新規追加しない。
+    if (isLegacyClassRepresentativeRole(roleToAdd)) {
+		alert('廃止済みのクラス代表ロールは追加できません。');
       return;
     }
 
@@ -641,7 +645,7 @@ import { onMount } from 'svelte';
             <p class="text-sm font-medium text-gray-700 mb-2">現在のロール:</p>
             <div class="flex flex-wrap gap-2">
               {#if selectedUser.roles && selectedUser.roles.length > 0}
-				{#each selectedUser.roles.filter((role) => !role.name.endsWith('_rep')) as role (role.id)}
+				{#each selectedUser.roles.filter((role) => !isLegacyClassRepresentativeRole(role.name)) as role (role.id)}
                   <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 border border-gray-200">
                     <span>{role.name}</span>
 					{#if !masterRoles.includes(role.name)}
@@ -676,7 +680,7 @@ import { onMount } from 'svelte';
                 class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" 
                 bind:value={newRoleName}
               />
-				<p class="text-xs text-gray-500 mt-1">※ `student` / `admin` / `root` と `_rep` で終わるロールはここでは追加できません。</p>
+				<p class="text-xs text-gray-500 mt-1">※ `student` / `admin` / `root` と廃止済みのクラス代表ロールは、ここでは追加できません。</p>
             </div>
             <button 
               class="rounded-md bg-gray-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:bg-gray-300" 

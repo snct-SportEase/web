@@ -4,7 +4,7 @@
     const defaultRoles = ['root', 'admin', 'student'];
 
     function isClassSportRole(roleName) {
-        // アンダースコアを含むロール（_rep・_競技名どちらも）はクラス管理から操作するため削除不可
+        // アンダースコアを含むクラス管理用ロールは削除不可
         if (roleName.includes('_')) {
             if (!defaultRoles.includes(roleName.toLowerCase())) {
                 return true;

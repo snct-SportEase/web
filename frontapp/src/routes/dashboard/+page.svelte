@@ -534,7 +534,7 @@
     </section>
   {/if}
 
-  {#if data.isClassRep}
+  {#if data.isClassMember}
     <section class="space-y-6">
       <div class="flex items-center justify-between">
         <h2 class="text-2xl font-semibold text-gray-900">クラス概要</h2>

@@ -8,7 +8,7 @@ export async function load({ locals, fetch, request }) {
     user: locals.user,
     classes: [],
     events: [],
-    isClassRep: false,
+    isClassMember: false,
     className: null,
     classInfo: null,
     members: [],
@@ -52,13 +52,13 @@ export async function load({ locals, fetch, request }) {
       });
       if (response.ok) {
         const payload = await response.json();
-        returnData.isClassRep = true;
+        returnData.isClassMember = true;
         returnData.className = payload.class_name ?? null;
         returnData.classInfo = payload.class_info ?? null;
         returnData.members = payload.members ?? [];
         returnData.progress = payload.progress ?? [];
       } else if (response.status === 403) {
-        returnData.isClassRep = false;
+        returnData.isClassMember = false;
       }
     } catch (e) {
       console.error('Failed to fetch class progress:', e);
