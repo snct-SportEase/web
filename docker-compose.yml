@@ -142,6 +142,7 @@ services:
   sportease-backapp:
     build:
       context: ./backapp
+      network: host
     container_name: sportease-backapp
     env_file:
       - .env
@@ -177,6 +178,7 @@ services:
   sportease-frontapp:
     build:
       context: ./frontapp
+      network: host
     container_name: frontapp
     env_file:
       - ./frontapp/.env
