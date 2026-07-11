@@ -173,7 +173,7 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 昼競技セッション管理 | 昼競技の開催枠・ポイント設定 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | 昼競技テンプレート実行 | リレー等の対戦カード自動生成 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | ユーザー表示名変更 | ユーザーの表示名更新 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
-| クラス所属ロール付け替え | クラス所属（クラス名_rep）の変更 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
+| クラス代表ロール廃止 | 廃止済みのクラス代表ロール管理UIを表示しない | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
 | クラス人数設定 | 各クラスの学生数更新 | ○ | ○ | `class-student-count.svelte.spec.js` / `root-class-student-count.spec.js` で確認済み |
 | MIC結果確認 | 投票結果の確認 | ○ | ○ | `identify-mic.svelte.spec.js` / `root-identify-mic.spec.js` で確認済み |
 | 競技要項PDFアップロード | 競技要項PDFの登録・管理 | ○ | ○ | `competition-guidelines-upload.svelte.spec.js` / `root-competition-guidelines-upload.spec.js` で確認済み |
