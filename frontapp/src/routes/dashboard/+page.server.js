@@ -42,8 +42,8 @@ export async function load({ locals, fetch, request }) {
     }
   }
 
-  const classRole = locals.user?.roles?.find(role => typeof role.name === 'string' && role.name.endsWith('_rep'));
-  if (classRole) {
+  const classId = locals.user?.class_id;
+  if (classId) {
     try {
       const response = await fetch(`${BACKEND_URL}/api/student/class-progress`, {
         headers: {
@@ -53,7 +53,7 @@ export async function load({ locals, fetch, request }) {
       if (response.ok) {
         const payload = await response.json();
         returnData.isClassRep = true;
-        returnData.className = payload.class_name ?? classRole.name.replace(/_rep$/, '');
+        returnData.className = payload.class_name ?? null;
         returnData.classInfo = payload.class_info ?? null;
         returnData.members = payload.members ?? [];
         returnData.progress = payload.progress ?? [];

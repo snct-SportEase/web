@@ -316,21 +316,13 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Check if it's the first time the profile is being completed
-	isFirstCompletion := !user.IsProfileComplete
-
 	user.DisplayName = &req.DisplayName
-	user.ClassID = &req.ClassID
-	user.IsProfileComplete = true
-
-	if err := h.userRepo.UpdateUser(user); err != nil {
-		log.Printf("UpdateUser error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
-		return
-	}
-
-	// Assign the class membership role on first completion
-	if isFirstCompletion {
+	if user.IsProfileComplete {
+		if user.ClassID == nil || *user.ClassID != req.ClassID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Class cannot be changed after profile completion"})
+			return
+		}
+	} else {
 		activeEventID, err := h.eventRepo.GetActiveEvent()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
@@ -342,19 +334,22 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
 			return
 		}
-		if class != nil {
-			// Verify the class belongs to the active event
-			if class.EventID != nil && *class.EventID != activeEventID {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
-				return
-			}
-
-			roleName := class.Name + "_rep"
-			if err := h.userRepo.UpdateUserRole(user.ID, roleName, &activeEventID); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign class role"})
-				return
-			}
+		if class == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class not found"})
+			return
 		}
+		if class.EventID != nil && *class.EventID != activeEventID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
+			return
+		}
+		user.ClassID = &req.ClassID
+		user.IsProfileComplete = true
+	}
+
+	if err := h.userRepo.UpdateUser(user); err != nil {
+		log.Printf("UpdateUser error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
 	}
 
 	c.JSON(http.StatusOK, user)

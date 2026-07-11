@@ -22,7 +22,7 @@ func NewAttendanceHandler(classRepo repository.ClassRepository, eventRepo reposi
 	}
 }
 
-func getAttendanceScope(user *models.User) (isRoot bool, isAdmin bool, hasClassRepRole bool) {
+func getAttendanceScope(user *models.User) (isRoot bool, isAdmin bool) {
 	for _, role := range user.Roles {
 		switch role.Name {
 		case "root":
@@ -31,16 +31,9 @@ func getAttendanceScope(user *models.User) (isRoot bool, isAdmin bool, hasClassR
 			isAdmin = true
 		}
 
-		if len(role.Name) > 4 && role.Name[len(role.Name)-4:] == "_rep" {
-			hasClassRepRole = true
-		}
 	}
 
-	return isRoot, isAdmin, hasClassRepRole
-}
-
-func (h *AttendanceHandler) getManagedAttendanceClass(user *models.User, activeEventID int) (*models.Class, error) {
-	return h.classRepo.GetClassByRepRole(user.ID, activeEventID)
+	return isRoot, isAdmin
 }
 
 func (h *AttendanceHandler) GetClassDetailsHandler(c *gin.Context) {
@@ -70,29 +63,10 @@ func (h *AttendanceHandler) GetClassDetailsHandler(c *gin.Context) {
 
 	user := userCtx.(*models.User)
 
-	isRoot, isAdmin, hasClassRepRole := getAttendanceScope(user)
-
-	if !isRoot {
-		if !isAdmin && !hasClassRepRole {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
-			return
-		}
-
-		managedClass, err := h.getManagedAttendanceClass(user, activeEventID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
-			return
-		}
-
-		if managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this user"})
-			return
-		}
-
-		if managedClass.ID != classID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to view details for your managed class"})
-			return
-		}
+	isRoot, isAdmin := getAttendanceScope(user)
+	if !isRoot && !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
+		return
 	}
 
 	classDetails, err := h.classRepo.GetClassDetails(classID, activeEventID)
@@ -139,29 +113,10 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 
 	user := userCtx.(*models.User)
 
-	isRoot, isAdmin, hasClassRepRole := getAttendanceScope(user)
-
-	if !isRoot {
-		if !isAdmin && !hasClassRepRole {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
-			return
-		}
-
-		managedClass, err := h.getManagedAttendanceClass(user, activeEventID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check managed class"})
-			return
-		}
-
-		if managedClass == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "No managed class found for this user"})
-			return
-		}
-
-		if managedClass.ID != req.ClassID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are only authorized to register attendance for your managed class"})
-			return
-		}
+	isRoot, isAdmin := getAttendanceScope(user)
+	if !isRoot && !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this resource"})
+		return
 	}
 
 	class, err := h.classRepo.GetClassByID(req.ClassID)
