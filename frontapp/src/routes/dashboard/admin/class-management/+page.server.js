@@ -86,14 +86,10 @@ export async function load({ fetch, locals, request }) {
 			if (sportRes.ok) {
 				const sportPayload = await sportRes.json();
 				eventSports = Array.isArray(sportPayload) ? sportPayload : [];
-			}
-
-			const allSportRes = await fetch(`${BACKEND_URL}/api/admin/allsports`, {
-				headers
-			});
-			if (allSportRes.ok) {
-				const allSportPayload = await allSportRes.json();
-				allSports = Array.isArray(allSportPayload) ? allSportPayload : [];
+				allSports = eventSports.map((eventSport) => ({
+					id: eventSport.sport_id,
+					name: eventSport.sport_name
+				}));
 			}
 
 			const noonSessionRes = await fetch(
