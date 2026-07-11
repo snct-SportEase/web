@@ -17,6 +17,7 @@
     survey_url: null,
     status: 'upcoming',
     hide_scores: false,
+    duplicate_registration_threshold: 31,
   });
 
   $effect(() => {
@@ -68,6 +69,7 @@
       survey_url: null,
       status: 'upcoming',
       hide_scores: false,
+      duplicate_registration_threshold: 31,
     };
     showModal = true;
   }
@@ -92,12 +94,18 @@
 
   async function handleSave() {
     try {
+      const duplicateRegistrationThreshold = Number(currentEvent.duplicate_registration_threshold);
+      if (!Number.isInteger(duplicateRegistrationThreshold) || duplicateRegistrationThreshold < 0) {
+        throw new Error('重複登録を許可するクラス人数は0以上の整数で入力してください');
+      }
+
       const method = selectedEvent ? 'PUT' : 'POST';
       const url = selectedEvent ? `/api/root/events/${selectedEvent.id}` : '/api/root/events';
 
       const body = {
         ...currentEvent,
         year: parseInt(currentEvent.year, 10),
+        duplicate_registration_threshold: duplicateRegistrationThreshold,
       };
 
       const response = await fetch(url, {
@@ -412,6 +420,11 @@
                 <option value="active">開催中 (Active)</option>
                 <option value="archived">アーカイブ (Archived)</option>
               </select>
+            </div>
+            <div>
+              <label for="duplicate_registration_threshold" class="block text-sm font-medium text-gray-700">2競技への重複登録を許可するクラス人数</label>
+              <input type="number" id="duplicate_registration_threshold" min="0" required bind:value={currentEvent.duplicate_registration_threshold} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+              <p class="mt-1 text-xs text-gray-500">この人数以下のクラスは、1人につき2競技まで登録できます。</p>
             </div>
             <div class="flex items-center">
               <label class="flex items-center cursor-pointer">

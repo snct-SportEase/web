@@ -19,7 +19,7 @@ import (
 var eventCols = []string{
 	"id", "name", "year", "season", "start_date", "end_date",
 	"is_rainy_mode", "competition_guidelines_pdf_url", "survey_url",
-	"is_survey_published", "status", "hide_scores",
+	"is_survey_published", "status", "hide_scores", "duplicate_registration_threshold",
 }
 
 func newEvent() *models.Event {
@@ -29,14 +29,14 @@ func newEvent() *models.Event {
 		ID: 1, Name: "Spring 2024", Year: 2024, Season: "spring",
 		Start_date: &start, End_date: &end,
 		IsRainyMode: false, IsSurveyPublished: false,
-		Status: "active", HideScores: false,
+		Status: "active", HideScores: false, DuplicateRegistrationThreshold: 31,
 	}
 }
 
 func eventRow(e *models.Event) *sqlmock.Rows {
 	return sqlmock.NewRows(eventCols).AddRow(
 		e.ID, e.Name, e.Year, e.Season, e.Start_date, e.End_date,
-		e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores,
+		e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold,
 	)
 }
 
@@ -50,7 +50,7 @@ func setupEvent(t *testing.T) (repository.EventRepository, sqlmock.Sqlmock, func
 // ─── GetEventByID ──────────────────────────────────────────────────────────
 
 func TestEventRepository_GetEventByID(t *testing.T) {
-	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores FROM events WHERE id = ?"
+	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold FROM events WHERE id = ?"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupEvent(t)
@@ -95,7 +95,7 @@ func TestEventRepository_GetEventByID(t *testing.T) {
 // ─── GetAllEvents ──────────────────────────────────────────────────────────
 
 func TestEventRepository_GetAllEvents(t *testing.T) {
-	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
+	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupEvent(t)
@@ -195,8 +195,8 @@ func TestEventRepository_GetActiveEvent(t *testing.T) {
 // ─── GetEventByYearAndSeason ───────────────────────────────────────────────
 
 func TestEventRepository_GetEventByYearAndSeason(t *testing.T) {
-	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status FROM events WHERE `year` = ? AND season = ?"
-	var yasCols = []string{"id", "name", "year", "season", "start_date", "end_date", "is_rainy_mode", "competition_guidelines_pdf_url", "survey_url", "is_survey_published", "status"}
+	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, duplicate_registration_threshold FROM events WHERE `year` = ? AND season = ?"
+	var yasCols = []string{"id", "name", "year", "season", "start_date", "end_date", "is_rainy_mode", "competition_guidelines_pdf_url", "survey_url", "is_survey_published", "status", "duplicate_registration_threshold"}
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupEvent(t)
@@ -204,7 +204,7 @@ func TestEventRepository_GetEventByYearAndSeason(t *testing.T) {
 
 		now := time.Now()
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(2024, "spring").
-			WillReturnRows(sqlmock.NewRows(yasCols).AddRow(1, "Spring 2024", 2024, "spring", now, now, false, nil, nil, false, "active"))
+			WillReturnRows(sqlmock.NewRows(yasCols).AddRow(1, "Spring 2024", 2024, "spring", now, now, false, nil, nil, false, "active", 31))
 
 		got, err := repo.GetEventByYearAndSeason(2024, "spring")
 		require.NoError(t, err)
@@ -241,7 +241,7 @@ func TestEventRepository_GetEventByYearAndSeason(t *testing.T) {
 // ─── CreateEvent ───────────────────────────────────────────────────────────
 
 func TestEventRepository_CreateEvent(t *testing.T) {
-	const insertQ = "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	const insertQ = "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
 	const activeQ = "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
 
@@ -254,7 +254,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 
 		mock.ExpectBegin()
 		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
-			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores).
+			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold).
 			WillReturnResult(sqlmock.NewResult(10, 1))
 		mock.ExpectCommit()
 
@@ -273,7 +273,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 
 		mock.ExpectBegin()
 		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
-			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores).
+			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold).
 			WillReturnResult(sqlmock.NewResult(10, 1))
 		mock.ExpectExec(regexp.QuoteMeta(archiveQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 2))
 		mock.ExpectExec(regexp.QuoteMeta(activeQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -322,7 +322,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 // ─── UpdateEvent ───────────────────────────────────────────────────────────
 
 func TestEventRepository_UpdateEvent(t *testing.T) {
-	const updateQ = "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ?, competition_guidelines_pdf_url = ?, survey_url = ?, is_survey_published = ?, status = ?, hide_scores = ? WHERE id = ?"
+	const updateQ = "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ?, competition_guidelines_pdf_url = ?, survey_url = ?, is_survey_published = ?, status = ?, hide_scores = ?, duplicate_registration_threshold = ? WHERE id = ?"
 	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
 	const activeQ = "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
 	const clearQ = "UPDATE active_event SET event_id = NULL WHERE id = 1 AND event_id = ?"
@@ -336,7 +336,7 @@ func TestEventRepository_UpdateEvent(t *testing.T) {
 
 		mock.ExpectBegin()
 		mock.ExpectExec(regexp.QuoteMeta(updateQ)).
-			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.ID).
+			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold, e.ID).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(archiveQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(activeQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -356,7 +356,7 @@ func TestEventRepository_UpdateEvent(t *testing.T) {
 
 		mock.ExpectBegin()
 		mock.ExpectExec(regexp.QuoteMeta(updateQ)).
-			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.ID).
+			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold, e.ID).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(clearQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()

@@ -41,14 +41,15 @@ func NewEventHandler(eventRepo repository.EventRepository, tournamentRepo reposi
 
 func (h *EventHandler) CreateEvent(c *gin.Context) {
 	var req struct {
-		Name       string  `json:"name"`
-		Year       int     `json:"year"`
-		Season     string  `json:"season"`
-		StartDate  string  `json:"start_date"`
-		EndDate    string  `json:"end_date"`
-		SurveyUrl  *string `json:"survey_url"`
-		Status     string  `json:"status"`
-		HideScores bool    `json:"hide_scores"`
+		Name                           string  `json:"name"`
+		Year                           int     `json:"year"`
+		Season                         string  `json:"season"`
+		StartDate                      string  `json:"start_date"`
+		EndDate                        string  `json:"end_date"`
+		SurveyUrl                      *string `json:"survey_url"`
+		Status                         string  `json:"status"`
+		HideScores                     bool    `json:"hide_scores"`
+		DuplicateRegistrationThreshold *int    `json:"duplicate_registration_threshold"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -78,16 +79,25 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 	if req.Status == "" {
 		req.Status = "upcoming"
 	}
+	if req.DuplicateRegistrationThreshold != nil && *req.DuplicateRegistrationThreshold < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "duplicate_registration_threshold must be 0 or greater"})
+		return
+	}
+	duplicateRegistrationThreshold := 31
+	if req.DuplicateRegistrationThreshold != nil {
+		duplicateRegistrationThreshold = *req.DuplicateRegistrationThreshold
+	}
 
 	event := &models.Event{
-		Name:       req.Name,
-		Year:       req.Year,
-		Season:     req.Season,
-		Start_date: startDate,
-		End_date:   endDate,
-		SurveyUrl:  req.SurveyUrl,
-		Status:     req.Status,
-		HideScores: req.HideScores,
+		Name:                           req.Name,
+		Year:                           req.Year,
+		Season:                         req.Season,
+		Start_date:                     startDate,
+		End_date:                       endDate,
+		SurveyUrl:                      req.SurveyUrl,
+		Status:                         req.Status,
+		HideScores:                     req.HideScores,
+		DuplicateRegistrationThreshold: duplicateRegistrationThreshold,
 	}
 
 	id, err := h.eventRepo.CreateEvent(event)
@@ -138,18 +148,23 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	}
 
 	var req struct {
-		Name       string  `json:"name"`
-		Year       int     `json:"year"`
-		Season     string  `json:"season"`
-		StartDate  string  `json:"start_date"`
-		EndDate    string  `json:"end_date"`
-		SurveyUrl  *string `json:"survey_url"`
-		Status     string  `json:"status"`
-		HideScores bool    `json:"hide_scores"`
+		Name                           string  `json:"name"`
+		Year                           int     `json:"year"`
+		Season                         string  `json:"season"`
+		StartDate                      string  `json:"start_date"`
+		EndDate                        string  `json:"end_date"`
+		SurveyUrl                      *string `json:"survey_url"`
+		Status                         string  `json:"status"`
+		HideScores                     bool    `json:"hide_scores"`
+		DuplicateRegistrationThreshold *int    `json:"duplicate_registration_threshold"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.DuplicateRegistrationThreshold != nil && *req.DuplicateRegistrationThreshold < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "duplicate_registration_threshold must be 0 or greater"})
 		return
 	}
 
@@ -191,6 +206,9 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	existingEvent.SurveyUrl = req.SurveyUrl
 	existingEvent.Status = req.Status
 	existingEvent.HideScores = req.HideScores
+	if req.DuplicateRegistrationThreshold != nil {
+		existingEvent.DuplicateRegistrationThreshold = *req.DuplicateRegistrationThreshold
+	}
 
 	err = h.eventRepo.UpdateEvent(existingEvent)
 	if err != nil {

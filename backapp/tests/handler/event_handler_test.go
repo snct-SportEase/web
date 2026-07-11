@@ -148,6 +148,118 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 	})
 }
 
+func TestEventHandler_DuplicateRegistrationThreshold(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("create uses default threshold when omitted", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		repo.On("CreateEvent", mock.MatchedBy(func(event *models.Event) bool {
+			return event.DuplicateRegistrationThreshold == 31
+		})).Return(int64(1), nil).Once()
+
+		body := []byte(`{"name":"大会","year":2026,"season":"spring"}`)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.CreateEvent(c)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("create stores configured threshold", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		repo.On("CreateEvent", mock.MatchedBy(func(event *models.Event) bool {
+			return event.DuplicateRegistrationThreshold == 24
+		})).Return(int64(1), nil).Once()
+
+		body := []byte(`{"name":"大会","year":2026,"season":"spring","duplicate_registration_threshold":24}`)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.CreateEvent(c)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("create rejects negative threshold", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		body := []byte(`{"name":"大会","year":2026,"season":"spring","duplicate_registration_threshold":-1}`)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.CreateEvent(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		repo.AssertNotCalled(t, "CreateEvent", mock.Anything)
+	})
+
+	t.Run("update changes configured threshold", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		existing := &models.Event{ID: 1, DuplicateRegistrationThreshold: 31}
+		repo.On("GetEventByID", 1).Return(existing, nil).Once()
+		repo.On("UpdateEvent", mock.MatchedBy(func(event *models.Event) bool {
+			return event.DuplicateRegistrationThreshold == 18
+		})).Return(nil).Once()
+
+		body := []byte(`{"name":"大会","year":2026,"season":"spring","duplicate_registration_threshold":18}`)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.UpdateEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("update preserves threshold when omitted", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		existing := &models.Event{ID: 1, DuplicateRegistrationThreshold: 22}
+		repo.On("GetEventByID", 1).Return(existing, nil).Once()
+		repo.On("UpdateEvent", mock.MatchedBy(func(event *models.Event) bool {
+			return event.DuplicateRegistrationThreshold == 22
+		})).Return(nil).Once()
+
+		body := []byte(`{"name":"大会","year":2026,"season":"spring"}`)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.UpdateEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("update rejects negative threshold before repository access", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		body := []byte(`{"duplicate_registration_threshold":-1}`)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.UpdateEvent(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		repo.AssertNotCalled(t, "GetEventByID", mock.Anything)
+		repo.AssertNotCalled(t, "UpdateEvent", mock.Anything)
+	})
+}
+
 func TestEventHandler_UpdateCompetitionGuidelines(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
