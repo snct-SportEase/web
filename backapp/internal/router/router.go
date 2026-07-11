@@ -228,10 +228,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 		}
 
-		// Class and team management routes. Students are scoped to their own class.
+		// Class and team management routes are restricted to event operators.
 		adminClassTeam := api.Group("/admin/class-team")
 		{
-			adminClassTeam.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
+			adminClassTeam.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("admin", "root"))
 			adminClassTeam.GET("/managed-class", classTeamHandler.GetManagedClassHandler)
 			adminClassTeam.GET("/classes/:class_id/members", classTeamHandler.GetClassMembersHandler)
 			adminClassTeam.POST("/assign-members", classTeamHandler.AssignTeamMembersHandler)
