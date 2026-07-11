@@ -6,9 +6,31 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+func teamRegistrationLimit(class *models.Class, smallClassStudentThreshold int) int {
+	className := strings.TrimSpace(class.Name)
+	if className == "専教" || className == "専攻科・教員" {
+		return 0
+	}
+	if class.StudentCount <= smallClassStudentThreshold {
+		return 2
+	}
+	return 1
+}
+
+func registeredSportCountForEvent(teams []*models.TeamWithSport, eventID int, newSportID int) int {
+	sportIDs := map[int]struct{}{newSportID: {}}
+	for _, team := range teams {
+		if team.EventID == eventID {
+			sportIDs[team.SportID] = struct{}{}
+		}
+	}
+	return len(sportIDs)
+}
 
 // ClassTeamHandler handles class and team management API requests
 type ClassTeamHandler struct {
@@ -223,6 +245,11 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		c.JSON(statusCode, gin.H{"error": errMsg})
 		return
 	}
+	activeEvent, err := h.eventRepo.GetEventByID(activeEventID)
+	if err != nil || activeEvent == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event settings"})
+		return
+	}
 
 	// Get sport information
 	sport, err := h.sportRepo.GetSportByID(req.SportID)
@@ -311,19 +338,42 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 	// Create role name: class_name_sport_name
 	roleName := fmt.Sprintf("%s_%s", managedClass.Name, sport.Name)
 
+	// Validate the duplicate registration limit before changing any memberships.
+	registrationLimit := teamRegistrationLimit(managedClass, activeEvent.DuplicateRegistrationThreshold)
+	validUsers := make([]*models.User, 0, len(req.UserIDs))
+	seenUserIDs := make(map[string]struct{}, len(req.UserIDs))
+	for _, userID := range req.UserIDs {
+		if _, exists := seenUserIDs[userID]; exists {
+			continue
+		}
+		seenUserIDs[userID] = struct{}{}
+
+		user, err := h.userRepo.GetUserWithRoles(userID)
+		if err != nil || user == nil || user.ClassID == nil || *user.ClassID != managedClass.ID {
+			continue
+		}
+
+		if registrationLimit > 0 {
+			registeredTeams, err := h.teamRepo.GetTeamsByUserID(userID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check duplicate registrations"})
+				return
+			}
+			if registeredSportCountForEvent(registeredTeams, activeEventID, req.SportID) > registrationLimit {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": fmt.Sprintf("%s は登録可能な競技数（%d競技）を超えています", userID, registrationLimit),
+				})
+				return
+			}
+		}
+
+		validUsers = append(validUsers, user)
+	}
+
 	// Assign team members and roles
 	assignedCount := 0
-	for _, userID := range req.UserIDs {
-		// Verify user belongs to the class
-		user, err := h.userRepo.GetUserWithRoles(userID)
-		if err != nil || user == nil {
-			continue // Skip invalid users
-		}
-
-		if user.ClassID == nil || *user.ClassID != managedClass.ID {
-			continue // Skip users not in the class
-		}
-
+	for _, user := range validUsers {
+		userID := user.ID
 		// Add to team_members (ignore duplicate errors)
 		err = h.teamRepo.AddTeamMember(team.ID, userID)
 		if err != nil {
