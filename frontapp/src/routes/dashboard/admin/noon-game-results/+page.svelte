@@ -13,12 +13,14 @@
   let errorMessage = $state('');
 
   let resultForms = $state({});
+  let activeEventStatus = $state('');
   let templateRunForms = $state({});
   let templateRuns = $state([]);
 
   onMount(async () => {
     await activeEvent.init();
     const current = get(activeEvent);
+    activeEventStatus = current?.status ?? '';
     if (current) {
       await fetchSession(current.id);
     }
@@ -91,6 +93,10 @@
   }
 
   async function submitResult(match) {
+    if (activeEventStatus !== 'active') {
+      alert('試合結果は開催中の大会でのみ入力できます。');
+      return;
+    }
     const form = resultForms[match.id];
     if (!form) {
       alert('フォーム情報がありません。');
@@ -424,6 +430,10 @@
   }
 
   async function submitTemplateResult(run, match, template) {
+    if (activeEventStatus !== 'active') {
+      alert('試合結果は開催中の大会でのみ入力できます。');
+      return;
+    }
     const formKey = `${run.key}-${match.id}`;
     const form = templateRunForms[formKey];
     if (!form) {
@@ -699,6 +709,11 @@
 
 <div class="space-y-8 p-4 md:p-8">
   <h1 class="text-3xl font-bold text-gray-800 border-b pb-2">昼競技結果入力</h1>
+  {#if activeEventStatus !== 'active'}
+    <p class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      試合結果は大会が「開催中」になってから入力できます。
+    </p>
+  {/if}
   {#if errorMessage}
     <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
       <p class="font-semibold">エラー</p>
@@ -797,7 +812,7 @@
                         <button
                           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                           onclick={() => submitTemplateResult(run, match, template)}
-                          disabled={saving[formKey]}>
+                          disabled={saving[formKey] || activeEventStatus !== 'active'}>
                           {saving[formKey] ? '送信中...' : '結果を登録'}
                         </button>
                       </div>
@@ -906,7 +921,7 @@
               <div class="flex justify-end">
                 <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                   onclick={() => submitResult(match)}
-                  disabled={saving[match.id]}>
+                  disabled={saving[match.id] || activeEventStatus !== 'active'}>
                   {saving[match.id] ? '送信中...' : '結果を登録'}
                 </button>
               </div>

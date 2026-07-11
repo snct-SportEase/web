@@ -15,7 +15,7 @@
     start_date: '',
     end_date: '',
     survey_url: null,
-    status: 'upcoming',
+    status: 'preparing',
     hide_scores: false,
     duplicate_registration_threshold: 31,
   });
@@ -67,7 +67,7 @@
       start_date: '',
       end_date: '',
       survey_url: null,
-      status: 'upcoming',
+      status: 'preparing',
       hide_scores: false,
       duplicate_registration_threshold: 31,
     };
@@ -82,7 +82,7 @@
       start_date: event.start_date ? new Date(event.start_date).toISOString().split('T')[0] : '',
       end_date: event.end_date ? new Date(event.end_date).toISOString().split('T')[0] : '',
       survey_url: event.survey_url || '',
-      status: event.status || 'upcoming',
+      status: event.status || 'preparing',
       hide_scores: event.hide_scores || false,
     };
     showModal = true;
@@ -330,7 +330,9 @@
               {event.end_date ? new Date(event.end_date).toLocaleDateString() : ''}
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">
-              {#if event.status === 'active'}
+              {#if event.status === 'preparing'}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">準備中</span>
+              {:else if event.status === 'active'}
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">開催中</span>
               {:else if event.status === 'archived'}
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">アーカイブ</span>
@@ -416,6 +418,7 @@
             <div>
               <label for="status" class="block text-sm font-medium text-gray-700">ステータス</label>
               <select id="status" bind:value={currentEvent.status} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <option value="preparing">準備中 (Preparing)</option>
                 <option value="upcoming">予定 (Upcoming)</option>
                 <option value="active">開催中 (Active)</option>
                 <option value="archived">アーカイブ (Archived)</option>

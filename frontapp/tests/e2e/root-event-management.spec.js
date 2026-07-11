@@ -55,7 +55,7 @@ test.describe('大会情報登録・管理 (root)', () => {
       season: 'autumn',
       start_date: '2026-10-01',
       end_date: '2026-10-02',
-      status: 'upcoming',
+      status: 'preparing',
       hide_scores: false
     });
 

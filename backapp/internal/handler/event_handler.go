@@ -77,7 +77,11 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 	}
 
 	if req.Status == "" {
-		req.Status = "upcoming"
+		req.Status = models.EventStatusUpcoming
+	}
+	if !models.IsValidEventStatus(req.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event status"})
+		return
 	}
 	if req.DuplicateRegistrationThreshold != nil && *req.DuplicateRegistrationThreshold < 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "duplicate_registration_threshold must be 0 or greater"})
@@ -195,6 +199,12 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	}
 	if existingEvent == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+	if req.Status == "" {
+		req.Status = existingEvent.Status
+	} else if !models.IsValidEventStatus(req.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event status"})
 		return
 	}
 

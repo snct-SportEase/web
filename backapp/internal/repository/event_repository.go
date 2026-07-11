@@ -65,8 +65,13 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 		return 0, err
 	}
 
-	if event.Status == "active" {
+	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
 		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+		if event.Status == models.EventStatusPreparing {
+			// 準備中の大会も、画面上で現在操作する大会として active_event に設定する。
+			// 操作対象は一意にするため、既存の準備中大会もアーカイブする。
+			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+		}
 		_, err = tx.Exec(archiveQuery, id)
 		if err != nil {
 			tx.Rollback()
@@ -128,8 +133,11 @@ func (r *eventRepository) UpdateEvent(event *models.Event) error {
 		return err
 	}
 
-	if event.Status == "active" {
+	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
 		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+		if event.Status == models.EventStatusPreparing {
+			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+		}
 		_, err = tx.Exec(archiveQuery, event.ID)
 		if err != nil {
 			tx.Rollback()

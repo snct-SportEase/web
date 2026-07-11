@@ -13,6 +13,7 @@
 	let selectedTournamentId = $state('');
 	let selectedMatch = $state(null);
 	let activeEventId = $state(null);
+	let activeEventStatus = $state('');
 	let showModal = $state(false);
 	let showConfirmModal = $state(false);
 	let scoresToSubmit = $state(null);
@@ -66,6 +67,7 @@
 					const activeEvent = events.find(e => e.id === activeEventId);
 					if (activeEvent) {
 						isRainyMode = activeEvent.is_rainy_mode || false;
+						activeEventStatus = activeEvent.status || '';
 					}
 				}
 
@@ -85,6 +87,10 @@
 	});
 
 	function openModal(match) {
+		if (activeEventStatus !== 'active') {
+			alert('試合結果は開催中の大会でのみ入力できます。');
+			return;
+		}
 		selectedMatch = match;
 		showModal = true;
 	}
@@ -105,6 +111,10 @@
 	}
 
 	async function handleSubmit(result = {}) {
+		if (activeEventStatus !== 'active') {
+			alert('試合結果は開催中の大会でのみ入力できます。');
+			return;
+		}
 		if (!selectedMatch || !scoresToSubmit) return;
 
 		const { team1_score, team2_score } = scoresToSubmit;
@@ -186,6 +196,12 @@
 </script>
 
 <h1 class="text-2xl font-bold mb-4">試合結果入力</h1>
+
+{#if activeEventId && activeEventStatus !== 'active'}
+	<p class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+		試合結果は大会が「開催中」になってから入力できます。
+	</p>
+{/if}
 
 <div class="mb-4">
 	<label for="tournament-select" class="block text-sm font-medium text-gray-700"
