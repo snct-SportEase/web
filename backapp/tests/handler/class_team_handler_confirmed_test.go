@@ -72,7 +72,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		confirmedCount := 2
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", classID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, sportID, activeEventID).Return(team, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembers", teamID).Return(confirmedMembers, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembersCount", teamID).Return(confirmedCount, nil).Once()
@@ -151,7 +151,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		confirmedCount := 0
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", classID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, sportID, activeEventID).Return(team, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembers", teamID).Return(confirmedMembers, nil).Once()
 		mockTeamRepo.On("GetConfirmedTeamMembersCount", teamID).Return(confirmedCount, nil).Once()
@@ -206,7 +206,7 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", classID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, sportID, activeEventID).Return(nil, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -251,8 +251,9 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 		}
 
 		activeEventID := 1
+		classID := 1
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(nil, nil).Once()
+		mockClassRepo.On("GetClassByID", classID).Return(nil, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -264,8 +265,8 @@ func TestClassTeamHandler_GetConfirmedTeamMembersHandler(t *testing.T) {
 
 		h.GetConfirmedTeamMembersHandler(c)
 
-		assert.Equal(t, http.StatusForbidden, w.Code)
-		assert.Contains(t, w.Body.String(), "No managed class found")
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Class not found")
 
 		mockClassRepo.AssertExpectations(t)
 		mockEventRepo.AssertExpectations(t)

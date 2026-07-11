@@ -14,6 +14,39 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestAuthHandler_UpdateProfile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("rejects a class change after profile completion", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		currentClassID := 1
+		user := &models.User{
+			ID:                "user-1",
+			ClassID:           &currentClassID,
+			IsProfileComplete: true,
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/user/profile", bytes.NewBufferString(`{"display_name":"Updated","class_id":2}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		authHandler.UpdateProfile(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.JSONEq(t, `{"error":"Class cannot be changed after profile completion"}`, w.Body.String())
+		assert.Equal(t, currentClassID, *user.ClassID)
+		mockUserRepo.AssertNotCalled(t, "UpdateUser", mock.Anything)
+		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
+		mockClassRepo.AssertNotCalled(t, "GetClassByID", mock.Anything)
+	})
+}
+
 func TestAuthHandler_GoogleLogin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -145,66 +178,6 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 
 		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
 		assert.Equal(t, "http://localhost:3300/?error=access_denied", w.Header().Get("Location"))
-	})
-}
-
-func TestAuthHandler_UpdateUserClassRepByRoot(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("replaces class role", func(t *testing.T) {
-		mockUserRepo := new(MockUserRepository)
-		mockEventRepo := new(MockEventRepository)
-		mockClassRepo := new(MockClassRepository)
-		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
-
-		activeEventID := 3
-		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByID", 12).Return(&models.Class{
-			ID:      12,
-			EventID: &activeEventID,
-			Name:    "2A",
-		}, nil).Once()
-		mockUserRepo.On("ReplaceClassRepRole", "user-1", "2A_rep", 12, &activeEventID).Return(nil).Once()
-
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/users/class-rep", bytes.NewBufferString(`{"user_id":"user-1","class_id":12}`))
-		c.Request.Header.Set("Content-Type", "application/json")
-
-		authHandler.UpdateUserClassRepByRoot(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.JSONEq(t, `{"message":"Class role replaced successfully"}`, w.Body.String())
-		mockEventRepo.AssertExpectations(t)
-		mockClassRepo.AssertExpectations(t)
-		mockUserRepo.AssertExpectations(t)
-	})
-
-	t.Run("rejects class outside active event", func(t *testing.T) {
-		mockUserRepo := new(MockUserRepository)
-		mockEventRepo := new(MockEventRepository)
-		mockClassRepo := new(MockClassRepository)
-		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
-
-		activeEventID := 3
-		otherEventID := 4
-		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByID", 12).Return(&models.Class{
-			ID:      12,
-			EventID: &otherEventID,
-			Name:    "2A",
-		}, nil).Once()
-
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/users/class-rep", bytes.NewBufferString(`{"user_id":"user-1","class_id":12}`))
-		c.Request.Header.Set("Content-Type", "application/json")
-
-		authHandler.UpdateUserClassRepByRoot(c)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.JSONEq(t, `{"error":"Selected class does not belong to the active event"}`, w.Body.String())
-		mockUserRepo.AssertNotCalled(t, "ReplaceClassRepRole", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 

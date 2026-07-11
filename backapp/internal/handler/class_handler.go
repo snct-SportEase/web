@@ -265,13 +265,22 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return
 	}
 
-	class, err := h.classRepo.GetClassByRepRole(user.ID, activeEventID)
+	if user.ClassID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Class is required"})
+		return
+	}
+
+	class, err := h.classRepo.GetClassByID(*user.ClassID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class information"})
 		return
 	}
 	if class == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Class role is required"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Class not found"})
+		return
+	}
+	if class.EventID != nil && *class.EventID != activeEventID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Class does not belong to the active event"})
 		return
 	}
 

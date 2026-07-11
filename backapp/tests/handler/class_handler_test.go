@@ -232,7 +232,8 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		return h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo
 	}
 
-	user := &models.User{ID: "user-1"}
+	classID := 10
+	user := &models.User{ID: "user-1", ClassID: &classID}
 	class := &models.Class{ID: 10, Name: "IS3"}
 	team := &models.TeamWithSport{ID: 100, Name: "IS3-A", SportID: 1, SportName: "バスケットボール"}
 	displayNameA := "User A"
@@ -280,7 +281,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
@@ -327,7 +328,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		noonGameTeam := &models.TeamWithSport{ID: 200, Name: "IS3リレー", SportID: 99, SportName: "学年対抗リレー"}
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
 		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{noonGameTeam}, nil).Once()
@@ -419,7 +420,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
@@ -459,7 +460,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 	})
 
 	t.Run("unauthorized - no user in context", func(t *testing.T) {
-		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
+		h, _, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -470,13 +471,12 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
-		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
 		mockTeamRepo.AssertNotCalled(t, "GetTeamsByClassID", mock.Anything, mock.Anything)
 		mockTournamentRepo.AssertNotCalled(t, "GetMatchesForTeams", mock.Anything, mock.Anything)
 	})
 
 	t.Run("GetActiveEvent returns error", func(t *testing.T) {
-		h, mockClassRepo, mockEventRepo, _, _ := newHandler()
+		h, _, mockEventRepo, _, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(0, errors.New("db error")).Once()
 
@@ -490,11 +490,10 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		mockEventRepo.AssertExpectations(t)
-		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
 	})
 
 	t.Run("no active event", func(t *testing.T) {
-		h, mockClassRepo, mockEventRepo, _, _ := newHandler()
+		h, _, mockEventRepo, _, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(0, nil).Once()
 
@@ -508,14 +507,13 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		mockEventRepo.AssertExpectations(t)
-		mockClassRepo.AssertNotCalled(t, "GetClassByRepRole", mock.Anything, mock.Anything)
 	})
 
-	t.Run("GetClassByRepRole returns error", func(t *testing.T) {
+	t.Run("GetClassByID returns error", func(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, errors.New("db error")).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(nil, errors.New("db error")).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -531,11 +529,11 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockTeamRepo.AssertNotCalled(t, "GetTeamsByClassID", mock.Anything, mock.Anything)
 	})
 
-	t.Run("user does not have the required class role", func(t *testing.T) {
+	t.Run("configured class does not exist", func(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(nil, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -555,7 +553,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return(nil, errors.New("db error")).Once()
 		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
@@ -578,7 +576,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, _ := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(nil, errors.New("db error")).Once()
@@ -601,7 +599,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
@@ -626,7 +624,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		h, mockClassRepo, mockEventRepo, mockTeamRepo, mockTournamentRepo := newHandler()
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(class, nil).Once()
+		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()

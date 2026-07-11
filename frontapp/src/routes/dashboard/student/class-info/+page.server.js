@@ -125,19 +125,17 @@ function buildNoonProgressEntries(session, matches, classId, className) {
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ fetch, request, locals }) {
 	const user = locals.user;
-	const classRole = user?.roles?.find(
-		(role) => typeof role?.name === 'string' && role.name.endsWith('_rep')
-	);
+	const configuredClassId = user?.class_id;
 
-	if (!classRole) {
+	if (!configuredClassId) {
 		return {
-			isClassRep: false,
+			isClassMember: false,
 			className: null,
 			classInfo: null
 		};
 	}
 
-	const className = classRole.name.slice(0, -4);
+	const className = null;
 	const headers = createHeaders(request);
 
 	try {
@@ -148,7 +146,7 @@ export async function load({ fetch, request, locals }) {
 		if (!response.ok) {
 			if (response.status === 403) {
 				return {
-					isClassRep: false,
+					isClassMember: false,
 					className,
 					classInfo: null,
 					progress: []
@@ -189,7 +187,7 @@ export async function load({ fetch, request, locals }) {
 		}
 
 		return {
-			isClassRep: true,
+			isClassMember: true,
 			classId,
 			className: payload.class_name ?? className,
 			classInfo: payload.class_info ?? null,
@@ -198,7 +196,7 @@ export async function load({ fetch, request, locals }) {
 	} catch (error) {
 		console.error('Error loading class progress:', error);
 		return {
-			isClassRep: true,
+			isClassMember: true,
 			className,
 			classInfo: null,
 			progress: [],

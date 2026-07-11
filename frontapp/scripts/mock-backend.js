@@ -20,7 +20,6 @@ const studentUser = {
   is_profile_complete: true,
   roles: [
     { id: 1, name: 'student' },
-    { id: 2, name: '1A_rep' },
     { id: 4, name: 'judge' }
   ]
 };
@@ -104,7 +103,6 @@ const defaultUsers = () => ([
     class_id: 1,
     roles: [
       { id: 1, name: 'student' },
-      { id: 2, name: '1A_rep' },
       { id: 4, name: 'judge' }
     ]
   },
@@ -959,24 +957,6 @@ createServer(async (req, res) => {
       return {
         ...user,
         roles: [...nonMasterRoles, { id: Date.now(), name: body.role }]
-      };
-    });
-    sendJson(res, 200, { ok: true });
-    return;
-  }
-
-  if (url.pathname === '/api/root/users/class-rep' && req.method === 'PUT') {
-    const body = await readJson(req);
-    const targetClass = classes.find((cls) => cls.id === body.class_id);
-    users = users.map((user) => {
-      if (user.id !== body.user_id || !targetClass) return user;
-      return {
-        ...user,
-        class_id: body.class_id,
-        roles: [
-          ...user.roles.filter((role) => !role.name.endsWith('_rep')),
-          { id: Date.now(), name: `${targetClass.name}_rep` }
-        ]
       };
     });
     sendJson(res, 200, { ok: true });

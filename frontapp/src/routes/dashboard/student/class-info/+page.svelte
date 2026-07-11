@@ -50,13 +50,13 @@
   <div class="space-y-2">
     <h1 class="text-3xl font-bold text-gray-900">クラス情報</h1>
     <p class="text-sm text-gray-600">
-      自分のクラスの人数や出席状況を確認できます。クラス所属ロール（クラス名_rep）を持つユーザーのみ閲覧可能です。
+      自分のクラスの人数や出席状況を確認できます。プロフィールでクラスを設定したユーザーのみ閲覧可能です。
     </p>
   </div>
 
-  {#if !data.isClassRep}
+  {#if !data.isClassMember}
     <div class="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-      クラス所属ロールが割り当てられていないため、クラス情報を表示できません。
+      クラスが設定されていないため、クラス情報を表示できません。
     </div>
   {:else}
     {#if data.error}

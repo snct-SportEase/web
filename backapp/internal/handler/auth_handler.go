@@ -316,21 +316,13 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Check if it's the first time the profile is being completed
-	isFirstCompletion := !user.IsProfileComplete
-
 	user.DisplayName = &req.DisplayName
-	user.ClassID = &req.ClassID
-	user.IsProfileComplete = true
-
-	if err := h.userRepo.UpdateUser(user); err != nil {
-		log.Printf("UpdateUser error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
-		return
-	}
-
-	// Assign the class membership role on first completion
-	if isFirstCompletion {
+	if user.IsProfileComplete {
+		if user.ClassID == nil || *user.ClassID != req.ClassID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Class cannot be changed after profile completion"})
+			return
+		}
+	} else {
 		activeEventID, err := h.eventRepo.GetActiveEvent()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
@@ -342,19 +334,22 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
 			return
 		}
-		if class != nil {
-			// Verify the class belongs to the active event
-			if class.EventID != nil && *class.EventID != activeEventID {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
-				return
-			}
-
-			roleName := class.Name + "_rep"
-			if err := h.userRepo.UpdateUserRole(user.ID, roleName, &activeEventID); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign class role"})
-				return
-			}
+		if class == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class not found"})
+			return
 		}
+		if class.EventID != nil && *class.EventID != activeEventID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
+			return
+		}
+		user.ClassID = &req.ClassID
+		user.IsProfileComplete = true
+	}
+
+	if err := h.userRepo.UpdateUser(user); err != nil {
+		log.Printf("UpdateUser error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
 	}
 
 	c.JSON(http.StatusOK, user)
@@ -500,52 +495,6 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 type PromoteUserRequest struct {
 	UserID string `json:"user_id"`
 	Role   string `json:"role"` // "student", "admin", or "root"
-}
-
-type UpdateUserClassRepRequest struct {
-	UserID  string `json:"user_id"`
-	ClassID int    `json:"class_id"`
-}
-
-func (h *AuthHandler) UpdateUserClassRepByRoot(c *gin.Context) {
-	var req UpdateUserClassRepRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if strings.TrimSpace(req.UserID) == "" || req.ClassID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id and class_id are required"})
-		return
-	}
-
-	activeEventID, err := h.eventRepo.GetActiveEvent()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
-		return
-	}
-
-	class, err := h.classRepo.GetClassByID(req.ClassID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class details"})
-		return
-	}
-	if class == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
-		return
-	}
-	if class.EventID != nil && *class.EventID != activeEventID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
-		return
-	}
-
-	roleName := class.Name + "_rep"
-	if err := h.userRepo.ReplaceClassRepRole(req.UserID, roleName, req.ClassID, &activeEventID); err != nil {
-		log.Printf("ReplaceClassRepRole error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to replace class role"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Class role replaced successfully"})
 }
 
 // PromoteUserByRoot はroot権限でユーザーのマスタロールを交換する

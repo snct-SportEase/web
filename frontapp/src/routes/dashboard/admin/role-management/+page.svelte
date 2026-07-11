@@ -97,7 +97,7 @@
 	}
 
 	function isClassSportRole(roleName) {
-		// アンダースコアを含むロール（_rep・_競技名どちらも）はクラス管理から操作するため割り当て不可
+		// アンダースコアを含むクラス管理用ロールは割り当て不可
 		const trimmed = roleName.trim();
 		if (trimmed.includes('_')) {
 			if (!defaultRoles.includes(trimmed.toLowerCase())) {

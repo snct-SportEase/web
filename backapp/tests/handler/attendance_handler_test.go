@@ -33,12 +33,10 @@ func TestGetClassDetailsHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
-				{Name: "1A_rep"},
 			},
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassDetails", 1, 1).Return(expectedDetails, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
@@ -57,7 +55,7 @@ func TestGetClassDetailsHandler(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 
-	t.Run("Admin without rep role is forbidden", func(t *testing.T) {
+	t.Run("Admin can view any class", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockEventRepo := new(MockEventRepository)
 
@@ -69,7 +67,7 @@ func TestGetClassDetailsHandler(t *testing.T) {
 		}
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, 1).Return(nil, nil).Once()
+		mockClassRepo.On("GetClassDetails", 1, 1).Return(&models.ClassDetails{ID: 1}, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
 
@@ -80,7 +78,7 @@ func TestGetClassDetailsHandler(t *testing.T) {
 
 		h.GetClassDetailsHandler(c)
 
-		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 		mockClassRepo.AssertExpectations(t)
 		mockEventRepo.AssertExpectations(t)
 	})
@@ -100,7 +98,6 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
-				{Name: "1A_rep"},
 			},
 		}
 
@@ -110,7 +107,6 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		}
 		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 		mockClassRepo.On("UpdateAttendance", reqBody.ClassID, activeEventID, reqBody.AttendanceCount).Return(10, nil).Once()
 
@@ -142,7 +138,6 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
-				{Name: "1A_rep"},
 			},
 		}
 
@@ -153,7 +148,6 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		class := &models.Class{ID: 1, EventID: &differentEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
@@ -182,7 +176,6 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			ID: "test-user-id",
 			Roles: []models.Role{
 				{Name: "admin"},
-				{Name: "1A_rep"},
 			},
 		}
 
@@ -193,7 +186,6 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		class := &models.Class{ID: 1, EventID: &activeEventID, Name: "Test Class", StudentCount: 25}
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
 		mockClassRepo.On("GetClassByID", reqBody.ClassID).Return(class, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
@@ -213,7 +205,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 
-	t.Run("Admin with rep role cannot register outside managed class", func(t *testing.T) {
+	t.Run("Admin can register attendance for any class", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockEventRepo := new(MockEventRepository)
 		activeEventID := 1
@@ -231,7 +223,9 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 			AttendanceCount: 18,
 		}
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", user.ID, activeEventID).Return(&models.Class{ID: 1, Name: "1A"}, nil).Once()
+		class := &models.Class{ID: 2, EventID: &activeEventID, StudentCount: 20}
+		mockClassRepo.On("GetClassByID", 2).Return(class, nil).Once()
+		mockClassRepo.On("UpdateAttendance", 2, activeEventID, 18).Return(0, nil).Once()
 
 		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
 
@@ -245,7 +239,7 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 
 		h.RegisterAttendanceHandler(c)
 
-		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 		mockClassRepo.AssertExpectations(t)
 		mockEventRepo.AssertExpectations(t)
 	})

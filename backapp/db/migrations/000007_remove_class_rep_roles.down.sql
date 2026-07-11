@@ -1,0 +1,1 @@
+-- Irreversible data cleanup: deleted class representative role assignments cannot be reconstructed.

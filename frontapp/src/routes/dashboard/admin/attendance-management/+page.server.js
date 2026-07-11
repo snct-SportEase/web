@@ -8,10 +8,6 @@ export async function load({ fetch, locals, request }) {
   const user = locals.user;
   const isRoot = user?.roles?.some((role) => role.name === 'root') ?? false;
   const isAdmin = user?.roles?.some((role) => role.name === 'admin') ?? false;
-  const classRole = user?.roles?.find(
-    (role) => typeof role?.name === 'string' && role.name.endsWith('_rep')
-  );
-  const managedClassName = classRole?.name?.slice(0, -4) ?? null;
 
   const headers = {
     cookie: request.headers.get('cookie') ?? ''
@@ -31,25 +27,12 @@ export async function load({ fetch, locals, request }) {
     const classesPayload = await classesResponse.json();
     const allClasses = Array.isArray(classesPayload) ? classesPayload : [];
 
-    if (isRoot) {
+    if (isRoot || isAdmin) {
       return {
         classes: allClasses,
         managedClass: null,
         canSelectAllClasses: true,
         restrictionError: ''
-      };
-    }
-
-    if (isAdmin) {
-      const managedClass = allClasses.find((cls) => cls?.name === managedClassName) ?? null;
-
-      return {
-        classes: managedClass ? [managedClass] : [],
-        managedClass,
-        canSelectAllClasses: false,
-        restrictionError: managedClass
-          ? ''
-          : '担当クラスが見つからないため、出席点管理を利用できません。'
       };
     }
 

@@ -126,19 +126,6 @@ JOIN classes c ON c.id = u.class_id AND c.event_id = @demo_event_id
 WHERE u.email LIKE 'demo-%@example.com'
 ON DUPLICATE KEY UPDATE event_id = VALUES(event_id);
 
--- 通常のプロフィール作成処理と同様に、クラス所属の全ユーザーへ{クラス名}_repを付与する。
-INSERT INTO roles (name)
-SELECT CONCAT(class_name, '_rep') FROM demo_class_map
-ON DUPLICATE KEY UPDATE name = VALUES(name);
-
-INSERT INTO user_roles (user_id, role_id, event_id)
-SELECT u.id, r.id, @demo_event_id
-FROM classes c
-JOIN users u ON u.class_id = c.id
-JOIN roles r ON r.name = CONCAT(c.name, '_rep')
-WHERE c.event_id = @demo_event_id
-ON DUPLICATE KEY UPDATE event_id = VALUES(event_id);
-
 -- 競技
 INSERT INTO sports (name)
 SELECT 'デモバスケットボール'

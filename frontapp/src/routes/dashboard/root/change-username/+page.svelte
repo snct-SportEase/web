@@ -16,12 +16,15 @@ import { onMount } from 'svelte';
   let newDisplayName = $state('');
   // ロール管理用
   let newRoleName = $state('');
-  let selectedClassRep = $state(''); // クラス所属変更用
 
   let showModal = $state(false);
   let isLoading = $state(false);
   let errorMessage = $state('');
   const masterRoles = ['student', 'admin', 'root'];
+
+	function isLegacyClassRepresentativeRole(roleName) {
+		return roleName.endsWith('_rep');
+	}
 
   // 指数バックオフ付きのフェッチ関数
   async function fetchWithBackoff(url, options = {}, maxRetries = 5) {
@@ -100,20 +103,6 @@ import { onMount } from 'svelte';
     newDisplayName = user.display_name || '';
     newRoleName = '';
     
-    // 現在のクラス所属ロールを探す
-    const repRole = user.roles?.find(r => r.name.endsWith('_rep'));
-    if (repRole) {
-      // "3A_rep" -> "3A" を抽出して初期値にする
-      // クラス名が可変長の場合も考慮して _rep を除去
-      const className = repRole.name.slice(0, -4);
-      // クラスIDではなくクラス名をバインドする必要があるため、クラス一覧から探す
-      // API仕様上、classesは{id, name, ...}を返すはず
-      const cls = classes.find(c => c.name === className);
-      selectedClassRep = cls ? cls.id : '';
-    } else {
-      selectedClassRep = '';
-    }
-
     showModal = true;
   }
 
@@ -122,7 +111,6 @@ import { onMount } from 'svelte';
     selectedUser = null;
     newDisplayName = '';
     newRoleName = '';
-    selectedClassRep = '';
   }
 
   function handleOverlayClick(event) {
@@ -167,40 +155,6 @@ import { onMount } from 'svelte';
     }
   }
 
-  // クラス所属ロールの付け替え
-  async function handleClassRepChange() {
-    if (!selectedUser || !selectedClassRep) return;
-
-    const targetClass = classes.find(c => c.id == selectedClassRep);
-    if (!targetClass) return;
-
-    try {
-      const response = await fetchWithBackoff('/api/root/users/class-rep', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          class_id: Number(selectedClassRep)
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        alert(`クラス所属変更失敗: ${err.error}`);
-        return;
-      }
-
-      alert('クラス所属を変更しました');
-      await fetchUsers(searchQuery, searchType);
-      await checkAndInvalidateIfSelf(selectedUser.id);
-      closeEditModal();
-
-    } catch (error) {
-      console.error('Error changing class role:', error);
-      alert('エラーが発生しました');
-    }
-  }
-
   // その他のロール追加
   async function handleRoleAdd() {
     if (!newRoleName.trim()) return;
@@ -211,9 +165,9 @@ import { onMount } from 'svelte';
       return;
     }
     
-    // _rep制限
-    if (roleToAdd.endsWith('_rep')) {
-      alert('クラス所属ロール（_rep）はここからは追加できません。「クラス所属の変更」を使用してください。');
+	// 廃止済みのクラス代表ロールは新規追加しない。
+    if (isLegacyClassRepresentativeRole(roleToAdd)) {
+		alert('廃止済みのクラス代表ロールは追加できません。');
       return;
     }
 
@@ -682,39 +636,7 @@ import { onMount } from 'svelte';
           </div>
         </section>
 
-        <!-- セクション4: クラス所属ロール変更 -->
-        <section class="bg-blue-50 p-4 rounded-md border border-blue-100">
-          <h4 class="text-md font-bold text-blue-900 mb-2">クラス所属の変更</h4>
-          <p class="text-xs text-blue-700 mb-3">
-            誤ったクラスの所属ロールを持ってしまった場合、ここで正しいクラスに付け替えることができます。
-          </p>
-          <div class="flex gap-4 items-end">
-            <div class="flex-1">
-              <label class="block text-sm font-medium text-blue-800 mb-1" for="classRepSelect">
-                担当クラスを選択
-              </label>
-              <select 
-                id="classRepSelect"
-                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                bind:value={selectedClassRep}
-              >
-                <option value="">（選択してください）</option>
-                {#each classes as cls (cls.id)}
-                  <option value={cls.id}>{cls.name}</option>
-                {/each}
-              </select>
-            </div>
-            <button 
-              class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:bg-blue-300" 
-              onclick={handleClassRepChange}
-              disabled={!selectedClassRep}
-            >
-              変更・保存
-            </button>
-          </div>
-        </section>
-
-        <!-- セクション5: その他のロール管理 -->
+		<!-- その他のロール管理 -->
         <section>
           <h4 class="text-md font-bold text-gray-800 mb-3 pb-1 border-b">その他のロール管理</h4>
           
@@ -723,11 +645,10 @@ import { onMount } from 'svelte';
             <p class="text-sm font-medium text-gray-700 mb-2">現在のロール:</p>
             <div class="flex flex-wrap gap-2">
               {#if selectedUser.roles && selectedUser.roles.length > 0}
-                {#each selectedUser.roles as role (role.id)}
+				{#each selectedUser.roles.filter((role) => !isLegacyClassRepresentativeRole(role.name)) as role (role.id)}
                   <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 border border-gray-200">
                     <span>{role.name}</span>
-                    <!-- マスタロールと_repロールは別セクションで管理 -->
-                    {#if !role.name.endsWith('_rep') && !masterRoles.includes(role.name)}
+					{#if !masterRoles.includes(role.name)}
                       <button 
                         class="text-gray-400 hover:text-red-500 focus:outline-none ml-1"
                         onclick={() => handleRoleDelete(role.name)}
@@ -759,7 +680,7 @@ import { onMount } from 'svelte';
                 class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" 
                 bind:value={newRoleName}
               />
-              <p class="text-xs text-gray-500 mt-1">※ `student` / `admin` / `root` と `_rep` で終わるロールはここでは追加できません。</p>
+				<p class="text-xs text-gray-500 mt-1">※ `student` / `admin` / `root` と廃止済みのクラス代表ロールは、ここでは追加できません。</p>
             </div>
             <button 
               class="rounded-md bg-gray-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:bg-gray-300" 

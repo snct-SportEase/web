@@ -35,10 +35,8 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 
 		// Mock current user with the class role
 		currentUser := &models.User{
-			ID: "rep-user-id",
-			Roles: []models.Role{
-				{Name: "1A_rep"},
-			},
+			ID:      "rep-user-id",
+			ClassID: classTeamIntPtr(10),
 		}
 
 		// Mock request body
@@ -53,7 +51,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockEventRepo.On("GetEventByID", activeEventID).Return(&models.Event{ID: activeEventID, DuplicateRegistrationThreshold: 31}, nil).Once()
 		managedClass := &models.Class{ID: 10, Name: "1A"}
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(managedClass, nil).Once()
+		mockClassRepo.On("GetClassByID", managedClass.ID).Return(managedClass, nil).Once()
 		sport := &models.Sport{ID: 1, Name: "Basketball"}
 		mockSportRepo.On("GetSportByID", 1).Return(sport, nil).Once()
 
@@ -124,8 +122,8 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		r.POST("/assign", h.AssignTeamMembersHandler)
 
 		currentUser := &models.User{
-			ID:    "rep-user-id",
-			Roles: []models.Role{{Name: "1A_rep"}},
+			ID:      "rep-user-id",
+			ClassID: classTeamIntPtr(10),
 		}
 
 		reqBody := gin.H{
@@ -138,7 +136,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockEventRepo.On("GetEventByID", activeEventID).Return(&models.Event{ID: activeEventID, DuplicateRegistrationThreshold: 31}, nil).Once()
 		managedClass := &models.Class{ID: 10, Name: "1A"}
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(managedClass, nil).Once()
+		mockClassRepo.On("GetClassByID", managedClass.ID).Return(managedClass, nil).Once()
 		sport := &models.Sport{ID: 1, Name: "Basketball"}
 		mockSportRepo.On("GetSportByID", 1).Return(sport, nil).Once()
 
@@ -178,7 +176,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewClassTeamHandler(mockClassRepo, mockTeamRepo, mockUserRepo, mockEventRepo, mockSportRepo)
 
-		currentUser := &models.User{ID: "rep-user-id", Roles: []models.Role{{Name: "1A_rep"}}}
+		currentUser := &models.User{ID: "rep-user-id", ClassID: classTeamIntPtr(10)}
 		body, _ := json.Marshal(gin.H{"sport_id": 2, "user_ids": []string{"user1"}})
 		activeEventID := 1
 		classID := 10
@@ -186,7 +184,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockEventRepo.On("GetEventByID", activeEventID).Return(&models.Event{ID: activeEventID, DuplicateRegistrationThreshold: 31}, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(managedClass, nil).Once()
+		mockClassRepo.On("GetClassByID", managedClass.ID).Return(managedClass, nil).Once()
 		mockSportRepo.On("GetSportByID", 2).Return(&models.Sport{ID: 2, Name: "Volleyball"}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, 2, activeEventID).Return(&models.Team{ID: 200}, nil).Once()
 		mockSportRepo.On("GetSportDetails", activeEventID, 2).Return(&models.EventSport{}, nil).Once()
@@ -214,7 +212,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewClassTeamHandler(mockClassRepo, mockTeamRepo, mockUserRepo, mockEventRepo, mockSportRepo)
 
-		currentUser := &models.User{ID: "rep-user-id", Roles: []models.Role{{Name: "1A_rep"}}}
+		currentUser := &models.User{ID: "rep-user-id", ClassID: classTeamIntPtr(10)}
 		body, _ := json.Marshal(gin.H{"sport_id": 2, "user_ids": []string{"user1"}})
 		activeEventID := 1
 		classID := 10
@@ -222,7 +220,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockEventRepo.On("GetEventByID", activeEventID).Return(&models.Event{ID: activeEventID, DuplicateRegistrationThreshold: 25}, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(managedClass, nil).Once()
+		mockClassRepo.On("GetClassByID", managedClass.ID).Return(managedClass, nil).Once()
 		mockSportRepo.On("GetSportByID", 2).Return(&models.Sport{ID: 2, Name: "Volleyball"}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, 2, activeEventID).Return(&models.Team{ID: 200}, nil).Once()
 		mockSportRepo.On("GetSportDetails", activeEventID, 2).Return(&models.EventSport{}, nil).Once()
@@ -250,7 +248,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		mockSportRepo := new(MockSportRepository)
 		h := handler.NewClassTeamHandler(mockClassRepo, mockTeamRepo, mockUserRepo, mockEventRepo, mockSportRepo)
 
-		currentUser := &models.User{ID: "rep-user-id", Roles: []models.Role{{Name: "専教_rep"}}}
+		currentUser := &models.User{ID: "rep-user-id", ClassID: classTeamIntPtr(20)}
 		body, _ := json.Marshal(gin.H{"sport_id": 3, "user_ids": []string{"teacher1"}})
 		activeEventID := 1
 		classID := 20
@@ -258,7 +256,7 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		mockEventRepo.On("GetEventByID", activeEventID).Return(&models.Event{ID: activeEventID, DuplicateRegistrationThreshold: 31}, nil).Once()
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(managedClass, nil).Once()
+		mockClassRepo.On("GetClassByID", managedClass.ID).Return(managedClass, nil).Once()
 		mockSportRepo.On("GetSportByID", 3).Return(&models.Sport{ID: 3, Name: "Tennis"}, nil).Once()
 		mockTeamRepo.On("GetTeamByClassAndSport", classID, 3, activeEventID).Return(&models.Team{ID: 300}, nil).Once()
 		mockSportRepo.On("GetSportDetails", activeEventID, 3).Return(&models.EventSport{}, nil).Once()
@@ -334,12 +332,12 @@ func TestClassTeamHandler_DuplicateRegistrationRules(t *testing.T) {
 			const eventID = 10
 			const classID = 100
 			const sportID = 3
-			currentUser := &models.User{ID: "rep", Roles: []models.Role{{Name: "1A_rep"}}}
+			currentUser := &models.User{ID: "rep", ClassID: classTeamIntPtr(classID)}
 			managedClass := &models.Class{ID: classID, Name: "1A", StudentCount: tt.studentCount}
 
 			eventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
 			eventRepo.On("GetEventByID", eventID).Return(&models.Event{ID: eventID, DuplicateRegistrationThreshold: tt.threshold}, nil).Once()
-			classRepo.On("GetClassByRepRole", "rep", eventID).Return(managedClass, nil).Once()
+			classRepo.On("GetClassByID", classID).Return(managedClass, nil).Once()
 			sportRepo.On("GetSportByID", sportID).Return(&models.Sport{ID: sportID, Name: "Tennis"}, nil).Once()
 			teamRepo.On("GetTeamByClassAndSport", classID, sportID, eventID).Return(&models.Team{ID: 300}, nil).Once()
 			sportRepo.On("GetSportDetails", eventID, sportID).Return(&models.EventSport{}, nil).Once()
@@ -388,8 +386,8 @@ func TestClassTeamHandler_RemoveTeamMemberHandler(t *testing.T) {
 		h := handler.NewClassTeamHandler(mockClassRepo, mockTeamRepo, mockUserRepo, mockEventRepo, mockSportRepo)
 
 		currentUser := &models.User{
-			ID:    "rep-user-id",
-			Roles: []models.Role{{Name: "1A_rep"}},
+			ID:      "rep-user-id",
+			ClassID: classTeamIntPtr(10),
 		}
 
 		reqBody := gin.H{
@@ -401,7 +399,7 @@ func TestClassTeamHandler_RemoveTeamMemberHandler(t *testing.T) {
 		activeEventID := 1
 		mockEventRepo.On("GetActiveEvent").Return(activeEventID, nil).Once()
 		managedClass := &models.Class{ID: 10, Name: "1A"}
-		mockClassRepo.On("GetClassByRepRole", currentUser.ID, activeEventID).Return(managedClass, nil).Once()
+		mockClassRepo.On("GetClassByID", managedClass.ID).Return(managedClass, nil).Once()
 		sport := &models.Sport{ID: 1, Name: "Basketball"}
 		mockSportRepo.On("GetSportByID", 1).Return(sport, nil).Once()
 
