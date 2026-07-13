@@ -19,11 +19,17 @@ type Config struct {
 	WebPushPublicKey                                                     string
 	WebPushPrivateKey                                                    string
 	WebPushAllowedHosts                                                  []string
+	TrustedProxyCIDRs                                                    []string
 	RedisAddr                                                            string
 }
 
 func Load() (*Config, error) {
 	loadEnv()
+
+	trustedProxyCIDRs := splitCommaSeparated(os.Getenv("TRUSTED_PROXY_CIDRS"))
+	if len(trustedProxyCIDRs) == 0 {
+		trustedProxyCIDRs = []string{"127.0.0.1/32", "::1/128"}
+	}
 
 	cfg := &Config{
 		DBHost:              os.Getenv("DB_HOST"),
@@ -45,6 +51,7 @@ func Load() (*Config, error) {
 		WebPushPublicKey:    os.Getenv("WEBPUSH_PUBLIC_KEY"),
 		WebPushPrivateKey:   os.Getenv("WEBPUSH_PRIVATE_KEY"),
 		WebPushAllowedHosts: splitCommaSeparated(os.Getenv("WEBPUSH_ALLOWED_HOSTS")),
+		TrustedProxyCIDRs:   trustedProxyCIDRs,
 		RedisAddr:           os.Getenv("REDIS_ADDR"),
 	}
 	return cfg, nil

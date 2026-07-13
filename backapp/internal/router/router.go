@@ -8,6 +8,7 @@ import (
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,12 @@ import (
 // SetupRouter はGinルーターをセットアップし、ルーティングを定義します
 func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManager) *gin.Engine {
 	router := gin.Default()
+	if err := router.SetTrustedProxies(cfg.TrustedProxyCIDRs); err != nil {
+		panic(fmt.Sprintf("invalid TRUSTED_PROXY_CIDRS: %v", err))
+	}
+	// The SvelteKit proxy emits one canonical X-Forwarded-For value. Do not
+	// fall back to alternative client-controlled IP headers.
+	router.RemoteIPHeaders = []string{"X-Forwarded-For"}
 
 	// CORS middleware
 	router.Use(middleware.CORSMiddleware(cfg))

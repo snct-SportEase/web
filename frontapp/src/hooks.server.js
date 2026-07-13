@@ -1,3 +1,5 @@
+import { createBackendProxyHeaders } from '$lib/server/backendProxyHeaders.js';
+
 const BACKEND_URL = process.env.BACKEND_URL;
 const BACKEND_PROXY_PREFIXES = ['/api', '/swagger'];
 
@@ -15,13 +17,17 @@ async function proxyToBackend(event) {
   }
 
   const targetUrl = new URL(event.url.pathname + event.url.search, BACKEND_URL);
-  const headers = new Headers(event.request.headers);
-
-  headers.delete('host');
-  headers.delete('connection');
-  headers.delete('content-length');
-  headers.set('x-forwarded-host', event.request.headers.get('host') ?? event.url.host);
-  headers.set('x-forwarded-proto', event.url.protocol.replace(':', ''));
+  let headers;
+  try {
+    headers = createBackendProxyHeaders(event.request.headers, {
+      clientAddress: event.getClientAddress(),
+      host: event.url.host,
+      protocol: event.url.protocol.replace(':', '')
+    });
+  } catch (error) {
+    console.error('Backend proxy rejected request without a trusted client address:', error);
+    return new Response('Backend proxy is not configured securely', { status: 502 });
+  }
 
   const requestInit = {
     method: event.request.method,
