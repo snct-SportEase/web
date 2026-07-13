@@ -10,12 +10,6 @@ CREATE TYPE event_season AS ENUM ('spring', 'autumn');
 CREATE TYPE sport_location AS ENUM ('gym1', 'gym2', 'ground', 'noon_game', 'other');
 CREATE TYPE check_in_purpose AS ENUM ('opening_ceremony', 'event_participation');
 
--- ログインを許可するメールアドレスのホワイトリスト
-CREATE TABLE whitelisted_emails (
-    email TEXT PRIMARY KEY,
-    role user_role NOT NULL
-);
-
 -- クラス情報テーブル
 CREATE TABLE classes (
     id SERIAL PRIMARY KEY,
@@ -446,13 +440,6 @@ ALTER TABLE notification_recipients ADD CONSTRAINT fk_recipients_class_id FOREIG
     "コマンド": "SELECT",
     "条件式 (USING)": "(auth.uid() = id)",
     "チェック式 (WITH CHECK)": null
-  },
-  {
-    "テーブル名": "whitelisted_emails",
-    "ポリシー名": "Allow admin full access on whitelisted_emails",
-    "コマンド": "ALL",
-    "条件式 (USING)": "(get_my_role() = ANY (ARRAY['root'::text, 'admin'::text]))",
-    "チェック式 (WITH CHECK)": "(get_my_role() = ANY (ARRAY['root'::text, 'admin'::text]))"
   }
 ]
 ```
