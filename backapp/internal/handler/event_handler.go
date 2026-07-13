@@ -2,18 +2,16 @@ package handler
 
 import (
 	"backapp/internal/models"
+	"backapp/internal/push"
 	"backapp/internal/repository"
 	"encoding/csv"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/SherClockHolmes/webpush-go"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,8 +21,7 @@ type EventHandler struct {
 	classRepo        repository.ClassRepository
 	notificationRepo repository.NotificationRepository
 	userRepo         repository.UserRepository
-	vapidPublicKey   string
-	vapidPrivateKey  string
+	pushSender       push.Sender
 }
 
 func NewEventHandler(eventRepo repository.EventRepository, tournamentRepo repository.TournamentRepository, classRepo repository.ClassRepository, notificationRepo repository.NotificationRepository, userRepo repository.UserRepository, vapidPublicKey string, vapidPrivateKey string) *EventHandler {
@@ -34,9 +31,16 @@ func NewEventHandler(eventRepo repository.EventRepository, tournamentRepo reposi
 		classRepo:        classRepo,
 		notificationRepo: notificationRepo,
 		userRepo:         userRepo,
-		vapidPublicKey:   vapidPublicKey,
-		vapidPrivateKey:  vapidPrivateKey,
+		pushSender: push.NewSender(push.Config{
+			VAPIDPublicKey:  vapidPublicKey,
+			VAPIDPrivateKey: vapidPrivateKey,
+		}),
 	}
+}
+
+func (h *EventHandler) WithPushSender(sender push.Sender) *EventHandler {
+	h.pushSender = sender
+	return h
 }
 
 func (h *EventHandler) CreateEvent(c *gin.Context) {
@@ -419,7 +423,7 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
 	log.Printf("[event-notification] 通知送信開始: notificationID=%d, title=%s, targetRoles=%v\n", notificationID, title, targetRoles)
 
-	if h.vapidPrivateKey == "" || h.vapidPublicKey == "" {
+	if h.pushSender == nil || !h.pushSender.Enabled() {
 		log.Println("[event-notification] VAPIDキーが設定されていないためPush通知をスキップします")
 		return
 	}
@@ -471,53 +475,7 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 		return
 	}
 
-	log.Printf("[event-notification] %d件の購読に対してPush通知を送信します (ants pool)\n", len(subs))
-	var wg sync.WaitGroup
-	for i, sub := range subs {
-		index, s := i, sub
-		wg.Add(1)
-		// WebPush送信は外部HTTP待ちが支配的なので、既存のworker poolで購読ごとに並行送信する。
-		err := repository.GlobalAnts.Submit(func() {
-			defer wg.Done()
-			subscription := &webpush.Subscription{
-				Endpoint: s.Endpoint,
-				Keys: webpush.Keys{
-					Auth:   s.AuthKey,
-					P256dh: s.P256dhKey,
-				},
-			}
-
-			log.Printf("[event-notification] [%d/%d] Push送信試行: userID=%s, endpoint=%s\n", index+1, len(subs), s.UserID, s.Endpoint)
-
-			resp, err := webpush.SendNotification(payload, subscription, &webpush.Options{
-				Subscriber:      "mailto:notifications@sportease.local",
-				VAPIDPublicKey:  h.vapidPublicKey,
-				VAPIDPrivateKey: h.vapidPrivateKey,
-				TTL:             60,
-			})
-
-			if err != nil {
-				log.Printf("[event-notification] [%d/%d] Push送信に失敗しました: userID=%s, endpoint=%s, error=%v\n", index+1, len(subs), s.UserID, s.Endpoint, err)
-				return
-			}
-
-			if resp != nil {
-				defer resp.Body.Close()
-				if resp.StatusCode >= 400 {
-					bodyBytes, _ := io.ReadAll(resp.Body)
-					log.Printf("[event-notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode, string(bodyBytes))
-					cleanupExpiredPushSubscription(h.notificationRepo, s, resp.StatusCode, "event-notification")
-				} else {
-					log.Printf("[event-notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode)
-				}
-			}
-		})
-		if err != nil {
-			log.Printf("[event-notification] ants worker pool submission failed: %v\n", err)
-			wg.Done()
-		}
-	}
-	wg.Wait()
+	dispatchPushBatch(h.pushSender, h.notificationRepo, payload, subs, 60, "event-notification")
 	log.Printf("[event-notification] 通知送信完了: notificationID=%d\n", notificationID)
 }
 

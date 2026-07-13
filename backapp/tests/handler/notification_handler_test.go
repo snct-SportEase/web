@@ -3,10 +3,15 @@ package handler_test
 import (
 	"backapp/internal/handler"
 	"backapp/internal/models"
+	"backapp/internal/push"
 	"bytes"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -132,19 +137,21 @@ func TestNotificationHandler_SaveAndDeleteSubscription(t *testing.T) {
 	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, mockRoleRepo, mockUserRepo, "", "")
 
 	user := &models.User{ID: "user-1"}
+	authKey, p256dhKey := validPushSubscriptionKeys(t)
+	endpoint := "https://fcm.googleapis.com/fcm/send/test-token"
 
 	// Save
 	{
-		mockNotifRepo.On("UpsertPushSubscription", "user-1", "https://example.com", "auth", "p256dh").
+		mockNotifRepo.On("UpsertPushSubscription", "user-1", endpoint, authKey, p256dhKey, push.MaxSubscriptionsPerUser).
 			Return(nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		subReq := map[string]any{
-			"endpoint": "https://example.com",
+			"endpoint": endpoint,
 			"keys": map[string]string{
-				"auth":   "auth",
-				"p256dh": "p256dh",
+				"auth":   authKey,
+				"p256dh": p256dhKey,
 			},
 		}
 		payload, _ := json.Marshal(subReq)
@@ -160,13 +167,13 @@ func TestNotificationHandler_SaveAndDeleteSubscription(t *testing.T) {
 
 	// Delete
 	{
-		mockNotifRepo.On("DeletePushSubscription", "user-1", "https://example.com").
+		mockNotifRepo.On("DeletePushSubscription", "user-1", endpoint).
 			Return(nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 
-		payload, _ := json.Marshal(map[string]string{"endpoint": "https://example.com"})
+		payload, _ := json.Marshal(map[string]string{"endpoint": endpoint})
 		c.Request, _ = http.NewRequest(http.MethodDelete, "/api/notifications/subscription", bytes.NewBuffer(payload))
 		c.Request.Header.Set("Content-Type", "application/json")
 		c.Set("user", user)
@@ -178,6 +185,65 @@ func TestNotificationHandler_SaveAndDeleteSubscription(t *testing.T) {
 
 	mockNotifRepo.AssertExpectations(t)
 	mockRoleRepo.AssertExpectations(t)
+}
+
+func validPushSubscriptionKeys(t *testing.T) (string, string) {
+	t.Helper()
+	auth := []byte("0123456789abcdef")
+	_, x, y, err := elliptic.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate push subscription key: %v", err)
+	}
+	publicKey := elliptic.Marshal(elliptic.P256(), x, y)
+	return base64.RawURLEncoding.EncodeToString(auth), base64.RawURLEncoding.EncodeToString(publicKey)
+}
+
+func TestNotificationHandler_SaveSubscriptionRejectsUnsafeEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockNotifRepo := new(MockNotificationRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, nil, nil, nil, "", "")
+	authKey, p256dhKey := validPushSubscriptionKeys(t)
+
+	payload, _ := json.Marshal(map[string]any{
+		"endpoint": "https://127.0.0.1/internal",
+		"keys": map[string]string{
+			"auth":   authKey,
+			"p256dh": p256dhKey,
+		},
+	})
+	request := httptest.NewRequest(http.MethodPost, "/api/notifications/subscription", bytes.NewReader(payload))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(response)
+	context.Request = request
+	context.Set("user", &models.User{ID: "user-1"})
+
+	h.SaveSubscription(context)
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	mockNotifRepo.AssertNumberOfCalls(t, "UpsertPushSubscription", 0)
+}
+
+func TestNotificationHandler_SaveSubscriptionRejectsOversizedBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockNotifRepo := new(MockNotificationRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, nil, nil, nil, "", "")
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/notifications/subscription",
+		strings.NewReader(`{"endpoint":"https://fcm.googleapis.com/`+strings.Repeat("a", 5000)+`"}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(response)
+	context.Request = request
+	context.Set("user", &models.User{ID: "user-1"})
+
+	h.SaveSubscription(context)
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	mockNotifRepo.AssertNumberOfCalls(t, "UpsertPushSubscription", 0)
 }
 
 func TestNotificationHandler_GetSubscription_Success(t *testing.T) {

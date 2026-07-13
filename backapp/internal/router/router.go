@@ -4,6 +4,7 @@ import (
 	"backapp/internal/config"
 	"backapp/internal/handler"
 	"backapp/internal/middleware"
+	"backapp/internal/push"
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
 	"database/sql"
@@ -38,7 +39,13 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	statisticsHandler := handler.NewStatisticsHandler(classRepo, eventRepo, sportRepo, tournRepo)
 
 	notificationRepo := repository.NewNotificationRepository(db)
-	eventHandler := handler.NewEventHandler(eventRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+	pushSender := push.NewSender(push.Config{
+		VAPIDPublicKey:  cfg.WebPushPublicKey,
+		VAPIDPrivateKey: cfg.WebPushPrivateKey,
+		AllowedHosts:    cfg.WebPushAllowedHosts,
+		MaxConcurrency:  32,
+	})
+	eventHandler := handler.NewEventHandler(eventRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).WithPushSender(pushSender)
 
 	rainyModeRepo := repository.NewRainyModeRepository(db)
 	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)
@@ -48,9 +55,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo).WithSportSync(sportRepo)
 
 	roleRepo := repository.NewRoleRepository(db)
-	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).WithPushSender(pushSender)
 	notificationRequestRepo := repository.NewNotificationRequestRepository(db)
-	notificationRequestHandler := handler.NewNotificationRequestHandler(notificationRequestRepo, notificationRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey)
+	notificationRequestHandler := handler.NewNotificationRequestHandler(notificationRequestRepo, notificationRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).WithPushSender(pushSender)
 
 	attendanceHandler := handler.NewAttendanceHandler(classRepo, eventRepo)
 
@@ -155,7 +162,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			notifications.GET("", notificationHandler.ListNotifications)
 			notifications.PUT("/filters", notificationHandler.UpdateNotificationFilters)
 			notifications.GET("/subscription", notificationHandler.GetSubscription)
-			notifications.POST("/subscription", notificationHandler.SaveSubscription)
+			notifications.POST("/subscription", middleware.UserRateLimit(10, time.Hour, "push-subscription"), notificationHandler.SaveSubscription)
 			notifications.DELETE("/subscription", notificationHandler.DeleteSubscription)
 		}
 

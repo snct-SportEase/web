@@ -625,8 +625,8 @@ func (m *MockNotificationRepository) GetPushSubscriptionStatsByRoles(roleNames [
 	return args.Get(0).(models.PushSubscriptionStats), args.Error(1)
 }
 
-func (m *MockNotificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error {
-	args := m.Called(userID, endpoint, authKey, p256dhKey)
+func (m *MockNotificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string, maxPerUser int) error {
+	args := m.Called(userID, endpoint, authKey, p256dhKey, maxPerUser)
 	return args.Error(0)
 }
 

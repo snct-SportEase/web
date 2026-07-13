@@ -2,6 +2,7 @@ package handler
 
 import (
 	"backapp/internal/models"
+	"backapp/internal/push"
 	"backapp/internal/repository"
 	"encoding/json"
 	"fmt"
@@ -9,16 +10,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SherClockHolmes/webpush-go"
 	"github.com/gin-gonic/gin"
 )
 
 type NotificationRequestHandler struct {
-	RequestRepo       repository.NotificationRequestRepository
-	NotificationRepo  repository.NotificationRepository
-	RoleRepo          repository.RoleRepository
-	WebPushPublicKey  string
-	WebPushPrivateKey string
+	RequestRepo      repository.NotificationRequestRepository
+	NotificationRepo repository.NotificationRepository
+	RoleRepo         repository.RoleRepository
+	PushSender       push.Sender
 }
 
 func NewNotificationRequestHandler(
@@ -29,12 +28,19 @@ func NewNotificationRequestHandler(
 	privateKey string,
 ) *NotificationRequestHandler {
 	return &NotificationRequestHandler{
-		RequestRepo:       requestRepo,
-		NotificationRepo:  notificationRepo,
-		RoleRepo:          roleRepo,
-		WebPushPublicKey:  publicKey,
-		WebPushPrivateKey: privateKey,
+		RequestRepo:      requestRepo,
+		NotificationRepo: notificationRepo,
+		RoleRepo:         roleRepo,
+		PushSender: push.NewSender(push.Config{
+			VAPIDPublicKey:  publicKey,
+			VAPIDPrivateKey: privateKey,
+		}),
 	}
+}
+
+func (h *NotificationRequestHandler) WithPushSender(sender push.Sender) *NotificationRequestHandler {
+	h.PushSender = sender
+	return h
 }
 
 type createNotificationRequestPayload struct {
@@ -246,7 +252,7 @@ func (h *NotificationRequestHandler) DecideRequest(c *gin.Context) {
 }
 
 func (h *NotificationRequestHandler) notifyRootsOfNewRequest(requestID int, req *models.NotificationRequest) {
-	if h.WebPushPrivateKey == "" || h.WebPushPublicKey == "" {
+	if h.PushSender == nil || !h.PushSender.Enabled() {
 		return
 	}
 
@@ -268,7 +274,7 @@ func (h *NotificationRequestHandler) notifyRootsOfNewRequest(requestID int, req 
 }
 
 func (h *NotificationRequestHandler) notifyParticipantsOfMessage(req *models.NotificationRequest, sender *models.User, message string, senderIsRoot bool) {
-	if h.WebPushPrivateKey == "" || h.WebPushPublicKey == "" {
+	if h.PushSender == nil || !h.PushSender.Enabled() {
 		return
 	}
 
@@ -299,7 +305,7 @@ func (h *NotificationRequestHandler) notifyParticipantsOfMessage(req *models.Not
 }
 
 func (h *NotificationRequestHandler) notifyRequesterDecision(req *models.NotificationRequest, status models.NotificationRequestStatus, resolver *models.User) {
-	if h.WebPushPrivateKey == "" || h.WebPushPublicKey == "" {
+	if h.PushSender == nil || !h.PushSender.Enabled() {
 		return
 	}
 
@@ -343,25 +349,7 @@ func (h *NotificationRequestHandler) sendPushToUsers(userIDs []string, payload g
 		return
 	}
 
-	for _, sub := range subscriptions {
-		subscription := &webpush.Subscription{
-			Endpoint: sub.Endpoint,
-			Keys: webpush.Keys{
-				Auth:   sub.AuthKey,
-				P256dh: sub.P256dhKey,
-			},
-		}
-		resp, err := webpush.SendNotification(bodyBytes, subscription, &webpush.Options{
-			Subscriber:      "mailto:notifications@sportease.local",
-			VAPIDPublicKey:  h.WebPushPublicKey,
-			VAPIDPrivateKey: h.WebPushPrivateKey,
-			TTL:             60,
-		})
-		if err == nil && resp != nil {
-			cleanupExpiredPushSubscription(h.NotificationRepo, sub, resp.StatusCode, "notification-request")
-			resp.Body.Close()
-		}
-	}
+	dispatchPushBatch(h.PushSender, h.NotificationRepo, bodyBytes, subscriptions, 60, "notification-request")
 }
 
 func userDisplayName(user *models.User) string {

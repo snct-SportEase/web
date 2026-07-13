@@ -2,10 +2,10 @@ package handler
 
 import (
 	"backapp/internal/models"
+	"backapp/internal/push"
 	"backapp/internal/repository"
 	"context"
 	"errors"
-	"io"
 	"log"
 	"net/http"
 	"sort"
@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SherClockHolmes/webpush-go"
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
@@ -24,8 +23,7 @@ type NotificationHandler struct {
 	EventRepo        repository.EventRepository
 	RoleRepo         repository.RoleRepository
 	UserRepo         repository.UserRepository
-	VAPIDPublicKey   string
-	VAPIDPrivateKey  string
+	PushSender       push.Sender
 }
 
 func NewNotificationHandler(notificationRepo repository.NotificationRepository, eventRepo repository.EventRepository, roleRepo repository.RoleRepository, userRepo repository.UserRepository, vapidPublicKey, vapidPrivateKey string) *NotificationHandler {
@@ -34,9 +32,16 @@ func NewNotificationHandler(notificationRepo repository.NotificationRepository, 
 		EventRepo:        eventRepo,
 		RoleRepo:         roleRepo,
 		UserRepo:         userRepo,
-		VAPIDPublicKey:   vapidPublicKey,
-		VAPIDPrivateKey:  vapidPrivateKey,
+		PushSender: push.NewSender(push.Config{
+			VAPIDPublicKey:  vapidPublicKey,
+			VAPIDPrivateKey: vapidPrivateKey,
+		}),
 	}
+}
+
+func (h *NotificationHandler) WithPushSender(sender push.Sender) *NotificationHandler {
+	h.PushSender = sender
+	return h
 }
 
 type createNotificationRequest struct {
@@ -288,6 +293,7 @@ func (h *NotificationHandler) SaveSubscription(c *gin.Context) {
 		return
 	}
 
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, push.MaxSubscriptionRequestBytes)
 	var req subscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "不正な購読情報です"})
@@ -302,16 +308,33 @@ func (h *NotificationHandler) SaveSubscription(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "購読情報が不足しています"})
 		return
 	}
+	if h.PushSender == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Push通知サービスを利用できません"})
+		return
+	}
+	if err := h.PushSender.ValidateSubscription(req.Endpoint, req.Keys.Auth, req.Keys.P256dh); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不正な購読情報です"})
+		return
+	}
 
-	log.Printf("[notification] 購読情報の保存を試行: userID=%s, endpoint=%s\n", user.ID, req.Endpoint)
+	endpointID := push.EndpointLogID(req.Endpoint)
+	log.Printf("[notification] 購読情報の保存を試行: userID=%s, endpointID=%s\n", user.ID, endpointID)
 
-	if err := h.NotificationRepo.UpsertPushSubscription(user.ID, req.Endpoint, req.Keys.Auth, req.Keys.P256dh); err != nil {
-		log.Printf("[notification] 購読情報の保存に失敗しました: userID=%s, endpoint=%s, error=%v\n", user.ID, req.Endpoint, err)
+	if err := h.NotificationRepo.UpsertPushSubscription(user.ID, req.Endpoint, req.Keys.Auth, req.Keys.P256dh, push.MaxSubscriptionsPerUser); err != nil {
+		if errors.Is(err, repository.ErrPushSubscriptionLimit) {
+			c.JSON(http.StatusConflict, gin.H{"error": "登録できるPush通知端末数の上限に達しています"})
+			return
+		}
+		if errors.Is(err, repository.ErrPushEndpointInUse) {
+			c.JSON(http.StatusConflict, gin.H{"error": "このPush購読は別のユーザーに登録されています"})
+			return
+		}
+		log.Printf("[notification] 購読情報の保存に失敗しました: userID=%s, endpointID=%s, errorType=%T\n", user.ID, endpointID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読情報の保存に失敗しました"})
 		return
 	}
 
-	log.Printf("[notification] 購読情報の保存に成功しました: userID=%s, endpoint=%s\n", user.ID, req.Endpoint)
+	log.Printf("[notification] 購読情報の保存に成功しました: userID=%s, endpointID=%s\n", user.ID, endpointID)
 	c.JSON(http.StatusCreated, gin.H{"message": "購読情報を保存しました"})
 }
 
@@ -386,7 +409,7 @@ func (h *NotificationHandler) GetSubscription(c *gin.Context) {
 func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
 	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%v\n", notificationID, title, notificationType, targetRoles)
 
-	if h.VAPIDPrivateKey == "" || h.VAPIDPublicKey == "" {
+	if h.PushSender == nil || !h.PushSender.Enabled() {
 		log.Println("[notification] VAPIDキーが設定されていないためPush通知をスキップします")
 		return
 	}
@@ -438,53 +461,7 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 		return
 	}
 
-	log.Printf("[notification] %d件の購読に対してPush通知を送信します (ants pool)\n", len(subs))
-	var wg sync.WaitGroup
-	for i, sub := range subs {
-		index, s := i, sub
-		wg.Add(1)
-		err := repository.GlobalAnts.Submit(func() {
-			defer wg.Done()
-			subscription := &webpush.Subscription{
-				Endpoint: s.Endpoint,
-				Keys: webpush.Keys{
-					Auth:   s.AuthKey,
-					P256dh: s.P256dhKey,
-				},
-			}
-
-			log.Printf("[notification] [%d/%d] Push送信試行: userID=%s, endpoint=%s\n", index+1, len(subs), s.UserID, s.Endpoint)
-
-			resp, err := webpush.SendNotification(payload, subscription, &webpush.Options{
-				Subscriber:      "mailto:notifications@sportease.local",
-				VAPIDPublicKey:  h.VAPIDPublicKey,
-				VAPIDPrivateKey: h.VAPIDPrivateKey,
-				TTL:             60,
-			})
-
-			if err != nil {
-				log.Printf("[notification] [%d/%d] Push送信に失敗しました: userID=%s, endpoint=%s, error=%v\n", index+1, len(subs), s.UserID, s.Endpoint, err)
-				return
-			}
-
-			if resp != nil {
-				defer resp.Body.Close()
-				if resp.StatusCode >= 400 {
-					bodyBytes, _ := io.ReadAll(resp.Body)
-					log.Printf("[notification] [%d/%d] Push送信が失敗しました: userID=%s, endpoint=%s, status=%d, body=%s\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode, string(bodyBytes))
-					cleanupExpiredPushSubscription(h.NotificationRepo, s, resp.StatusCode, "notification")
-				} else {
-					log.Printf("[notification] [%d/%d] Push送信成功: userID=%s, endpoint=%s, status=%d\n", index+1, len(subs), s.UserID, s.Endpoint, resp.StatusCode)
-				}
-			}
-		})
-
-		if err != nil {
-			log.Printf("[notification] ants worker pool submission failed: %v\n", err)
-			wg.Done() // compensate for failed submission
-		}
-	}
-	wg.Wait()
+	dispatchPushBatch(h.PushSender, h.NotificationRepo, payload, subs, 60, "notification")
 	log.Printf("[notification] 通知送信完了: notificationID=%d\n", notificationID)
 }
 

@@ -3,8 +3,14 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
+)
+
+var (
+	ErrPushSubscriptionLimit = errors.New("push subscription limit reached")
+	ErrPushEndpointInUse     = errors.New("push endpoint belongs to another user")
 )
 
 type NotificationRepository interface {
@@ -15,7 +21,7 @@ type NotificationRepository interface {
 	GetPushSubscriptionsByUserIDs(userIDs []string) ([]models.PushSubscription, error)
 	GetPushSubscriptionsByUserID(userID string) ([]models.PushSubscription, error)
 	GetPushSubscriptionStatsByRoles(roleNames []string) (models.PushSubscriptionStats, error)
-	UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error
+	UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string, maxPerUser int) error
 	DeletePushSubscription(userID, endpoint string) error
 }
 
@@ -297,16 +303,67 @@ func (r *notificationRepository) GetPushSubscriptionStatsByRoles(roleNames []str
 	return stats, err
 }
 
-func (r *notificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string) error {
-	query := `
-		INSERT INTO push_subscriptions (user_id, endpoint, auth_key, p256dh_key)
-		VALUES (?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE
-			auth_key = VALUES(auth_key),
-			p256dh_key = VALUES(p256dh_key)
-	`
-	_, err := r.db.Exec(query, userID, endpoint, authKey, p256dhKey)
-	return err
+func (r *notificationRepository) UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string, maxPerUser int) error {
+	if maxPerUser <= 0 {
+		return ErrPushSubscriptionLimit
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var ownerID string
+	err = tx.QueryRow("SELECT user_id FROM push_subscriptions WHERE endpoint = ? FOR UPDATE", endpoint).Scan(&ownerID)
+	switch {
+	case err == nil:
+		if ownerID != userID {
+			return ErrPushEndpointInUse
+		}
+		if _, err := tx.Exec(
+			"UPDATE push_subscriptions SET auth_key = ?, p256dh_key = ? WHERE user_id = ? AND endpoint = ?",
+			authKey, p256dhKey, userID, endpoint,
+		); err != nil {
+			return err
+		}
+	case errors.Is(err, sql.ErrNoRows):
+		var count int
+		rows, err := tx.Query(
+			"SELECT id FROM push_subscriptions WHERE user_id = ? FOR UPDATE",
+			userID,
+		)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id int
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return err
+			}
+			count++
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if count >= maxPerUser {
+			return ErrPushSubscriptionLimit
+		}
+		if _, err := tx.Exec(
+			"INSERT INTO push_subscriptions (user_id, endpoint, auth_key, p256dh_key) VALUES (?, ?, ?, ?)",
+			userID, endpoint, authKey, p256dhKey,
+		); err != nil {
+			return err
+		}
+	default:
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (r *notificationRepository) DeletePushSubscription(userID, endpoint string) error {
