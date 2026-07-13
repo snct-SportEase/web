@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { createBackendSessionHeaders } from '$lib/server/backendSessionHeaders.js';
 const BACKEND_URL = env.BACKEND_URL;
 
 /** @type {import('./$types').PageServerLoad} */
@@ -70,17 +71,16 @@ export async function load({ locals, fetch, request }) {
 
 /** @type {import('./$types').Actions} */
 export const actions = {
-  logout: async ({ fetch, locals, request }) => {
-    const sessionCookie = request.headers.get('cookie');
+  logout: async ({ fetch, locals, cookies }) => {
     await fetch(`${BACKEND_URL}/api/auth/logout`, {
       method: 'POST',
-      headers: {
-        'cookie': sessionCookie,
-      },
+      headers: createBackendSessionHeaders(cookies)
     });
 
     // Clear the user from locals and redirect
     locals.user = null;
+    cookies.delete('session_token', { path: '/' });
+    cookies.delete('csrf_token', { path: '/' });
     throw redirect(302, '/');
   },
 };

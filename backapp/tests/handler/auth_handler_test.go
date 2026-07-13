@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -96,6 +97,23 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 			assert.True(t, oauthStateCookie.HttpOnly)
 			assert.Equal(t, http.SameSiteLaxMode, oauthStateCookie.SameSite)
 		}
+
+		var oauthNonceCookie *http.Cookie
+		for _, cookie := range w.Result().Cookies() {
+			if cookie.Name == "oauthnonce" {
+				oauthNonceCookie = cookie
+				break
+			}
+		}
+		if assert.NotNil(t, oauthNonceCookie) {
+			redirectURL, err := url.Parse(w.Header().Get("Location"))
+			if assert.NoError(t, err) {
+				assert.NotEmpty(t, oauthNonceCookie.Value)
+				assert.Equal(t, oauthNonceCookie.Value, redirectURL.Query().Get("nonce"))
+			}
+			assert.True(t, oauthNonceCookie.HttpOnly)
+			assert.Equal(t, http.SameSiteLaxMode, oauthNonceCookie.SameSite)
+		}
 	})
 
 	t.Run("sets oauth state cookie with secure attribute for forwarded https", func(t *testing.T) {
@@ -160,6 +178,41 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 			assert.True(t, clearedCookie.HttpOnly)
 			assert.Equal(t, http.SameSiteLaxMode, clearedCookie.SameSite)
 		}
+	})
+
+	t.Run("rejects callback when state cookie and query are both missing", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{
+			FrontendURL: "http://localhost:3300",
+		}, mockUserRepo, new(MockEventRepository), new(MockClassRepository))
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/auth/google/callback", nil)
+
+		authHandler.GoogleCallback(c)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+		assert.Equal(t, "http://localhost:3300/?error=invalid_state", w.Header().Get("Location"))
+		mockUserRepo.AssertNotCalled(t, "GetUserByEmail", mock.Anything)
+	})
+
+	t.Run("rejects callback when nonce cookie is missing", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{
+			FrontendURL: "http://localhost:3300",
+		}, mockUserRepo, new(MockEventRepository), new(MockClassRepository))
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/auth/google/callback?state=valid-state", nil)
+		c.Request.AddCookie(&http.Cookie{Name: "oauthstate", Value: "valid-state"})
+
+		authHandler.GoogleCallback(c)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+		assert.Equal(t, "http://localhost:3300/?error=invalid_nonce", w.Header().Get("Location"))
+		mockUserRepo.AssertNotCalled(t, "GetUserByEmail", mock.Anything)
 	})
 
 	t.Run("redirects google callback errors to frontend", func(t *testing.T) {

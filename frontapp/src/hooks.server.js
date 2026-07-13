@@ -1,4 +1,5 @@
 import { createBackendProxyHeaders } from '$lib/server/backendProxyHeaders.js';
+import { applyCSRFProxyProtection } from '$lib/server/csrfProxy.js';
 
 const BACKEND_URL = process.env.BACKEND_URL;
 const BACKEND_PROXY_PREFIXES = ['/api', '/swagger'];
@@ -24,7 +25,17 @@ async function proxyToBackend(event) {
       host: event.url.host,
       protocol: event.url.protocol.replace(':', '')
     });
+    headers = applyCSRFProxyProtection(headers, {
+      method: event.request.method,
+      requestOrigin: event.request.headers.get('origin'),
+      expectedOrigin: event.url.origin,
+      csrfToken: event.cookies.get('csrf_token')
+    });
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith('State-changing API request')) {
+      console.warn('Backend proxy rejected a state-changing cross-origin request');
+      return new Response('Invalid CSRF token or request origin', { status: 403 });
+    }
     console.error('Backend proxy rejected request without a trusted client address:', error);
     return new Response('Backend proxy is not configured securely', { status: 502 });
   }

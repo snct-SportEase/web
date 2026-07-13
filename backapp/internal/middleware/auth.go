@@ -16,6 +16,7 @@ import (
 
 const sessionTTL = 24 * time.Hour
 const sessionKeyPrefix = "session:"
+const csrfKeyPrefix = "csrf:"
 
 var redisClient *redis.Client
 
@@ -25,14 +26,27 @@ func InitSessionStore(addr string) {
 	})
 }
 
-func CreateSession(token, userID string) {
-	err := redisClient.Set(context.Background(), sessionKeyPrefix+token, userID, sessionTTL).Err()
-	if err != nil {
-		log.Printf("[redis] Failed to create session in Redis: %v", err)
+func CreateSession(token, userID, csrfToken string) error {
+	if redisClient == nil {
+		return fmt.Errorf("redis client is not initialized")
 	}
+	if token == "" || userID == "" || csrfToken == "" {
+		return fmt.Errorf("session token, user ID, and CSRF token are required")
+	}
+
+	ctx := context.Background()
+	_, err := redisClient.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Set(ctx, sessionKeyPrefix+token, userID, sessionTTL)
+		pipe.Set(ctx, csrfKeyPrefix+token, csrfToken, sessionTTL)
+		return nil
+	})
+	return err
 }
 
 func GetUserIDFromSession(token string) (string, bool) {
+	if redisClient == nil {
+		return "", false
+	}
 	val, err := redisClient.Get(context.Background(), sessionKeyPrefix+token).Result()
 	if err != nil {
 		if err != redis.Nil {
@@ -43,8 +57,26 @@ func GetUserIDFromSession(token string) (string, bool) {
 	return val, true
 }
 
+func GetCSRFTokenForSession(token string) (string, bool) {
+	if redisClient == nil {
+		return "", false
+	}
+
+	value, err := redisClient.Get(context.Background(), csrfKeyPrefix+token).Result()
+	if err != nil {
+		if err != redis.Nil {
+			log.Printf("[redis] Redis error during CSRF lookup: %T", err)
+		}
+		return "", false
+	}
+	return value, true
+}
+
 func DeleteSession(token string) {
-	redisClient.Del(context.Background(), sessionKeyPrefix+token)
+	if redisClient == nil {
+		return
+	}
+	redisClient.Del(context.Background(), sessionKeyPrefix+token, csrfKeyPrefix+token)
 }
 
 func SetRedisValue(key, value string, ttl time.Duration) error {

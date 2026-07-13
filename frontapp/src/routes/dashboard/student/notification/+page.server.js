@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { createBackendSessionHeaders } from '$lib/server/backendSessionHeaders.js';
 const BACKEND_URL = env.BACKEND_URL;
 
 /** @type {import('./$types').PageServerLoad} */
@@ -41,17 +42,16 @@ export async function load({ fetch, request, locals }) {
 
 /** @type {import('./$types').Actions} */
 export const actions = {
-	updateFilters: async ({ request, fetch }) => {
+	updateFilters: async ({ request, fetch, cookies }) => {
 		const data = await request.formData();
 		const filters = data.getAll('filters');
 
-		const headers = {
-			'Content-Type': 'application/json',
-			cookie: request.headers.get('cookie')
-		};
+		const headers = createBackendSessionHeaders(cookies, {
+			'Content-Type': 'application/json'
+		});
 		const authHeader = request.headers.get('Authorization');
 		if (authHeader) {
-			headers.Authorization = authHeader;
+			headers.set('Authorization', authHeader);
 		}
 
 		try {
@@ -74,4 +74,3 @@ export const actions = {
 		}
 	}
 };
-

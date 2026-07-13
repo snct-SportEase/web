@@ -92,7 +92,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	})
 
 	api := router.Group("/api")
-	api.Use(middleware.NoStore())
+	api.Use(middleware.NoStore(), middleware.CSRFProtection())
 	{
 		ws := api.Group("/ws")
 		{

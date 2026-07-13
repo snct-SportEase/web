@@ -1,18 +1,14 @@
 import { env } from '$env/dynamic/private';
 const BACKEND_URL = env.BACKEND_URL;
 import { json } from '@sveltejs/kit';
+import { createBackendSessionHeaders } from '$lib/server/backendSessionHeaders.js';
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({ cookies }) {
   try {
-    const sessionToken = cookies.get('session_token');
-    const headers = {
+    const headers = createBackendSessionHeaders(cookies, {
       'Content-Type': 'application/json'
-    };
-
-    if (sessionToken) {
-      headers['cookie'] = `session_token=${sessionToken}`;
-    }
+    });
 
     const response = await fetch(`${BACKEND_URL}/api/notifications/subscription`, {
       method: 'GET',
@@ -35,16 +31,11 @@ export async function GET({ cookies }) {
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request, cookies }) {
   try {
-    const sessionToken = cookies.get('session_token');
     const body = await request.json();
 
-    const headers = {
+    const headers = createBackendSessionHeaders(cookies, {
       'Content-Type': 'application/json'
-    };
-
-    if (sessionToken) {
-      headers['cookie'] = `session_token=${sessionToken}`;
-    }
+    });
 
     const response = await fetch(`${BACKEND_URL}/api/notifications/subscription`, {
       method: 'POST',
@@ -68,16 +59,11 @@ export async function POST({ request, cookies }) {
 /** @type {import('./$types').RequestHandler} */
 export async function DELETE({ request, cookies }) {
   try {
-    const sessionToken = cookies.get('session_token');
     const body = await request.json();
 
-    const headers = {
+    const headers = createBackendSessionHeaders(cookies, {
       'Content-Type': 'application/json'
-    };
-
-    if (sessionToken) {
-      headers['cookie'] = `session_token=${sessionToken}`;
-    }
+    });
 
     const response = await fetch(`${BACKEND_URL}/api/notifications/subscription`, {
       method: 'DELETE',
@@ -97,4 +83,3 @@ export async function DELETE({ request, cookies }) {
     return json({ error: '購読情報の削除に失敗しました' }, { status: 500 });
   }
 }
-

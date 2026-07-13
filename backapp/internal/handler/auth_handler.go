@@ -9,9 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -22,7 +20,24 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
+	"google.golang.org/api/idtoken"
 )
+
+const (
+	oauthStateCookieName = "oauthstate"
+	oauthNonceCookieName = "oauthnonce"
+	csrfTokenCookieName  = "csrf_token"
+)
+
+type googleIDTokenValidator interface {
+	Validate(context.Context, string, string) (*idtoken.Payload, error)
+}
+
+type officialGoogleIDTokenValidator struct{}
+
+func (officialGoogleIDTokenValidator) Validate(ctx context.Context, rawToken, audience string) (*idtoken.Payload, error) {
+	return idtoken.Validate(ctx, rawToken, audience)
+}
 
 type AuthHandler struct {
 	cfg          *config.Config
@@ -30,6 +45,7 @@ type AuthHandler struct {
 	eventRepo    repository.EventRepository
 	classRepo    repository.ClassRepository
 	oauth2Config *oauth2.Config
+	idTokens     googleIDTokenValidator
 }
 
 func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, eventRepo repository.EventRepository, classRepo repository.ClassRepository) *AuthHandler {
@@ -38,20 +54,19 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 		userRepo:  userRepo,
 		eventRepo: eventRepo,
 		classRepo: classRepo,
+		idTokens:  officialGoogleIDTokenValidator{},
 		oauth2Config: &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
 			RedirectURL:  cfg.GoogleRedirectURL,
-			Scopes:       []string{"openid", "email", "https://www.googleapis.com/auth/userinfo.email"},
+			Scopes:       []string{"openid", "email"},
 			Endpoint: oauth2.Endpoint{
-				AuthURL:  "https://accounts.google.com/o/oauth2/auth",
+				AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
 				TokenURL: "https://oauth2.googleapis.com/token",
 			},
 		},
 	}
 }
-
-// ... (GoogleLogin, GoogleCallback, GetUser are unchanged)
 
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 	if isLINEInAppBrowser(c.GetHeader("User-Agent")) {
@@ -59,19 +74,35 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 		return
 	}
 
-	state := generateStateOauthCookie(c.Writer, c.Request)
-	url := h.oauth2Config.AuthCodeURL(state)
+	state, err := setOAuthRandomCookie(c.Writer, c.Request, oauthStateCookieName)
+	if err != nil {
+		log.Printf("[auth] failed to generate OAuth state: %T", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+		return
+	}
+	nonce, err := setOAuthRandomCookie(c.Writer, c.Request, oauthNonceCookieName)
+	if err != nil {
+		log.Printf("[auth] failed to generate OAuth nonce: %T", err)
+		clearOAuthCookie(c.Writer, c.Request, oauthStateCookieName)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+		return
+	}
+
+	url := h.oauth2Config.AuthCodeURL(state, oauth2.SetAuthURLParam("nonce", nonce))
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
 func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	if oauthError := c.Query("error"); oauthError != "" {
+		clearOAuthCookies(c.Writer, c.Request)
 		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error="+url.QueryEscape(oauthError))
 		return
 	}
 
-	oauthState, cookieErr := c.Cookie("oauthstate")
-	if subtle.ConstantTimeCompare([]byte(c.Query("state")), []byte(oauthState)) != 1 {
+	oauthState, cookieErr := c.Cookie(oauthStateCookieName)
+	oauthNonce, nonceCookieErr := c.Cookie(oauthNonceCookieName)
+	queryState := c.Query("state")
+	if cookieErr != nil || queryState == "" || subtle.ConstantTimeCompare([]byte(queryState), []byte(oauthState)) != 1 {
 		log.Printf(
 			"[auth] invalid oauth state: cookie_present=%v request_host=%s forwarded_host=%s forwarded_proto=%s query_state_len=%d cookie_state_len=%d",
 			cookieErr == nil,
@@ -81,29 +112,34 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 			len(c.Query("state")),
 			len(oauthState),
 		)
-		clearOauthStateCookie(c.Writer, c.Request)
+		clearOAuthCookies(c.Writer, c.Request)
 		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=invalid_state")
 		return
 	}
-	clearOauthStateCookie(c.Writer, c.Request)
+	if nonceCookieErr != nil || oauthNonce == "" {
+		clearOAuthCookies(c.Writer, c.Request)
+		c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/?error=invalid_nonce")
+		return
+	}
+	// State and nonce are one-time values. Clear them before any network call
+	// so a callback cannot be replayed after a partial failure.
+	clearOAuthCookies(c.Writer, c.Request)
 
 	code := c.Query("code")
-	token, err := h.oauth2Config.Exchange(context.Background(), code)
+	requestContext, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	token, err := h.oauth2Config.Exchange(requestContext, code)
 	if err != nil {
-		log.Printf("oauth2 token exchange error: %v", err)
+		log.Printf("[auth] OAuth token exchange failed: %T", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
 		return
 	}
 
-	email, err := fetchGoogleUserEmail(context.Background(), token.AccessToken)
+	email, err := verifiedGoogleIDTokenEmail(requestContext, h.idTokens, token.Extra("id_token"), h.cfg.GoogleClientID, oauthNonce)
 	if err != nil {
-		log.Printf("failed to fetch google userinfo, falling back to id_token: %v", err)
-		email, err = emailFromGoogleIDToken(token.Extra("id_token"), h.cfg.GoogleClientID)
-		if err != nil {
-			log.Printf("failed to read email from google id_token: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
-			return
-		}
+		log.Printf("[auth] Google ID token validation failed: %T", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+		return
 	}
 
 	// ドメイン制限
@@ -154,10 +190,22 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	// Create session
 	sessionToken := uuid.New().String()
-	middleware.CreateSession(sessionToken, user.ID)
+	csrfToken, err := generateSecureRandomToken(32)
+	if err != nil {
+		log.Printf("[auth] Failed to generate CSRF token: %T", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+		return
+	}
+	if err := middleware.CreateSession(sessionToken, user.ID, csrfToken); err != nil {
+		log.Printf("[auth] Failed to create session: %T", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+		return
+	}
 
-	// Set session cookie
-	setSessionTokenCookie(c.Writer, c.Request, sessionToken, time.Now().Add(24*time.Hour))
+	// Set session and CSRF cookies only after both values are persisted.
+	sessionExpiration := time.Now().Add(24 * time.Hour)
+	setSessionTokenCookie(c.Writer, c.Request, sessionToken, sessionExpiration)
+	setCSRFTokenCookie(c.Writer, c.Request, csrfToken, sessionExpiration)
 
 	// Add a debug log to verify cookie flags
 	log.Printf("[auth] Session created for user %s, secure=%v, origin=%s", user.Email, shouldUseSecureCookie(c.Request), c.Request.RemoteAddr)
@@ -165,104 +213,56 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }
 
-func fetchGoogleUserEmail(ctx context.Context, accessToken string) (string, error) {
-	if accessToken == "" {
-		return "", fmt.Errorf("access token is empty")
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
-	if err != nil {
-		return "", fmt.Errorf("create userinfo request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("userinfo request failed: %w", err)
-	}
-	defer response.Body.Close()
-
-	data, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-	if err != nil {
-		return "", fmt.Errorf("read userinfo response: %w", err)
-	}
-	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("userinfo returned %s: %s", response.Status, strings.TrimSpace(string(data)))
-	}
-
-	var userInfo struct {
-		Email string `json:"email"`
-	}
-	if err := json.Unmarshal(data, &userInfo); err != nil {
-		return "", fmt.Errorf("parse userinfo response: %w", err)
-	}
-	if userInfo.Email == "" {
-		return "", fmt.Errorf("userinfo response did not include email")
-	}
-
-	return userInfo.Email, nil
-}
-
-func emailFromGoogleIDToken(rawIDToken any, expectedAudience string) (string, error) {
+func verifiedGoogleIDTokenEmail(ctx context.Context, validator googleIDTokenValidator, rawIDToken any, expectedAudience, expectedNonce string) (string, error) {
 	idToken, ok := rawIDToken.(string)
 	if !ok || idToken == "" {
 		return "", fmt.Errorf("id_token is missing")
 	}
-
-	parts := strings.Split(idToken, ".")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("id_token has invalid format")
+	if expectedAudience == "" {
+		return "", fmt.Errorf("expected audience is missing")
+	}
+	if expectedNonce == "" {
+		return "", fmt.Errorf("expected nonce is missing")
 	}
 
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	payload, err := validator.Validate(ctx, idToken, expectedAudience)
 	if err != nil {
-		return "", fmt.Errorf("decode id_token payload: %w", err)
+		return "", fmt.Errorf("validate id_token: %w", err)
 	}
-
-	var claims struct {
-		Email         string          `json:"email"`
-		EmailVerified bool            `json:"email_verified"`
-		Audience      json.RawMessage `json:"aud"`
-		ExpiresAt     int64           `json:"exp"`
+	if payload == nil {
+		return "", fmt.Errorf("id_token payload is missing")
 	}
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return "", fmt.Errorf("parse id_token payload: %w", err)
+	if payload.Issuer != "accounts.google.com" && payload.Issuer != "https://accounts.google.com" {
+		return "", fmt.Errorf("id_token issuer is invalid")
 	}
-
-	if claims.Email == "" {
-		return "", fmt.Errorf("id_token did not include email")
-	}
-	if !claims.EmailVerified {
-		return "", fmt.Errorf("id_token email is not verified")
-	}
-	if claims.ExpiresAt != 0 && time.Now().Unix() > claims.ExpiresAt {
-		return "", fmt.Errorf("id_token is expired")
-	}
-	if expectedAudience != "" && !idTokenAudienceMatches(claims.Audience, expectedAudience) {
+	if payload.Audience != expectedAudience {
 		return "", fmt.Errorf("id_token audience does not match client id")
 	}
-
-	return claims.Email, nil
-}
-
-func idTokenAudienceMatches(rawAudience json.RawMessage, expectedAudience string) bool {
-	var audience string
-	if err := json.Unmarshal(rawAudience, &audience); err == nil {
-		return audience == expectedAudience
+	if payload.Subject == "" {
+		return "", fmt.Errorf("id_token subject is missing")
 	}
 
-	var audiences []string
-	if err := json.Unmarshal(rawAudience, &audiences); err != nil {
-		return false
+	nonce, nonceOK := payload.Claims["nonce"].(string)
+	if !nonceOK || subtle.ConstantTimeCompare([]byte(nonce), []byte(expectedNonce)) != 1 {
+		return "", fmt.Errorf("id_token nonce does not match")
 	}
-
-	for _, audience := range audiences {
-		if audience == expectedAudience {
-			return true
+	if rawAuthorizedParty, exists := payload.Claims["azp"]; exists {
+		authorizedParty, ok := rawAuthorizedParty.(string)
+		if !ok || authorizedParty != expectedAudience {
+			return "", fmt.Errorf("id_token authorized party does not match client id")
 		}
 	}
-	return false
+
+	email, emailOK := payload.Claims["email"].(string)
+	if !emailOK || email == "" {
+		return "", fmt.Errorf("id_token did not include email")
+	}
+	emailVerified, verifiedOK := payload.Claims["email_verified"].(bool)
+	if !verifiedOK || !emailVerified {
+		return "", fmt.Errorf("id_token email is not verified")
+	}
+
+	return email, nil
 }
 
 func (h *AuthHandler) GetUser(c *gin.Context) {
@@ -365,7 +365,9 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	middleware.DeleteSession(cookie)
 
-	setSessionTokenCookie(c.Writer, c.Request, "", time.Now().Add(-1*time.Hour))
+	expired := time.Now().Add(-1 * time.Hour)
+	setSessionTokenCookie(c.Writer, c.Request, "", expired)
+	setCSRFTokenCookie(c.Writer, c.Request, "", expired)
 
 	c.JSON(http.StatusOK, gin.H{"message": "logout successful"})
 }
@@ -600,15 +602,24 @@ func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User role deleted successfully"})
 }
 
-func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
-	var expiration = time.Now().Add(20 * time.Minute)
-	b := make([]byte, 16)
-	rand.Read(b)
-	state := base64.URLEncoding.EncodeToString(b)
+func generateSecureRandomToken(size int) (string, error) {
+	value := make([]byte, size)
+	if _, err := rand.Read(value); err != nil {
+		return "", fmt.Errorf("read secure random bytes: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(value), nil
+}
+
+func setOAuthRandomCookie(w http.ResponseWriter, r *http.Request, name string) (string, error) {
+	value, err := generateSecureRandomToken(32)
+	if err != nil {
+		return "", err
+	}
+
 	cookie := http.Cookie{
-		Name:     "oauthstate",
-		Value:    state,
-		Expires:  expiration,
+		Name:     name,
+		Value:    value,
+		Expires:  time.Now().Add(20 * time.Minute),
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   shouldUseSecureCookie(r),
@@ -616,7 +627,7 @@ func generateStateOauthCookie(w http.ResponseWriter, r *http.Request) string {
 	}
 	http.SetCookie(w, &cookie)
 
-	return state
+	return value, nil
 }
 
 func setSessionTokenCookie(w http.ResponseWriter, r *http.Request, value string, expiration time.Time) {
@@ -631,9 +642,21 @@ func setSessionTokenCookie(w http.ResponseWriter, r *http.Request, value string,
 	})
 }
 
-func clearOauthStateCookie(w http.ResponseWriter, r *http.Request) {
+func setCSRFTokenCookie(w http.ResponseWriter, r *http.Request, value string, expiration time.Time) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "oauthstate",
+		Name:     csrfTokenCookieName,
+		Value:    value,
+		Expires:  expiration,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   shouldUseSecureCookie(r),
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func clearOAuthCookie(w http.ResponseWriter, r *http.Request, name string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     name,
 		Value:    "",
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
@@ -642,6 +665,11 @@ func clearOauthStateCookie(w http.ResponseWriter, r *http.Request) {
 		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func clearOAuthCookies(w http.ResponseWriter, r *http.Request) {
+	clearOAuthCookie(w, r, oauthStateCookieName)
+	clearOAuthCookie(w, r, oauthNonceCookieName)
 }
 
 func shouldUseSecureCookie(r *http.Request) bool {

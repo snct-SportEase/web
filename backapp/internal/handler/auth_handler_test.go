@@ -85,3 +85,24 @@ func TestSetSessionTokenCookieSecurityMatchesRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestCSRFTokenCookieIsHttpOnlyAndStrict(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set("X-Forwarded-Proto", "https")
+	expiration := time.Now().Add(24 * time.Hour)
+
+	setCSRFTokenCookie(w, r, "csrf-token", expiration)
+
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("expected exactly one cookie, got %d", len(cookies))
+	}
+	cookie := cookies[0]
+	if cookie.Name != csrfTokenCookieName || cookie.Value != "csrf-token" {
+		t.Fatalf("unexpected CSRF cookie: %#v", cookie)
+	}
+	if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("CSRF cookie flags are not hardened: %#v", cookie)
+	}
+}
