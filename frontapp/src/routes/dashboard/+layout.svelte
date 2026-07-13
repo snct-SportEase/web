@@ -91,18 +91,26 @@
 
   async function handleLogout() {
     try {
-      const response = await fetch('/api/auth/logout', {
+      await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-
-      if (response.ok) {
-        window.location.href = '/';
-      }
     } catch {
+      // Clear local data even if the server is temporarily unreachable.
+    } finally {
+      // Remove legacy caches that may contain responses from the previous
+      // account. The current Service Worker will repopulate public assets only.
+      if (browser && 'caches' in window) {
+        try {
+          const cacheNames = await window.caches.keys();
+          await Promise.all(cacheNames.map((cacheName) => window.caches.delete(cacheName)));
+        } catch {
+          // A cache failure must not prevent the logout redirect.
+        }
+      }
       window.location.href = '/';
     }
   }

@@ -71,13 +71,14 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	systemHandler := handler.NewSystemHandler(cfg)
 
 	// ヘルスチェック用のエンドポイント
-	router.GET("/api/health", func(c *gin.Context) {
+	router.GET("/api/health", middleware.NoStore(), func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "UP",
 		})
 	})
 
 	api := router.Group("/api")
+	api.Use(middleware.NoStore())
 	{
 		ws := api.Group("/ws")
 		{
