@@ -110,7 +110,9 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 
 		userID, exists := GetUserIDFromSession(cookie)
 		if !exists {
-			log.Printf("[auth] Session token not found in Redis: %s", cookie)
+			// Session cookies are bearer credentials. Never include the value in
+			// logs, even when the lookup fails.
+			log.Printf("[auth] Session token rejected for path: %s", c.Request.URL.Path)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Session expired or invalid"})
 			c.Abort()
 			return
