@@ -27,6 +27,9 @@ jobs:
           check-latest: true
           cache-dependency-path: 'backapp/go.sum'
 
+      - name: Set up Takumi Guard
+        uses: flatt-security/setup-takumi-guard-golang@v1
+
       - name: Install dependencies
         working-directory: ./backapp
         run: go mod download

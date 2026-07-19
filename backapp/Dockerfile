@@ -3,6 +3,9 @@ FROM golang:1.26.5-alpine AS builder
 
 WORKDIR /app
 
+# Route public Go module metadata through Takumi Guard during image builds.
+ENV GOPROXY=https://golang.flatt.tech
+
 COPY go.mod go.sum ./
 RUN go mod download
 

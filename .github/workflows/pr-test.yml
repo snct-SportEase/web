@@ -31,6 +31,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'frontapp/package-lock.json'
 
+      - name: Set up Takumi Guard
+        uses: flatt-security/setup-takumi-guard-npm@v1
+
       - name: Install dependencies
         working-directory: ./frontapp
         run: npm ci

@@ -3,8 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
+# Install dependencies. Copy .npmrc first so npm uses Takumi Guard.
+COPY package*.json .npmrc ./
 RUN npm install
 
 # Copy source code and build
