@@ -21,6 +21,7 @@ type Config struct {
 	WebPushAllowedHosts                                                  []string
 	TrustedProxyCIDRs                                                    []string
 	RedisAddr                                                            string
+	TypingAPIKey                                                         string
 }
 
 func Load() (*Config, error) {
@@ -53,6 +54,7 @@ func Load() (*Config, error) {
 		WebPushAllowedHosts: splitCommaSeparated(os.Getenv("WEBPUSH_ALLOWED_HOSTS")),
 		TrustedProxyCIDRs:   trustedProxyCIDRs,
 		RedisAddr:           os.Getenv("REDIS_ADDR"),
+		TypingAPIKey:        os.Getenv("TYPING_API_KEY"),
 	}
 	return cfg, nil
 }

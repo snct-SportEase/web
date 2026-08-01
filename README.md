@@ -94,9 +94,12 @@ SportEaseは、学校行事のスポーツ大会運営をオンラインで一�
 | `WEBPUSH_PUBLIC_KEY` | Web PushのVAPID公開鍵（Base64, URL Safe） |
 | `WEBPUSH_PRIVATE_KEY` | Web PushのVAPID秘密鍵 |
 | `WEBPUSH_ALLOWED_HOSTS` | 許可するPushサービスのホスト名／先頭`*.`ワイルドカード（カンマ区切り）。未設定時はFCM、Mozilla Push、Apple Web Push、Microsoft WNSを許可 |
+| `TYPING_API_KEY` | 独自タイピングシステムからのサーバー間APIを認証する共有鍵（32バイト以上のランダム値を推奨） |
 | `LETSENCRYPT_EMAIL` | Traefik用のLet's Encrypt通知メールアドレス |
 
 > `WEBPUSH_*` は `openssl` 等でVAPID鍵を生成して設定してください。開発中にPush通知を使用しない場合は未設定でも動作しますが、対応機能は無効化されます。
+
+独自タイピングシステムとの連携方法は[タイピングシステム連携API仕様](./docs/typing_system_api.md)を参照してください。
 
 #### 認証・プロキシの運用上の注意
 

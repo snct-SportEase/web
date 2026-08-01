@@ -300,13 +300,18 @@ func TestTeamRepository_GetTeamByClassAndSport(t *testing.T) {
 // ─── AddTeamMember ─────────────────────────────────────────────────────────
 
 func TestTeamRepository_AddTeamMember(t *testing.T) {
-	const q = "INSERT INTO team_members (team_id, user_id) VALUES (?, ?)"
+	const q = `
+		INSERT INTO team_members (team_id, user_id, entry_order)
+		SELECT ?, ?, COALESCE(MAX(entry_order), 0) + 1
+		FROM team_members
+		WHERE team_id = ?
+	`
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
 
-		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "user-1").
+		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "user-1", 10).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		assert.NoError(t, repo.AddTeamMember(10, "user-1"))
@@ -317,7 +322,7 @@ func TestTeamRepository_AddTeamMember(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
 
-		mock.ExpectExec(regexp.QuoteMeta(q)).WillReturnError(errors.New("db error"))
+		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(10, "user-1", 10).WillReturnError(errors.New("db error"))
 
 		assert.Error(t, repo.AddTeamMember(10, "user-1"))
 		assert.NoError(t, mock.ExpectationsWereMet())
