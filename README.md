@@ -99,7 +99,7 @@ SportEaseは、学校行事のスポーツ大会運営をオンラインで一�
 
 > `WEBPUSH_*` は `openssl` 等でVAPID鍵を生成して設定してください。開発中にPush通知を使用しない場合は未設定でも動作しますが、対応機能は無効化されます。
 
-独自タイピングシステムとの連携方法は[タイピングシステム連携API仕様](./docs/typing_system_api.md)を参照してください。
+独自タイピングシステムとの連携方針は、[共通仕様の範囲](./docs/typing_system_core_scope.md)、[SportEase提供API仕様](./docs/typing_system_api.md)、[タイピングシステム確定スコアAPI契約](./docs/typing_system_score_api.md)、[スコア計算仕様](./docs/typing_system_scoring_spec.md)、[入力判定仕様](./docs/typing_system_input_spec.md)を参照してください。
 
 #### 認証・プロキシの運用上の注意
 
