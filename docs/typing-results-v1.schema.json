@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nitsche-gyouji.com/schemas/typing-results-v1.schema.json",
+  "title": "SportEase typing results import v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "export_id",
+    "classes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "typing-results-v1"
+    },
+    "export_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "classes": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/class_result"
+      }
+    }
+  },
+  "$defs": {
+    "class_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class_name",
+        "match_1_score",
+        "match_2_score",
+        "match_3_score",
+        "total_score",
+        "rank"
+      ],
+      "properties": {
+        "class_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "match_1_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "match_2_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "match_3_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "total_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        }
+      }
+    }
+  }
+}

@@ -98,7 +98,7 @@ SportEaseは、学校行事のスポーツ大会運営をオンラインで一�
 
 > `WEBPUSH_*` は `openssl` 等でVAPID鍵を生成して設定してください。開発中にPush通知を使用しない場合は未設定でも動作しますが、対応機能は無効化されます。
 
-独自タイピングシステムは単体で動作し、確定結果をCSVでSportEaseへ取り込みます。仕様は、[共通仕様の範囲](./docs/typing_system_core_scope.md)、[確定結果CSV仕様](./docs/typing_system_results_csv_spec.md)、[運営・試合状況機能仕様](./docs/typing_system_operations_spec.md)、[スコア計算仕様](./docs/typing_system_scoring_spec.md)、[入力判定仕様](./docs/typing_system_input_spec.md)を参照してください。
+独自タイピングシステムは単体で動作し、クラス別の確定得点と順位をJSONでSportEaseへ取り込みます。仕様は、[共通仕様の範囲](./docs/typing_system_core_scope.md)、[確定結果JSON仕様](./docs/typing_system_results_json_spec.md)、[運営・試合状況機能仕様](./docs/typing_system_operations_spec.md)、[スコア計算仕様](./docs/typing_system_scoring_spec.md)、[入力判定仕様](./docs/typing_system_input_spec.md)、[問題・問題セット仕様](./docs/typing_system_problem_spec.md)を参照してください。
 
 #### 認証・プロキシの運用上の注意
 

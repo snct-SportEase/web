@@ -1,0 +1,54 @@
+{
+  "schema_version": "typing-results-v1",
+  "export_id": "4ef87d60-2e74-477a-9c16-a93423d04c20",
+  "classes": [
+    {
+      "class_name": "IS2",
+      "match_1_score": 123,
+      "match_2_score": 118,
+      "match_3_score": 130,
+      "total_score": 371,
+      "rank": 1
+    },
+    {
+      "class_name": "IS3",
+      "match_1_score": 110,
+      "match_2_score": 125,
+      "match_3_score": 121,
+      "total_score": 356,
+      "rank": 2
+    },
+    {
+      "class_name": "IT4",
+      "match_1_score": 120,
+      "match_2_score": 115,
+      "match_3_score": 121,
+      "total_score": 356,
+      "rank": 3
+    },
+    {
+      "class_name": "IE2",
+      "match_1_score": 100,
+      "match_2_score": 120,
+      "match_3_score": 110,
+      "total_score": 330,
+      "rank": 4
+    },
+    {
+      "class_name": "IS3",
+      "match_1_score": 110,
+      "match_2_score": 110,
+      "match_3_score": 110,
+      "total_score": 330,
+      "rank": 4
+    },
+    {
+      "class_name": "1-1",
+      "match_1_score": 90,
+      "match_2_score": 100,
+      "match_3_score": 105,
+      "total_score": 295,
+      "rank": 6
+    }
+  ]
+}
