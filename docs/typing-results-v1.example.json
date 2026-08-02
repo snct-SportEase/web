@@ -1,9 +1,9 @@
 {
   "schema_version": "typing-results-v1",
   "export_id": "4ef87d60-2e74-477a-9c16-a93423d04c20",
-  "classes": [
+  "teams": [
     {
-      "class_name": "IS2",
+      "team_name": "1年生",
       "match_1_score": 123,
       "match_2_score": 118,
       "match_3_score": 130,
@@ -11,7 +11,7 @@
       "rank": 1
     },
     {
-      "class_name": "IS3",
+      "team_name": "2年生",
       "match_1_score": 110,
       "match_2_score": 125,
       "match_3_score": 121,
@@ -19,7 +19,7 @@
       "rank": 2
     },
     {
-      "class_name": "IT4",
+      "team_name": "3年生",
       "match_1_score": 120,
       "match_2_score": 115,
       "match_3_score": 121,
@@ -27,7 +27,7 @@
       "rank": 3
     },
     {
-      "class_name": "IE2",
+      "team_name": "4年生",
       "match_1_score": 100,
       "match_2_score": 120,
       "match_3_score": 110,
@@ -35,7 +35,7 @@
       "rank": 4
     },
     {
-      "class_name": "IS3",
+      "team_name": "5年生",
       "match_1_score": 110,
       "match_2_score": 110,
       "match_3_score": 110,
@@ -43,7 +43,7 @@
       "rank": 4
     },
     {
-      "class_name": "1-1",
+      "team_name": "専攻科・教員",
       "match_1_score": 90,
       "match_2_score": 100,
       "match_3_score": 105,
