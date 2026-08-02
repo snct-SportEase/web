@@ -178,19 +178,12 @@ FROM classes c WHERE c.event_id = @demo_event_id
 ON DUPLICATE KEY UPDATE
     name = VALUES(name), min_capacity = VALUES(min_capacity), max_capacity = VALUES(max_capacity);
 
-INSERT INTO team_members (team_id, user_id, is_confirmed, entry_order)
-SELECT
-    candidates.team_id,
-    candidates.user_id,
-    TRUE,
-    ROW_NUMBER() OVER (PARTITION BY candidates.team_id ORDER BY candidates.user_id)
-FROM (
-    SELECT t.id AS team_id, u.id AS user_id
-    FROM teams t
-    JOIN classes c ON c.id = t.class_id
-    JOIN users u ON u.class_id = c.id AND u.email LIKE 'demo-%@example.com'
-    WHERE c.event_id = @demo_event_id
-) candidates
+INSERT INTO team_members (team_id, user_id, is_confirmed)
+SELECT t.id, u.id, TRUE
+FROM teams t
+JOIN classes c ON c.id = t.class_id
+JOIN users u ON u.class_id = c.id AND u.email LIKE 'demo-%@example.com'
+WHERE c.event_id = @demo_event_id
 ON DUPLICATE KEY UPDATE is_confirmed = VALUES(is_confirmed);
 
 -- 雨天時の人数・開始時刻設定。画面で通常値との差分を確認できる。

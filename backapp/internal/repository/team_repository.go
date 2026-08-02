@@ -169,13 +169,8 @@ func (r *teamRepository) GetTeamByClassAndSport(classID int, sportID int, eventI
 }
 
 func (r *teamRepository) AddTeamMember(teamID int, userID string) error {
-	query := `
-		INSERT INTO team_members (team_id, user_id, entry_order)
-		SELECT ?, ?, COALESCE(MAX(entry_order), 0) + 1
-		FROM team_members
-		WHERE team_id = ?
-	`
-	_, err := r.db.Exec(query, teamID, userID, teamID)
+	query := "INSERT INTO team_members (team_id, user_id) VALUES (?, ?)"
+	_, err := r.db.Exec(query, teamID, userID)
 	return err
 }
 

@@ -83,8 +83,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	wsHandler := handler.NewWebSocketHandler(hubManager, cfg.FrontendURL)
 
 	systemHandler := handler.NewSystemHandler(cfg)
-	typingIntegrationRepo := repository.NewTypingIntegrationRepository(db)
-	typingIntegrationHandler := handler.NewTypingIntegrationHandler(typingIntegrationRepo)
 
 	// ヘルスチェック用のエンドポイント
 	router.GET("/api/health", middleware.NoStore(), func(c *gin.Context) {
@@ -96,16 +94,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	api := router.Group("/api")
 	api.Use(middleware.NoStore(), middleware.CSRFProtection())
 	{
-		typingIntegration := api.Group("/integrations/typing/v1")
-		typingIntegration.Use(
-			middleware.RateLimit(120, time.Minute),
-			middleware.TypingAPIKeyAuth(cfg.TypingAPIKey),
-		)
-		{
-			typingIntegration.GET("/events/active", typingIntegrationHandler.GetActiveEvent)
-			typingIntegration.GET("/events/:event_id/sports/:sport_id", typingIntegrationHandler.GetCompetitionSnapshot)
-		}
-
 		ws := api.Group("/ws")
 		{
 			ws.Use(middleware.AuthMiddleware(userRepo))
@@ -188,8 +176,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		admin := api.Group("/admin")
 		{
 			admin.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("admin", "root"))
-			admin.PUT("/typing/teams/:team_id/entry-order", typingIntegrationHandler.UpdateTeamEntryOrder)
-
 			adminEvent := admin.Group("/events")
 			{
 				adminEvent.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
