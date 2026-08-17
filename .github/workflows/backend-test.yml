@@ -23,7 +23,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.4'
+          go-version: '1.26.6'
           check-latest: true
           cache-dependency-path: 'backapp/go.sum'
 
@@ -33,6 +33,12 @@ jobs:
       - name: Install dependencies
         working-directory: ./backapp
         run: go mod download
+
+      - name: Check known vulnerabilities
+        working-directory: ./backapp
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
+          govulncheck ./...
 
       - name: Run all package tests
         working-directory: ./backapp
