@@ -13,7 +13,9 @@ import (
 type NoonGameRepository interface {
 	GetSessionByID(sessionID int) (*models.NoonGameSession, error)
 	GetSessionByEvent(eventID int) (*models.NoonGameSession, error)
+	ListSessionsByEvent(eventID int, publishedOnly bool) ([]*models.NoonGameSession, error)
 	UpsertSession(session *models.NoonGameSession) (*models.NoonGameSession, error)
+	DeleteSession(sessionID int) error
 
 	GetGroupsWithMembers(sessionID int) ([]*models.NoonGameGroupWithMembers, error)
 	GetGroupWithMembers(sessionID int, groupID int) (*models.NoonGameGroupWithMembers, error)
@@ -32,6 +34,7 @@ type NoonGameRepository interface {
 	InsertPoints(points []*models.NoonGamePoint) error
 	InsertPoint(point *models.NoonGamePoint) (*models.NoonGamePoint, error)
 	SumPointsByClass(sessionID int) (map[int]int, error)
+	SumConfirmedPointsByEvent(eventID int) (map[int]int, error)
 
 	GetGroupMembers(groupID int) ([]*models.NoonGameGroupMember, error)
 	GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error)
@@ -407,25 +410,30 @@ func (r *noonGameRepository) DeleteTemplateRunAndRelatedData(sessionID int) erro
 
 func (r *noonGameRepository) GetSessionByID(sessionID int) (*models.NoonGameSession, error) {
 	row := r.db.QueryRow(`
-		SELECT id, event_id, name, description, mode, win_points, loss_points, draw_points,
-		       participation_points, allow_manual_points, created_at, updated_at
+		SELECT id, event_id, template_key, name, description, scheduled_at, location, mode, win_points, loss_points, draw_points,
+		       participation_points, allow_manual_points, status, created_at, updated_at
 		FROM noon_game_sessions
 		WHERE id = ?
 	`, sessionID)
 
 	session := &models.NoonGameSession{}
-	var description sql.NullString
+	var description, location sql.NullString
+	var scheduledAt sql.NullTime
 	if err := row.Scan(
 		&session.ID,
 		&session.EventID,
+		&session.TemplateKey,
 		&session.Name,
 		&description,
+		&scheduledAt,
+		&location,
 		&session.Mode,
 		&session.WinPoints,
 		&session.LossPoints,
 		&session.DrawPoints,
 		&session.ParticipationPoints,
 		&session.AllowManualPoints,
+		&session.Status,
 		&session.CreatedAt,
 		&session.UpdatedAt,
 	); err != nil {
@@ -436,31 +444,42 @@ func (r *noonGameRepository) GetSessionByID(sessionID int) (*models.NoonGameSess
 	}
 	if description.Valid {
 		session.Description = &description.String
+	}
+	if location.Valid {
+		session.Location = &location.String
+	}
+	if scheduledAt.Valid {
+		session.ScheduledAt = &scheduledAt.Time
 	}
 	return session, nil
 }
 
 func (r *noonGameRepository) GetSessionByEvent(eventID int) (*models.NoonGameSession, error) {
 	row := r.db.QueryRow(`
-		SELECT id, event_id, name, description, mode, win_points, loss_points, draw_points,
-		       participation_points, allow_manual_points, created_at, updated_at
+		SELECT id, event_id, template_key, name, description, scheduled_at, location, mode, win_points, loss_points, draw_points,
+		       participation_points, allow_manual_points, status, created_at, updated_at
 		FROM noon_game_sessions
-		WHERE event_id = ?
+		WHERE event_id = ? ORDER BY id LIMIT 1
 	`, eventID)
 
 	session := &models.NoonGameSession{}
-	var description sql.NullString
+	var description, location sql.NullString
+	var scheduledAt sql.NullTime
 	if err := row.Scan(
 		&session.ID,
 		&session.EventID,
+		&session.TemplateKey,
 		&session.Name,
 		&description,
+		&scheduledAt,
+		&location,
 		&session.Mode,
 		&session.WinPoints,
 		&session.LossPoints,
 		&session.DrawPoints,
 		&session.ParticipationPoints,
 		&session.AllowManualPoints,
+		&session.Status,
 		&session.CreatedAt,
 		&session.UpdatedAt,
 	); err != nil {
@@ -473,26 +492,70 @@ func (r *noonGameRepository) GetSessionByEvent(eventID int) (*models.NoonGameSes
 	if description.Valid {
 		session.Description = &description.String
 	}
+	if location.Valid {
+		session.Location = &location.String
+	}
+	if scheduledAt.Valid {
+		session.ScheduledAt = &scheduledAt.Time
+	}
 	return session, nil
+}
+
+func (r *noonGameRepository) ListSessionsByEvent(eventID int, publishedOnly bool) ([]*models.NoonGameSession, error) {
+	query := `SELECT id, event_id, template_key, name, description, scheduled_at, location, mode, win_points, loss_points, draw_points, participation_points, allow_manual_points, status, created_at, updated_at FROM noon_game_sessions WHERE event_id = ?`
+	if publishedOnly {
+		query += ` AND status = 'published'`
+	}
+	query += ` ORDER BY scheduled_at IS NULL, scheduled_at, id`
+	rows, err := r.db.Query(query, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var sessions []*models.NoonGameSession
+	for rows.Next() {
+		s := &models.NoonGameSession{}
+		var description, location sql.NullString
+		var scheduledAt sql.NullTime
+		if err := rows.Scan(&s.ID, &s.EventID, &s.TemplateKey, &s.Name, &description, &scheduledAt, &location, &s.Mode, &s.WinPoints, &s.LossPoints, &s.DrawPoints, &s.ParticipationPoints, &s.AllowManualPoints, &s.Status, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if description.Valid {
+			s.Description = &description.String
+		}
+		if location.Valid {
+			s.Location = &location.String
+		}
+		if scheduledAt.Valid {
+			s.ScheduledAt = &scheduledAt.Time
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions, rows.Err()
 }
 
 func (r *noonGameRepository) UpsertSession(session *models.NoonGameSession) (*models.NoonGameSession, error) {
 	result, err := r.db.Exec(`
 		INSERT INTO noon_game_sessions (
-			event_id, name, description, mode, win_points, loss_points, draw_points,
-			participation_points, allow_manual_points
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			id, event_id, template_key, name, description, scheduled_at, location, mode, win_points, loss_points, draw_points,
+			participation_points, allow_manual_points, status
+		) VALUES (NULLIF(?, 0), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
+			id = LAST_INSERT_ID(id),
+			template_key = VALUES(template_key),
 			name = VALUES(name),
 			description = VALUES(description),
+			scheduled_at = VALUES(scheduled_at),
+			location = VALUES(location),
 			mode = VALUES(mode),
 			win_points = VALUES(win_points),
 			loss_points = VALUES(loss_points),
 			draw_points = VALUES(draw_points),
 			participation_points = VALUES(participation_points),
 			allow_manual_points = VALUES(allow_manual_points),
+			status = VALUES(status),
 			updated_at = CURRENT_TIMESTAMP
-	`, session.EventID, session.Name, nullableString(session.Description), session.Mode, session.WinPoints, session.LossPoints, session.DrawPoints, session.ParticipationPoints, session.AllowManualPoints)
+	`, session.ID, session.EventID, session.TemplateKey, session.Name, nullableString(session.Description), nullableTime(session.ScheduledAt), nullableString(session.Location), session.Mode, session.WinPoints, session.LossPoints, session.DrawPoints, session.ParticipationPoints, session.AllowManualPoints, session.Status)
 	if err != nil {
 		return nil, err
 	}
@@ -500,17 +563,13 @@ func (r *noonGameRepository) UpsertSession(session *models.NoonGameSession) (*mo
 	id, err := result.LastInsertId()
 	if err == nil && id > 0 {
 		session.ID = int(id)
-	} else {
-		existing, err := r.GetSessionByEvent(session.EventID)
-		if err != nil {
-			return nil, err
-		}
-		if existing != nil {
-			session.ID = existing.ID
-		}
 	}
+	return r.GetSessionByID(session.ID)
+}
 
-	return r.GetSessionByEvent(session.EventID)
+func (r *noonGameRepository) DeleteSession(sessionID int) error {
+	_, err := r.db.Exec(`DELETE FROM noon_game_sessions WHERE id = ?`, sessionID)
+	return err
 }
 
 func (r *noonGameRepository) GetGroupsWithMembers(sessionID int) ([]*models.NoonGameGroupWithMembers, error) {
@@ -1867,6 +1926,31 @@ func (r *noonGameRepository) SumPointsByClass(sessionID int) (map[int]int, error
 	}
 
 	return result, nil
+}
+
+// SumConfirmedPointsByEvent is the event-wide source of truth for class scores.
+// Draft sessions may be edited freely and therefore never affect official scores.
+func (r *noonGameRepository) SumConfirmedPointsByEvent(eventID int) (map[int]int, error) {
+	rows, err := r.db.Query(`
+		SELECT p.class_id, COALESCE(SUM(p.points), 0)
+		FROM noon_game_points p
+		JOIN noon_game_sessions s ON s.id = p.session_id
+		WHERE s.event_id = ? AND s.status IN ('finalized', 'published')
+		GROUP BY p.class_id
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int]int)
+	for rows.Next() {
+		var classID, total int
+		if err := rows.Scan(&classID, &total); err != nil {
+			return nil, err
+		}
+		result[classID] = total
+	}
+	return result, rows.Err()
 }
 
 func nullableString(ptr *string) interface{} {

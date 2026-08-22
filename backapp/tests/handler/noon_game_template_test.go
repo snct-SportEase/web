@@ -37,6 +37,19 @@ func (m *MockNoonGameRepository) GetSessionByEvent(eventID int) (*models.NoonGam
 	return args.Get(0).(*models.NoonGameSession), args.Error(1)
 }
 
+func (m *MockNoonGameRepository) ListSessionsByEvent(eventID int, publishedOnly bool) ([]*models.NoonGameSession, error) {
+	args := m.Called(eventID, publishedOnly)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.NoonGameSession), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) DeleteSession(sessionID int) error {
+	args := m.Called(sessionID)
+	return args.Error(0)
+}
+
 func (m *MockNoonGameRepository) UpsertSession(session *models.NoonGameSession) (*models.NoonGameSession, error) {
 	args := m.Called(session)
 	if args.Get(0) == nil {
@@ -139,6 +152,25 @@ func (m *MockNoonGameRepository) InsertPoint(point *models.NoonGamePoint) (*mode
 
 func (m *MockNoonGameRepository) SumPointsByClass(sessionID int) (map[int]int, error) {
 	args := m.Called(sessionID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[int]int), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) SumConfirmedPointsByEvent(eventID int) (map[int]int, error) {
+	// Legacy result tests configure the former per-session aggregation. Keep the
+	// shared mock compatible while production now aggregates confirmed sessions.
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "SumPointsByClass" {
+			args := m.MethodCalled("SumPointsByClass", call.Arguments.Get(0))
+			if args.Get(0) == nil {
+				return nil, args.Error(1)
+			}
+			return args.Get(0).(map[int]int), args.Error(1)
+		}
+	}
+	args := m.Called(eventID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

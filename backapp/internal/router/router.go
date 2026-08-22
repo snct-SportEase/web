@@ -152,6 +152,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				studentEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				studentEvents.GET("/:event_id/noon-game/session", noonHandler.GetSession)
+				studentEvents.GET("/:event_id/noon-game/sessions", noonHandler.ListSessions)
+				studentEvents.GET("/:event_id/noon-game/sessions/:session_id", noonHandler.GetSessionByID)
 			}
 
 			studentNotificationRequests := student.Group("/notification-requests")
@@ -180,6 +182,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			{
 				adminEvent.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				adminEvent.GET("/:event_id/noon-game/session", noonHandler.GetSession)
+				adminEvent.GET("/:event_id/noon-game/sessions", noonHandler.ListSessions)
+				adminEvent.GET("/:event_id/noon-game/sessions/:session_id", noonHandler.GetSessionByID)
 				// Templates (noon-game)
 				adminEvent.POST("/:event_id/noon-game/templates/year-relay/run", noonHandler.CreateYearRelayRun)
 			}
@@ -276,6 +280,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.GET("/:id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				rootEvents.GET("/:id/noon-game/session", noonHandler.GetSession)
 				rootEvents.POST("/:id/noon-game/session", noonHandler.UpsertSession)
+				rootEvents.GET("/:id/noon-game/sessions", noonHandler.ListSessions)
+				rootEvents.POST("/:id/noon-game/sessions", noonHandler.UpsertSession)
+				rootEvents.GET("/:id/noon-game/sessions/:session_id", noonHandler.GetSessionByID)
+				rootEvents.PUT("/:id/noon-game/sessions/:session_id", noonHandler.UpsertSession)
+				rootEvents.DELETE("/:id/noon-game/sessions/:session_id", noonHandler.DeleteSession)
 				rootEvents.POST("/:id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
 				rootEvents.POST("/:id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)

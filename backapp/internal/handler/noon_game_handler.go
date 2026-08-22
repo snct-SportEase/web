@@ -123,6 +123,20 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
 	}
+	// Keep the legacy singular endpoint safe for students as well. New clients
+	// should use /sessions, but an unpublished first session must never leak.
+	if isStudentRequest(c) {
+		published, err := h.noonRepo.ListSessionsByEvent(eventID, true)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game sessions"})
+			return
+		}
+		if len(published) > 0 {
+			session = published[0]
+		} else {
+			session = nil
+		}
+	}
 	if session == nil {
 		// セッションが存在しない場合はリクエストから設定を取得、またはデフォルト値を使用
 		sessionName := defaultYearRelaySessionName
@@ -921,14 +935,18 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 }
 
 type upsertNoonSessionRequest struct {
+	TemplateKey         string  `json:"template_key"`
 	Name                string  `json:"name" binding:"required"`
 	Description         *string `json:"description"`
+	ScheduledAt         *string `json:"scheduled_at"`
+	Location            *string `json:"location"`
 	Mode                string  `json:"mode"`
 	WinPoints           int     `json:"win_points"`
 	LossPoints          int     `json:"loss_points"`
 	DrawPoints          int     `json:"draw_points"`
 	ParticipationPoints int     `json:"participation_points"`
 	AllowManualPoints   *bool   `json:"allow_manual_points"`
+	Status              string  `json:"status"`
 }
 
 type upsertNoonGroupRequest struct {
@@ -1132,6 +1150,84 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 	c.JSON(http.StatusOK, payload)
 }
 
+// ListSessions returns only published sessions to students. Administrators and
+// root users receive every state so they can prepare and publish sessions.
+func (h *NoonGameHandler) ListSessions(c *gin.Context) {
+	eventIDStr := c.Param("event_id")
+	if eventIDStr == "" {
+		eventIDStr = c.Param("id")
+	}
+	eventID, err := strconv.Atoi(eventIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id"})
+		return
+	}
+	if err := h.ensureEventExists(eventID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+	publishedOnly := isStudentRequest(c)
+	sessions, err := h.noonRepo.ListSessionsByEvent(eventID, publishedOnly)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game sessions"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"sessions": sessions})
+}
+
+func (h *NoonGameHandler) GetSessionByID(c *gin.Context) {
+	sessionID, err := strconv.Atoi(c.Param("session_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session_id"})
+		return
+	}
+	session, err := h.noonRepo.GetSessionByID(sessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session"})
+		return
+	}
+	if session == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Noon game session not found"})
+		return
+	}
+	if isStudentRequest(c) && session.Status != "published" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Noon game session not found"})
+		return
+	}
+	payload, err := h.buildSessionPayload(session)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload"})
+		return
+	}
+	c.JSON(http.StatusOK, payload)
+}
+
+func (h *NoonGameHandler) DeleteSession(c *gin.Context) {
+	sessionID, err := strconv.Atoi(c.Param("session_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session_id"})
+		return
+	}
+	session, err := h.noonRepo.GetSessionByID(sessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session"})
+		return
+	}
+	if session == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Noon game session not found"})
+		return
+	}
+	if err := h.noonRepo.DeleteSession(sessionID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete noon game session"})
+		return
+	}
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rebuild class scores"})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 	eventIDStr := c.Param("event_id")
 	if eventIDStr == "" {
@@ -1161,6 +1257,7 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 
 	session := &models.NoonGameSession{
 		EventID:             eventID,
+		TemplateKey:         strings.TrimSpace(req.TemplateKey),
 		Name:                req.Name,
 		Description:         req.Description,
 		Mode:                strings.ToLower(strings.TrimSpace(req.Mode)),
@@ -1169,7 +1266,44 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 		DrawPoints:          req.DrawPoints,
 		ParticipationPoints: req.ParticipationPoints,
 		AllowManualPoints:   true,
+		Status:              strings.ToLower(strings.TrimSpace(req.Status)),
 	}
+	if sessionIDRaw := c.Param("session_id"); sessionIDRaw != "" {
+		sessionID, err := strconv.Atoi(sessionIDRaw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session_id"})
+			return
+		}
+		existing, err := h.noonRepo.GetSessionByID(sessionID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session"})
+			return
+		}
+		if existing == nil || existing.EventID != eventID {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Noon game session not found"})
+			return
+		}
+		session.ID = sessionID
+	}
+	if session.TemplateKey == "" {
+		session.TemplateKey = "custom"
+	}
+	if session.Status == "" {
+		session.Status = "draft"
+	}
+	if session.Status != "draft" && session.Status != "finalized" && session.Status != "published" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
+		return
+	}
+	if req.ScheduledAt != nil && strings.TrimSpace(*req.ScheduledAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, *req.ScheduledAt)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid scheduled_at"})
+			return
+		}
+		session.ScheduledAt = &parsed
+	}
+	session.Location = req.Location
 	if session.Mode == "" {
 		session.Mode = "mixed"
 	}
@@ -1188,6 +1322,14 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync noon game sport"})
 		return
 	}
+	// A newly created draft has no official score impact. State transitions to
+	// finalized/published are the point at which it becomes part of the event total.
+	if updated.Status == "finalized" || updated.Status == "published" {
+		if err := h.rebuildNoonGameScores(eventID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rebuild class scores"})
+			return
+		}
+	}
 
 	payload, err := h.buildSessionPayload(updated)
 	if err != nil {
@@ -1197,6 +1339,34 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, payload)
+}
+
+func isStudentRequest(c *gin.Context) bool {
+	userValue, ok := c.Get("user")
+	if !ok {
+		return false
+	}
+	user, ok := userValue.(*models.User)
+	if !ok {
+		return false
+	}
+	for _, role := range user.Roles {
+		if role.Name == "student" {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *NoonGameHandler) rebuildNoonGameScores(eventID int) error {
+	points, err := h.noonRepo.SumConfirmedPointsByEvent(eventID)
+	if err != nil {
+		return fmt.Errorf("failed to aggregate confirmed points: %w", err)
+	}
+	if err := h.classRepo.SetNoonGamePoints(eventID, points); err != nil {
+		return fmt.Errorf("failed to update class scores: %w", err)
+	}
+	return nil
 }
 
 func (h *NoonGameHandler) SaveGroup(c *gin.Context) {
@@ -1964,13 +2134,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 		return
 	}
 
-	summary, err := h.noonRepo.SumPointsByClass(session.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
-		return
-	}
-
-	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
@@ -2057,13 +2221,7 @@ func (h *NoonGameHandler) AddManualPoint(c *gin.Context) {
 		return
 	}
 
-	summary, err := h.noonRepo.SumPointsByClass(sessionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
-		return
-	}
-
-	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
@@ -2620,12 +2778,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 	}
 
 	// クラス得点へ反映
-	summary, err := h.noonRepo.SumPointsByClass(session.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
-		return
-	}
-	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
@@ -3081,12 +3234,8 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 	}
 
 	// クラス得点へ反映
-	summary, err := h.noonRepo.SumPointsByClass(session.ID)
-	if err != nil {
-		return fmt.Errorf("failed to aggregate points: %w", err)
-	}
-	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
-		return fmt.Errorf("failed to update class scores: %w", err)
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
+		return err
 	}
 
 	log.Printf("INFO: overall bonus saved run_id=%d match_bonus_id=%d details=%d points_entries=%d", runID, matchBonus.ID, len(resultDetails), len(pointsEntries))
@@ -3382,12 +3531,7 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 	}
 
 	// クラス得点へ反映
-	summary, err := h.noonRepo.SumPointsByClass(session.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
-		return
-	}
-	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
@@ -3668,12 +3812,7 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 	}
 
 	// クラス得点へ反映
-	summary, err := h.noonRepo.SumPointsByClass(session.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate points"})
-		return
-	}
-	if err := h.classRepo.SetNoonGamePoints(session.EventID, summary); err != nil {
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
 		return
 	}
