@@ -325,11 +325,11 @@ func TestNoonGameHandler_CreateTypingRunHonorsRequestedStatus(t *testing.T) {
 	const userID = "00000000-0000-0000-0000-000000000001"
 	eventRepo.On("GetEventByID", eventID).Return(&models.Event{ID: eventID}, nil).Once()
 	noonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{}, nil).Once()
-	classRepo.On("GetAllClasses", eventID).Return([]*models.Class{}, nil).Once()
+	classRepo.On("GetAllClasses", eventID).Return([]*models.Class{{ID: 1, Name: "1A"}}, nil).Once()
 	noonRepo.On("UpsertSession", mock.MatchedBy(func(session *models.NoonGameSession) bool {
 		return session.TemplateKey == "typing" && session.Status == "published"
 	})).Return(&models.NoonGameSession{ID: 10, EventID: eventID, TemplateKey: "typing", Name: "競技タイピング", Status: "published"}, nil).Once()
-	noonRepo.On("SaveGroup", mock.AnythingOfType("*models.NoonGameGroup"), []int{}).Return(&models.NoonGameGroupWithMembers{}, nil).Times(6)
+	noonRepo.On("SaveGroup", mock.AnythingOfType("*models.NoonGameGroup"), []int{1}).Return(&models.NoonGameGroupWithMembers{}, nil).Times(6)
 	noonRepo.On("CreateTemplateRunWithPointsByRankJSON", 10, "typing", "競技タイピング", userID, mock.Anything).Return(&models.NoonGameTemplateRun{ID: 1}, nil).Once()
 
 	payload := map[string]any{
@@ -337,9 +337,9 @@ func TestNoonGameHandler_CreateTypingRunHonorsRequestedStatus(t *testing.T) {
 			"name":   "競技タイピング",
 			"status": "published",
 			"groups": []map[string]any{
-				{"group_name": "1年生", "class_names": []string{}}, {"group_name": "2年生", "class_names": []string{}},
-				{"group_name": "3年生", "class_names": []string{}}, {"group_name": "4年生", "class_names": []string{}},
-				{"group_name": "5年生", "class_names": []string{}}, {"group_name": "専攻科・教員", "class_names": []string{}},
+				{"group_name": "1年生", "class_names": []string{"1A"}}, {"group_name": "2年生", "class_names": []string{"1A"}},
+				{"group_name": "3年生", "class_names": []string{"1A"}}, {"group_name": "4年生", "class_names": []string{"1A"}},
+				{"group_name": "5年生", "class_names": []string{"1A"}}, {"group_name": "専攻科・教員", "class_names": []string{"1A"}},
 			},
 		},
 	}
