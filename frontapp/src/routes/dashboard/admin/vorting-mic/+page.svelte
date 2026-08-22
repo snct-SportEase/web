@@ -1,5 +1,6 @@
 <script>
   import FormField from '$lib/components/FormField.svelte';
+  import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
 
   let eligibleClasses = $state([]);
@@ -139,12 +140,12 @@
     </FormField>
 
     <div class="flex items-center justify-between">
-      <button
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+      <Button
+        class="border-blue-500 bg-blue-500 font-bold hover:bg-blue-700 focus:ring-blue-500"
         type="submit"
       >
         投票する
-      </button>
+      </Button>
     </div>
   </form>
 {/if}

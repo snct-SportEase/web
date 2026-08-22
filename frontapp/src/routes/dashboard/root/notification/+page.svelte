@@ -1,5 +1,6 @@
 <script>
   import FormField from '$lib/components/FormField.svelte';
+  import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
 
@@ -321,18 +322,15 @@
       </div>
     </div>
 
-    <button
+    <Button
       type="button"
-      class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
       onclick={(e) => { e.preventDefault(); handleSubmit(e); }}
-      disabled={!isInteractive || isSubmitting || availableRoles.length === 0}
+      disabled={!isInteractive || availableRoles.length === 0}
+      loading={isSubmitting}
+      loadingLabel="送信中..."
     >
-      {#if isSubmitting}
-        送信中...
-      {:else}
-        通知を送信
-      {/if}
-    </button>
+      通知を送信
+    </Button>
   </section>
 
   <section class="bg-white shadow rounded-lg p-6">

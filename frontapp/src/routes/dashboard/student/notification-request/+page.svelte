@@ -1,5 +1,6 @@
 <script>
   import FormField from '$lib/components/FormField.svelte';
+  import Button from '$lib/components/Button.svelte';
   import { page } from '$app/stores';
   import { goto, invalidateAll } from '$app/navigation';
   import { browser } from '$app/environment';
@@ -194,9 +195,9 @@
           ></textarea>
         </FormField>
         <div class="flex justify-end space-x-3">
-          <button
+          <Button
             type="button"
-            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            variant="secondary"
             onclick={() => {
               showNewForm = false;
               newTitle = '';
@@ -205,14 +206,14 @@
             }}
           >
             キャンセル
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 disabled:bg-indigo-300"
-            disabled={isSubmitting}
+            loading={isSubmitting}
+            loadingLabel="送信中..."
           >
-            {isSubmitting ? '送信中...' : '申請を送信'}
-          </button>
+            申請を送信
+          </Button>
         </div>
       </form>
     {/if}

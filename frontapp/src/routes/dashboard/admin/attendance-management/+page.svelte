@@ -1,5 +1,6 @@
 <script>
   import FormField from '$lib/components/FormField.svelte';
+  import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
 
   let { data } = $props();
@@ -171,13 +172,14 @@
             <p class="text-green-500 text-sm mb-4">{successMessage}</p>
           {/if}
 
-          <button
+          <Button
             type="submit"
-            disabled={isLoading}
-            class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            class="w-full"
+            loading={isLoading}
+            loadingLabel="登録中..."
           >
-            {isLoading ? '登録中...' : '出席を登録する'}
-          </button>
+            出席を登録する
+          </Button>
         </form>
       </div>
     {/if}
