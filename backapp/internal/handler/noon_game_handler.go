@@ -1118,6 +1118,7 @@ type createTypingRunRequest struct {
 		Description  *string                `json:"description"`
 		ScheduledAt  *string                `json:"scheduled_at"`
 		Location     *string                `json:"location"`
+		Status       string                 `json:"status"`
 		PointsByRank map[string]interface{} `json:"points_by_rank"`
 		Groups       []templateGroupConfig  `json:"groups"`
 	} `json:"session"`
@@ -2665,7 +2666,15 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 	if name == "" {
 		name = defaultTypingSessionName
 	}
-	session := &models.NoonGameSession{EventID: eventID, TemplateKey: noonTemplateTyping, Name: name, Description: req.Session.Description, Location: req.Session.Location, Mode: "group", AllowManualPoints: false, Status: "draft"}
+	status := strings.ToLower(strings.TrimSpace(req.Session.Status))
+	if status == "" {
+		status = "draft"
+	}
+	if status != "draft" && status != "published" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
+		return
+	}
+	session := &models.NoonGameSession{EventID: eventID, TemplateKey: noonTemplateTyping, Name: name, Description: req.Session.Description, Location: req.Session.Location, Mode: "group", AllowManualPoints: false, Status: status}
 	if existing != nil {
 		session.ID = existing.ID
 		session.Status = existing.Status
