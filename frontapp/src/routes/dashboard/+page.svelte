@@ -5,6 +5,7 @@
   import EventSetupModal from '$lib/components/EventSetupModal.svelte';
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
   import NotificationSettings from '$lib/components/NotificationSettings.svelte';
+  import ActionCard from '$lib/components/ActionCard.svelte';
 
   let { data } = $props();
   let user = $derived(data.user);
@@ -295,50 +296,18 @@
     </div>
     
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <button
-        type="button"
-        onclick={() => showPWAInstallGuide = true}
-        class="group block rounded-lg border border-indigo-100 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow text-left"
-      >
-        <div class="flex items-center mb-2">
-          <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <ActionCard title="PWAインストール方法" description="OS別のPWAインストール手順をご覧いただけます" onclick={() => showPWAInstallGuide = true}>
+          <svg class="mr-2 h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
           </svg>
-          <h4 class="text-base font-semibold text-indigo-700 group-hover:text-indigo-800">
-            PWAインストール方法
-          </h4>
-        </div>
-        <p class="mt-1 text-sm text-gray-600">OS別のPWAインストール手順をご覧いただけます</p>
-        <span class="mt-3 inline-flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
-          詳細を見る →
-        </span>
-      </button>
+      </ActionCard>
 
       {#if competitionGuidelinesUrl}
-        <button
-          type="button"
-          onclick={openCompetitionGuidelines}
-          class="group block rounded-lg border border-indigo-100 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow text-left"
-        >
-          <div class="flex items-center mb-2">
-            <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <ActionCard title="競技要項" description={activeEvent ? `${activeEvent.name}の競技要項を確認できます` : '大会の競技要項を確認できます'} actionLabel="競技要項を見る" onclick={openCompetitionGuidelines}>
+            <svg class="mr-2 h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
             </svg>
-            <h4 class="text-base font-semibold text-indigo-700 group-hover:text-indigo-800">
-              競技要項
-            </h4>
-          </div>
-          <p class="mt-1 text-sm text-gray-600">
-            {#if activeEvent}
-              {activeEvent.name}の競技要項を確認できます
-            {:else}
-              大会の競技要項を確認できます
-            {/if}
-          </p>
-          <span class="mt-3 inline-flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
-            競技要項を見る →
-          </span>
-        </button>
+        </ActionCard>
       {/if}
     </div>
   </section>
@@ -423,15 +392,7 @@
             <h3 class="text-lg font-semibold text-gray-800">{section.title}</h3>
             <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {#each section.shortcuts as shortcut (shortcut.href)}
-                <a href={shortcut.href} class="group block rounded-lg border border-indigo-100 bg-white p-5 shadow-sm transition hover:border-indigo-300 hover:shadow">
-                  <h4 class="text-base font-semibold text-indigo-700 group-hover:text-indigo-800">
-                    {shortcut.title}
-                  </h4>
-                  <p class="mt-1 text-sm text-gray-600">{shortcut.description}</p>
-                  <span class="mt-3 inline-flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
-                    詳細を見る →
-                  </span>
-                </a>
+                <ActionCard href={shortcut.href} title={shortcut.title} description={shortcut.description} />
               {/each}
             </div>
           </div>

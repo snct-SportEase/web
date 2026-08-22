@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
+  import ActionCard from '$lib/components/ActionCard.svelte';
 
   let showPWAInstallGuide = $state(false);
   let activeEvent = $state(null);
@@ -51,29 +52,11 @@
     </div>
 
     <div class="grid gap-6 md:grid-cols-2">
-      <button
-        type="button"
-        onclick={() => showPWAInstallGuide = true}
-        class="group block rounded-lg border border-indigo-100 bg-white p-6 shadow-sm transition hover:border-indigo-300 hover:shadow text-left"
-      >
-        <div class="flex items-center mb-3">
-          <svg class="w-8 h-8 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <ActionCard size="spacious" headingTag="h2" title="PWAインストール方法" description="iOS、Android、Windows、macOSなど、お使いのOS別のPWAインストール手順をご確認いただけます。" onclick={() => showPWAInstallGuide = true}>
+          <svg class="mr-3 h-8 w-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
           </svg>
-          <h2 class="text-xl font-semibold text-indigo-700 group-hover:text-indigo-800">
-            PWAインストール方法
-          </h2>
-        </div>
-        <p class="text-sm text-gray-600 mb-4">
-          iOS、Android、Windows、macOSなど、お使いのOS別のPWAインストール手順をご確認いただけます。
-        </p>
-        <div class="flex items-center text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
-          詳細を見る
-          <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-          </svg>
-        </div>
-      </button>
+      </ActionCard>
 
       {#if competitionGuidelinesUrl}
         <button
