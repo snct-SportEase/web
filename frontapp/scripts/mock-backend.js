@@ -219,6 +219,7 @@ let noonGroups = [];
 let noonMatches = [];
 let noonPointsSummary = [];
 let noonTemplateRuns = [];
+let noonTypingResults = [];
 let rainyModeSettings = [];
 
 function buildNoonGroupMembers(groupId, classIds = []) {
@@ -295,6 +296,15 @@ function readJson(req) {
   });
 }
 
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 function getSessionToken(req) {
   const cookieHeader = req.headers.cookie ?? '';
   const cookie = cookieHeader
@@ -350,6 +360,7 @@ createServer(async (req, res) => {
     noonMatches = [];
     noonPointsSummary = [];
     noonTemplateRuns = [];
+    noonTypingResults = [];
     rainyModeSettings = [];
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
@@ -1084,15 +1095,45 @@ createServer(async (req, res) => {
     return;
   }
 
+  const noonSessionPayload = () => ({
+    session: noonSession,
+    classes,
+    groups: noonGroups,
+    matches: noonMatches,
+    points_summary: noonPointsSummary,
+    template_runs: noonTemplateRuns,
+    typing_results: noonTypingResults,
+    typing_import_status: noonTypingResults.length > 0 ? 'finalized' : 'pending'
+  });
+
+  if (url.pathname === '/api/root/events/1/noon-game/sessions' && req.method === 'GET') {
+    sendJson(res, 200, { sessions: noonSession ? [noonSession] : [] });
+    return;
+  }
+
+  const noonSessionByIDMatch = url.pathname.match(/^\/api\/root\/events\/1\/noon-game\/sessions\/(\d+)$/);
+  if (noonSessionByIDMatch && req.method === 'GET') {
+    if (!noonSession || noonSession.id !== Number(noonSessionByIDMatch[1])) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+    sendJson(res, 200, noonSessionPayload());
+    return;
+  }
+
+  if (noonSessionByIDMatch && req.method === 'PUT') {
+    const body = await readJson(req);
+    if (!noonSession || noonSession.id !== Number(noonSessionByIDMatch[1])) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+    noonSession = { ...noonSession, ...body };
+    sendJson(res, 200, noonSessionPayload());
+    return;
+  }
+
   if (url.pathname === '/api/root/events/1/noon-game/session' && req.method === 'GET') {
-    sendJson(res, 200, {
-      session: noonSession,
-      classes,
-      groups: noonGroups,
-      matches: noonMatches,
-      points_summary: noonPointsSummary,
-      template_runs: noonTemplateRuns
-    });
+    sendJson(res, 200, noonSessionPayload());
     return;
   }
 
@@ -1109,14 +1150,7 @@ createServer(async (req, res) => {
       participation_points: body.participation_points,
       allow_manual_points: body.allow_manual_points
     };
-    sendJson(res, 200, {
-      session: noonSession,
-      classes,
-      groups: noonGroups,
-      matches: noonMatches,
-      points_summary: noonPointsSummary,
-      template_runs: noonTemplateRuns
-    });
+    sendJson(res, 200, noonSessionPayload());
     return;
   }
 
@@ -1137,32 +1171,69 @@ createServer(async (req, res) => {
         class_names: group.class_names ?? []
       }))
     };
-    sendJson(res, 200, { ok: true });
+    sendJson(res, 201, { session: noonSession, run: noonTemplateRuns[0] });
     return;
   }
 
   const rootTemplateRunMatch = url.pathname.match(/^\/api\/root\/events\/1\/noon-game\/templates\/([^/]+)\/run$/);
   if (rootTemplateRunMatch && req.method === 'POST') {
     const body = await readJson(req);
+    const templateKey = rootTemplateRunMatch[1].replace(/-/g, '_');
     noonSession = {
       id: 1,
+      template_key: templateKey,
       ...body.session
     };
     noonGroups = templateGroupsToNoonGroups(body.session?.groups ?? []);
-    noonTemplateRuns = [{ id: 1, template_key: rootTemplateRunMatch[1].replace(/-/g, '_') }];
-    sendJson(res, 200, { ok: true });
+    noonTemplateRuns = [{ id: 1, template_key: templateKey }];
+    sendJson(res, 201, { session: noonSession, run: noonTemplateRuns[0] });
+    return;
+  }
+
+  const typingImportMatch = url.pathname.match(/^\/api\/root\/noon-game\/sessions\/(\d+)\/typing-system\/import$/);
+  if (typingImportMatch && req.method === 'POST') {
+    if (!noonSession || noonSession.id !== Number(typingImportMatch[1])) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+    const requestBody = (await readBody(req)).toString('utf8');
+    const exportID = '4ef87d60-2e74-477a-9c16-a93423d04c20';
+    if (!requestBody.includes(exportID)) {
+      sendJson(res, 422, { error: 'Invalid typing results JSON' });
+      return;
+    }
+    noonTypingResults = [
+      { team_name: '1年生', match_1_score: 120, match_2_score: 130, match_3_score: 140, total_score: 390, rank: 1, points: 40 },
+      { team_name: '2年生', match_1_score: 110, match_2_score: 120, match_3_score: 130, total_score: 360, rank: 2, points: 30 },
+      { team_name: '3年生', match_1_score: 100, match_2_score: 110, match_3_score: 120, total_score: 330, rank: 3, points: 25 },
+      { team_name: '4年生', match_1_score: 90, match_2_score: 100, match_3_score: 110, total_score: 300, rank: 4, points: 0 },
+      { team_name: '5年生', match_1_score: 80, match_2_score: 90, match_3_score: 100, total_score: 270, rank: 5, points: 0 },
+      { team_name: '専攻科・教員', match_1_score: 70, match_2_score: 80, match_3_score: 90, total_score: 240, rank: 6, points: 0 }
+    ];
+    sendJson(res, 200, { message: 'imported', export_id: exportID });
+    return;
+  }
+
+  if (url.pathname === '/api/student/events/1/noon-game/session' && req.method === 'GET') {
+    if (!noonSession || noonSession.status !== 'published') {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+    sendJson(res, 200, noonSessionPayload());
     return;
   }
 
   const adminTemplateRunMatch = url.pathname.match(/^\/api\/admin\/events\/1\/noon-game\/templates\/([^/]+)\/run$/);
   if (adminTemplateRunMatch && req.method === 'POST') {
     const body = await readJson(req);
+    const templateKey = adminTemplateRunMatch[1].replace(/-/g, '_');
     noonSession = {
       id: 1,
+      template_key: templateKey,
       ...body.session
     };
     noonGroups = templateGroupsToNoonGroups(body.session?.groups ?? []);
-    noonTemplateRuns = [{ id: 1, template_key: adminTemplateRunMatch[1].replace(/-/g, '_') }];
+    noonTemplateRuns = [{ id: 1, template_key: templateKey }];
     sendJson(res, 200, { ok: true });
     return;
   }
