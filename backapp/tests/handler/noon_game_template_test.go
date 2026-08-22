@@ -137,6 +137,16 @@ func (m *MockNoonGameRepository) ClearPointsForMatch(matchID int) error {
 	return args.Error(0)
 }
 
+func (m *MockNoonGameRepository) ClearPointsForSessionAndSource(sessionID int, source string) error {
+	args := m.Called(sessionID, source)
+	return args.Error(0)
+}
+
+func (m *MockNoonGameRepository) ApplyTypingSystemResultImport(sessionID int, points []*models.NoonGamePoint, replace bool, history *models.NoonGameTypingSystemImportRecord) error {
+	args := m.Called(sessionID, points, replace, history)
+	return args.Error(0)
+}
+
 func (m *MockNoonGameRepository) InsertPoints(points []*models.NoonGamePoint) error {
 	args := m.Called(points)
 	return args.Error(0)
@@ -148,6 +158,32 @@ func (m *MockNoonGameRepository) InsertPoint(point *models.NoonGamePoint) (*mode
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*models.NoonGamePoint), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) GetActiveTypingSystemImport(sessionID int) (*models.NoonGameTypingSystemImportRecord, error) {
+	args := m.Called(sessionID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.NoonGameTypingSystemImportRecord), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) GetTypingSystemImportsBySessionAndExportID(sessionID int, exportID string) ([]*models.NoonGameTypingSystemImportRecord, error) {
+	args := m.Called(sessionID, exportID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.NoonGameTypingSystemImportRecord), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) CreateTypingSystemImportHistory(record *models.NoonGameTypingSystemImportRecord) error {
+	args := m.Called(record)
+	return args.Error(0)
+}
+
+func (m *MockNoonGameRepository) SetTypingSystemImportInactive(sessionID int) error {
+	args := m.Called(sessionID)
+	return args.Error(0)
 }
 
 func (m *MockNoonGameRepository) SumPointsByClass(sessionID int) (map[int]int, error) {
