@@ -6,6 +6,8 @@
   import { dndzone } from 'svelte-dnd-action';
 
   let session = $state(null);
+  let sessions = $state([]);
+  let selectedSessionId = $state(null);
   let matches = $state([]);
   let pointsSummary = $state([]);
   let loading = $state(false);
@@ -16,21 +18,40 @@
   let activeEventStatus = $state('');
   let templateRunForms = $state({});
   let templateRuns = $state([]);
+  let typingFile = $state(null);
+  let importingTypingResults = $state(false);
 
   onMount(async () => {
     await activeEvent.init();
     const current = get(activeEvent);
     activeEventStatus = current?.status ?? '';
     if (current) {
-      await fetchSession(current.id);
+      await fetchSessions(current.id);
     }
   });
 
-  async function fetchSession(eventId) {
+  async function fetchSessions(eventId, preferredSessionId = selectedSessionId) {
     loading = true;
     errorMessage = '';
     try {
-      const res = await fetch(`/api/admin/events/${eventId}/noon-game/session`);
+      const listResponse = await fetch(`/api/admin/events/${eventId}/noon-game/sessions`);
+      if (!listResponse.ok) {
+        const detail = await safeJson(listResponse);
+        throw new Error(detail?.error || '昼競技一覧の取得に失敗しました');
+      }
+      const listData = await listResponse.json();
+      sessions = listData.sessions || [];
+      const selected = sessions.find((item) => item.id === preferredSessionId) || sessions[0];
+      if (!selected) {
+        selectedSessionId = null;
+        session = null;
+        matches = [];
+        pointsSummary = [];
+        templateRuns = [];
+        return;
+      }
+      selectedSessionId = selected.id;
+      const res = await fetch(`/api/admin/events/${eventId}/noon-game/sessions/${selected.id}`);
       if (!res.ok) {
         const detail = await safeJson(res);
         throw new Error(detail?.error || '昼競技データの取得に失敗しました');
@@ -46,6 +67,32 @@
       errorMessage = err.message;
     } finally {
       loading = false;
+    }
+  }
+
+  async function importTypingResults(replace = false) {
+    if (!session?.id || !typingFile) {
+      alert('JSON ファイルを選択してください。');
+      return;
+    }
+    importingTypingResults = true;
+    try {
+      const form = new FormData();
+      form.append('file', typingFile);
+      const response = await fetch(`/api/admin/noon-game/sessions/${session.id}/typing-system/import${replace ? '?replace=true' : ''}`, {
+        method: 'POST',
+        body: form
+      });
+      const detail = await safeJson(response);
+      if (!response.ok) throw new Error(detail?.error || '結果のインポートに失敗しました');
+      alert(detail?.status === 'already_imported' ? 'この結果はすでにインポート済みです。' : '競技タイピング結果を確定しました。');
+      typingFile = null;
+      const current = get(activeEvent);
+      if (current) await fetchSessions(current.id, session.id);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      importingTypingResults = false;
     }
   }
 
@@ -148,7 +195,7 @@
       }
       const current = get(activeEvent);
       if (current) {
-        await fetchSession(current.id);
+        await fetchSessions(current.id, session?.id);
       }
       alert('試合結果を登録しました。');
     } catch (err) {
@@ -509,7 +556,7 @@
 
       const current = get(activeEvent);
       if (current) {
-        await fetchSession(current.id);
+        await fetchSessions(current.id, session?.id);
       }
       alert('試合結果を登録しました。');
     } catch (err) {
@@ -729,6 +776,34 @@
       <p>root 権限ユーザーにてセッションの作成を依頼してください。</p>
     </div>
   {:else}
+    {#if sessions.length > 1}
+      <section class="bg-white shadow rounded-lg p-4 flex flex-wrap items-center gap-3">
+        <label class="text-sm font-medium text-gray-700" for="admin-noon-game-session">入力する昼競技</label>
+        <select
+          id="admin-noon-game-session"
+          class="border rounded px-3 py-2"
+          value={selectedSessionId ?? ''}
+          onchange={(event) => {
+            const current = get(activeEvent);
+            if (current) fetchSessions(current.id, Number(event.currentTarget.value));
+          }}>
+          {#each sessions as item (item.id)}
+            <option value={item.id}>{item.name}（{item.status}）</option>
+          {/each}
+        </select>
+      </section>
+    {/if}
+    {#if session.template_key === 'typing'}
+      <section class="bg-white shadow rounded-lg p-6 space-y-4">
+        <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">競技タイピング結果のインポート</h2>
+        <p class="text-sm text-gray-600">typing-results-v1 の JSON を読み込み、順位点を大会得点へ反映します。</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <input type="file" accept="application/json,.json" onchange={(event) => { typingFile = event.currentTarget.files?.[0] ?? null; }} />
+          <button class="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50" onclick={() => importTypingResults(false)} disabled={!typingFile || importingTypingResults || activeEventStatus !== 'active'}>{importingTypingResults ? 'インポート中…' : '結果をインポート'}</button>
+          <button class="px-4 py-2 border border-orange-500 text-orange-700 rounded disabled:opacity-50" onclick={() => importTypingResults(true)} disabled={!typingFile || importingTypingResults || activeEventStatus !== 'active'}>置換インポート</button>
+        </div>
+      </section>
+    {/if}
     <!-- テンプレートラン用の結果入力 -->
     {#if templateRuns.length > 0}
       <section class="bg-white shadow rounded-lg p-6 space-y-6">
