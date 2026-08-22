@@ -1,4 +1,6 @@
 <script>
+  import FormField from '$lib/components/FormField.svelte';
+  import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
 
   let eligibleClasses = $state([]);
@@ -112,8 +114,7 @@
   </div>
 {:else}
   <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" onsubmit={(e) => { e.preventDefault(); vote(e); }}>
-    <div>
-      <label for="class-select" class="block text-gray-700 font-bold mb-2">投票対象クラス</label>
+    <FormField label="投票対象クラス" inputId="class-select" labelClass="mb-2 block font-bold text-gray-700">
       <select
         id="class-select"
         bind:value={selectedClass}
@@ -125,10 +126,9 @@
           <option value={c.id}>{c.name}</option>
         {/each}
       </select>
-    </div>
+    </FormField>
 
-    <div>
-      <label for="reason" class="block text-gray-700 font-bold mb-2">理由</label>
+    <FormField label="理由" inputId="reason" labelClass="mb-2 block font-bold text-gray-700">
       <textarea
         id="reason"
         bind:value={reason}
@@ -137,15 +137,15 @@
         rows="4"
         placeholder="投票理由を入力してください"
       ></textarea>
-    </div>
+    </FormField>
 
     <div class="flex items-center justify-between">
-      <button
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+      <Button
+        class="border-blue-500 bg-blue-500 font-bold hover:bg-blue-700 focus:ring-blue-500"
         type="submit"
       >
         投票する
-      </button>
+      </Button>
     </div>
   </form>
 {/if}

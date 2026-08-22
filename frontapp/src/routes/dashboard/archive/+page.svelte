@@ -1,5 +1,9 @@
 <script>
     import { onMount } from 'svelte';
+    import Alert from '$lib/components/Alert.svelte';
+    import EmptyState from '$lib/components/EmptyState.svelte';
+    import PageHeader from '$lib/components/PageHeader.svelte';
+    import LoadingState from '$lib/components/LoadingState.svelte';
     
     let events = $state([]);
     let loading = $state(true);
@@ -39,26 +43,23 @@
 </svelte:head>
 
 <div class="px-4 py-6 sm:px-0">
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">過去の大会アーカイブ</h1>
-        <p class="mt-2 text-sm text-gray-600">終了した大会の結果やスコアを振り返ることができます。</p>
-    </div>
+    <PageHeader
+        title="過去の大会アーカイブ"
+        description="終了した大会の結果やスコアを振り返ることができます。"
+    />
 
     {#if loading}
-        <div class="flex justify-center p-12">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-        </div>
+        <LoadingState />
     {:else if error}
-        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <Alert variant="error">
             <span class="block sm:inline whitespace-pre-wrap">{error}</span>
-        </div>
+        </Alert>
     {:else if events.length === 0}
-        <div class="bg-white shadow rounded-lg p-10 text-center text-gray-500 border border-gray-100">
+        <EmptyState title="過去の大会データがありません。" class="bg-white p-10 shadow">
             <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
             </svg>
-            <p>過去の大会データがありません。</p>
-        </div>
+        </EmptyState>
     {:else}
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {#each events as ev (ev.id)}

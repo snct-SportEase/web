@@ -1,6 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
+  import Modal from '$lib/components/Modal.svelte';
+  import FormField from '$lib/components/FormField.svelte';
+  import Badge from '$lib/components/Badge.svelte';
+  import ModalFooter from '$lib/components/ModalFooter.svelte';
 
   let events = $state([]);
   let showModal = $state(false);
@@ -331,13 +335,13 @@
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">
               {#if event.status === 'preparing'}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">準備中</span>
+                <Badge variant="warning">準備中</Badge>
               {:else if event.status === 'active'}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">開催中</span>
+                <Badge variant="success">開催中</Badge>
               {:else if event.status === 'archived'}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">アーカイブ</span>
+                <Badge>アーカイブ</Badge>
               {:else}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">予定</span>
+                <Badge variant="info">予定</Badge>
               {/if}
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" onclick={(e) => e.stopPropagation()}>
@@ -368,44 +372,27 @@
   </div>
 </div>
 
-{#if showModal}
-  <div class="fixed z-10 inset-0 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-      <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-      </div>
-
-      <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-      <div class="relative z-30 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{selectedEvent ? '大会編集' : '大会作成'}</h3>
-          <div class="space-y-4">
-            <div>
-              <label for="name" class="block text-sm font-medium text-gray-700">大会名</label>
+<Modal bind:open={showModal} title={selectedEvent ? '大会編集' : '大会作成'} onclose={closeModal}>
+  <div class="mt-4 space-y-4">
+            <FormField label="大会名" inputId="name">
               <input type="text" id="name" bind:value={currentEvent.name} oninput={onNameInput} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="year" class="block text-sm font-medium text-gray-700">年度</label>
+            </FormField>
+            <FormField label="年度" inputId="year">
               <input type="number" id="year" bind:value={currentEvent.year} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="season" class="block text-sm font-medium text-gray-700">シーズン</label>
+            </FormField>
+            <FormField label="シーズン" inputId="season">
               <select id="season" bind:value={currentEvent.season} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 <option value="spring">春</option>
                 <option value="autumn">秋</option>
               </select>
-            </div>
-            <div>
-              <label for="start_date" class="block text-sm font-medium text-gray-700">開始日</label>
+            </FormField>
+            <FormField label="開始日" inputId="start_date">
               <input type="date" id="start_date" bind:value={currentEvent.start_date} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="end_date" class="block text-sm font-medium text-gray-700">終了日</label>
+            </FormField>
+            <FormField label="終了日" inputId="end_date">
               <input type="date" id="end_date" bind:value={currentEvent.end_date} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="survey_url" class="block text-sm font-medium text-gray-700">アンケートURL</label>
+            </FormField>
+            <FormField label="アンケートURL" inputId="survey_url">
               <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-1">
                 <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 {#if selectedEvent && currentEvent.survey_url}
@@ -414,21 +401,18 @@
                   </button>
                 {/if}
               </div>
-            </div>
-            <div>
-              <label for="status" class="block text-sm font-medium text-gray-700">ステータス</label>
+            </FormField>
+            <FormField label="ステータス" inputId="status">
               <select id="status" bind:value={currentEvent.status} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 <option value="preparing">準備中 (Preparing)</option>
                 <option value="upcoming">予定 (Upcoming)</option>
                 <option value="active">開催中 (Active)</option>
                 <option value="archived">アーカイブ (Archived)</option>
               </select>
-            </div>
-            <div>
-              <label for="duplicate_registration_threshold" class="block text-sm font-medium text-gray-700">2競技への重複登録を許可するクラス人数</label>
+            </FormField>
+            <FormField label="2競技への重複登録を許可するクラス人数" inputId="duplicate_registration_threshold" description="この人数以下のクラスは、1人につき2競技まで登録できます。">
               <input type="number" id="duplicate_registration_threshold" min="0" required bind:value={currentEvent.duplicate_registration_threshold} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-              <p class="mt-1 text-xs text-gray-500">この人数以下のクラスは、1人につき2競技まで登録できます。</p>
-            </div>
+            </FormField>
             <div class="flex items-center">
               <label class="flex items-center cursor-pointer">
                 <input type="checkbox" id="hide_scores" bind:checked={currentEvent.hide_scores} class="sr-only">
@@ -439,17 +423,8 @@
                 <span class="ml-3 text-sm font-medium text-gray-700">スコアを非表示にする</span>
               </label>
             </div>
-          </div>
-        </div>
-        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-          <button onclick={handleSave} type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
-            保存
-          </button>
-          <button onclick={closeModal} type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-            キャンセル
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
-{/if}
+  {#snippet footer()}
+    <ModalFooter onconfirm={handleSave} oncancel={closeModal} />
+  {/snippet}
+</Modal>

@@ -1,4 +1,6 @@
 <script>
+  import FormField from '$lib/components/FormField.svelte';
+  import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
 
   let { data } = $props();
@@ -117,8 +119,7 @@
         <p class="text-sm text-gray-500">adminユーザーは担当クラスのみ操作できます。</p>
       </div>
     {:else if canSelectAllClasses}
-      <div class="mb-6">
-        <label for="classSelector" class="block text-sm font-medium text-gray-700 mb-2">対象クラスを選択</label>
+      <FormField class="mb-6" label="対象クラスを選択" inputId="classSelector" labelClass="mb-2 block text-sm font-medium text-gray-700">
         <select
           id="classSelector"
           class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
@@ -130,7 +131,7 @@
             <option value={cls.id}>{cls.name}</option>
           {/each}
         </select>
-      </div>
+      </FormField>
     {/if}
 
     {#if errorMessage && !classDetails}
@@ -151,8 +152,7 @@
         </div>
 
         <form onsubmit={(e) => { e.preventDefault(); handleSubmit(e); }}>
-          <div class="mb-4">
-            <label for="attendanceCount" class="block text-sm font-medium text-gray-700">出席人数</label>
+          <FormField class="mb-4" label="出席人数" inputId="attendanceCount">
             <input
               type="number"
               id="attendanceCount"
@@ -162,7 +162,7 @@
               required
               class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
-          </div>
+          </FormField>
 
           {#if errorMessage}
             <p class="text-red-500 text-sm mb-4">{errorMessage}</p>
@@ -172,13 +172,15 @@
             <p class="text-green-500 text-sm mb-4">{successMessage}</p>
           {/if}
 
-          <button
+          <Button
             type="submit"
-            disabled={isLoading}
-            class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            size="sm"
+            class="w-full"
+            loading={isLoading}
+            loadingLabel="登録中..."
           >
-            {isLoading ? '登録中...' : '出席を登録する'}
-          </button>
+            出席を登録する
+          </Button>
         </form>
       </div>
     {/if}

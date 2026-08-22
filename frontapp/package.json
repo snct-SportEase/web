@@ -10,7 +10,9 @@
 		"lint": "eslint .",
 		"test:unit": "vitest",
 		"test:e2e": "playwright test",
-		"test": "node test-wrapper.js --run"
+		"test": "node test-wrapper.js --run",
+		"storybook": "storybook dev -p 6006",
+		"build-storybook": "storybook build"
 	},
 	"type": "module",
 	"devDependencies": {
@@ -37,7 +39,13 @@
 		"typescript": "^5.3.2",
 		"vite": "^8.0.16",
 		"vitest": "^4.1.9",
-		"vitest-browser-svelte": "^2.1.1"
+		"vitest-browser-svelte": "^2.1.1",
+		"storybook": "^10.5.10",
+		"@storybook/sveltekit": "^10.5.10",
+		"@storybook/addon-svelte-csf": "latest",
+		"@storybook/addon-a11y": "^10.5.10",
+		"@storybook/addon-docs": "^10.5.10",
+		"eslint-plugin-storybook": "^10.5.10"
 	},
 	"keywords": [
 		"svelte"
