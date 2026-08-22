@@ -17,8 +17,12 @@ import (
 func TestActiveEventStatusRequired(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const activeEventQuery = "SELECT event_id FROM active_event WHERE id = 1"
-	const eventQuery = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold FROM events WHERE id = ?"
-	columns := []string{"id", "name", "year", "season", "start_date", "end_date", "is_rainy_mode", "competition_guidelines_pdf_url", "survey_url", "is_survey_published", "status", "hide_scores", "duplicate_registration_threshold"}
+	const eventQuery = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, is_mic_voting_enabled, status, hide_scores, duplicate_registration_threshold FROM events WHERE id = ?"
+	columns := []string{
+		"id", "name", "year", "season", "start_date", "end_date", "is_rainy_mode",
+		"competition_guidelines_pdf_url", "survey_url", "is_survey_published", "is_mic_voting_enabled",
+		"status", "hide_scores", "duplicate_registration_threshold",
+	}
 
 	for _, tc := range []struct {
 		name       string
@@ -36,7 +40,7 @@ func TestActiveEventStatusRequired(t *testing.T) {
 			defer db.Close()
 
 			mock.ExpectQuery(regexp.QuoteMeta(activeEventQuery)).WillReturnRows(sqlmock.NewRows([]string{"event_id"}).AddRow(1))
-			mock.ExpectQuery(regexp.QuoteMeta(eventQuery)).WithArgs(1).WillReturnRows(sqlmock.NewRows(columns).AddRow(1, "大会", 2026, "spring", nil, nil, false, nil, nil, false, tc.status, false, 31))
+			mock.ExpectQuery(regexp.QuoteMeta(eventQuery)).WithArgs(1).WillReturnRows(sqlmock.NewRows(columns).AddRow(1, "大会", 2026, "spring", nil, nil, false, nil, nil, false, true, tc.status, false, 31))
 
 			router := gin.New()
 			router.Use(middleware.ActiveEventStatusRequired(repository.NewEventRepository(db), models.EventStatusActive))
