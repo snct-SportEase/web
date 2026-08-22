@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://typing.nitsche-gyouji.com/schemas/typing-problem-presets-v1.schema.json",
+  "title": "Typing competition problem presets v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "duration_seconds", "content_origin", "design_note", "preset_policy", "difficulty_balance", "presets"],
+  "properties": {
+    "schema_version": {"const": "typing-problem-presets-v1"},
+    "duration_seconds": {"const": 180},
+    "content_origin": {"const": "original"},
+    "design_note": {"type": "string", "minLength": 1},
+    "preset_policy": {"type": "object"},
+    "difficulty_balance": {"type": "object"},
+    "presets": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {"$ref": "#/$defs/preset"}
+    }
+  },
+  "$defs": {
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["problem_id", "order", "type", "display_text", "reading"],
+      "properties": {
+        "problem_id": {"type": "string", "pattern": "^[mr][0-9]{2}-[wsl][0-9]{2}$"},
+        "order": {"type": "integer", "minimum": 1, "maximum": 36},
+        "type": {"enum": ["word", "short_sentence", "long_sentence"]},
+        "display_text": {"type": "string", "minLength": 1, "pattern": "^[^ !-~　]+$"},
+        "reading": {"type": "string", "minLength": 1, "pattern": "^[ぁ-んァ-ンー、。]+$"}
+      }
+    },
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["problem_set_id", "version", "role", "title", "problems"],
+      "properties": {
+        "problem_set_id": {"type": "string", "pattern": "^typing-(main|reserve)-[0-9]{2}$"},
+        "version": {"const": 1},
+        "role": {"enum": ["main", "reserve"]},
+        "match_number": {"type": "integer", "minimum": 1, "maximum": 3},
+        "reserve_priority": {"type": "integer", "minimum": 1, "maximum": 7},
+        "title": {"type": "string", "minLength": 1},
+        "problems": {
+          "type": "array",
+          "minItems": 36,
+          "maxItems": 36,
+          "items": {"$ref": "#/$defs/problem"}
+        }
+      }
+    }
+  }
+}

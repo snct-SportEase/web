@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://typing.nitsche-gyouji.com/schemas/typing-input-tests-v1.schema.json",
+  "title": "Typing input conformance tests v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "title", "normalization", "romanization_table", "context_rules", "romanization_cases", "event_cases"],
+  "properties": {
+    "schema_version": {"const": "typing-input-tests-v1"},
+    "title": {"type": "string", "minLength": 1},
+    "normalization": {"type": "object"},
+    "romanization_table": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "string", "pattern": "^[a-z,.'-]+$"},
+        "uniqueItems": true
+      }
+    },
+    "context_rules": {"type": "object"},
+    "romanization_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "reading", "accepted_inputs", "rejected_inputs"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^R[0-9]{3}$"},
+          "reading": {"type": "string", "minLength": 1},
+          "accepted_inputs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "rejected_inputs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+        }
+      }
+    },
+    "event_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "problems", "events", "expected"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^E[0-9]{3}$"},
+          "description": {"type": "string", "minLength": 1},
+          "duration_ms": {"type": "integer", "minimum": 1},
+          "problems": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "receive_offset_ms"],
+              "properties": {
+                "type": {"enum": ["key", "paste", "composition"]},
+                "key": {"type": "string"},
+                "text": {"type": "string"},
+                "receive_offset_ms": {"type": "integer"},
+                "repeat": {"type": "boolean"},
+                "shift": {"type": "boolean"},
+                "ctrl": {"type": "boolean"},
+                "alt": {"type": "boolean"},
+                "meta": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["correct_types", "incorrect_types", "completed_problems", "current_problem_index", "current_input_position"],
+            "properties": {
+              "correct_types": {"type": "integer", "minimum": 0},
+              "incorrect_types": {"type": "integer", "minimum": 0},
+              "completed_problems": {"type": "integer", "minimum": 0},
+              "current_problem_index": {"type": "integer", "minimum": 0},
+              "current_input_position": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
+      }
+    }
+  }
+}

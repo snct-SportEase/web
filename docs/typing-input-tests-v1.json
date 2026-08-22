@@ -1,0 +1,188 @@
+{
+  "schema_version": "typing-input-tests-v1",
+  "title": "独自タイピングシステム共通入力適合テスト",
+  "normalization": {
+    "katakana_to_hiragana": true,
+    "shifted_ascii_letters_to_lowercase": true,
+    "unicode_normalization": "NFC"
+  },
+  "romanization_table": {
+    "あ": ["a"], "い": ["i"], "う": ["u"], "え": ["e"], "お": ["o"],
+    "か": ["ka"], "き": ["ki"], "く": ["ku"], "け": ["ke"], "こ": ["ko"],
+    "さ": ["sa"], "し": ["si", "shi"], "す": ["su"], "せ": ["se"], "そ": ["so"],
+    "た": ["ta"], "ち": ["ti", "chi"], "つ": ["tu", "tsu"], "て": ["te"], "と": ["to"],
+    "な": ["na"], "に": ["ni"], "ぬ": ["nu"], "ね": ["ne"], "の": ["no"],
+    "は": ["ha"], "ひ": ["hi"], "ふ": ["hu", "fu"], "へ": ["he"], "ほ": ["ho"],
+    "ま": ["ma"], "み": ["mi"], "む": ["mu"], "め": ["me"], "も": ["mo"],
+    "や": ["ya"], "ゆ": ["yu"], "よ": ["yo"],
+    "ら": ["ra"], "り": ["ri"], "る": ["ru"], "れ": ["re"], "ろ": ["ro"],
+    "わ": ["wa"], "を": ["wo"],
+    "が": ["ga"], "ぎ": ["gi"], "ぐ": ["gu"], "げ": ["ge"], "ご": ["go"],
+    "ざ": ["za"], "じ": ["zi", "ji"], "ず": ["zu"], "ぜ": ["ze"], "ぞ": ["zo"],
+    "だ": ["da"], "ぢ": ["di"], "づ": ["du"], "で": ["de"], "ど": ["do"],
+    "ば": ["ba"], "び": ["bi"], "ぶ": ["bu"], "べ": ["be"], "ぼ": ["bo"],
+    "ぱ": ["pa"], "ぴ": ["pi"], "ぷ": ["pu"], "ぺ": ["pe"], "ぽ": ["po"],
+    "きゃ": ["kya"], "きゅ": ["kyu"], "きょ": ["kyo"],
+    "しゃ": ["sya", "sha"], "しゅ": ["syu", "shu"], "しょ": ["syo", "sho"],
+    "ちゃ": ["tya", "cha", "cya"], "ちゅ": ["tyu", "chu", "cyu"], "ちょ": ["tyo", "cho", "cyo"],
+    "にゃ": ["nya"], "にゅ": ["nyu"], "にょ": ["nyo"],
+    "ひゃ": ["hya"], "ひゅ": ["hyu"], "ひょ": ["hyo"],
+    "みゃ": ["mya"], "みゅ": ["myu"], "みょ": ["myo"],
+    "りゃ": ["rya"], "りゅ": ["ryu"], "りょ": ["ryo"],
+    "ぎゃ": ["gya"], "ぎゅ": ["gyu"], "ぎょ": ["gyo"],
+    "じゃ": ["zya", "ja", "jya"], "じゅ": ["zyu", "ju", "jyu"], "じょ": ["zyo", "jo", "jyo"],
+    "びゃ": ["bya"], "びゅ": ["byu"], "びょ": ["byo"],
+    "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["pyo"],
+    "ぁ": ["xa", "la"], "ぃ": ["xi", "li"], "ぅ": ["xu", "lu"], "ぇ": ["xe", "le"], "ぉ": ["xo", "lo"],
+    "ゃ": ["xya", "lya"], "ゅ": ["xyu", "lyu"], "ょ": ["xyo", "lyo"],
+    "っ": ["xtu", "ltu"],
+    "ー": ["-"], "、": [","], "。": ["."]
+  },
+  "context_rules": {
+    "ん": {
+      "always": ["nn"],
+      "before_consonant_or_end": ["n"],
+      "before_vowel_n_or_y": ["nn", "n'"]
+    },
+    "っ": {
+      "rule": "次のローマ字系列の先頭がn以外の子音なら、その子音の重ね打ちを許可する",
+      "standalone": ["xtu", "ltu"]
+    }
+  },
+  "romanization_cases": [
+    {"id":"R001","reading":"し","accepted_inputs":["si","shi"],"rejected_inputs":["ci"]},
+    {"id":"R002","reading":"ち","accepted_inputs":["ti","chi"],"rejected_inputs":["thi"]},
+    {"id":"R003","reading":"つ","accepted_inputs":["tu","tsu"],"rejected_inputs":["cu"]},
+    {"id":"R004","reading":"ふ","accepted_inputs":["hu","fu"],"rejected_inputs":["phu"]},
+    {"id":"R005","reading":"じ","accepted_inputs":["zi","ji"],"rejected_inputs":["gi"]},
+    {"id":"R006","reading":"しゃ","accepted_inputs":["sya","sha"],"rejected_inputs":["shya"]},
+    {"id":"R007","reading":"ちゅ","accepted_inputs":["tyu","chu","cyu"],"rejected_inputs":["tchu"]},
+    {"id":"R008","reading":"じょ","accepted_inputs":["zyo","jo","jyo"],"rejected_inputs":["dyo"]},
+    {"id":"R009","reading":"きって","accepted_inputs":["kitte","kixtute","kiltute"],"rejected_inputs":["kite"]},
+    {"id":"R010","reading":"がっこう","accepted_inputs":["gakkou","gaxtukou","galtukou"],"rejected_inputs":["gakou"]},
+    {"id":"R011","reading":"ほん","accepted_inputs":["hon","honn"],"rejected_inputs":["ho"]},
+    {"id":"R012","reading":"かんい","accepted_inputs":["kanni","kan'i"],"rejected_inputs":["kani"]},
+    {"id":"R013","reading":"こんにちは","accepted_inputs":["konnitiha","konnichiha"],"rejected_inputs":["konitiha"]},
+    {"id":"R014","reading":"きょう。","accepted_inputs":["kyou."],"rejected_inputs":["kyou"]},
+    {"id":"R015","reading":"ノート、ペン。","accepted_inputs":["no-to,pen."],"rejected_inputs":["no-to pen."]},
+    {"id":"R016","reading":"ふぁ","accepted_inputs":["huxa","hula","fuxa","fula"],"rejected_inputs":["fa"]},
+    {"id":"R017","reading":"てぃ","accepted_inputs":["texi","teli"],"rejected_inputs":["thi"]},
+    {"id":"R018","reading":"ゔ","accepted_inputs":[],"rejected_inputs":["vu"]}
+  ],
+  "event_cases": [
+    {
+      "id": "E001",
+      "description": "誤入力では位置を進めない",
+      "problems": ["か"],
+      "events": [
+        {"type":"key","key":"x","receive_offset_ms":100},
+        {"type":"key","key":"k","receive_offset_ms":200},
+        {"type":"key","key":"a","receive_offset_ms":300}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":1,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E002",
+      "description": "Backspaceを無視する",
+      "problems": ["か"],
+      "events": [
+        {"type":"key","key":"k","receive_offset_ms":100},
+        {"type":"key","key":"Backspace","receive_offset_ms":200},
+        {"type":"key","key":"a","receive_offset_ms":300}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":0,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E003",
+      "description": "repeatイベントを無視する",
+      "problems": ["か"],
+      "events": [
+        {"type":"key","key":"k","receive_offset_ms":100},
+        {"type":"key","key":"k","repeat":true,"receive_offset_ms":150},
+        {"type":"key","key":"a","receive_offset_ms":200}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":0,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E004",
+      "description": "Shift付き英字を小文字化する",
+      "problems": ["か"],
+      "events": [
+        {"type":"key","key":"K","shift":true,"receive_offset_ms":100},
+        {"type":"key","key":"a","receive_offset_ms":200}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":0,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E005",
+      "description": "Control、Alt、Metaを含む入力を無視する",
+      "problems": ["か"],
+      "events": [
+        {"type":"key","key":"v","ctrl":true,"receive_offset_ms":100},
+        {"type":"key","key":"x","alt":true,"receive_offset_ms":150},
+        {"type":"key","key":"c","meta":true,"receive_offset_ms":200},
+        {"type":"key","key":"k","receive_offset_ms":250},
+        {"type":"key","key":"a","receive_offset_ms":300}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":0,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E006",
+      "description": "Spaceは誤タイプとして数える",
+      "problems": ["か"],
+      "events": [
+        {"type":"key","key":" ","receive_offset_ms":100},
+        {"type":"key","key":"k","receive_offset_ms":200},
+        {"type":"key","key":"a","receive_offset_ms":300}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":1,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E007",
+      "description": "貼り付けとIME入力を無視する",
+      "problems": ["か"],
+      "events": [
+        {"type":"paste","text":"ka","receive_offset_ms":100},
+        {"type":"composition","text":"か","receive_offset_ms":150},
+        {"type":"key","key":"k","receive_offset_ms":200},
+        {"type":"key","key":"a","receive_offset_ms":300}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":0,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E008",
+      "description": "開始前と終了時刻以後の入力を無視する",
+      "duration_ms": 180000,
+      "problems": ["か"],
+      "events": [
+        {"type":"key","key":"x","receive_offset_ms":-1},
+        {"type":"key","key":"k","receive_offset_ms":0},
+        {"type":"key","key":"a","receive_offset_ms":179999},
+        {"type":"key","key":"x","receive_offset_ms":180000}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":0,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E009",
+      "description": "句読点をカンマとピリオドで入力する",
+      "problems": ["、。"],
+      "events": [
+        {"type":"key","key":",","receive_offset_ms":100},
+        {"type":"key","key":".","receive_offset_ms":200}
+      ],
+      "expected": {"correct_types":2,"incorrect_types":0,"completed_problems":1,"current_problem_index":0,"current_input_position":0}
+    },
+    {
+      "id": "E010",
+      "description": "Enterなしで次の問題へ進み、最終問題後は先頭へ戻る",
+      "problems": ["か", "き"],
+      "events": [
+        {"type":"key","key":"k","receive_offset_ms":100},
+        {"type":"key","key":"a","receive_offset_ms":200},
+        {"type":"key","key":"k","receive_offset_ms":300},
+        {"type":"key","key":"i","receive_offset_ms":400}
+      ],
+      "expected": {"correct_types":4,"incorrect_types":0,"completed_problems":2,"current_problem_index":0,"current_input_position":0}
+    }
+  ]
+}

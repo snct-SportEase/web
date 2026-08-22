@@ -176,7 +176,6 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		admin := api.Group("/admin")
 		{
 			admin.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("admin", "root"))
-
 			adminEvent := admin.Group("/events")
 			{
 				adminEvent.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)

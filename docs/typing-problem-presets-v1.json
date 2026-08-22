@@ -1,0 +1,2651 @@
+{
+  "schema_version": "typing-problem-presets-v1",
+  "duration_seconds": 180,
+  "content_origin": "original",
+  "design_note": "単語、短文、長文を組み合わせた180秒競技向けの複合問題。問題文はすべて本大会向けの新規作成。",
+  "preset_policy": {
+    "main_presets": 3,
+    "reserve_presets": 7,
+    "problems_per_preset": 36,
+    "composition": {
+      "word": 12,
+      "short_sentence": 12,
+      "long_sentence": 12
+    },
+    "order": "word_then_short_sentence_then_long_sentence",
+    "after_last_problem": "loop_to_first"
+  },
+  "difficulty_balance": {
+    "method": "typing-input-tests-v1の許可系列から算出した最短入力キー数",
+    "accepted_range_per_cycle": {
+      "minimum": 1450,
+      "maximum": 1650
+    },
+    "observed_minimum": 1463,
+    "observed_maximum": 1648,
+    "preset_minimum_keystrokes": {
+      "typing-main-01": 1560,
+      "typing-main-02": 1648,
+      "typing-main-03": 1579,
+      "typing-reserve-01": 1463,
+      "typing-reserve-02": 1569,
+      "typing-reserve-03": 1603,
+      "typing-reserve-04": 1606,
+      "typing-reserve-05": 1562,
+      "typing-reserve-06": 1615,
+      "typing-reserve-07": 1586
+    }
+  },
+  "presets": [
+    {
+      "problem_set_id": "typing-main-01",
+      "version": 1,
+      "role": "main",
+      "match_number": 1,
+      "title": "朝の学校",
+      "problems": [
+        {
+          "problem_id": "m01-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "青空",
+          "reading": "あおぞら"
+        },
+        {
+          "problem_id": "m01-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "靴音",
+          "reading": "くつおと"
+        },
+        {
+          "problem_id": "m01-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "時間割",
+          "reading": "じかんわり"
+        },
+        {
+          "problem_id": "m01-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "図書室",
+          "reading": "としょしつ"
+        },
+        {
+          "problem_id": "m01-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "校門",
+          "reading": "こうもん"
+        },
+        {
+          "problem_id": "m01-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "朝礼",
+          "reading": "ちょうれい"
+        },
+        {
+          "problem_id": "m01-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "黒板",
+          "reading": "こくばん"
+        },
+        {
+          "problem_id": "m01-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "予鈴",
+          "reading": "よれい"
+        },
+        {
+          "problem_id": "m01-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "教科書",
+          "reading": "きょうかしょ"
+        },
+        {
+          "problem_id": "m01-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "筆箱",
+          "reading": "ふでばこ"
+        },
+        {
+          "problem_id": "m01-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "登校",
+          "reading": "とうこう"
+        },
+        {
+          "problem_id": "m01-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "日直",
+          "reading": "にっちょく"
+        },
+        {
+          "problem_id": "m01-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "朝の光が窓から差し込む。",
+          "reading": "あさのひかりがまどからさしこむ。"
+        },
+        {
+          "problem_id": "m01-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "教室の時計が静かに進む。",
+          "reading": "きょうしつのとけいがしずかにすすむ。"
+        },
+        {
+          "problem_id": "m01-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "忘れ物がないかもう一度確かめる。",
+          "reading": "わすれものがないかもういちどたしかめる。"
+        },
+        {
+          "problem_id": "m01-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "廊下では元気な挨拶が聞こえる。",
+          "reading": "ろうかではげんきなあいさつがきこえる。"
+        },
+        {
+          "problem_id": "m01-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "校門の前で友達と出会う。",
+          "reading": "こうもんのまえでともだちとであう。"
+        },
+        {
+          "problem_id": "m01-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "日直が黒板をきれいに消す。",
+          "reading": "にっちょくがこくばんをきれいにけす。"
+        },
+        {
+          "problem_id": "m01-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "予鈴を聞いて急いで席に着く。",
+          "reading": "よれいをきいていそいでせきにつく。"
+        },
+        {
+          "problem_id": "m01-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "教科書と筆箱を机に並べる。",
+          "reading": "きょうかしょとふでばこをつくえにならべる。"
+        },
+        {
+          "problem_id": "m01-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "窓を開けると涼しい風が入る。",
+          "reading": "まどをあけるとすずしいかぜがはいる。"
+        },
+        {
+          "problem_id": "m01-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "今日の目標をノートに書き留める。",
+          "reading": "きょうのもくひょうをのーとにかきとめる。"
+        },
+        {
+          "problem_id": "m01-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "先生が来る前に宿題を確認する。",
+          "reading": "せんせいがくるまえにしゅくだいをかくにんする。"
+        },
+        {
+          "problem_id": "m01-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "朝礼の知らせが校内に流れる。",
+          "reading": "ちょうれいのしらせがこうないにながれる。"
+        },
+        {
+          "problem_id": "m01-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "朝の会が始まる前に、今日の予定を仲間と確認し、一日の流れを頭に入れた。",
+          "reading": "あさのかいがはじまるまえに、きょうのよていをなかまとかくにんし、いちにちのながれをあたまにいれた。"
+        },
+        {
+          "problem_id": "m01-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "図書室の窓辺で本を開くと、校庭から明るい声が届き、風でカーテンが揺れていた。",
+          "reading": "としょしつのまどべでほんをひらくと、こうていからあかるいこえがとどき、かぜでかーてんがゆれていた。"
+        },
+        {
+          "problem_id": "m01-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "授業の準備を早めに終えると、落ち着いた気持ちで先生の話を聞ける。",
+          "reading": "じゅぎょうのじゅんびをはやめにおえると、おちついたきもちでせんせいのはなしをきける。"
+        },
+        {
+          "problem_id": "m01-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "小さな目標を一つ決めて、昨日より少しだけ前へ進む一日にしよう。",
+          "reading": "ちいさなもくひょうをひとつきめて、きのうよりすこしだけまえへすすむいちにちにしよう。"
+        },
+        {
+          "problem_id": "m01-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "校門をくぐると部活動の朝練習を終えた生徒が戻ってきて、にぎやかな一日が始まった。",
+          "reading": "こうもんをくぐるとぶかつどうのあされんしゅうをおえたせいとがもどってきて、にぎやかないちにちがはじまった。"
+        },
+        {
+          "problem_id": "m01-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "教室へ入って窓を開け、机の上を整えてから、今日使う教科書を時間割の順に並べた。",
+          "reading": "きょうしつへはいってまどをあけ、つくえのうえをととのえてから、きょうつかうきょうかしょをじかんわりのじゅんにならべた。"
+        },
+        {
+          "problem_id": "m01-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "朝の短い時間でも先に課題を確認しておけば、授業が始まってから慌てずに集中できる。",
+          "reading": "あさのみじかいじかんでもさきにかだいをかくにんしておけば、じゅぎょうがはじまってからあわてずにしゅうちゅうできる。"
+        },
+        {
+          "problem_id": "m01-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "友達と昨日の出来事を話しているうちに予鈴が鳴り、全員がそれぞれの席へ戻っていった。",
+          "reading": "ともだちときのうのできごとをはなしているうちによれいがなり、ぜんいんがそれぞれのせきへもどっていった。"
+        },
+        {
+          "problem_id": "m01-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "日直は黒板の日付を書き直し、配布物の枚数を数えて、朝の会に必要な準備を整えた。",
+          "reading": "にっちょくはこくばんのひづけをかきなおし、はいふぶつのまいすうをかぞえて、あさのかいにひつようなじゅんびをととのえた。"
+        },
+        {
+          "problem_id": "m01-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "校庭から聞こえる元気な掛け声に耳を傾けながら、静かな教室で一時間目の予習を進めた。",
+          "reading": "こうていからきこえるげんきなかけごえにみみをかたむけながら、しずかなきょうしつでいちじかんめのよしゅうをすすめた。"
+        },
+        {
+          "problem_id": "m01-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "忘れ物に気づいた友達へ予備の筆記用具を貸すと、安心した表情で何度もお礼を言われた。",
+          "reading": "わすれものにきづいたともだちへよびのひっきようぐをかすと、あんしんしたひょうじょうでなんどもおれいをいわれた。"
+        },
+        {
+          "problem_id": "m01-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "朝に決めた小さな目標を意識して過ごすと、放課後には一日の成長をはっきり感じられた。",
+          "reading": "あさにきめたちいさなもくひょうをいしきしてすごすと、ほうかごにはいちにちのせいちょうをはっきりかんじられた。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-main-02",
+      "version": 1,
+      "role": "main",
+      "match_number": 2,
+      "title": "情報と技術",
+      "problems": [
+        {
+          "problem_id": "m02-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "端末",
+          "reading": "たんまつ"
+        },
+        {
+          "problem_id": "m02-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "通信",
+          "reading": "つうしん"
+        },
+        {
+          "problem_id": "m02-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "設計図",
+          "reading": "せっけいず"
+        },
+        {
+          "problem_id": "m02-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "キーボード",
+          "reading": "きーぼーど"
+        },
+        {
+          "problem_id": "m02-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "回路基板",
+          "reading": "かいろきばん"
+        },
+        {
+          "problem_id": "m02-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "暗号化",
+          "reading": "あんごうか"
+        },
+        {
+          "problem_id": "m02-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "更新履歴",
+          "reading": "こうしんりれき"
+        },
+        {
+          "problem_id": "m02-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "電源装置",
+          "reading": "でんげんそうち"
+        },
+        {
+          "problem_id": "m02-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "処理速度",
+          "reading": "しょりそくど"
+        },
+        {
+          "problem_id": "m02-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "検証環境",
+          "reading": "けんしょうかんきょう"
+        },
+        {
+          "problem_id": "m02-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "無線通信",
+          "reading": "むせんつうしん"
+        },
+        {
+          "problem_id": "m02-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "制御信号",
+          "reading": "せいぎょしんごう"
+        },
+        {
+          "problem_id": "m02-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "画面の表示を丁寧に確認する。",
+          "reading": "がめんのひょうじをていねいにかくにんする。"
+        },
+        {
+          "problem_id": "m02-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "短い命令を順番に組み立てる。",
+          "reading": "みじかいめいれいをじゅんばんにくみたてる。"
+        },
+        {
+          "problem_id": "m02-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "大切な記録は安全な場所へ保存する。",
+          "reading": "たいせつなきろくはあんぜんなばしょへほぞんする。"
+        },
+        {
+          "problem_id": "m02-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "困ったときは原因を一つずつ調べる。",
+          "reading": "こまったときはげんいんをひとつずつしらべる。"
+        },
+        {
+          "problem_id": "m02-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "回路の接続を図面と照合する。",
+          "reading": "かいろのせつぞくをずめんとしょうごうする。"
+        },
+        {
+          "problem_id": "m02-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "変更した理由を履歴に残す。",
+          "reading": "へんこうしたりゆうをりれきにのこす。"
+        },
+        {
+          "problem_id": "m02-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "重要な通信を暗号化する。",
+          "reading": "じゅうようなつうしんをあんごうかする。"
+        },
+        {
+          "problem_id": "m02-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "電源を切ってから配線を直す。",
+          "reading": "でんげんをきってからはいせんをなおす。"
+        },
+        {
+          "problem_id": "m02-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "検証環境で動作を繰り返し試す。",
+          "reading": "けんしょうかんきょうでどうさをくりかえしためす。"
+        },
+        {
+          "problem_id": "m02-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "処理の遅い場所を記録から探す。",
+          "reading": "しょりのおそいばしょをきろくからさがす。"
+        },
+        {
+          "problem_id": "m02-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "無線の強さを場所ごとに測る。",
+          "reading": "むせんのつよさをばしょごとにはかる。"
+        },
+        {
+          "problem_id": "m02-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "制御信号の順序を正しく保つ。",
+          "reading": "せいぎょしんごうのじゅんじょをただしくたもつ。"
+        },
+        {
+          "problem_id": "m02-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "新しい機能を作る前に、誰がどの場面で使うのかを具体的に考えた。",
+          "reading": "あたらしいきのうをつくるまえに、だれがどのばめんでつかうのかをぐたいてきにかんがえた。"
+        },
+        {
+          "problem_id": "m02-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "通信が途切れた場合でも、記録が失われない仕組みを準備しておく。",
+          "reading": "つうしんがとぎれたばあいでも、きろくがうしなわれないしくみをじゅんびしておく。"
+        },
+        {
+          "problem_id": "m02-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "分かりやすい画面と正確な処理は、安心して使えるシステムの両輪になる。",
+          "reading": "わかりやすいがめんとせいかくなしょりは、あんしんしてつかえるしすてむのりょうりんになる。"
+        },
+        {
+          "problem_id": "m02-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "小さな改善を積み重ねることで、道具は少しずつ使いやすく育っていく。",
+          "reading": "ちいさなかいぜんをつみかさねることで、どうぐはすこしずつつかいやすくそだっていく。"
+        },
+        {
+          "problem_id": "m02-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "回路基板へ部品を取り付ける前に、向きと番号を設計図で確かめ、間違いがないことを確認した。",
+          "reading": "かいろきばんへぶひんをとりつけるまえに、むきとばんごうをせっけいずでたしかめ、まちがいがないことをかくにんした。"
+        },
+        {
+          "problem_id": "m02-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "新しい版を公開するときは、変更内容と注意点を更新履歴へ書き、利用者が迷わないようにする。",
+          "reading": "あたらしいばんをこうかいするときは、へんこうないようとちゅういてんをこうしんりれきへかき、りようしゃがまよわないようにする。"
+        },
+        {
+          "problem_id": "m02-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "通信内容を暗号化するだけで安心せず、接続相手が正しいことも別の方法で確かめる必要がある。",
+          "reading": "つうしんないようをあんごうかするだけであんしんせず、せつぞくあいてがただしいこともべつのほうほうでたしかめるひつようがある。"
+        },
+        {
+          "problem_id": "m02-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "検証環境で見つかった不具合を再現できる手順にまとめると、原因を調べる作業が進めやすくなる。",
+          "reading": "けんしょうかんきょうでみつかったふぐあいをさいげんできるてじゅんにまとめると、げんいんをしらべるさぎょうがすすめやすくなる。"
+        },
+        {
+          "problem_id": "m02-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "処理速度を改善する前に現在の時間を正確に測り、変更後の結果と同じ条件で比較する。",
+          "reading": "しょりそくどをかいぜんするまえにげんざいのじかんをせいかくにはかり、へんこうごのけっかとおなじじょうけんでひかくする。"
+        },
+        {
+          "problem_id": "m02-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "無線通信が不安定な場所では、端末の位置や周囲の障害物を変えながら原因を切り分けた。",
+          "reading": "むせんつうしんがふあんていなばしょでは、たんまつのいちやしゅういのしょうがいぶつをかえながらげんいんをきりわけた。"
+        },
+        {
+          "problem_id": "m02-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "装置へ送る制御信号の順序を誤ると危険なため、異常な入力を受けた場合は安全に停止させる。",
+          "reading": "そうちへおくるせいぎょしんごうのじゅんじょをあやまるときけんなため、いじょうなにゅうりょくをうけたばあいはあんぜんにていしさせる。"
+        },
+        {
+          "problem_id": "m02-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "分かりやすい設計資料と十分な動作記録が残っていれば、担当者が変わっても安全に改善を続けられる。",
+          "reading": "わかりやすいせっけいしりょうとじゅうぶんなどうさきろくがのこっていれば、たんとうしゃがかわってもあんぜんにかいぜんをつづけられる。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-main-03",
+      "version": 1,
+      "role": "main",
+      "match_number": 3,
+      "title": "スポーツ大会",
+      "problems": [
+        {
+          "problem_id": "m03-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "応援",
+          "reading": "おうえん"
+        },
+        {
+          "problem_id": "m03-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "選手",
+          "reading": "せんしゅ"
+        },
+        {
+          "problem_id": "m03-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "作戦",
+          "reading": "さくせん"
+        },
+        {
+          "problem_id": "m03-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "決勝戦",
+          "reading": "けっしょうせん"
+        },
+        {
+          "problem_id": "m03-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "競技場",
+          "reading": "きょうぎじょう"
+        },
+        {
+          "problem_id": "m03-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "入場行進",
+          "reading": "にゅうじょうこうしん"
+        },
+        {
+          "problem_id": "m03-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "得点板",
+          "reading": "とくてんばん"
+        },
+        {
+          "problem_id": "m03-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "準決勝",
+          "reading": "じゅんけっしょう"
+        },
+        {
+          "problem_id": "m03-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "選手宣誓",
+          "reading": "せんしゅせんせい"
+        },
+        {
+          "problem_id": "m03-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "応援席",
+          "reading": "おうえんせき"
+        },
+        {
+          "problem_id": "m03-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "表彰式",
+          "reading": "ひょうしょうしき"
+        },
+        {
+          "problem_id": "m03-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "記録更新",
+          "reading": "きろくこうしん"
+        },
+        {
+          "problem_id": "m03-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "会場に大きな拍手が響いた。",
+          "reading": "かいじょうにおおきなはくしゅがひびいた。"
+        },
+        {
+          "problem_id": "m03-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "選手は深呼吸をして開始を待つ。",
+          "reading": "せんしゅはしんこきゅうをしてかいしをまつ。"
+        },
+        {
+          "problem_id": "m03-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "仲間の声が最後の力を引き出す。",
+          "reading": "なかまのこえがさいごのちからをひきだす。"
+        },
+        {
+          "problem_id": "m03-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "勝敗の後には互いの健闘をたたえる。",
+          "reading": "しょうはいのあとにはたがいのけんとうをたたえる。"
+        },
+        {
+          "problem_id": "m03-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "審判の合図で競技が始まる。",
+          "reading": "しんぱんのあいずできょうぎがはじまる。"
+        },
+        {
+          "problem_id": "m03-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "得点板に新しい記録が映る。",
+          "reading": "とくてんばんにあたらしいきろくがうつる。"
+        },
+        {
+          "problem_id": "m03-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "応援席から手拍子が広がる。",
+          "reading": "おうえんせきからてびょうしがひろがる。"
+        },
+        {
+          "problem_id": "m03-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "選手は用具を丁寧に点検する。",
+          "reading": "せんしゅはようぐをていねいにてんけんする。"
+        },
+        {
+          "problem_id": "m03-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "仲間と作戦を最後に確認する。",
+          "reading": "なかまとさくせんをさいごにかくにんする。"
+        },
+        {
+          "problem_id": "m03-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "緊張を力に変えて前を向く。",
+          "reading": "きんちょうをちからにかえてまえをむく。"
+        },
+        {
+          "problem_id": "m03-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "終了の合図まで全力を尽くす。",
+          "reading": "しゅうりょうのあいずまでぜんりょくをつくす。"
+        },
+        {
+          "problem_id": "m03-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "表彰式で互いの努力を認める。",
+          "reading": "ひょうしょうしきでたがいのどりょくをみとめる。"
+        },
+        {
+          "problem_id": "m03-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "開始の合図が鳴ると、会場の空気が変わり、全員の視線が選手へ集まった。",
+          "reading": "かいしのあいずがなると、かいじょうのくうきがかわり、ぜんいんのしせんがせんしゅへあつまった。"
+        },
+        {
+          "problem_id": "m03-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "練習で身につけた動きを信じて、焦らず一つずつ正確に進めていく。",
+          "reading": "れんしゅうでみにつけたうごきをしんじて、あせらずひとつずつせいかくにすすめていく。"
+        },
+        {
+          "problem_id": "m03-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "結果だけではなく、仲間と工夫を重ねた時間も大会の大切な記録になる。",
+          "reading": "けっかだけではなく、なかまとくふうをかさねたじかんもたいかいのたいせつなきろくになる。"
+        },
+        {
+          "problem_id": "m03-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "最後まで集中を切らさずに競技を終えた選手へ、惜しみない拍手が送られた。",
+          "reading": "さいごまでしゅうちゅうをきらさずにきょうぎをおえたせんしゅへ、おしみないはくしゅがおくられた。"
+        },
+        {
+          "problem_id": "m03-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "入場行進が始まると色とりどりの旗が会場を進み、観客席から大きな拍手が送られた。",
+          "reading": "にゅうじょうこうしんがはじまるといろとりどりのはたがかいじょうをすすみ、かんきゃくせきからおおきなはくしゅがおくられた。"
+        },
+        {
+          "problem_id": "m03-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "競技の直前に用具と立ち位置を確かめておくと、開始の合図にも落ち着いて反応できる。",
+          "reading": "きょうぎのちょくぜんにようぐとたちいちをたしかめておくと、かいしのあいずにもおちついてはんのうできる。"
+        },
+        {
+          "problem_id": "m03-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "思うような結果が出ない場面でも声を掛け合い、最後まで作戦を信じて競技を続けた。",
+          "reading": "おもうようなけっかがでないばめんでもこえをかけあい、さいごまでさくせんをしんじてきょうぎをつづけた。"
+        },
+        {
+          "problem_id": "m03-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "得点板の数字が変わるたびに応援席が沸き、会場全体の緊張は少しずつ高まっていった。",
+          "reading": "とくてんばんのすうじがかわるたびにおうえんせきがわき、かいじょうぜんたいのきんちょうはすこしずつたかまっていった。"
+        },
+        {
+          "problem_id": "m03-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "勝った選手も負けた選手も互いに礼を交わし、全力で競った相手への敬意を言葉で伝えた。",
+          "reading": "かったせんしゅもまけたせんしゅもたがいにれいをかわし、ぜんりょくでたたかったあいてへのけいいをことばでつたえた。"
+        },
+        {
+          "problem_id": "m03-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "日々の練習で繰り返した基本動作が大切な場面で自然に出て、チームを大きく助けた。",
+          "reading": "ひびのれんしゅうでくりかえしたきほんどうさがたいせつなばめんでしぜんにでて、ちーむをおおきくたすけた。"
+        },
+        {
+          "problem_id": "m03-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "審判や記録係を含む多くの人が役割を果たすことで、公平で安全な大会が成り立っている。",
+          "reading": "しんぱんやきろくがかりをふくむおおくのひとがやくわりをはたすことで、こうへいであんぜんなたいかいがなりたっている。"
+        },
+        {
+          "problem_id": "m03-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "表彰式が終わった後も選手たちは仲間と写真を撮り、忘れられない一日の記録を残した。",
+          "reading": "ひょうしょうしきがおわったあともせんしゅたちはなかまとしゃしんをとり、わすれられないいちにちのきろくをのこした。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-reserve-01",
+      "version": 1,
+      "role": "reserve",
+      "reserve_priority": 1,
+      "title": "秋の景色",
+      "problems": [
+        {
+          "problem_id": "r01-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "秋風",
+          "reading": "あきかぜ"
+        },
+        {
+          "problem_id": "r01-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "夕焼け",
+          "reading": "ゆうやけ"
+        },
+        {
+          "problem_id": "r01-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "落ち葉",
+          "reading": "おちば"
+        },
+        {
+          "problem_id": "r01-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "金木犀",
+          "reading": "きんもくせい"
+        },
+        {
+          "problem_id": "r01-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "紅葉",
+          "reading": "こうよう"
+        },
+        {
+          "problem_id": "r01-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "木枯らし",
+          "reading": "こがらし"
+        },
+        {
+          "problem_id": "r01-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "鈴虫",
+          "reading": "すずむし"
+        },
+        {
+          "problem_id": "r01-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "秋晴れ",
+          "reading": "あきばれ"
+        },
+        {
+          "problem_id": "r01-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "稲穂",
+          "reading": "いなほ"
+        },
+        {
+          "problem_id": "r01-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "栗拾い",
+          "reading": "くりひろい"
+        },
+        {
+          "problem_id": "r01-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "渡り鳥",
+          "reading": "わたりどり"
+        },
+        {
+          "problem_id": "r01-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "夜長",
+          "reading": "よなが"
+        },
+        {
+          "problem_id": "r01-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "冷たい風が頬をなでる。",
+          "reading": "つめたいかぜがほおをなでる。"
+        },
+        {
+          "problem_id": "r01-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "木々の葉が赤く色づいた。",
+          "reading": "きぎのはがあかくいろづいた。"
+        },
+        {
+          "problem_id": "r01-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "澄んだ空に細い雲が流れる。",
+          "reading": "すんだそらにほそいくもがながれる。"
+        },
+        {
+          "problem_id": "r01-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "温かい飲み物で手を休める。",
+          "reading": "あたたかいのみものでてをやすめる。"
+        },
+        {
+          "problem_id": "r01-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "夕暮れの空を鳥が横切る。",
+          "reading": "ゆうぐれのそらをとりがよこぎる。"
+        },
+        {
+          "problem_id": "r01-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "赤い落ち葉を一枚拾う。",
+          "reading": "あかいおちばをいちまいひろう。"
+        },
+        {
+          "problem_id": "r01-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "鈴虫の声が庭から聞こえる。",
+          "reading": "すずむしのこえがにわからきこえる。"
+        },
+        {
+          "problem_id": "r01-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "秋晴れの空が高く澄んでいる。",
+          "reading": "あきばれのそらがたかくすんでいる。"
+        },
+        {
+          "problem_id": "r01-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "実った稲穂が風に揺れる。",
+          "reading": "みのったいなほがかぜにゆれる。"
+        },
+        {
+          "problem_id": "r01-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "長い夜に静かに本を読む。",
+          "reading": "ながいよるにしずかにほんをよむ。"
+        },
+        {
+          "problem_id": "r01-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "山の斜面が鮮やかに色づく。",
+          "reading": "やまのしゃめんがあざやかにいろづく。"
+        },
+        {
+          "problem_id": "r01-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "温かな上着を用意して出かける。",
+          "reading": "あたたかなうわぎをよういしてでかける。"
+        },
+        {
+          "problem_id": "r01-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "放課後の道には落ち葉が重なり、歩くたびに軽やかな音が聞こえ、季節が進んだことを感じた。",
+          "reading": "ほうかごのみちにはおちばがかさなり、あるくたびにかろやかなおとがきこえ、きせつがすすんだことをかんじた。"
+        },
+        {
+          "problem_id": "r01-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "夕焼けに染まった校舎を見上げると、長い一日が静かに終わり、影もゆっくり伸びていた。",
+          "reading": "ゆうやけにそまったこうしゃをみあげると、ながいいちにちがしずかにおわり、かげもゆっくりのびていた。"
+        },
+        {
+          "problem_id": "r01-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "季節の変化に気づく余裕があると、いつもの帰り道も少し新しく見える。",
+          "reading": "きせつのへんかにきづくよゆうがあると、いつものかえりみちもすこしあたらしくみえる。"
+        },
+        {
+          "problem_id": "r01-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "窓を開けて深く息を吸うと、どこからか金木犀の甘い香りが届いた。",
+          "reading": "まどをあけてふかくいきをすうと、どこからかきんもくせいのあまいかおりがとどいた。"
+        },
+        {
+          "problem_id": "r01-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "朝晩の空気が急に冷たくなり、通学路の木々も少しずつ赤や黄色へ姿を変えていった。",
+          "reading": "あさばんのくうきがきゅうにつめたくなり、つうがくろのきぎもすこしずつあかやきいろへすがたをかえていった。"
+        },
+        {
+          "problem_id": "r01-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "秋晴れの休日に川沿いを歩くと、渡り鳥の群れが列を作って遠い空へ飛んでいった。",
+          "reading": "あきばれのきゅうじつにかわぞいをあるくと、わたりどりのむれがれつをつくってとおいそらへとんでいった。"
+        },
+        {
+          "problem_id": "r01-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "庭から聞こえる鈴虫の声に耳を澄ませると、にぎやかだった夏が終わったことを感じる。",
+          "reading": "にわからきこえるすずむしのこえにみみをすませると、にぎやかだったなつがおわったことをかんじる。"
+        },
+        {
+          "problem_id": "r01-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "山道を進むにつれて紅葉の色が濃くなり、曲がり角ごとに新しい景色が広がった。",
+          "reading": "やまみちをすすむにつれてこうようのいろがこくなり、まがりかどごとにあたらしいけしきがひろがった。"
+        },
+        {
+          "problem_id": "r01-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "収穫を待つ田んぼでは金色の稲穂が風に波打ち、遠くまで穏やかな景色が続いている。",
+          "reading": "しゅうかくをまつたんぼではきんいろのいなほがかぜになみうち、とおくまでおだやかなけしきがつづいている。"
+        },
+        {
+          "problem_id": "r01-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "拾ったどんぐりや色づいた葉を机に並べると、身近な場所にも秋の形がたくさん見つかった。",
+          "reading": "ひろったどんぐりやいろづいたはをつくえにならべると、みぢかなばしょにもあきのかたちがたくさんみつかった。"
+        },
+        {
+          "problem_id": "r01-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "日が暮れる時刻が早くなったため、帰り道は明るいうちに通り、周囲へ注意して歩いた。",
+          "reading": "ひがくれるじこくがはやくなったため、かえりみちはあかるいうちにとおり、しゅういへちゅういしてあるいた。"
+        },
+        {
+          "problem_id": "r01-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "温かい飲み物を片手に窓の外を眺めると、木枯らしが落ち葉を空高く舞い上げていた。",
+          "reading": "あたたかいのみものをかたてにまどのそとをながめると、こがらしがおちばをそらたかくまいあげていた。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-reserve-02",
+      "version": 1,
+      "role": "reserve",
+      "reserve_priority": 2,
+      "title": "地域の一日",
+      "problems": [
+        {
+          "problem_id": "r02-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "商店街",
+          "reading": "しょうてんがい"
+        },
+        {
+          "problem_id": "r02-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "交差点",
+          "reading": "こうさてん"
+        },
+        {
+          "problem_id": "r02-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "公園",
+          "reading": "こうえん"
+        },
+        {
+          "problem_id": "r02-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "案内板",
+          "reading": "あんないばん"
+        },
+        {
+          "problem_id": "r02-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "回覧板",
+          "reading": "かいらんばん"
+        },
+        {
+          "problem_id": "r02-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "路線バス",
+          "reading": "ろせんばす"
+        },
+        {
+          "problem_id": "r02-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "消防団",
+          "reading": "しょうぼうだん"
+        },
+        {
+          "problem_id": "r02-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "朝市",
+          "reading": "あさいち"
+        },
+        {
+          "problem_id": "r02-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "遊歩道",
+          "reading": "ゆうほどう"
+        },
+        {
+          "problem_id": "r02-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "町内会",
+          "reading": "ちょうないかい"
+        },
+        {
+          "problem_id": "r02-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "街路樹",
+          "reading": "がいろじゅ"
+        },
+        {
+          "problem_id": "r02-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "地域交流",
+          "reading": "ちいきこうりゅう"
+        },
+        {
+          "problem_id": "r02-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "店先に季節の品が並ぶ。",
+          "reading": "みせさきにきせつのしながならぶ。"
+        },
+        {
+          "problem_id": "r02-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "横断歩道では左右を確認する。",
+          "reading": "おうだんほどうではさゆうをかくにんする。"
+        },
+        {
+          "problem_id": "r02-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "公園の時計が正午を知らせた。",
+          "reading": "こうえんのとけいがしょうごをしらせた。"
+        },
+        {
+          "problem_id": "r02-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "道を尋ねられて地図を開いた。",
+          "reading": "みちをたずねられてちずをひらいた。"
+        },
+        {
+          "problem_id": "r02-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "朝市に新鮮な野菜が並ぶ。",
+          "reading": "あさいちにしんせんなやさいがならぶ。"
+        },
+        {
+          "problem_id": "r02-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "路線バスが停留所へ着く。",
+          "reading": "ろせんばすがていりゅうじょへつく。"
+        },
+        {
+          "problem_id": "r02-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "回覧板を隣の家へ届ける。",
+          "reading": "かいらんばんをとなりのいえへとどける。"
+        },
+        {
+          "problem_id": "r02-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "遊歩道の花を皆で手入れする。",
+          "reading": "ゆうほどうのはなをみんなでていれする。"
+        },
+        {
+          "problem_id": "r02-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "消防団が地域を見回っている。",
+          "reading": "しょうぼうだんがちいきをみまわっている。"
+        },
+        {
+          "problem_id": "r02-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "町内会で来月の予定を話す。",
+          "reading": "ちょうないかいでらいげつのよていをはなす。"
+        },
+        {
+          "problem_id": "r02-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "街路樹の下で雨宿りをする。",
+          "reading": "がいろじゅのしたであまやどりをする。"
+        },
+        {
+          "problem_id": "r02-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "広場で交流会の準備が進む。",
+          "reading": "ひろばでこうりゅうかいのじゅんびがすすむ。"
+        },
+        {
+          "problem_id": "r02-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "朝の商店街では店を開く準備が進み、元気な声が通りに広がっていた。",
+          "reading": "あさのしょうてんがいではみせをひらくじゅんびがすすみ、げんきなこえがとおりにひろがっていた。"
+        },
+        {
+          "problem_id": "r02-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "地域の行事を知らせる案内板には、参加する人への大切な連絡が書かれている。",
+          "reading": "ちいきのぎょうじをしらせるあんないばんには、さんかするひとへのたいせつなれんらくがかかれている。"
+        },
+        {
+          "problem_id": "r02-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "困っている人へ声をかける小さな行動が、安心して暮らせる町につながる。",
+          "reading": "こまっているひとへこえをかけるちいさなこうどうが、あんしんしてくらせるまちにつながる。"
+        },
+        {
+          "problem_id": "r02-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "夕方になると公園から子どもたちが帰り、通りには穏やかな灯りがともった。",
+          "reading": "ゆうがたになるとこうえんからこどもたちがかえり、とおりにはおだやかなあかりがともった。"
+        },
+        {
+          "problem_id": "r02-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "朝市では農家が育てた野菜や果物が並び、買い物客と店の人の明るい会話が続いていた。",
+          "reading": "あさいちではのうかがそだてたやさいやくだものがならび、かいものきゃくとみせのひとのあかるいかいわがつづいていた。"
+        },
+        {
+          "problem_id": "r02-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "路線バスの時刻や行き先を案内板で確認してから乗ると、初めての場所でも安心して移動できる。",
+          "reading": "ろせんばすのじこくやいきさきをあんないばんでかくにんしてからのると、はじめてのばしょでもあんしんしていどうできる。"
+        },
+        {
+          "problem_id": "r02-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "地域の清掃活動へ参加した人たちは役割を分け、通学路や公園を丁寧にきれいにした。",
+          "reading": "ちいきのせいそうかつどうへさんかしたひとたちはやくわりをわけ、つうがくろやこうえんをていねいにきれいにした。"
+        },
+        {
+          "problem_id": "r02-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "大雨に備えて避難場所と連絡方法を家族で確かめ、必要な物をすぐ持ち出せるよう準備した。",
+          "reading": "おおあめにそなえてひなんばしょとれんらくほうほうをかぞくでたしかめ、ひつようなものをすぐもちだせるようじゅんびした。"
+        },
+        {
+          "problem_id": "r02-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "商店街の催しでは子どもから大人まで協力し、通りを飾って訪れる人を温かく迎えた。",
+          "reading": "しょうてんがいのもよおしではこどもからおとなまできょうりょくし、とおりをかざっておとずれるひとをあたたかくむかえた。"
+        },
+        {
+          "problem_id": "r02-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "回覧板に書かれた工事の日程を確認したため、当日は混雑する道を避けて早めに出発できた。",
+          "reading": "かいらんばんにかかれたこうじのにっていをかくにんしたため、とうじつはこんざつするみちをさけてはやめにしゅっぱつできた。"
+        },
+        {
+          "problem_id": "r02-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "普段から近所の人と挨拶を交わしていると、困ったときにも互いに声を掛けやすくなる。",
+          "reading": "ふだんからきんじょのひととあいさつをかわしていると、こまったときにもたがいにこえをかけやすくなる。"
+        },
+        {
+          "problem_id": "r02-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "遊歩道の花壇を季節の花へ植え替えると、散歩を楽しむ人が足を止めて眺めていた。",
+          "reading": "ゆうほどうのかだんをきせつのはなへうえかえると、さんぽをたのしむひとがあしをとめてながめていた。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-reserve-03",
+      "version": 1,
+      "role": "reserve",
+      "reserve_priority": 3,
+      "title": "科学の観察",
+      "problems": [
+        {
+          "problem_id": "r03-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "実験",
+          "reading": "じっけん"
+        },
+        {
+          "problem_id": "r03-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "温度計",
+          "reading": "おんどけい"
+        },
+        {
+          "problem_id": "r03-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "顕微鏡",
+          "reading": "けんびきょう"
+        },
+        {
+          "problem_id": "r03-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "観察記録",
+          "reading": "かんさつきろく"
+        },
+        {
+          "problem_id": "r03-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "試験管",
+          "reading": "しけんかん"
+        },
+        {
+          "problem_id": "r03-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "測定結果",
+          "reading": "そくていけっか"
+        },
+        {
+          "problem_id": "r03-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "仮説",
+          "reading": "かせつ"
+        },
+        {
+          "problem_id": "r03-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "標本",
+          "reading": "ひょうほん"
+        },
+        {
+          "problem_id": "r03-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "反応速度",
+          "reading": "はんのうそくど"
+        },
+        {
+          "problem_id": "r03-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "実験装置",
+          "reading": "じっけんそうち"
+        },
+        {
+          "problem_id": "r03-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "再現性",
+          "reading": "さいげんせい"
+        },
+        {
+          "problem_id": "r03-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "研究発表",
+          "reading": "けんきゅうはっぴょう"
+        },
+        {
+          "problem_id": "r03-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "小さな変化を丁寧に記録する。",
+          "reading": "ちいさなへんかをていねいにきろくする。"
+        },
+        {
+          "problem_id": "r03-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "予想と結果の違いを比べる。",
+          "reading": "よそうとけっかのちがいをくらべる。"
+        },
+        {
+          "problem_id": "r03-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "安全を確認して実験を始める。",
+          "reading": "あんぜんをかくにんしてじっけんをはじめる。"
+        },
+        {
+          "problem_id": "r03-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "見えない仕組みを想像してみる。",
+          "reading": "みえないしくみをそうぞうしてみる。"
+        },
+        {
+          "problem_id": "r03-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "試験管の番号を先に確かめる。",
+          "reading": "しけんかんのばんごうをさきにたしかめる。"
+        },
+        {
+          "problem_id": "r03-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "測定結果を表に整理する。",
+          "reading": "そくていけっかをひょうにせいりする。"
+        },
+        {
+          "problem_id": "r03-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "観察から新しい仮説を立てる。",
+          "reading": "かんさつからあたらしいかせつをたてる。"
+        },
+        {
+          "problem_id": "r03-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "標本へ日付と名前を記入する。",
+          "reading": "ひょうほんへひづけとなまえをきにゅうする。"
+        },
+        {
+          "problem_id": "r03-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "反応の速さを秒単位で測る。",
+          "reading": "はんのうのはやさをびょうたんいではかる。"
+        },
+        {
+          "problem_id": "r03-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "装置の電源を順番に入れる。",
+          "reading": "そうちのでんげんをじゅんばんにいれる。"
+        },
+        {
+          "problem_id": "r03-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "同じ実験で再現性を確かめる。",
+          "reading": "おなじじっけんでさいげんせいをたしかめる。"
+        },
+        {
+          "problem_id": "r03-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "研究の成果を図で説明する。",
+          "reading": "けんきゅうのせいかをずでせつめいする。"
+        },
+        {
+          "problem_id": "r03-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "同じ条件で何度も実験を行うと、結果に共通する特徴が少しずつ見えてくる。",
+          "reading": "おなじじょうけんでなんどもじっけんをおこなうと、けっかにきょうつうするとくちょうがすこしずつみえてくる。"
+        },
+        {
+          "problem_id": "r03-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "観察した事実と自分の予想を分けて書くことで、記録はさらに分かりやすくなる。",
+          "reading": "かんさつしたじじつとじぶんのよそうをわけてかくことで、きろくはさらにわかりやすくなる。"
+        },
+        {
+          "problem_id": "r03-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "うまくいかなかった実験にも、次の方法を考えるための大切な手がかりがある。",
+          "reading": "うまくいかなかったじっけんにも、つぎのほうほうをかんがえるためのたいせつなてがかりがある。"
+        },
+        {
+          "problem_id": "r03-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "身近な疑問をそのままにせず、確かめる方法を考えることから科学は始まる。",
+          "reading": "みぢかなぎもんをそのままにせず、たしかめるほうほうをかんがえることからかがくははじまる。"
+        },
+        {
+          "problem_id": "r03-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "実験を始める前に手順と注意事項を全員で読み、必要な器具がそろっているか確認した。",
+          "reading": "じっけんをはじめるまえにてじゅんとちゅういじこうをぜんいんでよみ、ひつようなきぐがそろっているかかくにんした。"
+        },
+        {
+          "problem_id": "r03-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "測定結果が予想と異なったときは失敗と決めつけず、条件や記録に誤りがないか調べる。",
+          "reading": "そくていけっかがよそうとことなったときはしっぱいときめつけず、じょうけんやきろくにあやまりがないかしらべる。"
+        },
+        {
+          "problem_id": "r03-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "顕微鏡の倍率を少しずつ上げて観察すると、肉眼では見えなかった細かな構造が現れた。",
+          "reading": "けんびきょうのばいりつをすこしずつあげてかんさつすると、にくがんではみえなかったこまかなこうぞうがあらわれた。"
+        },
+        {
+          "problem_id": "r03-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "同じ条件で得られた複数の値を比べることで、測定のばらつきや傾向を判断しやすくなる。",
+          "reading": "おなじじょうけんでえられたふくすうのあたいをくらべることで、そくていのばらつきやけいこうをはんだんしやすくなる。"
+        },
+        {
+          "problem_id": "r03-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "考えた仮説を確かめるには、どの条件だけを変え、何を同じに保つかを明確に決める。",
+          "reading": "かんがえたかせつをたしかめるには、どのじょうけんだけをかえ、なにをおなじにたもつかをめいかくにきめる。"
+        },
+        {
+          "problem_id": "r03-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "研究発表では結果だけでなく、実験方法と考察の流れも図を使って分かりやすく説明した。",
+          "reading": "けんきゅうはっぴょうではけっかだけでなく、じっけんほうほうとこうさつのながれもずをつかってわかりやすくせつめいした。"
+        },
+        {
+          "problem_id": "r03-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "別の人が同じ手順を行って同様の結果を得られれば、その実験の再現性は高いと考えられる。",
+          "reading": "べつのひとがおなじてじゅんをおこなってどうようのけっかをえられれば、そのじっけんのさいげんせいはたかいとかんがえられる。"
+        },
+        {
+          "problem_id": "r03-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "身の回りで生まれた小さな疑問を観察と実験で確かめる過程には、新しい発見が隠れている。",
+          "reading": "みのまわりでうまれたちいさなぎもんをかんさつとじっけんでたしかめるかていには、あたらしいはっけんがかくれている。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-reserve-04",
+      "version": 1,
+      "role": "reserve",
+      "reserve_priority": 4,
+      "title": "ものづくり",
+      "problems": [
+        {
+          "problem_id": "r04-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "工具箱",
+          "reading": "こうぐばこ"
+        },
+        {
+          "problem_id": "r04-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "設計",
+          "reading": "せっけい"
+        },
+        {
+          "problem_id": "r04-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "材料",
+          "reading": "ざいりょう"
+        },
+        {
+          "problem_id": "r04-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "完成品",
+          "reading": "かんせいひん"
+        },
+        {
+          "problem_id": "r04-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "作業台",
+          "reading": "さぎょうだい"
+        },
+        {
+          "problem_id": "r04-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "研磨紙",
+          "reading": "けんまし"
+        },
+        {
+          "problem_id": "r04-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "試作機",
+          "reading": "しさくき"
+        },
+        {
+          "problem_id": "r04-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "組立図",
+          "reading": "くみたてず"
+        },
+        {
+          "problem_id": "r04-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "安全眼鏡",
+          "reading": "あんぜんめがね"
+        },
+        {
+          "problem_id": "r04-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "加工精度",
+          "reading": "かこうせいど"
+        },
+        {
+          "problem_id": "r04-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "部品表",
+          "reading": "ぶひんひょう"
+        },
+        {
+          "problem_id": "r04-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "耐久試験",
+          "reading": "たいきゅうしけん"
+        },
+        {
+          "problem_id": "r04-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "寸法を測って印を付ける。",
+          "reading": "すんぽうをはかってしるしをつける。"
+        },
+        {
+          "problem_id": "r04-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "道具は決められた場所へ戻す。",
+          "reading": "どうぐはきめられたばしょへもどす。"
+        },
+        {
+          "problem_id": "r04-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "試作品から改善点を見つける。",
+          "reading": "しさくひんからかいぜんてんをみつける。"
+        },
+        {
+          "problem_id": "r04-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "安全な姿勢で作業を続ける。",
+          "reading": "あんぜんなしせいでさぎょうをつづける。"
+        },
+        {
+          "problem_id": "r04-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "作業台の上をきれいに整える。",
+          "reading": "さぎょうだいのうえをきれいにととのえる。"
+        },
+        {
+          "problem_id": "r04-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "研磨紙で表面を滑らかにする。",
+          "reading": "けんましでひょうめんをなめらかにする。"
+        },
+        {
+          "problem_id": "r04-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "試作機を動かして課題を探す。",
+          "reading": "しさくきをうごかしてかだいをさがす。"
+        },
+        {
+          "problem_id": "r04-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "組立図で部品の向きを確かめる。",
+          "reading": "くみたてずでぶひんのむきをたしかめる。"
+        },
+        {
+          "problem_id": "r04-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "安全眼鏡を正しく身に着ける。",
+          "reading": "あんぜんめがねをただしくみにつける。"
+        },
+        {
+          "problem_id": "r04-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "加工した寸法をもう一度測る。",
+          "reading": "かこうしたすんぽうをもういちどはかる。"
+        },
+        {
+          "problem_id": "r04-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "部品表と実物の数を照合する。",
+          "reading": "ぶひんひょうとじつぶつのかずをしょうごうする。"
+        },
+        {
+          "problem_id": "r04-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "完成品の耐久性を丁寧に試す。",
+          "reading": "かんせいひんのたいきゅうせいをていねいにためす。"
+        },
+        {
+          "problem_id": "r04-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "設計図をよく確認してから作業を始めると、材料の無駄や作り直しを減らせる。",
+          "reading": "せっけいずをよくかくにんしてからさぎょうをはじめると、ざいりょうのむだやつくりなおしをへらせる。"
+        },
+        {
+          "problem_id": "r04-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "使う人の立場を想像しながら形を整えることで、手になじむ道具へ近づいていく。",
+          "reading": "つかうひとのたちばをそうぞうしながらかたちをととのえることで、てになじむどうぐへちかづいていく。"
+        },
+        {
+          "problem_id": "r04-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "失敗した部分を隠さずに調べると、次の試作品で直すべき場所がはっきりする。",
+          "reading": "しっぱいしたぶぶんをかくさずにしらべると、つぎのしさくひんでなおすべきばしょがはっきりする。"
+        },
+        {
+          "problem_id": "r04-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "仲間と役割を分けて声をかけ合えば、複雑な作業も安全に進めることができる。",
+          "reading": "なかまとやくわりをわけてこえをかけあえば、ふくざつなさぎょうもあんぜんにすすめることができる。"
+        },
+        {
+          "problem_id": "r04-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "作業を始める前に工具の状態と周囲の安全を確かめ、保護具を正しく身に着けた。",
+          "reading": "さぎょうをはじめるまえにこうぐのじょうたいとしゅういのあんぜんをたしかめ、ほごぐをただしくみにつけた。"
+        },
+        {
+          "problem_id": "r04-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "試作機を実際に使ってもらうと、設計中には気づかなかった操作の難しさが見つかった。",
+          "reading": "しさくきをじっさいにつかってもらうと、せっけいちゅうにはきづかなかったそうさのむずかしさがみつかった。"
+        },
+        {
+          "problem_id": "r04-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "部品を加工する順序をあらかじめ考えておくことで、作業時間と材料の無駄を減らせる。",
+          "reading": "ぶひんをかこうするじゅんじょをあらかじめかんがえておくことで、さぎょうじかんとざいりょうのむだをへらせる。"
+        },
+        {
+          "problem_id": "r04-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "測った寸法をその場で記録し、設計値との差を確認しながら少しずつ形を整えていく。",
+          "reading": "はかったすんぽうをそのばできろくし、せっけいちとさをかくにんしながらすこしずつかたちをととのえていく。"
+        },
+        {
+          "problem_id": "r04-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "完成品に繰り返し力を加える耐久試験を行い、安全に使用できる回数や条件を調べた。",
+          "reading": "かんせいひんにくりかえしちからをくわえるたいきゅうしけんをおこない、あんぜんにしようできるかいすうやじょうけんをしらべた。"
+        },
+        {
+          "problem_id": "r04-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "組立図と部品表へ最新の変更を反映しておけば、別の担当者でも同じ製品を正しく作れる。",
+          "reading": "くみたてずとぶひんひょうへさいしんのへんこうをはんえいしておけば、べつのたんとうしゃでもおなじせいひんをただしくつくれる。"
+        },
+        {
+          "problem_id": "r04-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "道具の正しい使い方を互いに確認し、危険な作業では必ず周囲へ声を掛けてから始める。",
+          "reading": "どうぐのただしいつかいかたをたがいにかくにんし、きけんなさぎょうではかならずしゅういへこえをかけてからはじめる。"
+        },
+        {
+          "problem_id": "r04-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "使う人から届いた意見を次の設計へ取り入れることで、製品はより安全で便利な形に育つ。",
+          "reading": "つかうひとからとどいたいけんをつぎのせっけいへとりいれることで、せいひんはよりあんぜんでべんりなかたちにそだつ。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-reserve-05",
+      "version": 1,
+      "role": "reserve",
+      "reserve_priority": 5,
+      "title": "小さな旅",
+      "problems": [
+        {
+          "problem_id": "r05-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "乗車券",
+          "reading": "じょうしゃけん"
+        },
+        {
+          "problem_id": "r05-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "目的地",
+          "reading": "もくてきち"
+        },
+        {
+          "problem_id": "r05-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "展望台",
+          "reading": "てんぼうだい"
+        },
+        {
+          "problem_id": "r05-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "旅行鞄",
+          "reading": "りょこうかばん"
+        },
+        {
+          "problem_id": "r05-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "時刻表",
+          "reading": "じこくひょう"
+        },
+        {
+          "problem_id": "r05-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "改札口",
+          "reading": "かいさつぐち"
+        },
+        {
+          "problem_id": "r05-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "観光案内",
+          "reading": "かんこうあんない"
+        },
+        {
+          "problem_id": "r05-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "終着駅",
+          "reading": "しゅうちゃくえき"
+        },
+        {
+          "problem_id": "r05-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "車窓",
+          "reading": "しゃそう"
+        },
+        {
+          "problem_id": "r05-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "遊覧船",
+          "reading": "ゆうらんせん"
+        },
+        {
+          "problem_id": "r05-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "名物料理",
+          "reading": "めいぶつりょうり"
+        },
+        {
+          "problem_id": "r05-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "旅日記",
+          "reading": "たびにっき"
+        },
+        {
+          "problem_id": "r05-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "地図を開いて道順を確かめる。",
+          "reading": "ちずをひらいてみちじゅんをたしかめる。"
+        },
+        {
+          "problem_id": "r05-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "窓の外に知らない町が見える。",
+          "reading": "まどのそとにしらないまちがみえる。"
+        },
+        {
+          "problem_id": "r05-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "荷物を軽くして歩き始める。",
+          "reading": "にもつをかるくしてあるきはじめる。"
+        },
+        {
+          "problem_id": "r05-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "帰りの時刻を忘れずに確認する。",
+          "reading": "かえりのじこくをわすれずにかくにんする。"
+        },
+        {
+          "problem_id": "r05-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "時刻表で乗り換えを調べる。",
+          "reading": "じこくひょうでのりかえをしらべる。"
+        },
+        {
+          "problem_id": "r05-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "改札口で乗車券を取り出す。",
+          "reading": "かいさつぐちでじょうしゃけんをとりだす。"
+        },
+        {
+          "problem_id": "r05-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "案内所で町の見所を尋ねる。",
+          "reading": "あんないじょでまちのみどころをたずねる。"
+        },
+        {
+          "problem_id": "r05-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "終着駅で列車を降りる。",
+          "reading": "しゅうちゃくえきでれっしゃをおりる。"
+        },
+        {
+          "problem_id": "r05-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "車窓から海岸線を眺める。",
+          "reading": "しゃそうからかいがんせんをながめる。"
+        },
+        {
+          "problem_id": "r05-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "遊覧船が静かな港を離れる。",
+          "reading": "ゆうらんせんがしずかなみなとをはなれる。"
+        },
+        {
+          "problem_id": "r05-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "土地の名物料理を味わう。",
+          "reading": "とちのめいぶつりょうりをあじわう。"
+        },
+        {
+          "problem_id": "r05-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "一日の出来事を旅日記に書く。",
+          "reading": "いちにちのできごとをたびにっきにかく。"
+        },
+        {
+          "problem_id": "r05-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "駅を出て細い道を進むと、地図には載っていない静かな広場を見つけた。",
+          "reading": "えきをでてほそいみちをすすむと、ちずにはのっていないしずかなひろばをみつけた。"
+        },
+        {
+          "problem_id": "r05-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "展望台から町を見渡すと、歩いてきた道と遠くの山が一本につながって見えた。",
+          "reading": "てんぼうだからまちをみわたすと、あるいてきたみちととおくのやまがいっぽんにつながってみえた。"
+        },
+        {
+          "problem_id": "r05-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "予定どおりに進まない時間も楽しめると、旅の思い出はさらに豊かになる。",
+          "reading": "よていどおりにすすまないじかんもたのしめると、たびのおもいではさらにゆたかになる。"
+        },
+        {
+          "problem_id": "r05-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "帰宅して写真を見返すと、その場所で聞いた音や風の匂いまで思い出した。",
+          "reading": "きたくしてしゃしんをみかえすと、そのばしょできいたおとやかぜのにおいまでおもいだした。"
+        },
+        {
+          "problem_id": "r05-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "出発前に時刻表と天気予報を確認し、急な予定の変更にも対応できるよう余裕を持った。",
+          "reading": "しゅっぱつまえにじこくひょうとてんきよほうをかくにんし、きゅうなよていのへんこうにもたいおうできるようよゆうをもった。"
+        },
+        {
+          "problem_id": "r05-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "列車の車窓から広い田畑や遠くの山を眺めていると、目的地までの時間が短く感じられた。",
+          "reading": "れっしゃのしゃそうからひろいたはたやとおくのやまをながめていると、もくてきちまでのじかんがみじかくかんじられた。"
+        },
+        {
+          "problem_id": "r05-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "観光案内所で教えてもらった小道を歩くと、古い建物が並ぶ静かな通りへたどり着いた。",
+          "reading": "かんこうあんないじょでおしえてもらったこみちをあるくと、ふるいたてものがならぶしずかなとおりへたどりついた。"
+        },
+        {
+          "problem_id": "r05-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "遊覧船の甲板へ出ると潮の香りを含んだ風が吹き、港の町が少しずつ遠ざかった。",
+          "reading": "ゆうらんせんのかんぱんへでるとしおのかおりをふくんだかぜがふき、みなとのまちがすこしずつとおざかった。"
+        },
+        {
+          "problem_id": "r05-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "土地の食材を使った名物料理を味わいながら、店の人から地域の歴史や暮らしを聞いた。",
+          "reading": "とちのしょくざいをつかっためいぶつりょうりをあじわいながら、みせのひとからちいきのれきしやくらしをきいた。"
+        },
+        {
+          "problem_id": "r05-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "道に迷ったときは立ち止まって現在地を確かめ、分からなければ近くの人へ丁寧に尋ねる。",
+          "reading": "みちにまよったときはたちどまってげんざいちをたしかめ、わからなければちかくのひとへていねいにたずねる。"
+        },
+        {
+          "problem_id": "r05-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "旅先で撮った写真と切符を日記へ添えると、その日に感じた驚きや喜びまで思い出せる。",
+          "reading": "たびさきでとったしゃしんときっぷをにっきへそえると、そのひにかんじたおどろきやよろこびまでおもいだせる。"
+        },
+        {
+          "problem_id": "r05-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "帰りの列車が終着駅へ近づくころ、次は季節を変えて同じ町を訪れたいと思った。",
+          "reading": "かえりのれっしゃがしゅうちゃくえきへちかづくころ、つぎはきせつをかえておなじまちをおとずれたいとおもった。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-reserve-06",
+      "version": 1,
+      "role": "reserve",
+      "reserve_priority": 6,
+      "title": "協力する力",
+      "problems": [
+        {
+          "problem_id": "r06-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "相談",
+          "reading": "そうだん"
+        },
+        {
+          "problem_id": "r06-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "役割",
+          "reading": "やくわり"
+        },
+        {
+          "problem_id": "r06-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "合図",
+          "reading": "あいず"
+        },
+        {
+          "problem_id": "r06-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "共同作業",
+          "reading": "きょうどうさぎょう"
+        },
+        {
+          "problem_id": "r06-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "意見交換",
+          "reading": "いけんこうかん"
+        },
+        {
+          "problem_id": "r06-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "進行役",
+          "reading": "しんこうやく"
+        },
+        {
+          "problem_id": "r06-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "共通目標",
+          "reading": "きょうつうもくひょう"
+        },
+        {
+          "problem_id": "r06-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "信頼関係",
+          "reading": "しんらいかんけい"
+        },
+        {
+          "problem_id": "r06-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "役割分担",
+          "reading": "やくわりぶんたん"
+        },
+        {
+          "problem_id": "r06-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "助け合い",
+          "reading": "たすけあい"
+        },
+        {
+          "problem_id": "r06-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "達成感",
+          "reading": "たっせいかん"
+        },
+        {
+          "problem_id": "r06-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "振り返り",
+          "reading": "ふりかえり"
+        },
+        {
+          "problem_id": "r06-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "相手の話を最後まで聞く。",
+          "reading": "あいてのはなしをさいごまできく。"
+        },
+        {
+          "problem_id": "r06-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "困ったことを早めに共有する。",
+          "reading": "こまったことをはやめにきょうゆうする。"
+        },
+        {
+          "problem_id": "r06-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "得意なことを生かして助け合う。",
+          "reading": "とくいなことをいかしてたすけあう。"
+        },
+        {
+          "problem_id": "r06-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "感謝の言葉をきちんと伝える。",
+          "reading": "かんしゃのことばをきちんとつたえる。"
+        },
+        {
+          "problem_id": "r06-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "全員の意見を順番に聞く。",
+          "reading": "ぜんいんのいけんをじゅんばんにきく。"
+        },
+        {
+          "problem_id": "r06-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "進行役が話題を整理する。",
+          "reading": "しんこうやくがわだいをせいりする。"
+        },
+        {
+          "problem_id": "r06-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "共通の目標を言葉で確かめる。",
+          "reading": "きょうつうのもくひょうをことばでたしかめる。"
+        },
+        {
+          "problem_id": "r06-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "約束を守って信頼を積み重ねる。",
+          "reading": "やくそくをまもってしんらいをつみかさねる。"
+        },
+        {
+          "problem_id": "r06-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "作業量を見ながら役割を分ける。",
+          "reading": "さぎょうりょうをみながらやくわりをわける。"
+        },
+        {
+          "problem_id": "r06-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "忙しい仲間へ手助けを申し出る。",
+          "reading": "いそがしいなかまへてだすけをもうしでる。"
+        },
+        {
+          "problem_id": "r06-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "完成した喜びを皆で分かち合う。",
+          "reading": "かんせいしたよろこびをみんなでわかちあう。"
+        },
+        {
+          "problem_id": "r06-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "活動の終わりに良かった点を話す。",
+          "reading": "かつどうのおわりによかったてんをはなす。"
+        },
+        {
+          "problem_id": "r06-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "全員が同じ考えでなくても、目的を確かめながら話せば良い方法を見つけられる。",
+          "reading": "ぜんいんがおなじかんがえでなくても、もくてきをたしかめながらはなせばよいほうほうをみつけられる。"
+        },
+        {
+          "problem_id": "r06-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "作業が遅れている仲間に気づいたら、責める前に必要な手助けを一緒に考える。",
+          "reading": "さぎょうがおくれているなかまにきづいたら、せめるまえにひつようなたすけをいっしょにかんがえる。"
+        },
+        {
+          "problem_id": "r06-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "役割を終えた人が次にできることを探すと、チーム全体の流れが滑らかになる。",
+          "reading": "やくわりをおえたひとがつぎにできることをさがすと、ちーむぜんたいのながれがなめらかになる。"
+        },
+        {
+          "problem_id": "r06-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "成功した理由と失敗した理由を共有すれば、次の挑戦で全員が成長できる。",
+          "reading": "せいこうしたりゆうとしっぱいしたりゆうをきょうゆうすれば、つぎのちょうせんでぜんいんがせいちょうできる。"
+        },
+        {
+          "problem_id": "r06-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "話し合いでは最初に共通の目標を確認し、意見が異なる理由を一つずつ整理していった。",
+          "reading": "はなしあいではさいしょにきょうつうのもくひょうをかくにんし、いけんがことなるりゆうをひとつずつせいりしていった。"
+        },
+        {
+          "problem_id": "r06-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "得意な作業だけに偏らないよう役割を分担し、困ったときは互いに助けを求めることにした。",
+          "reading": "とくいなさぎょうだけにかたよらないようやくわりをぶんたんし、こまったときはたがいにたすけをもとめることにした。"
+        },
+        {
+          "problem_id": "r06-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "進み具合を定期的に共有すると、遅れや問題へ早く気づき、全員で対応を考えられる。",
+          "reading": "すすみぐあいをていきてきにきょうゆうすると、おくれやもんだいへはやくきづき、ぜんいんでたいおうをかんがえられる。"
+        },
+        {
+          "problem_id": "r06-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "相手の意見を否定する前に最後まで聞き、良い部分を認めてから自分の考えを伝えた。",
+          "reading": "あいてのいけんをひていするまえにさいごまできき、よいぶぶんをみとめてからじぶんのかんがえをつたえた。"
+        },
+        {
+          "problem_id": "r06-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "小さな約束でも守り続ける人がいると、仲間は安心して大切な仕事を任せられるようになる。",
+          "reading": "ちいさなやくそくでもまもりつづけるひとがいると、なかまはあんしんしてたいせつなしごとをまかせられるようになる。"
+        },
+        {
+          "problem_id": "r06-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "作業を終えた後の振り返りで成功と失敗の理由を整理し、次に試す方法を全員で決めた。",
+          "reading": "さぎょうをおえたあとのふりかえりでせいこうとしっぱいのりゆうをせいりし、つぎにためすほうほうをぜんいんできめた。"
+        },
+        {
+          "problem_id": "r06-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "一人では難しい課題でも知識や経験を持ち寄れば、思いがけない解決方法が見つかる。",
+          "reading": "ひとりではむずかしいかだいでもちしきやけいけんをもちよれば、おもいがけないかいけつほうほうがみつかる。"
+        },
+        {
+          "problem_id": "r06-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "全員で役割を果たして目標を達成した瞬間には、個人の成功とは違う大きな喜びが生まれた。",
+          "reading": "ぜんいんでやくわりをはたしてもくひょうをたっせいしたしゅんかんには、こじんのせいこうとはちがうおおきなよろこびがうまれた。"
+        }
+      ]
+    },
+    {
+      "problem_set_id": "typing-reserve-07",
+      "version": 1,
+      "role": "reserve",
+      "reserve_priority": 7,
+      "title": "未来への一歩",
+      "problems": [
+        {
+          "problem_id": "r07-w01",
+          "order": 1,
+          "type": "word",
+          "display_text": "挑戦",
+          "reading": "ちょうせん"
+        },
+        {
+          "problem_id": "r07-w02",
+          "order": 2,
+          "type": "word",
+          "display_text": "発見",
+          "reading": "はっけん"
+        },
+        {
+          "problem_id": "r07-w03",
+          "order": 3,
+          "type": "word",
+          "display_text": "可能性",
+          "reading": "かのうせい"
+        },
+        {
+          "problem_id": "r07-w04",
+          "order": 4,
+          "type": "word",
+          "display_text": "将来像",
+          "reading": "しょうらいぞう"
+        },
+        {
+          "problem_id": "r07-w05",
+          "order": 5,
+          "type": "word",
+          "display_text": "好奇心",
+          "reading": "こうきしん"
+        },
+        {
+          "problem_id": "r07-w06",
+          "order": 6,
+          "type": "word",
+          "display_text": "成長記録",
+          "reading": "せいちょうきろく"
+        },
+        {
+          "problem_id": "r07-w07",
+          "order": 7,
+          "type": "word",
+          "display_text": "新発想",
+          "reading": "しんはっそう"
+        },
+        {
+          "problem_id": "r07-w08",
+          "order": 8,
+          "type": "word",
+          "display_text": "目標設定",
+          "reading": "もくひょうせってい"
+        },
+        {
+          "problem_id": "r07-w09",
+          "order": 9,
+          "type": "word",
+          "display_text": "選択肢",
+          "reading": "せんたくし"
+        },
+        {
+          "problem_id": "r07-w10",
+          "order": 10,
+          "type": "word",
+          "display_text": "技術革新",
+          "reading": "ぎじゅつかくしん"
+        },
+        {
+          "problem_id": "r07-w11",
+          "order": 11,
+          "type": "word",
+          "display_text": "社会貢献",
+          "reading": "しゃかいこうけん"
+        },
+        {
+          "problem_id": "r07-w12",
+          "order": 12,
+          "type": "word",
+          "display_text": "未来設計",
+          "reading": "みらいせっけい"
+        },
+        {
+          "problem_id": "r07-s01",
+          "order": 13,
+          "type": "short_sentence",
+          "display_text": "最初の一歩を今日から始める。",
+          "reading": "さいしょのいっぽをきょうからはじめる。"
+        },
+        {
+          "problem_id": "r07-s02",
+          "order": 14,
+          "type": "short_sentence",
+          "display_text": "知らないことを楽しんで学ぶ。",
+          "reading": "しらないことをたのしんでまなぶ。"
+        },
+        {
+          "problem_id": "r07-s03",
+          "order": 15,
+          "type": "short_sentence",
+          "display_text": "小さな成功を次の自信に変える。",
+          "reading": "ちいさなせいこうをつぎのじしんにかえる。"
+        },
+        {
+          "problem_id": "r07-s04",
+          "order": 16,
+          "type": "short_sentence",
+          "display_text": "失敗しても方法を変えて試す。",
+          "reading": "しっぱいしてもほうほうをかえてためす。"
+        },
+        {
+          "problem_id": "r07-s05",
+          "order": 17,
+          "type": "short_sentence",
+          "display_text": "好奇心が新しい学びを生む。",
+          "reading": "こうきしんがあたらしいまなびをうむ。"
+        },
+        {
+          "problem_id": "r07-s06",
+          "order": 18,
+          "type": "short_sentence",
+          "display_text": "昨日との違いを記録に残す。",
+          "reading": "きのうとのちがいをきろくにのこす。"
+        },
+        {
+          "problem_id": "r07-s07",
+          "order": 19,
+          "type": "short_sentence",
+          "display_text": "自由な発想を紙に書き出す。",
+          "reading": "じゆうなはっそうをかみにかきだす。"
+        },
+        {
+          "problem_id": "r07-s08",
+          "order": 20,
+          "type": "short_sentence",
+          "display_text": "達成できる目標を具体的に決める。",
+          "reading": "たっせいできるもくひょうをぐたいてきにきめる。"
+        },
+        {
+          "problem_id": "r07-s09",
+          "order": 21,
+          "type": "short_sentence",
+          "display_text": "複数の選択肢を丁寧に比べる。",
+          "reading": "ふくすうのせんたくしをていねいにくらべる。"
+        },
+        {
+          "problem_id": "r07-s10",
+          "order": 22,
+          "type": "short_sentence",
+          "display_text": "新しい技術の使い道を考える。",
+          "reading": "あたらしいぎじゅつのつかいみちをかんがえる。"
+        },
+        {
+          "problem_id": "r07-s11",
+          "order": 23,
+          "type": "short_sentence",
+          "display_text": "学んだ知識を誰かのために使う。",
+          "reading": "まなんだちしきをだれかのためにつかう。"
+        },
+        {
+          "problem_id": "r07-s12",
+          "order": 24,
+          "type": "short_sentence",
+          "display_text": "未来の自分へ短い手紙を書く。",
+          "reading": "みらいのじぶんへみじかいてがみをかく。"
+        },
+        {
+          "problem_id": "r07-l01",
+          "order": 25,
+          "type": "long_sentence",
+          "display_text": "遠くに見える目標でも、今日できる小さな行動へ分ければ着実に近づける。",
+          "reading": "とおくにみえるもくひょうでも、きょうできるちいさなこうどうへわければちゃくじつにちかづける。"
+        },
+        {
+          "problem_id": "r07-l02",
+          "order": 26,
+          "type": "long_sentence",
+          "display_text": "新しい考えに出会ったときは、すぐに否定せず自分との違いを確かめてみる。",
+          "reading": "あたらしいかんがえにであったときは、すぐにひていせずじぶんとのちがいをたしかめてみる。"
+        },
+        {
+          "problem_id": "r07-l03",
+          "order": 27,
+          "type": "long_sentence",
+          "display_text": "昨日できなかったことが今日できるようになる、その積み重ねが未来を作る。",
+          "reading": "きのうできなかったことがきょうできるようになる、そのつみかさねがみらいをつくる。"
+        },
+        {
+          "problem_id": "r07-l04",
+          "order": 28,
+          "type": "long_sentence",
+          "display_text": "自分の得意を誰かの役に立てる方法を考えると、学ぶ目的がより鮮明になる。",
+          "reading": "じぶんのとくいをだれかのやくにたてるほうほうをかんがえると、まなぶもくてきがよりせんめいになる。"
+        },
+        {
+          "problem_id": "r07-l05",
+          "order": 29,
+          "type": "long_sentence",
+          "display_text": "興味を持ったことを自分で調べ、分からない部分を質問する習慣が新しい学びにつながる。",
+          "reading": "きょうみをもったことをじぶんでしらべ、わからないぶぶんをしつもんするしゅうかんがあたらしいまなびにつながる。"
+        },
+        {
+          "problem_id": "r07-l06",
+          "order": 30,
+          "type": "long_sentence",
+          "display_text": "大きな目標を短い期間で達成できる作業へ分けると、次に何をすべきかが見えやすくなる。",
+          "reading": "おおきなもくひょうをみじかいきかんでたっせいできるさぎょうへわけると、つぎになにをすべきかがみえやすくなる。"
+        },
+        {
+          "problem_id": "r07-l07",
+          "order": 31,
+          "type": "long_sentence",
+          "display_text": "思いついた新しい発想をすぐ記録して仲間へ伝えると、別の視点が加わって内容が深まった。",
+          "reading": "おもいついたあたらしいはっそうをすぐきろくしてなかまへつたえると、べつのしてんがくわわってないようがふかまった。"
+        },
+        {
+          "problem_id": "r07-l08",
+          "order": 32,
+          "type": "long_sentence",
+          "display_text": "進む道に迷ったときは複数の選択肢を比べ、自分が大切にしたいことを改めて考える。",
+          "reading": "すすむみちにまよったときはふくすうのせんたくしをくらべ、じぶんがたいせつにしたいことをあらためてかんがえる。"
+        },
+        {
+          "problem_id": "r07-l09",
+          "order": 33,
+          "type": "long_sentence",
+          "display_text": "新しい技術は便利さだけでなく安全性や周囲への影響も確かめ、責任を持って活用する。",
+          "reading": "あたらしいぎじゅつはべんりさだけでなくあんぜんせいやしゅういへのえいきょうもたしかめ、せきにんをもってかつようする。"
+        },
+        {
+          "problem_id": "r07-l10",
+          "order": 34,
+          "type": "long_sentence",
+          "display_text": "学んだ知識や身につけた技術を地域の課題へ生かせば、小さくても確かな社会貢献になる。",
+          "reading": "まなんだちしきやみにつけたぎじゅつをちいきのかだいへいかせば、ちいさくてもたしかなしゃかいこうけんになる。"
+        },
+        {
+          "problem_id": "r07-l11",
+          "order": 35,
+          "type": "long_sentence",
+          "display_text": "過去の成長記録を読み返すと、当時は難しかったことを今では自然にできると気づいた。",
+          "reading": "かこのせいちょうきろくをよみかえすと、とうじはむずかしかったことをいまではしぜんにできるときづいた。"
+        },
+        {
+          "problem_id": "r07-l12",
+          "order": 36,
+          "type": "long_sentence",
+          "display_text": "未来の姿を一つに決めつけず、さまざまな経験を重ねながら自分らしい道を選んでいく。",
+          "reading": "みらいのすがたをひとつにきめつけず、さまざまなけいけんをかさねながらじぶんらしいみちをえらんでいく。"
+        }
+      ]
+    }
+  ]
+}
