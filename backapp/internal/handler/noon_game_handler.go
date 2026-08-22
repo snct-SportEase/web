@@ -340,7 +340,6 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	for _, cls := range classes {
 		classIDByName[cls.Name] = cls.ID
 	}
-
 	groupIDs := make([]int, 0, len(teamDefs))
 	entryDisplays := make([]string, 0, len(teamDefs))
 	for _, def := range teamDefs {
@@ -2410,6 +2409,37 @@ func (h *NoonGameHandler) ImportTypingSystemResults(c *gin.Context) {
 	for _, cls := range classes {
 		classIDByName[cls.Name] = cls.ID
 	}
+	typingTeamClassIDs := map[string][]int{}
+	if session.TemplateKey == noonTemplateTyping {
+		configuredGroups, err := h.noonRepo.GetGroupsWithMembers(sessionID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch typing teams"})
+			return
+		}
+		for _, group := range configuredGroups {
+			if group == nil {
+				continue
+			}
+			if _, officialName := typingSystemTeamClassMap[group.Name]; !officialName {
+				continue
+			}
+			if _, duplicate := typingTeamClassIDs[group.Name]; duplicate {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Duplicate typing team: %s", group.Name)})
+				return
+			}
+			for _, member := range group.Members {
+				if member != nil {
+					typingTeamClassIDs[group.Name] = append(typingTeamClassIDs[group.Name], member.ClassID)
+				}
+			}
+		}
+		for _, teamName := range typingSystemTeamNames {
+			if len(typingTeamClassIDs[teamName]) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Typing team configuration is missing: %s", teamName)})
+				return
+			}
+		}
+	}
 
 	seenTeamNames := map[string]struct{}{}
 	pv := sha256.Sum256(content)
@@ -2478,20 +2508,23 @@ func (h *NoonGameHandler) ImportTypingSystemResults(c *gin.Context) {
 			}
 		}
 
-		classNames, ok := typingSystemTeamClassMap[team.TeamName]
-		if !ok {
+		classNames, officialTeam := typingSystemTeamClassMap[team.TeamName]
+		if !officialTeam {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid team_name: %s", team.TeamName)})
 			return
 		}
 
-		classIDs := make([]int, 0, len(classNames))
-		for _, className := range classNames {
-			classID, found := classIDByName[className]
-			if !found {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Required class not found for team: %s (%s)", team.TeamName, className)})
-				return
+		classIDs := typingTeamClassIDs[team.TeamName]
+		if session.TemplateKey != noonTemplateTyping {
+			classIDs = make([]int, 0, len(classNames))
+			for _, className := range classNames {
+				classID, found := classIDByName[className]
+				if !found {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Required class not found for team: %s (%s)", team.TeamName, className)})
+					return
+				}
+				classIDs = append(classIDs, classID)
 			}
-			classIDs = append(classIDs, classID)
 		}
 		classIDsByTeam[team.TeamName] = classIDs
 		teamResults[i] = team
@@ -2696,40 +2729,54 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync typing sport"})
 		return
 	}
-	if existing == nil {
-		classes, err := h.classRepo.GetAllClasses(eventID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
+	groups := req.Session.Groups
+	if len(groups) == 0 {
+		for _, team := range typingSystemTeamNames {
+			groups = append(groups, templateGroupConfig{GroupName: team, ClassNames: typingSystemTeamClassMap[team]})
+		}
+	}
+	if len(groups) != len(typingSystemTeamNames) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Typing template requires exactly 6 teams"})
+		return
+	}
+	classes, err := h.classRepo.GetAllClasses(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
+		return
+	}
+	classIDs := map[string]int{}
+	for _, class := range classes {
+		classIDs[class.Name] = class.ID
+	}
+	groupClassIDs := make([][]int, len(groups))
+	seenTeams := map[string]bool{}
+	for index, group := range groups {
+		if _, officialName := typingSystemTeamClassMap[group.GroupName]; !officialName {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid typing team: %s", group.GroupName)})
 			return
 		}
-		classIDs := map[string]int{}
-		for _, class := range classes {
-			classIDs[class.Name] = class.ID
-		}
-		groups := req.Session.Groups
-		if len(groups) == 0 {
-			for _, team := range typingSystemTeamNames {
-				groups = append(groups, templateGroupConfig{GroupName: team, ClassNames: typingSystemTeamClassMap[team]})
-			}
-		}
-		if len(groups) != 6 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Typing template requires exactly 6 teams"})
+		if seenTeams[group.GroupName] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Duplicate typing team: %s", group.GroupName)})
 			return
 		}
-		for _, group := range groups {
-			ids := []int{}
-			for _, className := range group.ClassNames {
-				id, ok := classIDs[className]
-				if !ok {
-					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Required class not found: %s", className)})
-					return
-				}
-				ids = append(ids, id)
-			}
-			if _, err := h.noonRepo.SaveGroup(&models.NoonGameGroup{SessionID: saved.ID, Name: group.GroupName}, ids); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save typing team"})
+		seenTeams[group.GroupName] = true
+		if len(group.ClassNames) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Typing team must include a class: %s", group.GroupName)})
+			return
+		}
+		for _, className := range group.ClassNames {
+			id, ok := classIDs[className]
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Required class not found: %s", className)})
 				return
 			}
+			groupClassIDs[index] = append(groupClassIDs[index], id)
+		}
+	}
+	for _, teamName := range typingSystemTeamNames {
+		if !seenTeams[teamName] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Typing team configuration is missing: %s", teamName)})
+			return
 		}
 	}
 	points := req.Session.PointsByRank
@@ -2742,6 +2789,12 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 	if existing != nil {
 		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(saved.ID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update typing template"})
+			return
+		}
+	}
+	for index, group := range groups {
+		if _, err := h.noonRepo.SaveGroup(&models.NoonGameGroup{SessionID: saved.ID, Name: group.GroupName}, groupClassIDs[index]); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save typing team"})
 			return
 		}
 	}
