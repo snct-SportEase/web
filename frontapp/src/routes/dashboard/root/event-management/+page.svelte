@@ -3,6 +3,7 @@
   import { activeEvent } from '$lib/stores/eventStore.js';
   import Modal from '$lib/components/Modal.svelte';
   import FormField from '$lib/components/FormField.svelte';
+  import Badge from '$lib/components/Badge.svelte';
 
   let events = $state([]);
   let showModal = $state(false);
@@ -333,13 +334,13 @@
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">
               {#if event.status === 'preparing'}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">準備中</span>
+                <Badge variant="warning">準備中</Badge>
               {:else if event.status === 'active'}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">開催中</span>
+                <Badge variant="success">開催中</Badge>
               {:else if event.status === 'archived'}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">アーカイブ</span>
+                <Badge>アーカイブ</Badge>
               {:else}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">予定</span>
+                <Badge variant="info">予定</Badge>
               {/if}
             </td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm" onclick={(e) => e.stopPropagation()}>
