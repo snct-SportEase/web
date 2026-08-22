@@ -5,14 +5,18 @@ import "time"
 type NoonGameSession struct {
 	ID                  int                         `json:"id"`
 	EventID             int                         `json:"event_id"`
+	TemplateKey         string                      `json:"template_key"`
 	Name                string                      `json:"name"`
 	Description         *string                     `json:"description,omitempty"`
+	ScheduledAt         *time.Time                  `json:"scheduled_at,omitempty"`
+	Location            *string                     `json:"location,omitempty"`
 	Mode                string                      `json:"mode"`
 	WinPoints           int                         `json:"win_points"`
 	LossPoints          int                         `json:"loss_points"`
 	DrawPoints          int                         `json:"draw_points"`
 	ParticipationPoints int                         `json:"participation_points"`
 	AllowManualPoints   bool                        `json:"allow_manual_points"`
+	Status              string                      `json:"status"`
 	CreatedAt           time.Time                   `json:"created_at"`
 	UpdatedAt           time.Time                   `json:"updated_at"`
 	Groups              []*NoonGameGroupWithMembers `json:"groups,omitempty"`
