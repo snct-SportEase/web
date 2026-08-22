@@ -616,6 +616,7 @@ func setOAuthRandomCookie(w http.ResponseWriter, r *http.Request, name string) (
 		return "", err
 	}
 
+	// #nosec G124 -- Secure is intentionally disabled only for loopback HTTP development.
 	cookie := http.Cookie{
 		Name:     name,
 		Value:    value,
@@ -625,13 +626,13 @@ func setOAuthRandomCookie(w http.ResponseWriter, r *http.Request, name string) (
 		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 	}
-	http.SetCookie(w, &cookie)
+	http.SetCookie(w, &cookie) // #nosec G124 -- Secure is intentionally disabled only for loopback HTTP development.
 
 	return value, nil
 }
 
 func setSessionTokenCookie(w http.ResponseWriter, r *http.Request, value string, expiration time.Time) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure is intentionally disabled only for loopback HTTP development.
 		Name:     "session_token",
 		Value:    value,
 		Expires:  expiration,
@@ -643,7 +644,7 @@ func setSessionTokenCookie(w http.ResponseWriter, r *http.Request, value string,
 }
 
 func setCSRFTokenCookie(w http.ResponseWriter, r *http.Request, value string, expiration time.Time) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure is intentionally disabled only for loopback HTTP development.
 		Name:     csrfTokenCookieName,
 		Value:    value,
 		Expires:  expiration,
@@ -655,7 +656,7 @@ func setCSRFTokenCookie(w http.ResponseWriter, r *http.Request, value string, ex
 }
 
 func clearOAuthCookie(w http.ResponseWriter, r *http.Request, name string) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure is intentionally disabled only for loopback HTTP development.
 		Name:     name,
 		Value:    "",
 		Expires:  time.Unix(0, 0),

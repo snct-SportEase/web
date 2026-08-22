@@ -1495,6 +1495,7 @@ func (r *noonGameRepository) fetchMatchEntries(matchIDs []int) (map[int][]*model
 	}
 
 	placeholder, args := buildInClause(matchIDs)
+	// #nosec G201 -- placeholder is generated internally from an integer ID slice; values are bound below.
 	query := fmt.Sprintf(`
 		SELECT id, match_id, entry_index, side_type, class_id, group_id, display_name
 		FROM noon_game_match_entries
@@ -1601,6 +1602,7 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 	}
 
 	placeholder, args := buildInClause(matchIDs)
+	// #nosec G201 -- placeholder is generated internally from an integer ID slice; values are bound below.
 	query := fmt.Sprintf(`
 		SELECT 
 			rd.id, r.match_id, rd.entry_id, rd.placement_rank, rd.points, rd.note, rd.entry_resolved_name,

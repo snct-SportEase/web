@@ -356,6 +356,7 @@ func (r *classRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*mod
 		return nil, fmt.Errorf("error iterating sport mappings: %w", err)
 	}
 
+	// #nosec G201 -- placeholders is generated internally from an integer ID slice; values are bound below.
 	query := fmt.Sprintf(`
 		SELECT
 			cs.id,
