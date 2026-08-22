@@ -440,7 +440,7 @@ createServer(async (req, res) => {
     return;
   }
 
-  if (/^\\/api\\/root\\/events\\/\\d+\\/mic\\/settings$/.test(url.pathname) && req.method === 'GET') {
+  if (/^\/api\/root\/events\/\d+\/mic\/settings$/.test(url.pathname) && req.method === 'GET') {
     const eventId = Number(url.pathname.split('/')[4]);
     const event = events.find((event) => event.id === eventId);
     if (!event) {
@@ -454,7 +454,7 @@ createServer(async (req, res) => {
     return;
   }
 
-  if (/^\\/api\\/root\\/events\\/\\d+\\/mic\\/settings$/.test(url.pathname) && req.method === 'PUT') {
+  if (/^\/api\/root\/events\/\d+\/mic\/settings$/.test(url.pathname) && req.method === 'PUT') {
     const eventId = Number(url.pathname.split('/')[4]);
     const event = events.find((event) => event.id === eventId);
     if (!event) {
