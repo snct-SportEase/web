@@ -3,6 +3,7 @@
     import Alert from '$lib/components/Alert.svelte';
     import EmptyState from '$lib/components/EmptyState.svelte';
     import PageHeader from '$lib/components/PageHeader.svelte';
+    import LoadingState from '$lib/components/LoadingState.svelte';
     
     let events = $state([]);
     let loading = $state(true);
@@ -48,9 +49,7 @@
     />
 
     {#if loading}
-        <div class="flex justify-center p-12">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-        </div>
+        <LoadingState />
     {:else if error}
         <Alert variant="error">
             <span class="block sm:inline whitespace-pre-wrap">{error}</span>
