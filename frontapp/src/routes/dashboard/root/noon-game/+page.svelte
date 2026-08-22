@@ -84,7 +84,11 @@
   let isInteractive = $state(false);
 
   const modeLabels = { mixed: 'クラス＆グループ混在', class: 'クラス対抗のみ', group: 'グループ対抗のみ' };
-  const templateKeyLabels = { year_relay: '学年対抗リレー', course_relay: 'コース対抗リレー', tug_of_war: '綱引き' };
+  const templateKeyLabels = { year_relay: '学年対抗リレー', course_relay: 'コース対抗リレー', tug_of_war: '綱引き', typing: '競技タイピング' };
+
+  function hasSessionForTemplate(templateKey) {
+    return sessions.some((item) => item.template_key === templateKey);
+  }
 
   let escapeHandler = null;
 
@@ -775,6 +779,7 @@
 
     // 既存のテンプレートランを探す
     const existingRun = templateRuns.find(run => run.template_key === templateKeyMap[templateType]);
+    const isEditingSelectedTemplate = session?.template_key === templateKeyMap[templateType];
 
     // デフォルトの点数設定
     let pointsByRank = {
@@ -847,7 +852,7 @@
         ];
       }
       // 既存のセッションがあれば、その設定を使用
-      if (session) {
+      if (isEditingSelectedTemplate) {
         templateConfigForm = {
           name: session.name || templateNames[templateType],
           description: session.description || '',
@@ -884,7 +889,7 @@
     }).catch(err => {
       console.error('Failed to load default groups:', err);
       // エラー時は空のグループ設定を使用
-      if (session) {
+      if (isEditingSelectedTemplate) {
         templateConfigForm = {
           name: session.name || templateNames[templateType],
           description: session.description || '',
@@ -1057,11 +1062,10 @@
       }
 
       const created = await res.json();
-      if (templateRuns.length > 0) {
-        alert(`${templateNames[selectedTemplateType]}テンプレートに更新しました。既存のテンプレートと関連データは削除されました。`);
-      } else {
-        alert(`${templateNames[selectedTemplateType]}テンプレートを作成しました。`);
-      }
+      const templateKeyMap = { 'year-relay': 'year_relay', 'course-relay': 'course_relay', 'tug-of-war': 'tug_of_war', typing: 'typing' };
+      alert(hasSessionForTemplate(templateKeyMap[selectedTemplateType])
+        ? `${templateNames[selectedTemplateType]}の設定を更新しました。`
+        : `${templateNames[selectedTemplateType]}を作成しました。`);
       closeTemplateConfig();
       selectedSessionId = created.session?.id ?? selectedSessionId;
       await refetchCurrentSession();
@@ -1125,10 +1129,7 @@
     <section class="bg-white shadow rounded-lg p-6 space-y-6">
       <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">テンプレート選択</h2>
       <p class="text-sm text-gray-600">
-        テンプレートを選択すると、セッションが自動で作成され、必要な試合が設定されます。
-        {#if templateRuns.length > 0}
-          <span class="text-orange-600 font-semibold">（既にテンプレートが作成されています。別のテンプレートを選択すると、既存のテンプレートと関連データが削除され、新しいテンプレートが作成されます。）</span>
-        {/if}
+        テンプレートごとに独立した昼競技を作成できます。同じ競技を選ぶ場合のみ、その競技の設定を更新します。
       </p>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="border rounded-lg p-4 space-y-3">
@@ -1141,7 +1142,7 @@
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('year-relay')}
             disabled={!isInteractive || creatingTemplate['year-relay']}>
-            {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
+            {hasSessionForTemplate('year_relay') ? 'この競技を編集' : '昼競技を作成'}
           </button>
         </div>
 
@@ -1154,7 +1155,7 @@
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('typing')}
             disabled={!isInteractive || creatingTemplate['typing']}>
-            {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
+            {hasSessionForTemplate('typing') ? 'この競技を編集' : '昼競技を作成'}
           </button>
         </div>
 
@@ -1168,7 +1169,7 @@
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('course-relay')}
             disabled={!isInteractive || creatingTemplate['course-relay']}>
-            {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
+            {hasSessionForTemplate('course_relay') ? 'この競技を編集' : '昼競技を作成'}
           </button>
         </div>
 
@@ -1182,7 +1183,7 @@
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('tug-of-war')}
             disabled={!isInteractive || creatingTemplate['tug-of-war']}>
-            {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
+            {hasSessionForTemplate('tug_of_war') ? 'この競技を編集' : '昼競技を作成'}
           </button>
         </div>
       </div>

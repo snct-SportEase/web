@@ -136,6 +136,19 @@ func (h *NoonGameHandler) syncNoonGameSport(eventID int, sessionName string) err
 	return nil
 }
 
+func (h *NoonGameHandler) getSessionForTemplate(eventID int, templateKey string) (*models.NoonGameSession, error) {
+	sessions, err := h.noonRepo.ListSessionsByEvent(eventID, false)
+	if err != nil {
+		return nil, err
+	}
+	for _, session := range sessions {
+		if session != nil && session.TemplateKey == templateKey {
+			return session, nil
+		}
+	}
+	return nil, nil
+}
+
 // CreateYearRelayRun は学年対抗リレー(テンプレート)の run を作成し、A/B/総合ボーナス用の試合を生成します。
 func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Param("event_id"))
@@ -161,7 +174,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		req = createTemplateRunRequest{}
 	}
 
-	session, err := h.noonRepo.GetSessionByEvent(eventID)
+	session, err := h.getSessionForTemplate(eventID, noonTemplateYearRelay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
@@ -192,6 +205,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		}
 		session = &models.NoonGameSession{
 			EventID:             eventID,
+			TemplateKey:         noonTemplateYearRelay,
 			Name:                sessionName,
 			Description:         nil,
 			Mode:                mode,
@@ -200,6 +214,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 			DrawPoints:          0,
 			ParticipationPoints: 0,
 			AllowManualPoints:   false,
+			Status:              "draft",
 		}
 		if req.Session != nil {
 			if req.Session.Description != nil {
@@ -464,7 +479,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		req = createTemplateRunRequest{}
 	}
 
-	session, err := h.noonRepo.GetSessionByEvent(eventID)
+	session, err := h.getSessionForTemplate(eventID, noonTemplateCourseRelay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
@@ -481,6 +496,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		}
 		session = &models.NoonGameSession{
 			EventID:             eventID,
+			TemplateKey:         noonTemplateCourseRelay,
 			Name:                sessionName,
 			Description:         nil,
 			Mode:                mode,
@@ -489,6 +505,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 			DrawPoints:          0,
 			ParticipationPoints: 0,
 			AllowManualPoints:   false,
+			Status:              "draft",
 		}
 		if req.Session != nil {
 			if req.Session.Description != nil {
@@ -751,7 +768,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		req = createTemplateRunRequest{}
 	}
 
-	session, err := h.noonRepo.GetSessionByEvent(eventID)
+	session, err := h.getSessionForTemplate(eventID, noonTemplateTugOfWar)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
@@ -768,6 +785,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		}
 		session = &models.NoonGameSession{
 			EventID:             eventID,
+			TemplateKey:         noonTemplateTugOfWar,
 			Name:                sessionName,
 			Description:         nil,
 			Mode:                mode,
@@ -776,6 +794,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 			DrawPoints:          0,
 			ParticipationPoints: 0,
 			AllowManualPoints:   false,
+			Status:              "draft",
 		}
 		if req.Session != nil {
 			if req.Session.Description != nil {

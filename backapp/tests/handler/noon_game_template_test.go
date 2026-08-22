@@ -329,11 +329,12 @@ func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 
 		// セッション
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "year_relay",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -438,7 +439,7 @@ func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 		sessionID := 10
 		userID := "00000000-0000-0000-0000-000000000001"
 
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(nil, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{}, nil).Once()
 
 		// セッションが存在しない場合は新しいセッションが作成される
 		session := &models.NoonGameSession{
@@ -1556,11 +1557,12 @@ func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
 
 		// セッション
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "course_relay",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -1672,11 +1674,12 @@ func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
 		eventID := 1
 		sessionID := 10
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "course_relay",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -1996,11 +1999,12 @@ func TestNoonGameHandler_CreateTugOfWarRun(t *testing.T) {
 
 		// セッション
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "tug_of_war",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -2107,11 +2111,12 @@ func TestNoonGameHandler_CreateTugOfWarRun(t *testing.T) {
 		eventID := 1
 		sessionID := 10
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "tug_of_war",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
