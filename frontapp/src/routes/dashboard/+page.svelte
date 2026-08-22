@@ -7,6 +7,7 @@
   import NotificationSettings from '$lib/components/NotificationSettings.svelte';
   import ActionCard from '$lib/components/ActionCard.svelte';
   import Card from '$lib/components/Card.svelte';
+  import DataTable from '$lib/components/DataTable.svelte';
 
   let { data } = $props();
   let user = $derived(data.user);
@@ -532,16 +533,14 @@
           {#if classMembers.length === 0}
             <p class="text-sm text-gray-600">クラスメンバーがまだ登録されていません。</p>
           {:else}
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
+            <DataTable>
+              {#snippet header()}
                   <tr>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">氏名</th>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">メール</th>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">担当競技</th>
                   </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 bg-white">
+              {/snippet}
                   {#each classMembers as member (member.id)}
                     <tr class="hover:bg-gray-50">
                       <td class="px-4 py-3 font-medium text-gray-900">{memberDisplayName(member)}</td>
@@ -549,9 +548,7 @@
                       <td class="px-4 py-3 text-gray-700">{formatAssignments(member.assignments)}</td>
                     </tr>
                   {/each}
-                </tbody>
-              </table>
-            </div>
+            </DataTable>
           {/if}
         </div>
 
