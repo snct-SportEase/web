@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import Alert from '$lib/components/Alert.svelte';
     
     let events = $state([]);
     let loading = $state(true);
@@ -49,9 +50,9 @@
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
         </div>
     {:else if error}
-        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <Alert variant="error">
             <span class="block sm:inline whitespace-pre-wrap">{error}</span>
-        </div>
+        </Alert>
     {:else if events.length === 0}
         <div class="bg-white shadow rounded-lg p-10 text-center text-gray-500 border border-gray-100">
             <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
