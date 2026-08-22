@@ -330,6 +330,9 @@ func TestNoonGameHandler_CreateTypingRunHonorsRequestedStatus(t *testing.T) {
 		return session.TemplateKey == "typing" && session.Status == "published"
 	})).Return(&models.NoonGameSession{ID: 10, EventID: eventID, TemplateKey: "typing", Name: "競技タイピング", Status: "published"}, nil).Once()
 	noonRepo.On("SaveGroup", mock.AnythingOfType("*models.NoonGameGroup"), []int{1}).Return(&models.NoonGameGroupWithMembers{}, nil).Times(6)
+	noonRepo.On("SaveMatch", mock.MatchedBy(func(match *models.NoonGameMatch) bool {
+		return match.SessionID == 10 && match.Title != nil && match.Status == "scheduled"
+	})).Return(&models.NoonGameMatch{}, nil).Times(3)
 	noonRepo.On("CreateTemplateRunWithPointsByRankJSON", 10, "typing", "競技タイピング", userID, mock.Anything).Return(&models.NoonGameTemplateRun{ID: 1}, nil).Once()
 
 	payload := map[string]any{

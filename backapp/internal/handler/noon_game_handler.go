@@ -2802,6 +2802,21 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 			return
 		}
 	}
+	for round := 1; round <= 3; round++ {
+		title := fmt.Sprintf("競技タイピング 第%dラウンド", round)
+		format := "6チーム同時"
+		if _, err := h.noonRepo.SaveMatch(&models.NoonGameMatch{
+			SessionID:   saved.ID,
+			Title:       &title,
+			ScheduledAt: saved.ScheduledAt,
+			Location:    saved.Location,
+			Status:      "scheduled",
+			Format:      &format,
+		}); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create typing round"})
+			return
+		}
+	}
 	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(saved.ID, noonTemplateTyping, name, user.ID, points)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create typing template"})
