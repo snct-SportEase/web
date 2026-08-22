@@ -20,6 +20,8 @@
   let creatingTemplate = $state({});
   let typingFile = $state(null);
   let importingTypingResults = $state(false);
+  let typingImportStatus = $state('pending');
+  let typingImportError = $state('');
   let selectedTemplateType = $state(null);
   let templateConfigForm = $state({
     name: '',
@@ -145,6 +147,7 @@
       matches = data.matches || [];
       pointsSummary = data.points_summary || [];
       templateRuns = data.template_runs || [];
+      typingImportStatus = data.typing_import_status || 'pending';
       if (session) {
         populateSessionForm(session);
       } else {
@@ -182,6 +185,7 @@
       matches = detail.matches || [];
       pointsSummary = detail.points_summary || [];
       templateRuns = detail.template_runs || [];
+      typingImportStatus = detail.typing_import_status || 'pending';
       populateSessionForm(session);
     } catch (err) {
       errorMessage = err.message;
@@ -1104,6 +1108,7 @@
   async function importTypingResults(replace = false) {
     if (!session?.id || !typingFile) { alert('JSON ファイルを選択してください。'); return; }
     importingTypingResults = true;
+    typingImportError = '';
     try {
       const form = new FormData();
       form.append('file', typingFile);
@@ -1113,7 +1118,10 @@
       alert(detail?.status === 'already_imported' ? 'この結果はすでにインポート済みです。' : '競技タイピング結果を確定しました。');
       typingFile = null;
       await refetchCurrentSession();
-    } catch (err) { alert(err.message); }
+    } catch (err) {
+      typingImportError = err.message;
+      alert(err.message);
+    }
     finally { importingTypingResults = false; }
   }
 </script>
@@ -1480,6 +1488,13 @@
       <section class="bg-white shadow rounded-lg p-6 space-y-4">
         <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">競技タイピング結果のインポート</h2>
         <p class="text-sm text-gray-600">typing-results-v1 の JSON を読み込み、順位点を大会得点へ反映します。</p>
+        {#if typingImportError}
+          <p class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">検証失敗: {typingImportError}</p>
+        {:else if typingImportStatus === 'finalized'}
+          <p class="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">確定済みです。訂正時は置換インポートを使用してください。</p>
+        {:else}
+          <p class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">結果は未インポートです。</p>
+        {/if}
         <div class="flex flex-wrap items-center gap-3">
           <input type="file" accept="application/json,.json" onchange={(event) => { typingFile = event.currentTarget.files?.[0] ?? null; }} />
           <button class="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50" onclick={() => importTypingResults(false)} disabled={!typingFile || importingTypingResults}>{importingTypingResults ? 'インポート中…' : '結果をインポート'}</button>
