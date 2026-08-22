@@ -1,3 +1,6 @@
+// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
+import storybook from "eslint-plugin-storybook";
+
 import { fileURLToPath } from 'node:url';
 import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
@@ -9,22 +12,23 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
-	includeIgnoreFile(gitignorePath),
-	js.configs.recommended,
-	...svelte.configs.recommended,
-	{
+    includeIgnoreFile(gitignorePath),
+    js.configs.recommended,
+    ...svelte.configs.recommended,
+    {
 		languageOptions: {
 			globals: { ...globals.browser, ...globals.node }
 		}
 	},
-	{
+    {
 		files: ['**/*.svelte', '**/*.svelte.js'],
 		languageOptions: { parserOptions: { svelteConfig } }
 	},
-	{
+    {
 		rules: {
 			'no-unused-vars': 'warn',
 			'svelte/no-navigation-without-resolve': 'off'
 		}
-	}
+	},
+    ...storybook.configs["flat/recommended"]
 ];
