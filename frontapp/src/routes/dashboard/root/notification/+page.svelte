@@ -324,6 +324,7 @@
 
     <Button
       type="button"
+      size="sm"
       onclick={(e) => { e.preventDefault(); handleSubmit(e); }}
       disabled={!isInteractive || availableRoles.length === 0}
       loading={isSubmitting}

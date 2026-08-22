@@ -174,6 +174,7 @@
 
           <Button
             type="submit"
+            size="sm"
             class="w-full"
             loading={isLoading}
             loadingLabel="登録中..."

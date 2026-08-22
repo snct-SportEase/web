@@ -1,6 +1,7 @@
 <script>
   let {
     variant = 'info',
+    size = 'md',
     title = null,
     children,
     class: className = ''
@@ -16,7 +17,7 @@
 
 <div
   role={variant === 'error' ? 'alert' : 'status'}
-  class={`rounded-md border px-4 py-3 text-sm ${variantClass} ${className}`}
+  class={`rounded-md border px-4 py-3 ${size === 'sm' ? 'text-sm' : 'text-base'} ${variantClass} ${className}`}
 >
   {#if title}
     <p class="font-semibold">{title}</p>

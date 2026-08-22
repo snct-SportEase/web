@@ -13,6 +13,7 @@
 
 <Button
   class="w-full sm:ml-3 sm:w-auto"
+  size="modal"
   onclick={onconfirm}
   disabled={confirmDisabled}
   loading={confirmLoading}
@@ -20,7 +21,7 @@
   {confirmLabel}
 </Button>
 {#if cancelLabel}
-  <Button class="mt-3 w-full sm:mt-0 sm:w-auto" variant="secondary" onclick={oncancel}>
+  <Button class="mt-3 w-full sm:mt-0 sm:w-auto" size="modal" variant="secondary" onclick={oncancel}>
     {cancelLabel}
   </Button>
 {/if}

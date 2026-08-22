@@ -16,7 +16,13 @@
     secondary: 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-500',
     danger: 'border-transparent bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
   }[variant] ?? 'border-transparent bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500');
-  const sizeClass = $derived(size === 'sm' ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm');
+  const sizeClass = $derived(
+    size === 'sm'
+      ? 'px-3 py-1.5 text-sm'
+      : size === 'modal'
+        ? 'px-4 py-2 text-base sm:text-sm'
+        : 'px-4 py-2 text-base'
+  );
 
   function handleClick(event) {
     if (disabled || loading) {

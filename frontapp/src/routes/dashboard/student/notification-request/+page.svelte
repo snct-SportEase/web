@@ -197,6 +197,7 @@
         <div class="flex justify-end space-x-3">
           <Button
             type="button"
+            size="sm"
             variant="secondary"
             onclick={() => {
               showNewForm = false;
@@ -209,6 +210,7 @@
           </Button>
           <Button
             type="submit"
+            size="sm"
             loading={isSubmitting}
             loadingLabel="送信中..."
           >
