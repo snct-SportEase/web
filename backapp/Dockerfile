@@ -18,10 +18,16 @@ FROM alpine:3.20
 
 WORKDIR /app
 
-RUN apk add --no-cache mysql-client
+RUN apk add --no-cache mysql-client \
+    && addgroup -S app \
+    && adduser -S -D -H -G app app \
+    && mkdir -p /app/uploads \
+    && chown -R app:app /app
 
-COPY --from=builder /app/server .
+COPY --from=builder --chown=app:app /app/server ./server
 
 EXPOSE 8080
+
+USER app
 
 CMD ["./server"]
