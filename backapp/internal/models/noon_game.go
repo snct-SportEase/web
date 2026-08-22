@@ -157,3 +157,19 @@ type NoonGameTemplateDefaultGroup struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+type NoonGameTypingSystemImportRecord struct {
+	ID               int       `json:"id"`
+	SessionID        int       `json:"session_id"`
+	ExportID         string    `json:"export_id"`
+	SHA256           string    `json:"sha256"`
+	Status           string    `json:"status"` // success|failed
+	Action           string    `json:"action"` // import|replace
+	ReplacedExportID *string   `json:"replaced_export_id,omitempty"`
+	RequestedBy      string    `json:"requested_by"`
+	RequestedAt      time.Time `json:"requested_at"`
+	Filename         *string   `json:"filename,omitempty"`
+	PayloadSize      int       `json:"payload_size"`
+	Message          *string   `json:"message,omitempty"`
+	IsActive         bool      `json:"is_active"`
+}

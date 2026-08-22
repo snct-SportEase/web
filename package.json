@@ -1,4 +1,10 @@
 {
+  "scripts": {
+    "test": "npm --prefix frontapp run test:unit -- --project=server",
+    "test:unit": "npm --prefix frontapp run test:unit -- --project=server",
+    "test:unit:all": "npm --prefix frontapp run test:unit",
+    "test:e2e": "npm --prefix frontapp run test:e2e"
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.0.0",
     "@commitlint/config-conventional": "^20.5.0",
