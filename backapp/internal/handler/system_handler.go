@@ -211,6 +211,7 @@ func showCreateObject(ctx context.Context, db *sql.DB, name string) (string, err
 }
 
 func writeTableRows(ctx context.Context, db *sql.DB, tableName string, writer io.Writer) error {
+	// #nosec G202 -- tableName comes from information_schema and quoteIdentifier escapes MySQL identifiers.
 	rows, err := db.QueryContext(ctx, "SELECT * FROM "+quoteIdentifier(tableName))
 	if err != nil {
 		return err
@@ -294,6 +295,12 @@ func (h *SystemHandler) ExportUploadsDump(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Uploads path is not a directory"})
 		return
 	}
+	uploadsRoot, err := os.OpenRoot(uploadsDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to access uploads directory"})
+		return
+	}
+	defer uploadsRoot.Close()
 
 	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=uploads_dump_%s.zip", time.Now().Format("20060102_150405")))
 	c.Writer.Header().Set("Content-Type", "application/zip")
@@ -334,7 +341,7 @@ func (h *SystemHandler) ExportUploadsDump(c *gin.Context) {
 			return err
 		}
 
-		file, err := os.Open(path)
+		file, err := uploadsRoot.Open(relativePath)
 		if err != nil {
 			return err
 		}

@@ -212,6 +212,7 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 	}
 
 	// Fetch roles for all users in a single query
+	// #nosec G202 -- only the number of bound placeholders is constructed from the locally collected user IDs.
 	rolesQuery := `
 		SELECT ur.user_id, r.id, r.name
 		FROM roles r

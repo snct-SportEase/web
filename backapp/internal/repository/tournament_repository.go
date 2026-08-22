@@ -418,6 +418,7 @@ func (r *tournamentRepository) GetMatchesForTeams(eventID int, teamIDs []int) (m
 	}
 
 	inClause := strings.Join(placeholders[:len(teamIDs)], ",")
+	// #nosec G202 -- inClause contains only internally generated placeholders; values are bound below.
 	query := `
 		SELECT
 			m.id,
@@ -1184,6 +1185,7 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 	}
 
 	if len(insertedMatches) > 0 {
+		// #nosec G202 -- each value tuple is a static placeholder template and matchArgs are bound.
 		res, err := tx.Exec(
 			"INSERT INTO matches (tournament_id, round, match_number_in_round, team1_id, team2_id, status, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block) VALUES "+strings.Join(matchValuePlaceholders, ","),
 			matchArgs...,
@@ -1272,6 +1274,7 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 		}
 		updateArgs = append(updateArgs, whereArgs...)
 
+		// #nosec G201 -- CASE and IN sections contain only static placeholders; IDs are bound in updateArgs.
 		query := fmt.Sprintf(
 			"UPDATE matches SET next_match_id = CASE id %s END WHERE id IN (%s)",
 			strings.Join(caseParts, " "),
@@ -1317,6 +1320,7 @@ func (r *tournamentRepository) DeleteTournamentsByEventID(eventID int) error {
 
 		qMarks := strings.Repeat("?,", len(args)-1) + "?"
 
+		// #nosec G201 -- qMarks contains only placeholders generated from integer database IDs.
 		query := fmt.Sprintf("DELETE FROM matches WHERE tournament_id IN (%s)", qMarks)
 		_, err = tx.Exec(query, args...)
 		if err != nil {
@@ -1366,6 +1370,7 @@ func (r *tournamentRepository) DeleteTournamentsByEventAndSportID(eventID int, s
 
 		qMarks := strings.Repeat("?,", len(args)-1) + "?"
 
+		// #nosec G201 -- qMarks contains only placeholders generated from integer database IDs.
 		query := fmt.Sprintf("DELETE FROM matches WHERE tournament_id IN (%s)", qMarks)
 		_, err = tx.Exec(query, args...)
 		if err != nil {

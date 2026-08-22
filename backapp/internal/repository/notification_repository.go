@@ -114,7 +114,7 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 	`
 
 	if len(filters) > 0 {
-		query += " WHERE (" + strings.Join(filters, " OR ") + ")"
+		query += " WHERE (" + strings.Join(filters, " OR ") + ")" // #nosec G202 -- filters are fixed SQL fragments and all values are bound.
 	} else {
 		// どのフィルターも無い場合は空を返す
 		return []models.Notification{}, nil
@@ -180,6 +180,7 @@ func (r *notificationRepository) GetUserIDsByRoles(roleNames []string) ([]string
 	}
 
 	placeholders := strings.Repeat(",?", len(roleNames)-1)
+	// #nosec G202 -- only the number of bound placeholders is constructed from roleNames.
 	query := `
 		SELECT DISTINCT u.id
 		FROM users u
@@ -217,6 +218,7 @@ func (r *notificationRepository) GetPushSubscriptionsByUserIDs(userIDs []string)
 	}
 
 	placeholders := strings.Repeat(",?", len(userIDs)-1)
+	// #nosec G202 -- only the number of bound placeholders is constructed from userIDs.
 	query := `
 		SELECT id, user_id, endpoint, auth_key, p256dh_key, created_at
 		FROM push_subscriptions

@@ -4,13 +4,13 @@ import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
+	"crypto/rand"
 	"fmt"
 	"log"
 	"math"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
@@ -326,11 +326,14 @@ func generateTournamentStructure(teams []*models.Team, roundBusyClasses map[int]
 	shuffledTeams := make([]*models.Team, len(availableTeams))
 	copy(shuffledTeams, availableTeams)
 
-	source := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(source)
-	r.Shuffle(len(shuffledTeams), func(i, j int) {
-		shuffledTeams[i], shuffledTeams[j] = shuffledTeams[j], shuffledTeams[i]
-	})
+	for i := len(shuffledTeams) - 1; i > 0; i-- {
+		j, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return nil, nil, fmt.Errorf("generate secure tournament shuffle index: %w", err)
+		}
+		shuffleIndex := int(j.Int64())
+		shuffledTeams[i], shuffledTeams[shuffleIndex] = shuffledTeams[shuffleIndex], shuffledTeams[i]
+	}
 
 	contestants := make(map[string]models.Contestant)
 	for i, team := range shuffledTeams {

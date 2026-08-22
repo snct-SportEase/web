@@ -226,6 +226,7 @@ func (r *teamRepository) GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*mode
 		args[i] = teamID
 	}
 
+	// #nosec G202 -- placeholders are generated internally from integer team IDs; values are bound below.
 	query := `
 		SELECT tm.team_id, u.id, u.email, u.display_name, u.class_id, u.is_profile_complete, u.created_at, u.updated_at
 		FROM users u
@@ -417,6 +418,7 @@ func (r *teamRepository) GetMatchTeamMembersByTeamIDs(teamIDs []int, eventID int
 		args = append(args, teamID)
 	}
 
+	// #nosec G202 -- placeholders are generated internally from integer team IDs; values are bound below.
 	query := `
 		SELECT
 			tm.team_id,
