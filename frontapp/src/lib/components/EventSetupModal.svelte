@@ -1,6 +1,7 @@
 <script>
   import Modal from '$lib/components/Modal.svelte';
   import FormField from '$lib/components/FormField.svelte';
+  import ModalFooter from '$lib/components/ModalFooter.svelte';
   let showModal = $state(true);
   let currentEvent = $state({
     name: '',
@@ -64,8 +65,6 @@
             </FormField>
   </div>
   {#snippet footer()}
-    <button onclick={handleSave} type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
-      保存
-    </button>
+    <ModalFooter cancelLabel={null} onconfirm={handleSave} />
   {/snippet}
 </Modal>
