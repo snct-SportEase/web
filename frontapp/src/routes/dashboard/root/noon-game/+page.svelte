@@ -90,6 +90,10 @@
     return sessions.some((item) => item.template_key === templateKey);
   }
 
+  function templateKeyFor(templateType) {
+    return { 'year-relay': 'year_relay', 'course-relay': 'course_relay', 'tug-of-war': 'tug_of_war', typing: 'typing' }[templateType];
+  }
+
   let escapeHandler = null;
 
   onMount(async () => {
@@ -970,6 +974,7 @@
 
   async function createTemplate() {
     if (!selectedTemplateType) return;
+    const templateType = selectedTemplateType;
 
     const current = get(activeEvent);
     if (!current) {
@@ -977,7 +982,7 @@
       return;
     }
 
-    creatingTemplate = { ...creatingTemplate, [selectedTemplateType]: true };
+    creatingTemplate = { ...creatingTemplate, [templateType]: true };
     errorMessage = '';
 
     try {
@@ -1004,7 +1009,7 @@
       };
 
       // 点数設定を追加
-      if (selectedTemplateType === 'year-relay') {
+      if (templateType === 'year-relay') {
         // 学年対抗リレーの場合、3つの点数設定を保存
         payload.session.points_by_rank = {
           block_a: {},
@@ -1029,7 +1034,7 @@
             payload.session.points_by_rank.overall[Number(rank)] = pointsNum;
           }
         }
-      } else if (selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war' || selectedTemplateType === 'typing') {
+      } else if (templateType === 'course-relay' || templateType === 'tug-of-war' || templateType === 'typing') {
         // コース対抗リレーと綱引きの場合
         payload.session.points_by_rank = {};
         for (const [rank, points] of Object.entries(templateConfigForm.points_by_rank)) {
@@ -1045,11 +1050,11 @@
         payload.session.groups = templateConfigForm.groups;
       }
 
-      const endpoint = selectedTemplateType === 'typing'
+      const endpoint = templateType === 'typing'
         ? `/api/root/events/${current.id}/noon-game/templates/typing/run`
-        : (selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war')
-        ? `/api/root/events/${current.id}/noon-game/templates/${selectedTemplateType}/run`
-        : `/api/admin/events/${current.id}/noon-game/templates/${selectedTemplateType}/run`;
+        : (templateType === 'course-relay' || templateType === 'tug-of-war')
+        ? `/api/root/events/${current.id}/noon-game/templates/${templateType}/run`
+        : `/api/admin/events/${current.id}/noon-game/templates/${templateType}/run`;
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1058,14 +1063,13 @@
 
       if (!res.ok) {
         const detail = await safeJson(res);
-        throw new Error(detail?.error || `${templateNames[selectedTemplateType]}テンプレートの作成に失敗しました`);
+        throw new Error(detail?.error || `${templateNames[templateType]}テンプレートの作成に失敗しました`);
       }
 
       const created = await res.json();
-      const templateKeyMap = { 'year-relay': 'year_relay', 'course-relay': 'course_relay', 'tug-of-war': 'tug_of_war', typing: 'typing' };
-      alert(hasSessionForTemplate(templateKeyMap[selectedTemplateType])
-        ? `${templateNames[selectedTemplateType]}の設定を更新しました。`
-        : `${templateNames[selectedTemplateType]}を作成しました。`);
+      alert(hasSessionForTemplate(templateKeyFor(templateType))
+        ? `${templateNames[templateType]}の設定を更新しました。`
+        : `${templateNames[templateType]}を作成しました。`);
       closeTemplateConfig();
       selectedSessionId = created.session?.id ?? selectedSessionId;
       await refetchCurrentSession();
@@ -1074,7 +1078,7 @@
       errorMessage = err.message;
       alert(err.message);
     } finally {
-      creatingTemplate = { ...creatingTemplate, [selectedTemplateType]: false };
+      creatingTemplate = { ...creatingTemplate, [templateType]: false };
     }
   }
 
@@ -1432,7 +1436,11 @@
                 class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                 onclick={createTemplate}
                 disabled={!isInteractive || creatingTemplate[selectedTemplateType]}>
-                {creatingTemplate[selectedTemplateType] ? '作成中...' : 'テンプレートを作成'}
+                {#if creatingTemplate[selectedTemplateType]}
+                  {hasSessionForTemplate(templateKeyFor(selectedTemplateType)) ? '更新中...' : '作成中...'}
+                {:else}
+                  {hasSessionForTemplate(templateKeyFor(selectedTemplateType)) ? '競技を更新' : '昼競技を作成'}
+                {/if}
               </button>
             </div>
           </div>
