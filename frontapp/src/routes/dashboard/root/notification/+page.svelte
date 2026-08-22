@@ -1,4 +1,5 @@
 <script>
+  import FormField from '$lib/components/FormField.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
 
@@ -266,8 +267,7 @@
     </div>
 
     <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1" for="title">タイトル</label>
+      <FormField label="タイトル" inputId="title" labelClass="mb-1 block text-sm font-medium text-gray-700">
         <input
           id="title"
           type="text"
@@ -275,10 +275,9 @@
           bind:value={title}
           placeholder="例）競技開始時刻変更のお知らせ"
         />
-      </div>
+      </FormField>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1" for="type">通知タイプ</label>
+      <FormField label="通知タイプ" inputId="type" labelClass="mb-1 block text-sm font-medium text-gray-700" description="通知の種類を選択してください。ユーザーのフィルタ設定に基づいて配信されます。">
         <select
           id="type"
           class="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -288,13 +287,9 @@
             <option value={type.value}>{type.label}</option>
           {/each}
         </select>
-        <p class="mt-1 text-sm text-gray-500">
-          通知の種類を選択してください。ユーザーのフィルタ設定に基づいて配信されます。
-        </p>
-      </div>
+      </FormField>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1" for="body">本文</label>
+      <FormField label="本文" inputId="body" labelClass="mb-1 block text-sm font-medium text-gray-700">
         <textarea
           id="body"
           class="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -302,7 +297,7 @@
           bind:value={body}
           placeholder="通知の内容を入力してください。"
         ></textarea>
-      </div>
+      </FormField>
 
       <div>
         <span class="block text-sm font-medium text-gray-700 mb-2">宛先ロール</span>

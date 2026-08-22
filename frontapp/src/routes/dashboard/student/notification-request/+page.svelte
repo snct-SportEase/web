@@ -1,4 +1,5 @@
 <script>
+  import FormField from '$lib/components/FormField.svelte';
   import { page } from '$app/stores';
   import { goto, invalidateAll } from '$app/navigation';
   import { browser } from '$app/environment';
@@ -167,26 +168,23 @@
 
     {#if showNewForm}
       <form class="mt-6 space-y-4" onsubmit={(e) => { e.preventDefault(); handleCreateRequest(e); }}>
-        <div>
-          <label class="block text-sm font-medium text-gray-700" for="requestTitle">タイトル</label>
+        <FormField label="タイトル" inputId="requestTitle">
           <input
             class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             id="requestTitle"
             bind:value={newTitle}
             placeholder="例）バスケットボール審判の招集"
           />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700" for="requestTarget">対象ロール / 申請先</label>
+        </FormField>
+        <FormField label="対象ロール / 申請先" inputId="requestTarget">
           <input
             class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             id="requestTarget"
             bind:value={newTargetText}
             placeholder="例）バスケットボール審判（全日程）"
           />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700" for="requestBody">内容</label>
+        </FormField>
+        <FormField label="内容" inputId="requestBody">
           <textarea
             class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             id="requestBody"
@@ -194,7 +192,7 @@
             bind:value={newBody}
             placeholder="通知内容や依頼理由を記載してください"
           ></textarea>
-        </div>
+        </FormField>
         <div class="flex justify-end space-x-3">
           <button
             type="button"

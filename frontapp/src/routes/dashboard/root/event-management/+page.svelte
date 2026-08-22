@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import Modal from '$lib/components/Modal.svelte';
+  import FormField from '$lib/components/FormField.svelte';
 
   let events = $state([]);
   let showModal = $state(false);
@@ -371,31 +372,25 @@
 
 <Modal bind:open={showModal} title={selectedEvent ? '大会編集' : '大会作成'} onclose={closeModal}>
   <div class="mt-4 space-y-4">
-            <div>
-              <label for="name" class="block text-sm font-medium text-gray-700">大会名</label>
+            <FormField label="大会名" inputId="name">
               <input type="text" id="name" bind:value={currentEvent.name} oninput={onNameInput} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="year" class="block text-sm font-medium text-gray-700">年度</label>
+            </FormField>
+            <FormField label="年度" inputId="year">
               <input type="number" id="year" bind:value={currentEvent.year} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="season" class="block text-sm font-medium text-gray-700">シーズン</label>
+            </FormField>
+            <FormField label="シーズン" inputId="season">
               <select id="season" bind:value={currentEvent.season} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 <option value="spring">春</option>
                 <option value="autumn">秋</option>
               </select>
-            </div>
-            <div>
-              <label for="start_date" class="block text-sm font-medium text-gray-700">開始日</label>
+            </FormField>
+            <FormField label="開始日" inputId="start_date">
               <input type="date" id="start_date" bind:value={currentEvent.start_date} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="end_date" class="block text-sm font-medium text-gray-700">終了日</label>
+            </FormField>
+            <FormField label="終了日" inputId="end_date">
               <input type="date" id="end_date" bind:value={currentEvent.end_date} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="survey_url" class="block text-sm font-medium text-gray-700">アンケートURL</label>
+            </FormField>
+            <FormField label="アンケートURL" inputId="survey_url">
               <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-1">
                 <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 {#if selectedEvent && currentEvent.survey_url}
@@ -404,21 +399,18 @@
                   </button>
                 {/if}
               </div>
-            </div>
-            <div>
-              <label for="status" class="block text-sm font-medium text-gray-700">ステータス</label>
+            </FormField>
+            <FormField label="ステータス" inputId="status">
               <select id="status" bind:value={currentEvent.status} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 <option value="preparing">準備中 (Preparing)</option>
                 <option value="upcoming">予定 (Upcoming)</option>
                 <option value="active">開催中 (Active)</option>
                 <option value="archived">アーカイブ (Archived)</option>
               </select>
-            </div>
-            <div>
-              <label for="duplicate_registration_threshold" class="block text-sm font-medium text-gray-700">2競技への重複登録を許可するクラス人数</label>
+            </FormField>
+            <FormField label="2競技への重複登録を許可するクラス人数" inputId="duplicate_registration_threshold" description="この人数以下のクラスは、1人につき2競技まで登録できます。">
               <input type="number" id="duplicate_registration_threshold" min="0" required bind:value={currentEvent.duplicate_registration_threshold} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-              <p class="mt-1 text-xs text-gray-500">この人数以下のクラスは、1人につき2競技まで登録できます。</p>
-            </div>
+            </FormField>
             <div class="flex items-center">
               <label class="flex items-center cursor-pointer">
                 <input type="checkbox" id="hide_scores" bind:checked={currentEvent.hide_scores} class="sr-only">
