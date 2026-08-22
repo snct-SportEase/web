@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import Alert from '$lib/components/Alert.svelte';
     import EmptyState from '$lib/components/EmptyState.svelte';
+    import PageHeader from '$lib/components/PageHeader.svelte';
     
     let events = $state([]);
     let loading = $state(true);
@@ -41,10 +42,10 @@
 </svelte:head>
 
 <div class="px-4 py-6 sm:px-0">
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">過去の大会アーカイブ</h1>
-        <p class="mt-2 text-sm text-gray-600">終了した大会の結果やスコアを振り返ることができます。</p>
-    </div>
+    <PageHeader
+        title="過去の大会アーカイブ"
+        description="終了した大会の結果やスコアを振り返ることができます。"
+    />
 
     {#if loading}
         <div class="flex justify-center p-12">
