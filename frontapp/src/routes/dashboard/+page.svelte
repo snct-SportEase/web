@@ -6,6 +6,7 @@
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
   import NotificationSettings from '$lib/components/NotificationSettings.svelte';
   import ActionCard from '$lib/components/ActionCard.svelte';
+  import Card from '$lib/components/Card.svelte';
 
   let { data } = $props();
   let user = $derived(data.user);
@@ -506,18 +507,18 @@
 
       {#if classInfo}
         <div class="grid gap-4 sm:grid-cols-3">
-          <div class="rounded-lg border border-indigo-100 bg-white p-4 shadow-sm">
+          <Card variant="featured" class="p-4">
             <p class="text-sm font-medium text-indigo-600">クラス名</p>
             <p class="mt-2 text-2xl font-semibold text-gray-900">{classInfo.name}</p>
-          </div>
-          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          </Card>
+          <Card class="p-4">
             <p class="text-sm font-medium text-gray-500">登録学生数</p>
             <p class="mt-2 text-2xl font-semibold text-gray-900">{classInfo.student_count} 名</p>
-          </div>
-          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          </Card>
+          <Card class="p-4">
             <p class="text-sm font-medium text-gray-500">出席数</p>
             <p class="mt-2 text-2xl font-semibold text-gray-900">{classInfo.attend_count} 名</p>
-          </div>
+          </Card>
         </div>
       {:else}
         <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
