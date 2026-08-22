@@ -212,6 +212,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			resultEntryRequired := middleware.ActiveEventStatusRequired(eventRepo, "active")
 			admin.PUT("/matches/:match_id/result", resultEntryRequired, tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/noon-game/matches/:match_id/result", resultEntryRequired, noonHandler.RecordMatchResult)
+			admin.POST("/noon-game/sessions/:session_id/typing-system/import", resultEntryRequired, noonHandler.ImportTypingSystemResults)
 			admin.GET("/noon-game/matches/:match_id/template-run", noonHandler.GetTemplateRunByMatchID)
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/blocks/:block/result", resultEntryRequired, noonHandler.RecordYearRelayBlockResult)
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/overall/result", resultEntryRequired, noonHandler.RecordYearRelayOverallBonus)
