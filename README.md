@@ -122,7 +122,7 @@ SportEaseは、学校行事のスポーツ大会運営をオンラインで一�
 
 #### バックエンド（Go）
 ```bash
-cd /home/saku0512/Desktop/develop/SportEase/webapp/backapp
+cd backapp
 go mod download
 go run cmd/server/main.go
 ```
@@ -130,7 +130,7 @@ MySQLを別途用意し、プロジェクトルートの `.env` に記載した�
 
 #### フロントエンド（SvelteKit）
 ```bash
-cd /home/saku0512/Desktop/develop/SportEase/webapp/frontapp
+cd frontapp
 npm install
 npm run dev -- --host --port 5000
 ```
@@ -140,7 +140,6 @@ npm run dev -- --host --port 5000
 初回起動時、またはDBスキーマ変更を取り込む場合は、先にマイグレーションを実行します。
 
 ```bash
-cd /home/saku0512/Desktop/develop/SportEase/webapp
 docker compose --profile migration run --rm migrate
 docker compose up --build
 ```
