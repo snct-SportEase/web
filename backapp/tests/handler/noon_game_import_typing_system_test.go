@@ -153,7 +153,16 @@ func TestNoonGameHandler_ImportTypingSystemResults(t *testing.T) {
 		}())
 		expectedHash := hex.EncodeToString(hash[:])
 
-		mockNoonRepo.On("GetSessionByID", sessionID).Return(&models.NoonGameSession{ID: sessionID, EventID: eventID}, nil).Once()
+		mockNoonRepo.On("GetSessionByID", sessionID).Return(&models.NoonGameSession{ID: sessionID, EventID: eventID, TemplateKey: "typing"}, nil).Once()
+		mockNoonRepo.On("GetGroupsWithMembers", sessionID).Return([]*models.NoonGameGroupWithMembers{
+			{NoonGameGroup: &models.NoonGameGroup{Name: "1年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 3}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "2年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 4}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "3年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 7}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "4年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 10}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "5年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 13}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "専攻科・教員"}, Members: []*models.NoonGameGroupMember{{ClassID: 16}}},
+		}, nil).Once()
+		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{{TemplateKey: "typing", PointsByRank: map[string]interface{}{"1": float64(40), "2": float64(30), "3": float64(25)}}}, nil).Once()
 		mockNoonRepo.On("GetTypingSystemImportsBySessionAndExportID", sessionID, exportID).Return([]*models.NoonGameTypingSystemImportRecord{}, nil).Once()
 		mockNoonRepo.On("GetActiveTypingSystemImport", sessionID).Return(nil, nil).Once()
 		mockClassRepo.On("GetAllClasses", eventID).Return(buildTypingSystemImportClasses(eventID), nil).Once()
@@ -176,14 +185,15 @@ func TestNoonGameHandler_ImportTypingSystemResults(t *testing.T) {
 			return true
 		})).Run(func(args mock.Arguments) {
 			points := args.Get(1).([]*models.NoonGamePoint)
-			assert.Equal(t, 16, len(points))
+			assert.Equal(t, 6, len(points))
 			for _, p := range points {
 				assert.Equal(t, "typing_system", p.Source)
 				assert.Equal(t, userID, p.CreatedBy)
 			}
+			assert.Equal(t, 3, points[0].ClassID)
 			assert.Equal(t, 40, points[0].Points)
-			assert.Equal(t, 30, points[3].Points)
-			assert.Equal(t, 25, points[6].Points)
+			assert.Equal(t, 30, points[1].Points)
+			assert.Equal(t, 25, points[2].Points)
 		}).Return(nil).Once()
 		mockNoonRepo.On("SumConfirmedPointsByEvent", eventID).Return(map[int]int{}, nil).Once()
 		mockClassRepo.On("SetNoonGamePoints", eventID, map[int]int{}).Return(nil).Once()
@@ -202,7 +212,7 @@ func TestNoonGameHandler_ImportTypingSystemResults(t *testing.T) {
 		assert.Equal(t, "imported", response["message"])
 		assert.Equal(t, "import", response["action"])
 		assert.Equal(t, float64(6), response["team_count"])
-		assert.Equal(t, float64(16), response["class_count"])
+		assert.Equal(t, float64(6), response["class_count"])
 
 		mockNoonRepo.AssertExpectations(t)
 		mockClassRepo.AssertExpectations(t)
