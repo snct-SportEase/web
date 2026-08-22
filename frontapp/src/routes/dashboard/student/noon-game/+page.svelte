@@ -4,6 +4,9 @@
   import { get } from 'svelte/store';
 
   let session = $state(null);
+  let sessions = $state([]);
+  let selectedSessionId = $state(null);
+  let groups = $state([]);
   let matches = $state([]);
   let pointsSummary = $state([]);
   let typingResults = $state([]);
@@ -17,21 +20,41 @@
     await activeEvent.init();
     const current = get(activeEvent);
     if (current) {
-      await fetchSession(current.id);
+      await fetchSessions(current.id);
     }
   });
 
-  async function fetchSession(eventId) {
+  async function fetchSessions(eventId, preferredSessionId = selectedSessionId) {
     loading = true;
     errorMessage = '';
     try {
-      const res = await fetch(`/api/student/events/${eventId}/noon-game/session`);
+      const listResponse = await fetch(`/api/student/events/${eventId}/noon-game/sessions`);
+      if (!listResponse.ok) {
+        const detail = await safeJson(listResponse);
+        throw new Error(detail?.error || '昼競技一覧の取得に失敗しました');
+      }
+      const listData = await listResponse.json();
+      sessions = listData.sessions || [];
+      const selected = sessions.find((item) => item.id === preferredSessionId) || sessions[0];
+      if (!selected) {
+        selectedSessionId = null;
+        session = null;
+        groups = [];
+        matches = [];
+        pointsSummary = [];
+        typingResults = [];
+        typingImportStatus = 'pending';
+        return;
+      }
+      selectedSessionId = selected.id;
+      const res = await fetch(`/api/student/events/${eventId}/noon-game/sessions/${selected.id}`);
       if (!res.ok) {
         const detail = await safeJson(res);
         throw new Error(detail?.error || '昼競技データの取得に失敗しました');
       }
       const data = await res.json();
       session = data.session;
+      groups = data.groups || [];
       matches = data.matches || [];
       pointsSummary = data.points_summary || [];
       typingResults = data.typing_results || [];
@@ -184,6 +207,23 @@
       <p class="font-semibold">昼競技セッションが設定されていません。</p>
     </div>
   {:else}
+    {#if sessions.length > 1}
+      <section class="bg-white shadow rounded-lg p-4 flex flex-wrap items-center gap-3">
+        <label class="text-sm font-medium text-gray-700" for="student-noon-game-session">表示する昼競技</label>
+        <select
+          id="student-noon-game-session"
+          class="border rounded px-3 py-2"
+          value={selectedSessionId ?? ''}
+          onchange={(event) => {
+            const current = get(activeEvent);
+            if (current) fetchSessions(current.id, Number(event.currentTarget.value));
+          }}>
+          {#each sessions as item (item.id)}
+            <option value={item.id}>{item.name}</option>
+          {/each}
+        </select>
+      </section>
+    {/if}
     {#if session.template_key === 'typing'}
       <section class="bg-white shadow rounded-lg p-6 space-y-4">
         <div>
@@ -200,6 +240,16 @@
                 {/each}
               </tbody>
             </table>
+          </div>
+        {/if}
+        {#if groups.length > 0}
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">チーム構成</h3>
+            <ul class="mt-2 grid gap-2 md:grid-cols-2">
+              {#each groups as group (group.id)}
+                <li class="rounded border px-3 py-2 text-sm"><span class="font-medium">{group.name}</span>: {(group.members || []).map((member) => member.class?.name).filter(Boolean).join('、') || '未設定'}</li>
+              {/each}
+            </ul>
           </div>
         {/if}
       </section>

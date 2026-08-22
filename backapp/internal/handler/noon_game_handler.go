@@ -1207,6 +1207,10 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 		})
 		return
 	}
+	if isStudentRequest(c) && session.Status != "published" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Noon game session not found"})
+		return
+	}
 
 	if err := h.syncNoonGameSport(eventID, session.Name); err != nil {
 		log.Printf("ERROR: GetSession failed to sync noon game sport: event_id=%d, session_name=%q, error=%v", eventID, session.Name, err)

@@ -1214,6 +1214,25 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/student/events/1/noon-game/sessions' && req.method === 'GET') {
+    if (!noonSession || noonSession.status !== 'published') {
+      sendJson(res, 200, { sessions: [] });
+      return;
+    }
+    sendJson(res, 200, { sessions: [noonSession] });
+    return;
+  }
+
+  const studentNoonSessionByIDMatch = url.pathname.match(/^\/api\/student\/events\/1\/noon-game\/sessions\/(\d+)$/);
+  if (studentNoonSessionByIDMatch && req.method === 'GET') {
+    if (!noonSession || noonSession.status !== 'published' || noonSession.id !== Number(studentNoonSessionByIDMatch[1])) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+    sendJson(res, 200, noonSessionPayload());
+    return;
+  }
+
   if (url.pathname === '/api/student/events/1/noon-game/session' && req.method === 'GET') {
     if (!noonSession || noonSession.status !== 'published') {
       sendJson(res, 404, { error: 'Noon game session not found' });
