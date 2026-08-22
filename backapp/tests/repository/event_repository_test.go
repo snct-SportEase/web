@@ -19,7 +19,7 @@ import (
 var eventCols = []string{
 	"id", "name", "year", "season", "start_date", "end_date",
 	"is_rainy_mode", "competition_guidelines_pdf_url", "survey_url",
-	"is_survey_published", "status", "hide_scores", "duplicate_registration_threshold",
+	"is_survey_published", "is_mic_voting_enabled", "status", "hide_scores", "duplicate_registration_threshold",
 }
 
 func newEvent() *models.Event {
@@ -36,7 +36,7 @@ func newEvent() *models.Event {
 func eventRow(e *models.Event) *sqlmock.Rows {
 	return sqlmock.NewRows(eventCols).AddRow(
 		e.ID, e.Name, e.Year, e.Season, e.Start_date, e.End_date,
-		e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold,
+		e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.IsMICVotingEnabled, e.Status, e.HideScores, e.DuplicateRegistrationThreshold,
 	)
 }
 
@@ -50,7 +50,7 @@ func setupEvent(t *testing.T) (repository.EventRepository, sqlmock.Sqlmock, func
 // ─── GetEventByID ──────────────────────────────────────────────────────────
 
 func TestEventRepository_GetEventByID(t *testing.T) {
-	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold FROM events WHERE id = ?"
+	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, is_mic_voting_enabled, status, hide_scores, duplicate_registration_threshold FROM events WHERE id = ?"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupEvent(t)
@@ -95,7 +95,7 @@ func TestEventRepository_GetEventByID(t *testing.T) {
 // ─── GetAllEvents ──────────────────────────────────────────────────────────
 
 func TestEventRepository_GetAllEvents(t *testing.T) {
-	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
+	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, is_mic_voting_enabled, status, hide_scores, duplicate_registration_threshold FROM events ORDER BY `year` DESC, FIELD(season, 'autumn', 'spring')"
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupEvent(t)
@@ -195,8 +195,8 @@ func TestEventRepository_GetActiveEvent(t *testing.T) {
 // ─── GetEventByYearAndSeason ───────────────────────────────────────────────
 
 func TestEventRepository_GetEventByYearAndSeason(t *testing.T) {
-	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, duplicate_registration_threshold FROM events WHERE `year` = ? AND season = ?"
-	var yasCols = []string{"id", "name", "year", "season", "start_date", "end_date", "is_rainy_mode", "competition_guidelines_pdf_url", "survey_url", "is_survey_published", "status", "duplicate_registration_threshold"}
+	const q = "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, is_mic_voting_enabled, status, duplicate_registration_threshold FROM events WHERE `year` = ? AND season = ?"
+	var yasCols = []string{"id", "name", "year", "season", "start_date", "end_date", "is_rainy_mode", "competition_guidelines_pdf_url", "survey_url", "is_survey_published", "is_mic_voting_enabled", "status", "duplicate_registration_threshold"}
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupEvent(t)
@@ -204,7 +204,7 @@ func TestEventRepository_GetEventByYearAndSeason(t *testing.T) {
 
 		now := time.Now()
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(2024, "spring").
-			WillReturnRows(sqlmock.NewRows(yasCols).AddRow(1, "Spring 2024", 2024, "spring", now, now, false, nil, nil, false, "active", 31))
+			WillReturnRows(sqlmock.NewRows(yasCols).AddRow(1, "Spring 2024", 2024, "spring", now, now, false, nil, nil, false, false, "active", 31))
 
 		got, err := repo.GetEventByYearAndSeason(2024, "spring")
 		require.NoError(t, err)
@@ -547,6 +547,34 @@ func TestEventRepository_SetRainyMode(t *testing.T) {
 		mock.ExpectExec(regexp.QuoteMeta(q)).WillReturnError(errors.New("db error"))
 
 		err := repo.SetRainyMode(1, true)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// ─── SetMICVotingEnabled ──────────────────────────────────────────────────
+
+func TestEventRepository_SetMICVotingEnabled(t *testing.T) {
+	const q = "UPDATE events SET is_mic_voting_enabled = ? WHERE id = ?"
+
+	t.Run("success", func(t *testing.T) {
+		repo, mock, close := setupEvent(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).WithArgs(true, 1).WillReturnResult(sqlmock.NewResult(0, 1))
+
+		err := repo.SetMICVotingEnabled(1, true)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("db error", func(t *testing.T) {
+		repo, mock, close := setupEvent(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).WillReturnError(errors.New("db error"))
+
+		err := repo.SetMICVotingEnabled(1, false)
 		assert.Error(t, err)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})

@@ -78,7 +78,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	guideDocumentHandler := handler.NewGuideDocumentHandler(guideDocumentRepo)
 
 	micRepo := repository.NewMICRepository(db)
-	micHandler := handler.NewMICHandler(micRepo)
+	micHandler := handler.NewMICHandler(micRepo, eventRepo)
 
 	wsHandler := handler.NewWebSocketHandler(hubManager, cfg.FrontendURL)
 
@@ -273,6 +273,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.POST("/:id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
 				rootEvents.PUT("/:id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
 				rootEvents.DELETE("/:id/rainy-mode/settings/:sport_id/:class_id", rainyModeHandler.DeleteRainyModeSettingHandler)
+				rootEvents.GET("/:id/mic/settings", eventHandler.GetMICVotingSettings)
+				rootEvents.PUT("/:id/mic/settings", eventHandler.SetMICVotingSettings)
 				rootEvents.POST("/:id/tournaments/generate-all", tournHandler.GenerateAllTournamentsHandler)
 				rootEvents.POST("/:id/tournaments/generate-preview", tournHandler.GenerateAllTournamentsPreviewHandler)
 				rootEvents.POST("/:id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)

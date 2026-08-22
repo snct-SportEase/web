@@ -1132,3 +1132,106 @@ func TestEventHandler_GetAllEvents(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 }
+
+func TestEventHandler_GetMICVotingSettings(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, new(MockUserRepository), "", "")
+
+		mockEventRepo.On("GetEventByID", 1).Return(&models.Event{ID: 1, IsMICVotingEnabled: true}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/root/events/1/mic/settings", nil)
+
+		h.GetMICVotingSettings(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, float64(1), resp["event_id"])
+		assert.Equal(t, true, resp["is_mic_voting_enabled"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Event not found", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, new(MockUserRepository), "", "")
+
+		mockEventRepo.On("GetEventByID", 999).Return((*models.Event)(nil), nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "999"}}
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/root/events/999/mic/settings", nil)
+
+		h.GetMICVotingSettings(c)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		mockEventRepo.AssertExpectations(t)
+	})
+}
+
+func TestEventHandler_SetMICVotingSettings(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Success - disable", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, new(MockUserRepository), "", "")
+
+		mockEventRepo.On("GetEventByID", 1).Return(&models.Event{ID: 1}, nil).Once()
+		mockEventRepo.On("SetMICVotingEnabled", 1, false).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/mic/settings", bytes.NewBufferString(`{"is_mic_voting_enabled":false}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.SetMICVotingSettings(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, false, resp["is_mic_voting_enabled"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("Event not found", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, new(MockUserRepository), "", "")
+
+		mockEventRepo.On("GetEventByID", 1).Return((*models.Event)(nil), nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/mic/settings", bytes.NewBufferString(`{"is_mic_voting_enabled":true}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.SetMICVotingSettings(c)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		mockEventRepo.AssertExpectations(t)
+		mockEventRepo.AssertNotCalled(t, "SetMICVotingEnabled", 1, true)
+	})
+
+	t.Run("Invalid payload", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, new(MockUserRepository), "", "")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/root/events/1/mic/settings", bytes.NewBufferString(`{"is_mic_voting_enabled":"yes"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.SetMICVotingSettings(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockEventRepo.AssertNotCalled(t, "GetEventByID", 1)
+	})
+}
