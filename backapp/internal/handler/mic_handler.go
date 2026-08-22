@@ -12,17 +12,42 @@ import (
 )
 
 type MICHandler struct {
-	micRepo repository.MICRepository
+	micRepo   repository.MICRepository
+	eventRepo repository.EventRepository
 }
 
-func NewMICHandler(micRepo repository.MICRepository) *MICHandler {
-	return &MICHandler{micRepo: micRepo}
+func NewMICHandler(micRepo repository.MICRepository, eventRepo repository.EventRepository) *MICHandler {
+	return &MICHandler{
+		micRepo:   micRepo,
+		eventRepo: eventRepo,
+	}
+}
+
+func (h *MICHandler) ensureMICVotingEnabled(c *gin.Context, eventID int) bool {
+	event, err := h.eventRepo.GetEventByID(eventID)
+	if err != nil {
+		log.Printf("GetEventByID error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return false
+	}
+	if event == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return false
+	}
+	if !event.IsMICVotingEnabled {
+		c.JSON(http.StatusForbidden, gin.H{"error": "MIC voting is disabled"})
+		return false
+	}
+	return true
 }
 
 func (h *MICHandler) GetEligibleClasses(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Query("event_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event_id"})
+		return
+	}
+	if !h.ensureMICVotingEnabled(c, eventID) {
 		return
 	}
 
@@ -52,6 +77,10 @@ func (h *MICHandler) VoteMIC(c *gin.Context) {
 	userCtx, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in context"})
+		return
+	}
+
+	if !h.ensureMICVotingEnabled(c, req.EventID) {
 		return
 	}
 
@@ -106,6 +135,9 @@ func (h *MICHandler) GetUserVote(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Query("event_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event_id"})
+		return
+	}
+	if !h.ensureMICVotingEnabled(c, eventID) {
 		return
 	}
 

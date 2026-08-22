@@ -7,56 +7,65 @@
   let selectedClass = $state('');
   let reason = $state('');
   let eventId = $state(null);
+  let isMicVotingEnabled = $state(false);
+  let isLoading = $state(true);
 
   let hasVoted = $state(false);
   let votedForClassId = $state(null);
   let votedForClassName = $state('');
 
   onMount(async () => {
-    // 1. Fetch active event first
     try {
       const eventRes = await fetch('/api/events/active');
       if (!eventRes.ok) {
-        console.error('Failed to fetch active event');
         alert('開催中のイベント情報の取得に失敗しました。');
+        isLoading = false;
         return;
       }
       const eventData = await eventRes.json();
       if (!eventData.event_id) {
-        console.error('No active event found');
         alert('開催中のイベントがありません。');
+        isLoading = false;
         return;
       }
       eventId = eventData.event_id;
-    } catch (error) {
-      console.error('Error fetching active event:', error);
-      alert('イベント情報の取得中にエラーが発生しました。');
-      return;
-    }
 
-    // 2. Fetch eligible classes using the active event ID
-    const classRes = await fetch(`/api/admin/mic/eligible-classes?event_id=${eventId}`);
-    if (classRes.ok) {
-      eligibleClasses = await classRes.json();
-    } else {
-      console.error('Failed to fetch eligible classes');
-      // Handle error appropriately
-    }
+      const classRes = await fetch(`/api/admin/mic/eligible-classes?event_id=${eventId}`);
+      if (classRes.ok) {
+        eligibleClasses = await classRes.json();
+        isMicVotingEnabled = true;
+      } else if (classRes.status === 403) {
+        isMicVotingEnabled = false;
+      } else {
+        alert('投票対象クラスの取得に失敗しました。');
+        isLoading = false;
+        return;
+      }
 
-    // 3. Check if user has already voted for this event
-    const voteRes = await fetch(`/api/admin/mic/user-vote?event_id=${eventId}`);
-    if (voteRes.ok) {
-      const voteData = await voteRes.json();
-      if (voteData.voted) {
-        hasVoted = true;
-        votedForClassId = voteData.vote.voted_for_class_id;
-        const votedClass = eligibleClasses.find(c => c.id === votedForClassId);
-        if (votedClass) {
-          votedForClassName = votedClass.name;
+      if (isMicVotingEnabled) {
+        const voteRes = await fetch(`/api/admin/mic/user-vote?event_id=${eventId}`);
+        if (voteRes.ok) {
+          const voteData = await voteRes.json();
+          if (voteData.voted) {
+            hasVoted = true;
+            votedForClassId = voteData.vote.voted_for_class_id;
+            const votedClass = eligibleClasses.find((c) => c.id === votedForClassId);
+            if (votedClass) {
+              votedForClassName = votedClass.name;
+            }
+          }
+        } else if (voteRes.status !== 403) {
+          alert('投票状態の取得に失敗しました。');
+          isLoading = false;
+          return;
         }
       }
-    } else {
-      console.error('Failed to fetch user vote status');
+
+      isLoading = false;
+    } catch (error) {
+      console.error('Error fetching MIC vote data:', error);
+      alert('イベント情報の取得中にエラーが発生しました。');
+      isLoading = false;
     }
   });
 
@@ -70,6 +79,11 @@
 
     if (!reason.trim()) {
       alert('投票理由を入力してください。');
+      return;
+    }
+
+    if (!isMicVotingEnabled) {
+      alert('現在、行事委員会賞投票は無効です。');
       return;
     }
 
@@ -89,7 +103,7 @@
       alert('投票が完了しました。');
       hasVoted = true;
       votedForClassId = parseInt(selectedClass);
-      const votedClass = eligibleClasses.find(c => c.id === votedForClassId);
+      const votedClass = eligibleClasses.find((c) => c.id === votedForClassId);
       if (votedClass) {
         votedForClassName = votedClass.name;
       }
@@ -106,14 +120,27 @@
 
 <h1 class="text-2xl font-bold mb-4">行事委員会賞投票</h1>
 
-{#if hasVoted}
+{#if isLoading}
+  <p class="text-gray-600">読み込み中...</p>
+{:else if !isMicVotingEnabled}
+  <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 text-center">
+    <h2 class="text-xl font-bold mb-2 text-yellow-700">現在無効</h2>
+    <p>行事委員会賞投票は現在「無効」状態です。</p>
+  </div>
+{:else if hasVoted}
   <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 text-center">
     <h2 class="text-xl font-bold mb-2">投票済みです</h2>
     <p>あなたは <span class="font-bold">{votedForClassName}</span> に投票しました。</p>
     <p class="text-gray-600 mt-4">行事委員会賞投票は一人一票までです。</p>
   </div>
 {:else}
-  <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" onsubmit={(e) => { e.preventDefault(); vote(e); }}>
+  <form class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6" onsubmit={(e) => {
+    e.preventDefault();
+    vote(e);
+  }}>
+    <div class="text-sm text-gray-700 mb-2">
+      投票状態: <span class="font-bold text-green-600">有効</span>
+    </div>
     <FormField label="投票対象クラス" inputId="class-select" labelClass="mb-2 block font-bold text-gray-700">
       <select
         id="class-select"

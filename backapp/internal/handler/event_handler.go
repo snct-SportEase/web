@@ -329,6 +329,71 @@ func (h *EventHandler) SetRainyMode(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Rainy mode updated successfully", "is_rainy_mode": req.IsRainyMode})
 }
 
+func (h *EventHandler) GetMICVotingSettings(c *gin.Context) {
+	eventIDStr := c.Param("id")
+	eventID, err := strconv.Atoi(eventIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+
+	event, err := h.eventRepo.GetEventByID(eventID)
+	if err != nil {
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+	if event == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"event_id":              event.ID,
+		"is_mic_voting_enabled": event.IsMICVotingEnabled,
+	})
+}
+
+func (h *EventHandler) SetMICVotingSettings(c *gin.Context) {
+	eventIDStr := c.Param("id")
+	eventID, err := strconv.Atoi(eventIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+
+	var req struct {
+		IsMICVotingEnabled bool `json:"is_mic_voting_enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	event, err := h.eventRepo.GetEventByID(eventID)
+	if err != nil {
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+	if event == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+
+	err = h.eventRepo.SetMICVotingEnabled(eventID, req.IsMICVotingEnabled)
+	if err != nil {
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"event_id":              eventID,
+		"is_mic_voting_enabled": req.IsMICVotingEnabled,
+	})
+}
+
 func (h *EventHandler) UpdateCompetitionGuidelines(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)

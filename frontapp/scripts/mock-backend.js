@@ -46,6 +46,7 @@ const defaultEvents = () => ([
     end_date: '2025-04-02T00:00:00Z',
     status: 'upcoming',
     survey_url: 'https://example.com/survey',
+    is_mic_voting_enabled: true,
     hide_scores: false,
     duplicate_registration_threshold: 31
   },
@@ -58,6 +59,7 @@ const defaultEvents = () => ([
     end_date: '2025-10-02T00:00:00Z',
     status: 'upcoming',
     survey_url: 'https://example.com/autumn-survey',
+    is_mic_voting_enabled: true,
     hide_scores: false,
     duplicate_registration_threshold: 31
   }
@@ -435,6 +437,36 @@ createServer(async (req, res) => {
     const body = await readJson(req);
     events = events.map((event) => event.id === 1 ? { ...event, is_rainy_mode: !!body.is_rainy_mode } : event);
     sendJson(res, 200, { is_rainy_mode: !!body.is_rainy_mode });
+    return;
+  }
+
+  if (/^\/api\/root\/events\/\d+\/mic\/settings$/.test(url.pathname) && req.method === 'GET') {
+    const eventId = Number(url.pathname.split('/')[4]);
+    const event = events.find((event) => event.id === eventId);
+    if (!event) {
+      sendJson(res, 404, { error: 'Event not found' });
+      return;
+    }
+    sendJson(res, 200, {
+      event_id: event.id,
+      is_mic_voting_enabled: Boolean(event.is_mic_voting_enabled)
+    });
+    return;
+  }
+
+  if (/^\/api\/root\/events\/\d+\/mic\/settings$/.test(url.pathname) && req.method === 'PUT') {
+    const eventId = Number(url.pathname.split('/')[4]);
+    const event = events.find((event) => event.id === eventId);
+    if (!event) {
+      sendJson(res, 404, { error: 'Event not found' });
+      return;
+    }
+    const body = await readJson(req);
+    event.is_mic_voting_enabled = Boolean(body.is_mic_voting_enabled);
+    sendJson(res, 200, {
+      event_id: event.id,
+      is_mic_voting_enabled: event.is_mic_voting_enabled
+    });
     return;
   }
 

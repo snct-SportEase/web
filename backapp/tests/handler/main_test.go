@@ -182,6 +182,11 @@ func (m *MockEventRepository) SetRainyMode(eventID int, isRainyMode bool) error 
 	return args.Error(0)
 }
 
+func (m *MockEventRepository) SetMICVotingEnabled(eventID int, isEnabled bool) error {
+	args := m.Called(eventID, isEnabled)
+	return args.Error(0)
+}
+
 func (m *MockEventRepository) PublishSurvey(eventID int) error {
 	args := m.Called(eventID)
 	return args.Error(0)
