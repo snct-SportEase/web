@@ -212,6 +212,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			resultEntryRequired := middleware.ActiveEventStatusRequired(eventRepo, "active")
 			admin.PUT("/matches/:match_id/result", resultEntryRequired, tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/noon-game/matches/:match_id/result", resultEntryRequired, noonHandler.RecordMatchResult)
+			admin.POST("/noon-game/sessions/:session_id/typing-system/import", resultEntryRequired, noonHandler.ImportTypingSystemResults)
 			admin.GET("/noon-game/matches/:match_id/template-run", noonHandler.GetTemplateRunByMatchID)
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/blocks/:block/result", resultEntryRequired, noonHandler.RecordYearRelayBlockResult)
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/overall/result", resultEntryRequired, noonHandler.RecordYearRelayOverallBonus)
@@ -289,6 +290,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.DELETE("/:id/noon-game/sessions/:session_id", noonHandler.DeleteSession)
 				rootEvents.POST("/:id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
 				rootEvents.POST("/:id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
+				rootEvents.POST("/:id/noon-game/templates/typing/run", noonHandler.CreateTypingRun)
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				rootEvents.POST("/:id/notify-survey", eventHandler.NotifySurvey)
 				rootEvents.POST("/:id/import-survey-scores", eventHandler.ImportSurveyScores)
@@ -330,6 +332,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootNoon.PUT("/sessions/:session_id/matches/:match_id", noonHandler.SaveMatch)
 				rootNoon.DELETE("/sessions/:session_id/matches/:match_id", noonHandler.DeleteMatch)
 				rootNoon.POST("/sessions/:session_id/manual-points", noonHandler.AddManualPoint)
+				rootNoon.POST("/sessions/:session_id/typing-system/import", noonHandler.ImportTypingSystemResults)
 				rootNoon.GET("/templates/:template_key/default-groups", noonHandler.GetTemplateDefaultGroups)
 				rootNoon.PUT("/templates/:template_key/default-groups", noonHandler.SaveTemplateDefaultGroups)
 			}

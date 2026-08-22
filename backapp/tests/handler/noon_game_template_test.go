@@ -137,6 +137,16 @@ func (m *MockNoonGameRepository) ClearPointsForMatch(matchID int) error {
 	return args.Error(0)
 }
 
+func (m *MockNoonGameRepository) ClearPointsForSessionAndSource(sessionID int, source string) error {
+	args := m.Called(sessionID, source)
+	return args.Error(0)
+}
+
+func (m *MockNoonGameRepository) ApplyTypingSystemResultImport(sessionID int, points []*models.NoonGamePoint, replace bool, history *models.NoonGameTypingSystemImportRecord) error {
+	args := m.Called(sessionID, points, replace, history)
+	return args.Error(0)
+}
+
 func (m *MockNoonGameRepository) InsertPoints(points []*models.NoonGamePoint) error {
 	args := m.Called(points)
 	return args.Error(0)
@@ -148,6 +158,32 @@ func (m *MockNoonGameRepository) InsertPoint(point *models.NoonGamePoint) (*mode
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*models.NoonGamePoint), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) GetActiveTypingSystemImport(sessionID int) (*models.NoonGameTypingSystemImportRecord, error) {
+	args := m.Called(sessionID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.NoonGameTypingSystemImportRecord), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) GetTypingSystemImportsBySessionAndExportID(sessionID int, exportID string) ([]*models.NoonGameTypingSystemImportRecord, error) {
+	args := m.Called(sessionID, exportID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.NoonGameTypingSystemImportRecord), args.Error(1)
+}
+
+func (m *MockNoonGameRepository) CreateTypingSystemImportHistory(record *models.NoonGameTypingSystemImportRecord) error {
+	args := m.Called(record)
+	return args.Error(0)
+}
+
+func (m *MockNoonGameRepository) SetTypingSystemImportInactive(sessionID int) error {
+	args := m.Called(sessionID)
+	return args.Error(0)
 }
 
 func (m *MockNoonGameRepository) SumPointsByClass(sessionID int) (map[int]int, error) {
@@ -277,6 +313,56 @@ func (m *MockNoonGameRepository) SaveTemplateDefaultGroups(templateKey string, g
 
 // --- Tests ---
 
+func TestNoonGameHandler_CreateTypingRunHonorsRequestedStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	noonRepo := new(MockNoonGameRepository)
+	classRepo := new(MockClassRepository)
+	eventRepo := new(MockEventRepository)
+	h := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo)
+
+	const eventID = 1
+	const userID = "00000000-0000-0000-0000-000000000001"
+	eventRepo.On("GetEventByID", eventID).Return(&models.Event{ID: eventID}, nil).Once()
+	noonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{}, nil).Once()
+	classRepo.On("GetAllClasses", eventID).Return([]*models.Class{{ID: 1, Name: "1A"}}, nil).Once()
+	noonRepo.On("UpsertSession", mock.MatchedBy(func(session *models.NoonGameSession) bool {
+		return session.TemplateKey == "typing" && session.Status == "published"
+	})).Return(&models.NoonGameSession{ID: 10, EventID: eventID, TemplateKey: "typing", Name: "競技タイピング", Status: "published"}, nil).Once()
+	noonRepo.On("SaveGroup", mock.AnythingOfType("*models.NoonGameGroup"), []int{1}).Return(&models.NoonGameGroupWithMembers{}, nil).Times(6)
+	noonRepo.On("SaveMatch", mock.MatchedBy(func(match *models.NoonGameMatch) bool {
+		return match.SessionID == 10 && match.Title != nil && match.Status == "scheduled"
+	})).Return(&models.NoonGameMatch{}, nil).Times(3)
+	noonRepo.On("CreateTemplateRunWithPointsByRankJSON", 10, "typing", "競技タイピング", userID, mock.Anything).Return(&models.NoonGameTemplateRun{ID: 1}, nil).Once()
+
+	payload := map[string]any{
+		"session": map[string]any{
+			"name":   "競技タイピング",
+			"status": "published",
+			"groups": []map[string]any{
+				{"group_name": "1年生", "class_names": []string{"1A"}}, {"group_name": "2年生", "class_names": []string{"1A"}},
+				{"group_name": "3年生", "class_names": []string{"1A"}}, {"group_name": "4年生", "class_names": []string{"1A"}},
+				{"group_name": "5年生", "class_names": []string{"1A"}}, {"group_name": "専攻科・教員", "class_names": []string{"1A"}},
+			},
+		},
+	}
+	body, err := json.Marshal(payload)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events/1/noon-game/templates/typing/run", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user", &models.User{ID: userID})
+
+	h.CreateTypingRun(c)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	noonRepo.AssertExpectations(t)
+	classRepo.AssertExpectations(t)
+	eventRepo.AssertExpectations(t)
+}
+
 func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -293,11 +379,12 @@ func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 
 		// セッション
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "year_relay",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -402,7 +489,7 @@ func TestNoonGameHandler_CreateYearRelayRun(t *testing.T) {
 		sessionID := 10
 		userID := "00000000-0000-0000-0000-000000000001"
 
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(nil, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{}, nil).Once()
 
 		// セッションが存在しない場合は新しいセッションが作成される
 		session := &models.NoonGameSession{
@@ -1520,11 +1607,12 @@ func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
 
 		// セッション
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "course_relay",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -1636,11 +1724,12 @@ func TestNoonGameHandler_CreateCourseRelayRun(t *testing.T) {
 		eventID := 1
 		sessionID := 10
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "course_relay",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -1960,11 +2049,12 @@ func TestNoonGameHandler_CreateTugOfWarRun(t *testing.T) {
 
 		// セッション
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "tug_of_war",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()
@@ -2071,11 +2161,12 @@ func TestNoonGameHandler_CreateTugOfWarRun(t *testing.T) {
 		eventID := 1
 		sessionID := 10
 		session := &models.NoonGameSession{
-			ID:      sessionID,
-			EventID: eventID,
-			Name:    "テスト昼競技",
+			ID:          sessionID,
+			EventID:     eventID,
+			TemplateKey: "tug_of_war",
+			Name:        "テスト昼競技",
 		}
-		mockNoonRepo.On("GetSessionByEvent", eventID).Return(session, nil).Once()
+		mockNoonRepo.On("ListSessionsByEvent", eventID, false).Return([]*models.NoonGameSession{session}, nil).Once()
 
 		// 既存のテンプレートランをチェック（空のリストを返す）
 		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{}, nil).Once()

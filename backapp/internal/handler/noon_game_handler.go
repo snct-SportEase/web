@@ -3,11 +3,18 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +41,43 @@ const (
 	defaultYearRelaySessionName   = "学年対抗リレー"
 	defaultCourseRelaySessionName = "コース対抗リレー"
 	defaultTugOfWarSessionName    = "綱引き"
+	defaultTypingSessionName      = "競技タイピング"
+	maxTypingSystemJSONSize       = 16 * 1024
+	typingSystemSource            = "typing_system"
+	noonTemplateTyping            = "typing"
 )
+
+var defaultTypingPointsByRank = map[string]int{"1": 40, "2": 30, "3": 25, "4": 0, "5": 0, "6": 0}
+
+const maxNoonTypingScore = 2147483647
+
+var typingSystemExportIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+
+type typingSystemTeamResult struct {
+	TeamName    string `json:"team_name"`
+	Match1Score int    `json:"match_1_score"`
+	Match2Score int    `json:"match_2_score"`
+	Match3Score int    `json:"match_3_score"`
+	TotalScore  int    `json:"total_score"`
+	Rank        int    `json:"rank"`
+}
+
+type typingSystemImportPayload struct {
+	SchemaVersion string                   `json:"schema_version"`
+	ExportID      string                   `json:"export_id"`
+	Teams         []typingSystemTeamResult `json:"teams"`
+}
+
+var typingSystemTeamClassMap = map[string][]string{
+	"1年生":    {"1-1", "1-2", "1-3"},
+	"2年生":    {"IS2", "IT2", "IE2"},
+	"3年生":    {"IS3", "IT3", "IE3"},
+	"4年生":    {"IS4", "IT4", "IE4"},
+	"5年生":    {"IS5", "IT5", "IE5"},
+	"専攻科・教員": {"専教"},
+}
+
+var typingSystemTeamNames = []string{"1年生", "2年生", "3年生", "4年生", "5年生", "専攻科・教員"}
 
 func NewNoonGameHandler(noonRepo repository.NoonGameRepository, classRepo repository.ClassRepository, eventRepo repository.EventRepository) *NoonGameHandler {
 	return &NoonGameHandler{
@@ -77,7 +120,7 @@ func (h *NoonGameHandler) syncNoonGameSport(eventID int, sessionName string) err
 		return fmt.Errorf("failed to get event sports: %w", err)
 	}
 	for _, eventSport := range eventSports {
-		if eventSport.Location == "noon_game" {
+		if eventSport.SportID == sport.ID {
 			return nil
 		}
 	}
@@ -91,6 +134,19 @@ func (h *NoonGameHandler) syncNoonGameSport(eventID int, sessionName string) err
 	}
 
 	return nil
+}
+
+func (h *NoonGameHandler) getSessionForTemplate(eventID int, templateKey string) (*models.NoonGameSession, error) {
+	sessions, err := h.noonRepo.ListSessionsByEvent(eventID, false)
+	if err != nil {
+		return nil, err
+	}
+	for _, session := range sessions {
+		if session != nil && session.TemplateKey == templateKey {
+			return session, nil
+		}
+	}
+	return nil, nil
 }
 
 // CreateYearRelayRun は学年対抗リレー(テンプレート)の run を作成し、A/B/総合ボーナス用の試合を生成します。
@@ -118,7 +174,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		req = createTemplateRunRequest{}
 	}
 
-	session, err := h.noonRepo.GetSessionByEvent(eventID)
+	session, err := h.getSessionForTemplate(eventID, noonTemplateYearRelay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
@@ -149,6 +205,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 		}
 		session = &models.NoonGameSession{
 			EventID:             eventID,
+			TemplateKey:         noonTemplateYearRelay,
 			Name:                sessionName,
 			Description:         nil,
 			Mode:                mode,
@@ -157,6 +214,7 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 			DrawPoints:          0,
 			ParticipationPoints: 0,
 			AllowManualPoints:   false,
+			Status:              "draft",
 		}
 		if req.Session != nil {
 			if req.Session.Description != nil {
@@ -282,7 +340,6 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 	for _, cls := range classes {
 		classIDByName[cls.Name] = cls.ID
 	}
-
 	groupIDs := make([]int, 0, len(teamDefs))
 	entryDisplays := make([]string, 0, len(teamDefs))
 	for _, def := range teamDefs {
@@ -421,7 +478,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		req = createTemplateRunRequest{}
 	}
 
-	session, err := h.noonRepo.GetSessionByEvent(eventID)
+	session, err := h.getSessionForTemplate(eventID, noonTemplateCourseRelay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
@@ -438,6 +495,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 		}
 		session = &models.NoonGameSession{
 			EventID:             eventID,
+			TemplateKey:         noonTemplateCourseRelay,
 			Name:                sessionName,
 			Description:         nil,
 			Mode:                mode,
@@ -446,6 +504,7 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 			DrawPoints:          0,
 			ParticipationPoints: 0,
 			AllowManualPoints:   false,
+			Status:              "draft",
 		}
 		if req.Session != nil {
 			if req.Session.Description != nil {
@@ -708,7 +767,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		req = createTemplateRunRequest{}
 	}
 
-	session, err := h.noonRepo.GetSessionByEvent(eventID)
+	session, err := h.getSessionForTemplate(eventID, noonTemplateTugOfWar)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
 		return
@@ -725,6 +784,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 		}
 		session = &models.NoonGameSession{
 			EventID:             eventID,
+			TemplateKey:         noonTemplateTugOfWar,
 			Name:                sessionName,
 			Description:         nil,
 			Mode:                mode,
@@ -733,6 +793,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 			DrawPoints:          0,
 			ParticipationPoints: 0,
 			AllowManualPoints:   false,
+			Status:              "draft",
 		}
 		if req.Session != nil {
 			if req.Session.Description != nil {
@@ -1050,6 +1111,18 @@ type createTemplateRunRequest struct {
 	} `json:"session"`
 }
 
+type createTypingRunRequest struct {
+	Session struct {
+		Name         string                 `json:"name"`
+		Description  *string                `json:"description"`
+		ScheduledAt  *string                `json:"scheduled_at"`
+		Location     *string                `json:"location"`
+		Status       string                 `json:"status"`
+		PointsByRank map[string]interface{} `json:"points_by_rank"`
+		Groups       []templateGroupConfig  `json:"groups"`
+	} `json:"session"`
+}
+
 type templateGroupConfig struct {
 	GroupName  string   `json:"group_name" binding:"required"`
 	ClassNames []string `json:"class_names" binding:"required"`
@@ -1132,6 +1205,10 @@ func (h *NoonGameHandler) GetSession(c *gin.Context) {
 			"points_summary": []interface{}{},
 			"template_runs":  []interface{}{},
 		})
+		return
+	}
+	if isStudentRequest(c) && session.Status != "published" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Noon game session not found"})
 		return
 	}
 
@@ -2233,6 +2310,546 @@ func (h *NoonGameHandler) AddManualPoint(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, payload)
+}
+
+func (h *NoonGameHandler) ImportTypingSystemResults(c *gin.Context) {
+	sessionID, err := strconv.Atoi(c.Param("session_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session_id"})
+		return
+	}
+
+	session, err := h.noonRepo.GetSessionByID(sessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch session"})
+		return
+	}
+	if session == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+		return
+	}
+
+	userVal, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+	user, ok := userVal.(*models.User)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON file is required"})
+		return
+	}
+
+	filename := strings.TrimSpace(file.Filename)
+	if strings.ToLower(filepath.Ext(filename)) != ".json" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file extension"})
+		return
+	}
+	if file.Size > maxTypingSystemJSONSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON file is too large"})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to open uploaded file"})
+		return
+	}
+	defer src.Close()
+
+	content, err := io.ReadAll(src)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read uploaded file"})
+		return
+	}
+	if len(content) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Uploaded file is empty"})
+		return
+	}
+	if len(content) > maxTypingSystemJSONSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON file is too large"})
+		return
+	}
+	if len(content) >= 3 && content[0] == 0xef && content[1] == 0xbb && content[2] == 0xbf {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "BOM is not allowed"})
+		return
+	}
+
+	var payload typingSystemImportPayload
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
+		return
+	}
+
+	if payload.SchemaVersion != "typing-results-v1" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported schema_version"})
+		return
+	}
+
+	if !typingSystemExportIDPattern.MatchString(payload.ExportID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid export_id"})
+		return
+	}
+
+	if len(payload.Teams) != 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Expected exactly 6 teams"})
+		return
+	}
+
+	classes, err := h.classRepo.GetAllClasses(session.EventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch classes"})
+		return
+	}
+	classIDByName := make(map[string]int, len(classes))
+	for _, cls := range classes {
+		classIDByName[cls.Name] = cls.ID
+	}
+	typingTeamClassIDs := map[string][]int{}
+	if session.TemplateKey == noonTemplateTyping {
+		configuredGroups, err := h.noonRepo.GetGroupsWithMembers(sessionID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch typing teams"})
+			return
+		}
+		for _, group := range configuredGroups {
+			if group == nil {
+				continue
+			}
+			if _, officialName := typingSystemTeamClassMap[group.Name]; !officialName {
+				continue
+			}
+			if _, duplicate := typingTeamClassIDs[group.Name]; duplicate {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Duplicate typing team: %s", group.Name)})
+				return
+			}
+			for _, member := range group.Members {
+				if member != nil {
+					typingTeamClassIDs[group.Name] = append(typingTeamClassIDs[group.Name], member.ClassID)
+				}
+			}
+		}
+		for _, teamName := range typingSystemTeamNames {
+			if len(typingTeamClassIDs[teamName]) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Typing team configuration is missing: %s", teamName)})
+				return
+			}
+		}
+	}
+
+	seenTeamNames := map[string]struct{}{}
+	pv := sha256.Sum256(content)
+	hashHex := hex.EncodeToString(pv[:])
+
+	classIDsByTeam := make(map[string][]int, len(payload.Teams))
+	teamResults := make([]typingSystemTeamResult, len(payload.Teams))
+	points := make([]*models.NoonGamePoint, 0, 16)
+
+	for i, team := range payload.Teams {
+		if team.TeamName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("team_name is required for teams[%d]", i)})
+			return
+		}
+		if _, ok := seenTeamNames[team.TeamName]; ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate team_name found"})
+			return
+		}
+		seenTeamNames[team.TeamName] = struct{}{}
+
+		if team.Rank < 1 || team.Rank > 6 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Rank must be between 1 and 6"})
+			return
+		}
+		if team.Match1Score < 0 || team.Match1Score > maxNoonTypingScore || team.Match2Score < 0 || team.Match2Score > maxNoonTypingScore ||
+			team.Match3Score < 0 || team.Match3Score > maxNoonTypingScore || team.TotalScore < 0 || team.TotalScore > maxNoonTypingScore {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Score must be within 0 to 2147483647"})
+			return
+		}
+
+		total := team.Match1Score + team.Match2Score + team.Match3Score
+		if total != team.TotalScore {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Total score mismatch"})
+			return
+		}
+
+		if i == 0 {
+			if team.Rank != 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "The first rank must be 1"})
+				return
+			}
+		} else {
+			prev := payload.Teams[i-1]
+			if team.Rank < prev.Rank {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Rank must be non-decreasing"})
+				return
+			}
+			if team.Rank != prev.Rank && team.Rank != i+1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rank order"})
+				return
+			}
+			if prev.Rank == team.Rank {
+				if team.TotalScore != prev.TotalScore {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Teams with same rank must have same total_score"})
+					return
+				}
+				if strings.TrimSpace(team.TeamName) <= strings.TrimSpace(prev.TeamName) {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Teams in same rank must be ordered by team_name"})
+					return
+				}
+			} else {
+				if prev.TotalScore == team.TotalScore {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Equal total_score must not have different rank"})
+					return
+				}
+			}
+		}
+
+		classNames, officialTeam := typingSystemTeamClassMap[team.TeamName]
+		if !officialTeam {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid team_name: %s", team.TeamName)})
+			return
+		}
+
+		classIDs := typingTeamClassIDs[team.TeamName]
+		if session.TemplateKey != noonTemplateTyping {
+			classIDs = make([]int, 0, len(classNames))
+			for _, className := range classNames {
+				classID, found := classIDByName[className]
+				if !found {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Required class not found for team: %s (%s)", team.TeamName, className)})
+					return
+				}
+				classIDs = append(classIDs, classID)
+			}
+		}
+		classIDsByTeam[team.TeamName] = classIDs
+		teamResults[i] = team
+	}
+
+	required := make(map[string]struct{}, len(typingSystemTeamNames))
+	for _, name := range typingSystemTeamNames {
+		required[name] = struct{}{}
+	}
+	for _, team := range teamResults {
+		if _, ok := required[team.TeamName]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unknown or missing team name"})
+			return
+		}
+		delete(required, team.TeamName)
+	}
+	if len(required) > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Team list must include all official teams"})
+		return
+	}
+
+	pointsByRank := make(map[string]int, len(defaultTypingPointsByRank))
+	for rank, value := range defaultTypingPointsByRank {
+		pointsByRank[rank] = value
+	}
+	if session.TemplateKey == noonTemplateTyping {
+		pointsByRank = h.typingPointsByRank(session.ID)
+	}
+	importResults := make([]models.NoonGameTypingTeamResult, 0, len(teamResults))
+	for _, team := range teamResults {
+		awardedPoints := pointsByRank[strconv.Itoa(team.Rank)]
+		importResults = append(importResults, models.NoonGameTypingTeamResult{
+			TeamName: team.TeamName, Match1Score: team.Match1Score, Match2Score: team.Match2Score,
+			Match3Score: team.Match3Score, TotalScore: team.TotalScore, Rank: team.Rank, Points: awardedPoints,
+		})
+		for _, classID := range classIDsByTeam[team.TeamName] {
+			reason := fmt.Sprintf("typing-system result (%s)", payload.ExportID)
+			points = append(points, &models.NoonGamePoint{
+				SessionID: sessionID,
+				ClassID:   classID,
+				Points:    awardedPoints,
+				Source:    typingSystemSource,
+				Reason:    &reason,
+				CreatedBy: user.ID,
+			})
+		}
+	}
+
+	replace := false
+	if v := strings.TrimSpace(c.Query("replace")); v == "1" || strings.EqualFold(v, "true") {
+		replace = true
+	}
+
+	historyRecords, err := h.noonRepo.GetTypingSystemImportsBySessionAndExportID(sessionID, payload.ExportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch import history"})
+		return
+	}
+
+	for _, history := range historyRecords {
+		if history == nil {
+			continue
+		}
+		if history.SHA256 != hashHex {
+			c.JSON(http.StatusConflict, gin.H{"error": "Import with same export_id already exists but file content differs"})
+			return
+		}
+		if strings.EqualFold(history.Status, "success") {
+			c.JSON(http.StatusOK, gin.H{
+				"message":    "already imported",
+				"export_id":  payload.ExportID,
+				"status":     "already_imported",
+				"is_replace": replace,
+			})
+			return
+		}
+	}
+
+	activeHistory, err := h.noonRepo.GetActiveTypingSystemImport(sessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch active import status"})
+		return
+	}
+	if activeHistory != nil && !replace && activeHistory.ExportID != payload.ExportID {
+		c.JSON(http.StatusConflict, gin.H{"error": "Existing import already exists for this session. Use replace=true to overwrite"})
+		return
+	}
+
+	action := "import"
+	var replacedExportID *string
+	if replace && activeHistory != nil && activeHistory.ExportID != payload.ExportID {
+		action = "replace"
+		replacedExportID = &activeHistory.ExportID
+	}
+
+	history := &models.NoonGameTypingSystemImportRecord{
+		SessionID:        sessionID,
+		ExportID:         payload.ExportID,
+		SHA256:           hashHex,
+		Status:           "success",
+		Action:           action,
+		ReplacedExportID: replacedExportID,
+		RequestedBy:      user.ID,
+		Filename:         &filename,
+		PayloadSize:      len(content),
+		IsActive:         true,
+		Results:          importResults,
+	}
+
+	replaceImport := activeHistory != nil && replace
+	if err := h.noonRepo.ApplyTypingSystemResultImport(sessionID, points, replaceImport, history); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store typing-system results"})
+		return
+	}
+
+	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update class scores"})
+		return
+	}
+
+	payloadResult := gin.H{
+		"message":     "imported",
+		"action":      action,
+		"export_id":   payload.ExportID,
+		"sha256":      hashHex,
+		"team_count":  len(payload.Teams),
+		"class_count": len(points),
+	}
+	c.JSON(http.StatusOK, payloadResult)
+}
+
+// CreateTypingRun creates the reusable typing template with its six R8 teams.
+func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id"})
+		return
+	}
+	if err := h.ensureEventExists(eventID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+	var req createTypingRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+	userValue, ok := c.Get("user")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+	user, ok := userValue.(*models.User)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type"})
+		return
+	}
+
+	sessions, err := h.noonRepo.ListSessionsByEvent(eventID, false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game sessions"})
+		return
+	}
+	var existing *models.NoonGameSession
+	for _, candidate := range sessions {
+		if candidate != nil && candidate.TemplateKey == noonTemplateTyping {
+			existing = candidate
+			break
+		}
+	}
+	name := strings.TrimSpace(req.Session.Name)
+	if name == "" {
+		name = defaultTypingSessionName
+	}
+	status := strings.ToLower(strings.TrimSpace(req.Session.Status))
+	if status == "" {
+		status = "draft"
+	}
+	if status != "draft" && status != "published" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
+		return
+	}
+	session := &models.NoonGameSession{EventID: eventID, TemplateKey: noonTemplateTyping, Name: name, Description: req.Session.Description, Location: req.Session.Location, Mode: "group", AllowManualPoints: false, Status: status}
+	if existing != nil {
+		session.ID = existing.ID
+		session.Status = existing.Status
+	}
+	if req.Session.ScheduledAt != nil && strings.TrimSpace(*req.Session.ScheduledAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, *req.Session.ScheduledAt)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid scheduled_at"})
+			return
+		}
+		session.ScheduledAt = &parsed
+	}
+	saved, err := h.noonRepo.UpsertSession(session)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save typing session"})
+		return
+	}
+	if err := h.syncNoonGameSport(eventID, saved.Name); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync typing sport"})
+		return
+	}
+	groups := req.Session.Groups
+	if len(groups) == 0 {
+		for _, team := range typingSystemTeamNames {
+			groups = append(groups, templateGroupConfig{GroupName: team, ClassNames: typingSystemTeamClassMap[team]})
+		}
+	}
+	if len(groups) != len(typingSystemTeamNames) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Typing template requires exactly 6 teams"})
+		return
+	}
+	classes, err := h.classRepo.GetAllClasses(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch classes"})
+		return
+	}
+	classIDs := map[string]int{}
+	for _, class := range classes {
+		classIDs[class.Name] = class.ID
+	}
+	groupClassIDs := make([][]int, len(groups))
+	seenTeams := map[string]bool{}
+	for index, group := range groups {
+		if _, officialName := typingSystemTeamClassMap[group.GroupName]; !officialName {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid typing team: %s", group.GroupName)})
+			return
+		}
+		if seenTeams[group.GroupName] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Duplicate typing team: %s", group.GroupName)})
+			return
+		}
+		seenTeams[group.GroupName] = true
+		if len(group.ClassNames) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Typing team must include a class: %s", group.GroupName)})
+			return
+		}
+		for _, className := range group.ClassNames {
+			id, ok := classIDs[className]
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Required class not found: %s", className)})
+				return
+			}
+			groupClassIDs[index] = append(groupClassIDs[index], id)
+		}
+	}
+	for _, teamName := range typingSystemTeamNames {
+		if !seenTeams[teamName] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Typing team configuration is missing: %s", teamName)})
+			return
+		}
+	}
+	points := req.Session.PointsByRank
+	if len(points) == 0 {
+		points = map[string]interface{}{}
+		for rank, value := range defaultTypingPointsByRank {
+			points[rank] = value
+		}
+	}
+	if existing != nil {
+		if err := h.noonRepo.DeleteTemplateRunAndRelatedData(saved.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update typing template"})
+			return
+		}
+	}
+	for index, group := range groups {
+		if _, err := h.noonRepo.SaveGroup(&models.NoonGameGroup{SessionID: saved.ID, Name: group.GroupName}, groupClassIDs[index]); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save typing team"})
+			return
+		}
+	}
+	for round := 1; round <= 3; round++ {
+		title := fmt.Sprintf("競技タイピング 第%dラウンド", round)
+		format := "6チーム同時"
+		if _, err := h.noonRepo.SaveMatch(&models.NoonGameMatch{
+			SessionID:   saved.ID,
+			Title:       &title,
+			ScheduledAt: saved.ScheduledAt,
+			Location:    saved.Location,
+			Status:      "scheduled",
+			Format:      &format,
+		}); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create typing round"})
+			return
+		}
+	}
+	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(saved.ID, noonTemplateTyping, name, user.ID, points)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create typing template"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"session": saved, "run": run})
+}
+
+func (h *NoonGameHandler) typingPointsByRank(sessionID int) map[string]int {
+	points := make(map[string]int, len(defaultTypingPointsByRank))
+	for rank, value := range defaultTypingPointsByRank {
+		points[rank] = value
+	}
+	runs, err := h.noonRepo.ListTemplateRunsBySession(sessionID)
+	if err != nil {
+		return points
+	}
+	for _, run := range runs {
+		if run == nil || run.TemplateKey != noonTemplateTyping {
+			continue
+		}
+		if configured, ok := run.PointsByRank.(map[string]interface{}); ok {
+			for rank, value := range configured {
+				switch v := value.(type) {
+				case float64:
+					points[rank] = int(v)
+				case int:
+					points[rank] = v
+				}
+			}
+		}
+	}
+	return points
 }
 
 // RecordYearRelayBlockResult は学年対抗リレーのA/Bブロック順位を登録し、テンプレ点を自動付与します。
@@ -3920,14 +4537,27 @@ func (h *NoonGameHandler) buildSessionPayload(session *models.NoonGameSession) (
 	h.normalizeSessionToJST(session)
 	h.normalizeMatchesToJST(matches)
 
-	return gin.H{
+	payload := gin.H{
 		"session":        session,
 		"groups":         groups,
 		"matches":        matches,
 		"classes":        classes,
 		"points_summary": summary,
 		"template_runs":  templateRuns,
-	}, nil
+	}
+	if session.TemplateKey == noonTemplateTyping {
+		activeImport, err := h.noonRepo.GetActiveTypingSystemImport(session.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch active typing-system import: %w", err)
+		}
+		if activeImport != nil {
+			payload["typing_results"] = activeImport.Results
+			payload["typing_import_status"] = "finalized"
+		} else {
+			payload["typing_import_status"] = "pending"
+		}
+	}
+	return payload, nil
 }
 
 func (h *NoonGameHandler) normalizeSessionToJST(session *models.NoonGameSession) {

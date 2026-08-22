@@ -98,7 +98,9 @@ describe('Noon Game Page', () => {
       }
 
       if (url === '/api/root/events/1/noon-game/templates/course-relay/run' && options.method === 'POST') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+        const body = JSON.parse(options.body);
+        session = { id: 1, template_key: 'course_relay', ...body.session };
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ session, run: { id: 1, template_key: 'course_relay' } }) });
       }
 
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -132,9 +134,9 @@ describe('Noon Game Page', () => {
   it('テンプレートを実行できる', async () => {
     render(Page);
 
-    await page.getByRole('button', { name: 'テンプレートを設定' }).nth(1).click();
+    await page.getByRole('button', { name: '昼競技を作成' }).nth(2).click();
     await expect.element(page.getByRole('heading', { name: /コース対抗リレー.*テンプレート設定/ })).toBeInTheDocument();
-    await page.getByRole('button', { name: 'テンプレートを作成' }).click();
+    await page.getByRole('button', { name: '昼競技を作成' }).last().click();
 
     const createCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/events/1/noon-game/templates/course-relay/run' && options?.method === 'POST');
     expect(createCall).toBeTruthy();

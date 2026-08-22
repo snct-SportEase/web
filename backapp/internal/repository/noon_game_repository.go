@@ -31,10 +31,16 @@ type NoonGameRepository interface {
 	GetResultByMatchID(matchID int) (*models.NoonGameResult, error)
 
 	ClearPointsForMatch(matchID int) error
+	ClearPointsForSessionAndSource(sessionID int, source string) error
 	InsertPoints(points []*models.NoonGamePoint) error
 	InsertPoint(point *models.NoonGamePoint) (*models.NoonGamePoint, error)
+	ApplyTypingSystemResultImport(sessionID int, points []*models.NoonGamePoint, replace bool, history *models.NoonGameTypingSystemImportRecord) error
 	SumPointsByClass(sessionID int) (map[int]int, error)
 	SumConfirmedPointsByEvent(eventID int) (map[int]int, error)
+	GetActiveTypingSystemImport(sessionID int) (*models.NoonGameTypingSystemImportRecord, error)
+	GetTypingSystemImportsBySessionAndExportID(sessionID int, exportID string) ([]*models.NoonGameTypingSystemImportRecord, error)
+	CreateTypingSystemImportHistory(record *models.NoonGameTypingSystemImportRecord) error
+	SetTypingSystemImportInactive(sessionID int) error
 
 	GetGroupMembers(groupID int) ([]*models.NoonGameGroupMember, error)
 	GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error)
@@ -1481,6 +1487,68 @@ func (r *noonGameRepository) ClearPointsForMatch(matchID int) error {
 	return err
 }
 
+func (r *noonGameRepository) ClearPointsForSessionAndSource(sessionID int, source string) error {
+	_, err := r.db.Exec(`DELETE FROM noon_game_points WHERE session_id = ? AND source = ?`, sessionID, source)
+	return err
+}
+
+func (r *noonGameRepository) ApplyTypingSystemResultImport(sessionID int, points []*models.NoonGamePoint, replace bool, history *models.NoonGameTypingSystemImportRecord) error {
+	if sessionID == 0 {
+		return fmt.Errorf("session_id is required")
+	}
+	if history == nil {
+		return fmt.Errorf("history is required")
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if replace {
+		if _, err := tx.Exec(`DELETE FROM noon_game_points WHERE session_id = ? AND source = ?`, sessionID, "typing_system"); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE noon_game_typing_system_imports SET is_active = FALSE WHERE session_id = ?`, sessionID); err != nil {
+			return err
+		}
+	}
+
+	if len(points) > 0 {
+		insertPointStmt, err := tx.Prepare(`
+			INSERT INTO noon_game_points (session_id, match_id, class_id, points, reason, source, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`)
+		if err != nil {
+			return err
+		}
+		for _, point := range points {
+			if _, err := insertPointStmt.Exec(
+				point.SessionID,
+				nullableInt(point.MatchID),
+				point.ClassID,
+				point.Points,
+				nullableString(point.Reason),
+				point.Source,
+				point.CreatedBy,
+			); err != nil {
+				insertPointStmt.Close()
+				return err
+			}
+		}
+		if err := insertPointStmt.Close(); err != nil {
+			return err
+		}
+	}
+
+	if err := r.insertTypingSystemImportTx(tx, history); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (r *noonGameRepository) InsertPoints(points []*models.NoonGamePoint) error {
 	if len(points) == 0 {
 		return nil
@@ -1521,6 +1589,89 @@ func (r *noonGameRepository) InsertPoints(points []*models.NoonGamePoint) error 
 	return tx.Commit()
 }
 
+func (r *noonGameRepository) GetActiveTypingSystemImport(sessionID int) (*models.NoonGameTypingSystemImportRecord, error) {
+	row := r.db.QueryRow(`
+		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
+		FROM noon_game_typing_system_imports
+		WHERE session_id = ? AND is_active = TRUE
+		ORDER BY requested_at DESC
+		LIMIT 1
+	`, sessionID)
+
+	return scanTypingSystemImportRow(row)
+}
+
+func (r *noonGameRepository) GetTypingSystemImportsBySessionAndExportID(sessionID int, exportID string) ([]*models.NoonGameTypingSystemImportRecord, error) {
+	rows, err := r.db.Query(`
+		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
+		FROM noon_game_typing_system_imports
+		WHERE session_id = ? AND export_id = ?
+		ORDER BY requested_at DESC
+	`, sessionID, exportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []*models.NoonGameTypingSystemImportRecord{}
+	for rows.Next() {
+		item, err := scanTypingSystemImportRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (r *noonGameRepository) CreateTypingSystemImportHistory(record *models.NoonGameTypingSystemImportRecord) error {
+	if record == nil {
+		return fmt.Errorf("history is required")
+	}
+	insert, err := r.db.Prepare(`
+		INSERT INTO noon_game_typing_system_imports
+		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, results, message, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return err
+	}
+	defer insert.Close()
+
+	replacedExportID := nullableString(record.ReplacedExportID)
+	filename := nullableString(record.Filename)
+	message := nullableString(record.Message)
+	results := marshalTypingResults(record.Results)
+
+	_, err = insert.Exec(
+		record.SessionID,
+		record.ExportID,
+		record.SHA256,
+		record.Status,
+		record.Action,
+		replacedExportID,
+		record.RequestedBy,
+		filename,
+		record.PayloadSize,
+		results,
+		message,
+		record.IsActive,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *noonGameRepository) SetTypingSystemImportInactive(sessionID int) error {
+	_, err := r.db.Exec(`UPDATE noon_game_typing_system_imports SET is_active = FALSE WHERE session_id = ? AND is_active = TRUE`, sessionID)
+	return err
+}
+
 func (r *noonGameRepository) InsertPoint(point *models.NoonGamePoint) (*models.NoonGamePoint, error) {
 	matchIDVal := nullableInt(point.MatchID)
 	reasonVal := nullableString(point.Reason)
@@ -1545,6 +1696,98 @@ func (r *noonGameRepository) InsertPoint(point *models.NoonGamePoint) (*models.N
 	}
 	point.CreatedAt = time.Now()
 	return point, nil
+}
+
+func (r *noonGameRepository) insertTypingSystemImportTx(tx *sql.Tx, record *models.NoonGameTypingSystemImportRecord) error {
+	query := `
+		INSERT INTO noon_game_typing_system_imports
+		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, results, message, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	replacedExportID := nullableString(record.ReplacedExportID)
+	filename := nullableString(record.Filename)
+	message := nullableString(record.Message)
+	results := marshalTypingResults(record.Results)
+
+	_, err := tx.Exec(
+		query,
+		record.SessionID,
+		record.ExportID,
+		record.SHA256,
+		record.Status,
+		record.Action,
+		replacedExportID,
+		record.RequestedBy,
+		filename,
+		record.PayloadSize,
+		results,
+		message,
+		record.IsActive,
+	)
+	return err
+}
+
+func scanTypingSystemImportRow(scanner interface{ Scan(...any) error }) (*models.NoonGameTypingSystemImportRecord, error) {
+	record := &models.NoonGameTypingSystemImportRecord{}
+	var (
+		replacedExportID sql.NullString
+		filename         sql.NullString
+		resultsJSON      []byte
+		message          sql.NullString
+	)
+	if err := scanner.Scan(
+		&record.ID,
+		&record.SessionID,
+		&record.ExportID,
+		&record.SHA256,
+		&record.Status,
+		&record.Action,
+		&replacedExportID,
+		&record.RequestedBy,
+		&record.RequestedAt,
+		&filename,
+		&record.PayloadSize,
+		&resultsJSON,
+		&message,
+		&record.IsActive,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if replacedExportID.Valid {
+		record.ReplacedExportID = &replacedExportID.String
+	}
+	if filename.Valid {
+		record.Filename = &filename.String
+	}
+	if message.Valid {
+		record.Message = &message.String
+	}
+	if len(resultsJSON) > 0 {
+		if err := json.Unmarshal(resultsJSON, &record.Results); err != nil {
+			return nil, fmt.Errorf("failed to decode typing-system results: %w", err)
+		}
+	}
+
+	return record, nil
+}
+
+func marshalTypingResults(results []models.NoonGameTypingTeamResult) interface{} {
+	if len(results) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(results)
+	if err != nil {
+		return nil
+	}
+	return string(b)
+}
+
+func scanTypingSystemImportRows(rows *sql.Rows) (*models.NoonGameTypingSystemImportRecord, error) {
+	return scanTypingSystemImportRow(rows)
 }
 
 func (r *noonGameRepository) fetchMatchEntries(matchIDs []int) (map[int][]*models.NoonGameMatchEntry, error) {

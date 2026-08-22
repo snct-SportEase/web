@@ -44,12 +44,12 @@ test.describe('昼競技管理 (root)', () => {
   });
 
   test('テンプレートを実行できる', async ({ page }) => {
-    const openButton = page.getByRole('button', { name: 'テンプレートを設定' }).nth(1);
-    await openButton.click();
+    const courseRelayCard = page.locator('div.border', { has: page.getByRole('heading', { name: 'コース対抗リレー' }) });
+    await courseRelayCard.getByRole('button', { name: '昼競技を作成' }).click();
     await expect(page.getByRole('heading', { name: /コース対抗リレー.*テンプレート設定/ })).toBeVisible();
 
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/events/1/noon-game/templates/course-relay/run') && request.method() === 'POST');
-    await page.getByRole('button', { name: 'テンプレートを作成' }).click();
+    await page.getByRole('button', { name: '昼競技を作成' }).last().click();
     await requestPromise;
   });
 
