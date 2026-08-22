@@ -26,6 +26,7 @@
     description: '',
     scheduled_at: '',
     location: '',
+    status: 'draft',
     mode: 'group',
     win_points: 0,
     loss_points: 0,
@@ -862,6 +863,7 @@
           description: session.description || '',
           scheduled_at: session.scheduled_at ? toLocalDateTime(session.scheduled_at) : '',
           location: session.location || '',
+          status: session.status === 'published' ? 'published' : 'draft',
           mode: session.mode || 'group',
           win_points: session.win_points || 0,
           loss_points: session.loss_points || 0,
@@ -879,6 +881,7 @@
           description: '',
           scheduled_at: '',
           location: '',
+          status: 'draft',
           mode: 'group',
           win_points: 0,
           loss_points: 0,
@@ -899,6 +902,7 @@
           description: session.description || '',
           scheduled_at: session.scheduled_at ? toLocalDateTime(session.scheduled_at) : '',
           location: session.location || '',
+          status: session.status === 'published' ? 'published' : 'draft',
           mode: session.mode || 'group',
           win_points: session.win_points || 0,
           loss_points: session.loss_points || 0,
@@ -915,6 +919,7 @@
           description: '',
           scheduled_at: '',
           location: '',
+          status: 'draft',
           mode: 'group',
           win_points: 0,
           loss_points: 0,
@@ -999,6 +1004,7 @@
           description: templateConfigForm.description || null,
           scheduled_at: templateConfigForm.scheduled_at ? new Date(templateConfigForm.scheduled_at).toISOString() : null,
           location: templateConfigForm.location || null,
+          status: templateConfigForm.status,
           mode: templateConfigForm.mode,
           win_points: Number(templateConfigForm.win_points),
           loss_points: Number(templateConfigForm.loss_points),
@@ -1048,6 +1054,19 @@
       // グループ設定を追加（手動設定がある場合のみ）
       if (templateConfigForm.groups && templateConfigForm.groups.length > 0) {
         payload.session.groups = templateConfigForm.groups;
+      }
+
+      const existingTemplateSession = sessions.find((item) => item.template_key === templateKeyFor(templateType));
+      if (existingTemplateSession) {
+        const updateResponse = await fetch(`/api/root/events/${current.id}/noon-game/sessions/${existingTemplateSession.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload.session, template_key: templateKeyFor(templateType) })
+        });
+        if (!updateResponse.ok) {
+          const detail = await safeJson(updateResponse);
+          throw new Error(detail?.error || '昼競技の状態更新に失敗しました');
+        }
       }
 
       const endpoint = templateType === 'typing'
@@ -1234,6 +1253,13 @@
                 <label class="flex flex-col text-sm font-medium text-gray-700">
                   会場
                   <input class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.location} placeholder="例: 視聴覚室" />
+                </label>
+                <label class="flex flex-col text-sm font-medium text-gray-700">
+                  公開状態
+                  <select class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.status}>
+                    <option value="draft">下書き（学生には非表示）</option>
+                    <option value="published">公開（学生に表示）</option>
+                  </select>
                 </label>
                 <label class="flex flex-col text-sm font-medium text-gray-700">
                   モード
