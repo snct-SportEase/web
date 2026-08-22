@@ -24,7 +24,9 @@ test.describe('競技タイピング結果インポート (root)', () => {
     await page.goto('/dashboard/root/noon-game');
     const typingCard = page.locator('div.border', { has: page.getByRole('heading', { name: '競技タイピング' }) });
     await typingCard.getByRole('button', { name: '昼競技を作成' }).click();
+    await expect(page.getByRole('textbox', { name: 'グループ名' }).first()).toBeVisible();
     await page.getByLabel('公開状態').selectOption('published');
+    await expect(page.getByLabel('公開状態')).toHaveValue('published');
     await page.getByRole('button', { name: '昼競技を作成' }).last().click();
 
     await expect(page.getByRole('heading', { name: '競技タイピング結果のインポート' })).toBeVisible();
