@@ -170,6 +170,9 @@ func TestNoonGameHandler_ImportTypingSystemResults(t *testing.T) {
 			if item.RequestedBy != userID {
 				return false
 			}
+			if len(item.Results) != 6 || item.Results[0].TeamName != "1年生" || item.Results[0].Points != 40 || item.Results[1].Points != 30 || item.Results[2].Points != 25 || item.Results[3].Points != 0 {
+				return false
+			}
 			return true
 		})).Run(func(args mock.Arguments) {
 			points := args.Get(1).([]*models.NoonGamePoint)
@@ -178,6 +181,9 @@ func TestNoonGameHandler_ImportTypingSystemResults(t *testing.T) {
 				assert.Equal(t, "typing_system", p.Source)
 				assert.Equal(t, userID, p.CreatedBy)
 			}
+			assert.Equal(t, 40, points[0].Points)
+			assert.Equal(t, 30, points[3].Points)
+			assert.Equal(t, 25, points[6].Points)
 		}).Return(nil).Once()
 		mockNoonRepo.On("SumConfirmedPointsByEvent", eventID).Return(map[int]int{}, nil).Once()
 		mockClassRepo.On("SetNoonGamePoints", eventID, map[int]int{}).Return(nil).Once()

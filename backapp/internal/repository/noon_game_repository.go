@@ -1591,7 +1591,7 @@ func (r *noonGameRepository) InsertPoints(points []*models.NoonGamePoint) error 
 
 func (r *noonGameRepository) GetActiveTypingSystemImport(sessionID int) (*models.NoonGameTypingSystemImportRecord, error) {
 	row := r.db.QueryRow(`
-		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, message, is_active
+		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
 		FROM noon_game_typing_system_imports
 		WHERE session_id = ? AND is_active = TRUE
 		ORDER BY requested_at DESC
@@ -1603,7 +1603,7 @@ func (r *noonGameRepository) GetActiveTypingSystemImport(sessionID int) (*models
 
 func (r *noonGameRepository) GetTypingSystemImportsBySessionAndExportID(sessionID int, exportID string) ([]*models.NoonGameTypingSystemImportRecord, error) {
 	rows, err := r.db.Query(`
-		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, message, is_active
+		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
 		FROM noon_game_typing_system_imports
 		WHERE session_id = ? AND export_id = ?
 		ORDER BY requested_at DESC
@@ -1634,8 +1634,8 @@ func (r *noonGameRepository) CreateTypingSystemImportHistory(record *models.Noon
 	}
 	insert, err := r.db.Prepare(`
 		INSERT INTO noon_game_typing_system_imports
-		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, message, is_active)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, results, message, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -1645,6 +1645,7 @@ func (r *noonGameRepository) CreateTypingSystemImportHistory(record *models.Noon
 	replacedExportID := nullableString(record.ReplacedExportID)
 	filename := nullableString(record.Filename)
 	message := nullableString(record.Message)
+	results := marshalTypingResults(record.Results)
 
 	_, err = insert.Exec(
 		record.SessionID,
@@ -1656,6 +1657,7 @@ func (r *noonGameRepository) CreateTypingSystemImportHistory(record *models.Noon
 		record.RequestedBy,
 		filename,
 		record.PayloadSize,
+		results,
 		message,
 		record.IsActive,
 	)
@@ -1699,12 +1701,13 @@ func (r *noonGameRepository) InsertPoint(point *models.NoonGamePoint) (*models.N
 func (r *noonGameRepository) insertTypingSystemImportTx(tx *sql.Tx, record *models.NoonGameTypingSystemImportRecord) error {
 	query := `
 		INSERT INTO noon_game_typing_system_imports
-		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, message, is_active)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, results, message, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	replacedExportID := nullableString(record.ReplacedExportID)
 	filename := nullableString(record.Filename)
 	message := nullableString(record.Message)
+	results := marshalTypingResults(record.Results)
 
 	_, err := tx.Exec(
 		query,
@@ -1717,6 +1720,7 @@ func (r *noonGameRepository) insertTypingSystemImportTx(tx *sql.Tx, record *mode
 		record.RequestedBy,
 		filename,
 		record.PayloadSize,
+		results,
 		message,
 		record.IsActive,
 	)
@@ -1728,6 +1732,7 @@ func scanTypingSystemImportRow(scanner interface{ Scan(...any) error }) (*models
 	var (
 		replacedExportID sql.NullString
 		filename         sql.NullString
+		resultsJSON      []byte
 		message          sql.NullString
 	)
 	if err := scanner.Scan(
@@ -1742,6 +1747,7 @@ func scanTypingSystemImportRow(scanner interface{ Scan(...any) error }) (*models
 		&record.RequestedAt,
 		&filename,
 		&record.PayloadSize,
+		&resultsJSON,
 		&message,
 		&record.IsActive,
 	); err != nil {
@@ -1760,8 +1766,24 @@ func scanTypingSystemImportRow(scanner interface{ Scan(...any) error }) (*models
 	if message.Valid {
 		record.Message = &message.String
 	}
+	if len(resultsJSON) > 0 {
+		if err := json.Unmarshal(resultsJSON, &record.Results); err != nil {
+			return nil, fmt.Errorf("failed to decode typing-system results: %w", err)
+		}
+	}
 
 	return record, nil
+}
+
+func marshalTypingResults(results []models.NoonGameTypingTeamResult) interface{} {
+	if len(results) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(results)
+	if err != nil {
+		return nil
+	}
+	return string(b)
 }
 
 func scanTypingSystemImportRows(rows *sql.Rows) (*models.NoonGameTypingSystemImportRecord, error) {

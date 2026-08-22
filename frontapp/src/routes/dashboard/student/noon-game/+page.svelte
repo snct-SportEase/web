@@ -6,6 +6,8 @@
   let session = $state(null);
   let matches = $state([]);
   let pointsSummary = $state([]);
+  let typingResults = $state([]);
+  let typingImportStatus = $state('pending');
   let loading = $state(false);
   let errorMessage = $state('');
   let templateMatches = $derived(matches.filter((match) => detectTemplateFromMatch(match)));
@@ -32,6 +34,8 @@
       session = data.session;
       matches = data.matches || [];
       pointsSummary = data.points_summary || [];
+      typingResults = data.typing_results || [];
+      typingImportStatus = data.typing_import_status || 'pending';
       
       // デバッグ用: テンプレート結果のデータ構造を確認
       if (templateMatches.length > 0) {
@@ -180,6 +184,27 @@
       <p class="font-semibold">昼競技セッションが設定されていません。</p>
     </div>
   {:else}
+    {#if session.template_key === 'typing'}
+      <section class="bg-white shadow rounded-lg p-6 space-y-4">
+        <div>
+          <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">競技タイピング結果</h2>
+          <p class="mt-2 text-sm text-gray-600">{typingImportStatus === 'finalized' ? '確定済みのチーム結果です。個人スコアは表示しません。' : '結果はまだインポート・確定されていません。'}</p>
+        </div>
+        {#if typingResults.length > 0}
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+              <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">チーム</th><th class="px-3 py-2 text-right">第1試合</th><th class="px-3 py-2 text-right">第2試合</th><th class="px-3 py-2 text-right">第3試合</th><th class="px-3 py-2 text-right">合計</th><th class="px-3 py-2 text-right">順位</th><th class="px-3 py-2 text-right">大会得点</th></tr></thead>
+              <tbody class="divide-y divide-gray-200">
+                {#each typingResults as result (result.team_name)}
+                  <tr><td class="px-3 py-2 font-medium">{result.team_name}</td><td class="px-3 py-2 text-right">{result.match_1_score}</td><td class="px-3 py-2 text-right">{result.match_2_score}</td><td class="px-3 py-2 text-right">{result.match_3_score}</td><td class="px-3 py-2 text-right font-semibold">{result.total_score}</td><td class="px-3 py-2 text-right">{result.rank}位</td><td class="px-3 py-2 text-right font-semibold text-indigo-600">{result.points}点</td></tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      </section>
+    {/if}
+
     <!-- テンプレートラン用の結果表示 -->
     {#if templateMatches.length > 0}
       <section class="bg-white shadow rounded-lg p-6 space-y-6">

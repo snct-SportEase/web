@@ -306,6 +306,23 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 		assert.NoError(t, repo.AssignSportToEvent(&esOther))
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+
+	t.Run("location=noon_game allows multiple sessions", func(t *testing.T) {
+		repo, mock, close := setupSport(t)
+		defer close()
+
+		esNoonGame := *es
+		esNoonGame.Location = "noon_game"
+		mock.ExpectQuery(regexp.QuoteMeta(checkDupSportQ)).WithArgs(1, 3).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+		// Noon-game is shared, so no duplicate-location query is issued.
+		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
+			WithArgs(esNoonGame.EventID, esNoonGame.SportID, esNoonGame.Description, esNoonGame.RulesPdfURL, esNoonGame.Location, esNoonGame.MinCapacity, esNoonGame.MaxCapacity).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		assert.NoError(t, repo.AssignSportToEvent(&esNoonGame))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 // ─── DeleteSportFromEvent ──────────────────────────────────────────────────

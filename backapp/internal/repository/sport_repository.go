@@ -132,8 +132,9 @@ func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) erro
 		return errors.New("この競技はすでにこの大会に割り当てられています。")
 	}
 
-	// Prevent duplicate locations, except for 'other' and custom "other:<name>" locations.
-	if !isOtherLocation(eventSport.Location) {
+	// Multiple noon-game sessions may coexist. Like "other", noon_game is a
+	// shared logical location rather than an exclusive physical court.
+	if !isOtherLocation(eventSport.Location) && eventSport.Location != "noon_game" {
 		query := "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND location = ?"
 		err := r.db.QueryRow(query, eventSport.EventID, eventSport.Location).Scan(&count)
 		if err != nil {

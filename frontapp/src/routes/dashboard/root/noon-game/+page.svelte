@@ -5,6 +5,8 @@
   import { activeEvent } from '$lib/stores/eventStore.js';
 
   let session = $state(null);
+  let sessions = $state([]);
+  let selectedSessionId = $state(null);
   let classes = $state([]);
   let groups = $state([]);
   let matches = $state([]);
@@ -16,10 +18,14 @@
   let savingMatch = $state(false);
   let savingManualPoint = $state(false);
   let creatingTemplate = $state({});
+  let typingFile = $state(null);
+  let importingTypingResults = $state(false);
   let selectedTemplateType = $state(null);
   let templateConfigForm = $state({
     name: '',
     description: '',
+    scheduled_at: '',
+    location: '',
     mode: 'group',
     win_points: 0,
     loss_points: 0,
@@ -102,7 +108,7 @@
     console.log('[NoonGame] activeEvent changed (reactive):', current);
     if (current && current.id) {
       console.log('[NoonGame] fetching session for event:', current.id);
-      fetchSession(current.id);
+      fetchSessions(current.id);
     }
   });
 
@@ -137,6 +143,38 @@
       }
     } catch (err) {
       console.error('[NoonGame] fetchSession error', err);
+      errorMessage = err.message;
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function fetchSessions(eventId, preferredSessionId = selectedSessionId) {
+    loading = true;
+    errorMessage = '';
+    try {
+      const response = await fetch(`/api/root/events/${eventId}/noon-game/sessions`);
+      if (!response.ok) throw new Error('昼競技一覧の取得に失敗しました');
+      const data = await response.json();
+      sessions = data.sessions || [];
+      const selected = sessions.find((item) => item.id === preferredSessionId) || sessions[0];
+      if (!selected) {
+        selectedSessionId = null;
+        await fetchSession(eventId);
+        return;
+      }
+      selectedSessionId = selected.id;
+      const detailResponse = await fetch(`/api/root/events/${eventId}/noon-game/sessions/${selected.id}`);
+      if (!detailResponse.ok) throw new Error('昼競技の取得に失敗しました');
+      const detail = await detailResponse.json();
+      session = detail.session;
+      classes = detail.classes || [];
+      groups = detail.groups || [];
+      matches = detail.matches || [];
+      pointsSummary = detail.points_summary || [];
+      templateRuns = detail.template_runs || [];
+      populateSessionForm(session);
+    } catch (err) {
       errorMessage = err.message;
     } finally {
       loading = false;
@@ -688,7 +726,7 @@
   async function refetchCurrentSession() {
     const current = get(activeEvent);
     if (current) {
-      await fetchSession(current.id);
+      await fetchSessions(current.id);
     }
   }
 
@@ -721,14 +759,16 @@
     const templateNames = {
       'year-relay': '学年対抗リレー',
       'course-relay': 'コース対抗リレー',
-      'tug-of-war': '綱引き'
+      'tug-of-war': '綱引き',
+      'typing': '競技タイピング'
     };
 
     // テンプレートキーのマッピング（フロントエンドのキー -> バックエンドのキー）
     const templateKeyMap = {
       'year-relay': 'year_relay',
       'course-relay': 'course_relay',
-      'tug-of-war': 'tug_of_war'
+      'tug-of-war': 'tug_of_war',
+      'typing': 'typing'
     };
 
     selectedTemplateType = templateType;
@@ -743,6 +783,9 @@
       3: 20,
       4: 10
     };
+    if (templateType === 'typing') {
+      pointsByRank = { 1: 40, 2: 30, 3: 25, 4: 0, 5: 0, 6: 0 };
+    }
     let yearRelayPoints = {
       block_a: {1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5},
       block_b: {1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5},
@@ -779,11 +822,13 @@
           }
         }
       } else {
-        // コース対抗リレーと綱引きの場合
+        // コース対抗リレー・綱引き・タイピングの場合
         pointsByRank = { ...existingRun.points_by_rank };
-        for (let rank = 1; rank <= 4; rank++) {
+        const maxRank = templateType === 'typing' ? 6 : 4;
+        const defaults = templateType === 'typing' ? [40, 30, 25, 0, 0, 0] : [40, 30, 20, 10];
+        for (let rank = 1; rank <= maxRank; rank++) {
           if (pointsByRank[rank] === undefined || pointsByRank[rank] === null) {
-            pointsByRank[rank] = [40, 30, 20, 10][rank - 1];
+            pointsByRank[rank] = defaults[rank - 1];
           }
         }
       }
@@ -791,11 +836,23 @@
 
     // デフォルトグループ設定を読み込む
     loadDefaultGroups(templateKeyMap[templateType]).then(defaultGroups => {
+      if (templateType === 'typing' && defaultGroups.length === 0) {
+        defaultGroups = [
+          { group_name: '1年生', class_names: ['1-1', '1-2', '1-3'] },
+          { group_name: '2年生', class_names: ['IS2', 'IT2', 'IE2'] },
+          { group_name: '3年生', class_names: ['IS3', 'IT3', 'IE3'] },
+          { group_name: '4年生', class_names: ['IS4', 'IT4', 'IE4'] },
+          { group_name: '5年生', class_names: ['IS5', 'IT5', 'IE5'] },
+          { group_name: '専攻科・教員', class_names: ['専教'] }
+        ];
+      }
       // 既存のセッションがあれば、その設定を使用
       if (session) {
         templateConfigForm = {
           name: session.name || templateNames[templateType],
           description: session.description || '',
+          scheduled_at: session.scheduled_at ? toLocalDateTime(session.scheduled_at) : '',
+          location: session.location || '',
           mode: session.mode || 'group',
           win_points: session.win_points || 0,
           loss_points: session.loss_points || 0,
@@ -811,6 +868,8 @@
         templateConfigForm = {
           name: templateNames[templateType],
           description: '',
+          scheduled_at: '',
+          location: '',
           mode: 'group',
           win_points: 0,
           loss_points: 0,
@@ -829,6 +888,8 @@
         templateConfigForm = {
           name: session.name || templateNames[templateType],
           description: session.description || '',
+          scheduled_at: session.scheduled_at ? toLocalDateTime(session.scheduled_at) : '',
+          location: session.location || '',
           mode: session.mode || 'group',
           win_points: session.win_points || 0,
           loss_points: session.loss_points || 0,
@@ -843,6 +904,8 @@
         templateConfigForm = {
           name: templateNames[templateType],
           description: '',
+          scheduled_at: '',
+          location: '',
           mode: 'group',
           win_points: 0,
           loss_points: 0,
@@ -916,13 +979,16 @@
       const templateNames = {
         'year-relay': '学年対抗リレー',
         'course-relay': 'コース対抗リレー',
-        'tug-of-war': '綱引き'
+        'tug-of-war': '綱引き',
+        'typing': '競技タイピング'
       };
 
       const payload = {
         session: {
           name: templateConfigForm.name,
           description: templateConfigForm.description || null,
+          scheduled_at: templateConfigForm.scheduled_at ? new Date(templateConfigForm.scheduled_at).toISOString() : null,
+          location: templateConfigForm.location || null,
           mode: templateConfigForm.mode,
           win_points: Number(templateConfigForm.win_points),
           loss_points: Number(templateConfigForm.loss_points),
@@ -958,7 +1024,7 @@
             payload.session.points_by_rank.overall[Number(rank)] = pointsNum;
           }
         }
-      } else if (selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war') {
+      } else if (selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war' || selectedTemplateType === 'typing') {
         // コース対抗リレーと綱引きの場合
         payload.session.points_by_rank = {};
         for (const [rank, points] of Object.entries(templateConfigForm.points_by_rank)) {
@@ -974,7 +1040,9 @@
         payload.session.groups = templateConfigForm.groups;
       }
 
-      const endpoint = (selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war')
+      const endpoint = selectedTemplateType === 'typing'
+        ? `/api/root/events/${current.id}/noon-game/templates/typing/run`
+        : (selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war')
         ? `/api/root/events/${current.id}/noon-game/templates/${selectedTemplateType}/run`
         : `/api/admin/events/${current.id}/noon-game/templates/${selectedTemplateType}/run`;
       const res = await fetch(endpoint, {
@@ -988,13 +1056,14 @@
         throw new Error(detail?.error || `${templateNames[selectedTemplateType]}テンプレートの作成に失敗しました`);
       }
 
-      await res.json();
+      const created = await res.json();
       if (templateRuns.length > 0) {
         alert(`${templateNames[selectedTemplateType]}テンプレートに更新しました。既存のテンプレートと関連データは削除されました。`);
       } else {
         alert(`${templateNames[selectedTemplateType]}テンプレートを作成しました。`);
       }
       closeTemplateConfig();
+      selectedSessionId = created.session?.id ?? selectedSessionId;
       await refetchCurrentSession();
     } catch (err) {
       console.error(err);
@@ -1003,6 +1072,22 @@
     } finally {
       creatingTemplate = { ...creatingTemplate, [selectedTemplateType]: false };
     }
+  }
+
+  async function importTypingResults(replace = false) {
+    if (!session?.id || !typingFile) { alert('JSON ファイルを選択してください。'); return; }
+    importingTypingResults = true;
+    try {
+      const form = new FormData();
+      form.append('file', typingFile);
+      const response = await fetch(`/api/root/noon-game/sessions/${session.id}/typing-system/import${replace ? '?replace=true' : ''}`, { method: 'POST', body: form });
+      const detail = await safeJson(response);
+      if (!response.ok) throw new Error(detail?.error || '結果のインポートに失敗しました');
+      alert(detail?.status === 'already_imported' ? 'この結果はすでにインポート済みです。' : '競技タイピング結果を確定しました。');
+      typingFile = null;
+      await refetchCurrentSession();
+    } catch (err) { alert(err.message); }
+    finally { importingTypingResults = false; }
   }
 </script>
 
@@ -1018,6 +1103,25 @@
   {#if loading}
     <div class="text-gray-600">読み込み中...</div>
   {:else}
+    {#if sessions.length > 0}
+      <section class="bg-white shadow rounded-lg p-4 flex flex-wrap items-center gap-3">
+        <label class="text-sm font-medium text-gray-700" for="noon-game-session">編集中の昼競技</label>
+        <select
+          id="noon-game-session"
+          class="border rounded px-3 py-2"
+          value={selectedSessionId ?? ''}
+          onchange={(event) => {
+            selectedSessionId = Number(event.currentTarget.value);
+            const current = get(activeEvent);
+            if (current) fetchSessions(current.id, selectedSessionId);
+          }}>
+          {#each sessions as item (item.id)}
+            <option value={item.id}>{item.name}（{item.status}）</option>
+          {/each}
+        </select>
+        <span class="text-sm text-gray-500">昼競技は複数作成できます。</span>
+      </section>
+    {/if}
     <section class="bg-white shadow rounded-lg p-6 space-y-6">
       <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">テンプレート選択</h2>
       <p class="text-sm text-gray-600">
@@ -1037,6 +1141,19 @@
             class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
             onclick={() => openTemplateConfig('year-relay')}
             disabled={!isInteractive || creatingTemplate['year-relay']}>
+            {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
+          </button>
+        </div>
+
+        <div class="border rounded-lg p-4 space-y-3">
+          <h3 class="text-lg font-semibold text-gray-800">競技タイピング</h3>
+          <p class="text-sm text-gray-600">
+            6学年チーム・全3ラウンドのスコアを JSON から確定します。順位点は 40 / 30 / 25 点です。
+          </p>
+          <button
+            class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+            onclick={() => openTemplateConfig('typing')}
+            disabled={!isInteractive || creatingTemplate['typing']}>
             {templateRuns.length > 0 ? 'テンプレートを更新' : 'テンプレートを設定'}
           </button>
         </div>
@@ -1087,6 +1204,7 @@
               {#if selectedTemplateType === 'year-relay'}学年対抗リレー
               {:else if selectedTemplateType === 'course-relay'}コース対抗リレー
               {:else if selectedTemplateType === 'tug-of-war'}綱引き
+              {:else if selectedTemplateType === 'typing'}競技タイピング
               {/if} テンプレート設定
             </h2>
             <button class="text-gray-500 hover:text-gray-700" onclick={closeTemplateConfig}>×</button>
@@ -1103,6 +1221,14 @@
                 <label class="flex flex-col text-sm font-medium text-gray-700 md:col-span-2">
                   説明
                   <textarea class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.description} rows="3" placeholder="概要やメモを入力"></textarea>
+                </label>
+                <label class="flex flex-col text-sm font-medium text-gray-700">
+                  日時
+                  <input type="datetime-local" class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.scheduled_at} />
+                </label>
+                <label class="flex flex-col text-sm font-medium text-gray-700">
+                  会場
+                  <input class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.location} placeholder="例: 視聴覚室" />
                 </label>
                 <label class="flex flex-col text-sm font-medium text-gray-700">
                   モード
@@ -1182,11 +1308,11 @@
                     </div>
                   </div>
                 </div>
-              {:else if selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war'}
+              {:else if selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war' || selectedTemplateType === 'typing'}
                 <div class="border rounded-lg p-4 space-y-4 bg-blue-50">
                   <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">点数設定</h3>
                   <p class="text-sm text-gray-600">順位ごとの点数を設定します。</p>
-                  <div class="grid grid-cols-4 gap-4">
+                  <div class="grid grid-cols-3 gap-4">
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       1位の点数
                       <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[1]} oninput={(e) => {
@@ -1205,12 +1331,14 @@
                         templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 3: Number(e.target.value) || 0};
                       }} />
                     </label>
+                    {#if selectedTemplateType !== 'typing'}
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       4位の点数
                       <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[4]} oninput={(e) => {
                         templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 4: Number(e.target.value) || 0};
                       }} />
                     </label>
+                    {/if}
                   </div>
                 </div>
               {/if}
@@ -1225,7 +1353,8 @@
                       const templateKeyMap = {
                         'year-relay': 'year_relay',
                         'course-relay': 'course_relay',
-                        'tug-of-war': 'tug_of_war'
+                        'tug-of-war': 'tug_of_war',
+                        'typing': 'typing'
                       };
                       saveDefaultGroups(templateKeyMap[selectedTemplateType]);
                     }}>
@@ -1312,6 +1441,17 @@
 
     <!-- 現在の昼競技設定 -->
     {#if session}
+    {#if session.template_key === 'typing'}
+      <section class="bg-white shadow rounded-lg p-6 space-y-4">
+        <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">競技タイピング結果のインポート</h2>
+        <p class="text-sm text-gray-600">typing-results-v1 の JSON を読み込み、順位点を大会得点へ反映します。</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <input type="file" accept="application/json,.json" onchange={(event) => { typingFile = event.currentTarget.files?.[0] ?? null; }} />
+          <button class="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50" onclick={() => importTypingResults(false)} disabled={!typingFile || importingTypingResults}>{importingTypingResults ? 'インポート中…' : '結果をインポート'}</button>
+          <button class="px-4 py-2 border border-orange-500 text-orange-700 rounded disabled:opacity-50" onclick={() => importTypingResults(true)} disabled={!typingFile || importingTypingResults}>置換インポート</button>
+        </div>
+      </section>
+    {/if}
     <section class="bg-white shadow rounded-lg p-6 space-y-6">
       <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">現在の昼競技設定</h2>
 

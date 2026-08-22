@@ -289,6 +289,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.DELETE("/:id/noon-game/sessions/:session_id", noonHandler.DeleteSession)
 				rootEvents.POST("/:id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
 				rootEvents.POST("/:id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
+				rootEvents.POST("/:id/noon-game/templates/typing/run", noonHandler.CreateTypingRun)
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				rootEvents.POST("/:id/notify-survey", eventHandler.NotifySurvey)
 				rootEvents.POST("/:id/import-survey-scores", eventHandler.ImportSurveyScores)
