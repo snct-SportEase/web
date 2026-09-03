@@ -62,7 +62,13 @@ jobs:
           cache-dependency-path: frontapp/package-lock.json
       - name: Audit frontend production dependencies
         working-directory: ./frontapp
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          if npm audit --omit=dev --audit-level=high; then
+            exit 0
+          fi
+
+          echo "Takumi Guard npm audit failed; retrying with the official npm registry."
+          npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org/
 
   govulncheck:
     name: Go reachable vulnerability audit

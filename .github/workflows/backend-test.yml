@@ -36,32 +36,10 @@ jobs:
         working-directory: ./backapp
         run: go mod download
 
-      - name: Check known vulnerabilities
+      - name: Run tests with race detector and coverage
         working-directory: ./backapp
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
-          govulncheck ./...
-
-      - name: Run all package tests
-        working-directory: ./backapp
-        run: go test -v ./...
-
-      - name: Run unit tests
-        working-directory: ./backapp
-        run: |
-          go test -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
-
-      - name: Run race detector
-        working-directory: ./backapp
-        run: |
-          go test -race -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
-
-      - name: Generate coverage report
-        working-directory: ./backapp
-        run: |
-          go test -v -covermode=atomic -coverprofile=coverage.out \
-            -coverpkg=backapp/internal/handler,backapp/internal/repository,backapp/internal/websocket \
-            ./tests/handler/... ./tests/repository/... ./internal/websocket/...
+          go test -race -covermode=atomic -coverprofile=coverage.out ./...
           go tool cover -func=coverage.out | tee coverage.txt
 
       - name: Publish coverage summary
