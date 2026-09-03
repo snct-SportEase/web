@@ -15,6 +15,8 @@ jobs:
   backend-test:
     name: Backend Go Tests
     runs-on: ubuntu-latest
+    env:
+      GOFLAGS: -mod=mod
 
     steps:
       - name: Checkout Repository
