@@ -1,0 +1,43 @@
+name: Frontend E2E
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-e2e:
+    name: Frontend Playwright E2E
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble@sha256:f1e7e01021efd65dd1a2c56064be399f3e4de00fd021ac561325f2bfbb2b837a
+      options: --ipc=host
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontapp/package-lock.json'
+
+      - name: Set up Takumi Guard
+        uses: flatt-security/setup-takumi-guard-npm@6d4182745c1e474c35a023573c2612c085be45a4 # v1
+
+      - name: Install dependencies
+        working-directory: ./frontapp
+        run: npm ci
+
+      - name: Run Playwright E2E
+        working-directory: ./frontapp
+        run: npm run test:e2e
+        env:
+          CI: 'true'
