@@ -11,7 +11,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -o /app/server ./cmd/server/main.go
 
 # final stage
 FROM alpine:3.20
