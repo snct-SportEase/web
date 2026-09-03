@@ -20,7 +20,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.26.4'
+          go-version: '1.26.6'
           check-latest: true
           cache-dependency-path: 'backapp/go.sum'
 
@@ -33,22 +33,22 @@ jobs:
 
       - name: Run all package tests
         working-directory: ./backapp
-        run: go test -v ./...
+        run: go test -mod=mod -v ./...
 
       - name: Run unit tests
         working-directory: ./backapp
         run: |
-          go test -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
+          go test -mod=mod -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
 
       - name: Run race detector
         working-directory: ./backapp
         run: |
-          go test -race -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
+          go test -mod=mod -race -v ./tests/handler/... ./tests/repository/... ./internal/websocket/...
 
       - name: Generate coverage report
         working-directory: ./backapp
         run: |
-          go test -v -covermode=atomic -coverprofile=coverage.out \
+          go test -mod=mod -v -covermode=atomic -coverprofile=coverage.out \
             -coverpkg=backapp/internal/handler,backapp/internal/repository,backapp/internal/websocket \
             ./tests/handler/... ./tests/repository/... ./internal/websocket/...
           go tool cover -func=coverage.out | tee coverage.txt
