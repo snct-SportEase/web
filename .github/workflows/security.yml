@@ -63,12 +63,52 @@ jobs:
       - name: Audit frontend production dependencies
         working-directory: ./frontapp
         run: |
-          if npm audit --omit=dev --audit-level=high; then
+          run_audit() {
+            local registry="$1"
+            local output
+            local status
+
+            set +e
+            if [ -n "$registry" ]; then
+              output=$(npm audit --omit=dev --audit-level=high --registry="$registry" 2>&1)
+            else
+              output=$(npm audit --omit=dev --audit-level=high 2>&1)
+            fi
+            status=$?
+            set -e
+
+            printf '%s\n' "$output"
+
+            if [ "$status" -eq 0 ]; then
+              return 0
+            fi
+
+            if printf '%s\n' "$output" | grep -Eqi 'audit endpoint returned an error|5[0-9][0-9] (Bad Gateway|Service Unavailable|Gateway Timeout|Internal Server Error)|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|socket hang up'; then
+              return 2
+            fi
+
+            return 1
+          }
+
+          status=0
+          run_audit "" || status=$?
+          if [ "$status" -eq 0 ]; then
             exit 0
+          elif [ "$status" -eq 1 ]; then
+            exit 1
           fi
 
-          echo "Takumi Guard npm audit failed; retrying with the official npm registry."
-          npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org/
+          echo "::warning::Takumi Guard npm audit service is unavailable; retrying with the official npm registry."
+
+          status=0
+          run_audit "https://registry.npmjs.org/" || status=$?
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          elif [ "$status" -eq 1 ]; then
+            exit 1
+          fi
+
+          echo "::warning::Both npm audit services are unavailable. Continuing because dependency review and Trivy remain blocking security checks."
 
   govulncheck:
     name: Go reachable vulnerability audit
