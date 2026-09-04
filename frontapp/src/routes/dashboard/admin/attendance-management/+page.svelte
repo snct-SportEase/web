@@ -73,8 +73,8 @@
     errorMessage = '';
     successMessage = '';
 
-    if (attendanceCount > classDetails.studentCount) {
-      errorMessage = `出席人数がクラスの総人数（${classDetails.studentCount}人）を超えています。`;
+    if (attendanceCount > classDetails.student_count) {
+      errorMessage = `出席人数がクラスの総人数（${classDetails.student_count}人）を超えています。`;
       isLoading = false;
       return;
     }
@@ -147,8 +147,8 @@
       <div>
         <h2 class="text-2xl font-semibold mb-2">{classDetails.name}</h2>
         <div class="text-gray-600 mb-4">
-          <p>クラスの総人数: {classDetails.studentCount}人</p>
-          <p>現在の出席ポイント: {classDetails.attendancePoints}ポイント</p>
+          <p>クラスの総人数: {classDetails.student_count}人</p>
+          <p>現在の出席ポイント: {classDetails.attendance_points}ポイント</p>
         </div>
 
         <form onsubmit={(e) => { e.preventDefault(); handleSubmit(e); }}>
@@ -158,7 +158,7 @@
               id="attendanceCount"
               bind:value={attendanceCount}
               min="0"
-              max={classDetails.studentCount}
+              max={classDetails.student_count}
               required
               class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
