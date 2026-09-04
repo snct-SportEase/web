@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"backapp/internal/push"
 	"backapp/internal/repository"
+	"backapp/internal/safelog"
 	"encoding/csv"
 	"encoding/json"
 	"log"
@@ -486,7 +487,7 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 }
 
 func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
-	log.Printf("[event-notification] 通知送信開始: notificationID=%d, title=%s, targetRoles=%v\n", notificationID, title, targetRoles)
+	log.Printf("[event-notification] 通知送信開始: notificationID=%d, title=%s, targetRoles=%s\n", notificationID, safelog.Value(title), safelog.Value(targetRoles))
 
 	if h.pushSender == nil || !h.pushSender.Enabled() {
 		log.Println("[event-notification] VAPIDキーが設定されていないためPush通知をスキップします")
@@ -495,10 +496,10 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 
 	userIDs, err := h.notificationRepo.GetUserIDsByRoles(targetRoles)
 	if err != nil {
-		log.Printf("[event-notification] ユーザー抽出に失敗しました: %v\n", err)
+		log.Printf("[event-notification] ユーザー抽出に失敗しました: %s\n", safelog.Value(err))
 		return
 	}
-	log.Printf("[event-notification] 対象ユーザー数: %d, userIDs=%v\n", len(userIDs), userIDs)
+	log.Printf("[event-notification] 対象ユーザー数: %d, userIDs=%s\n", len(userIDs), safelog.Value(userIDs))
 	if len(userIDs) == 0 {
 		log.Println("[event-notification] 対象ユーザーが0人のためPush通知をスキップします")
 		return
@@ -507,10 +508,10 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 	// Apply notification filters
 	filteredUserIDs, err := h.filterUsersByNotificationType(userIDs, notificationType)
 	if err != nil {
-		log.Printf("[event-notification] 通知フィルタ適用に失敗しました: %v\n", err)
+		log.Printf("[event-notification] 通知フィルタ適用に失敗しました: %s\n", safelog.Value(err))
 		return
 	}
-	log.Printf("[event-notification] フィルタ適用後ユーザー数: %d, filteredUserIDs=%v\n", len(filteredUserIDs), filteredUserIDs)
+	log.Printf("[event-notification] フィルタ適用後ユーザー数: %d, filteredUserIDs=%s\n", len(filteredUserIDs), safelog.Value(filteredUserIDs))
 	if len(filteredUserIDs) == 0 {
 		log.Println("[event-notification] フィルタ適用後対象ユーザーが0人のためPush通知をスキップします")
 		return
@@ -518,7 +519,7 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 
 	subs, err := h.notificationRepo.GetPushSubscriptionsByUserIDs(filteredUserIDs)
 	if err != nil {
-		log.Printf("[event-notification] 購読情報の取得に失敗しました: %v\n", err)
+		log.Printf("[event-notification] 購読情報の取得に失敗しました: %s\n", safelog.Value(err))
 		return
 	}
 
@@ -670,7 +671,7 @@ func (h *EventHandler) filterUsersByNotificationType(userIDs []string, notificat
 	for _, userID := range userIDs {
 		user, err := h.userRepo.GetUserWithRoles(userID)
 		if err != nil {
-			log.Printf("[event-notification] ユーザー情報取得失敗: userID=%s, error=%v\n", userID, err)
+			log.Printf("[event-notification] ユーザー情報取得失敗: userID=%s, error=%s\n", safelog.Value(userID), safelog.Value(err))
 			continue
 		}
 		if user == nil {

@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"backapp/internal/push"
 	"backapp/internal/repository"
+	"backapp/internal/safelog"
 	"context"
 	"errors"
 	"log"
@@ -318,7 +319,7 @@ func (h *NotificationHandler) SaveSubscription(c *gin.Context) {
 	}
 
 	endpointID := push.EndpointLogID(req.Endpoint)
-	log.Printf("[notification] 購読情報の保存を試行: userID=%s, endpointID=%s\n", user.ID, endpointID)
+	log.Printf("[notification] 購読情報の保存を試行: userID=%s, endpointID=%s\n", safelog.Value(user.ID), safelog.Value(endpointID))
 
 	if err := h.NotificationRepo.UpsertPushSubscription(user.ID, req.Endpoint, req.Keys.Auth, req.Keys.P256dh, push.MaxSubscriptionsPerUser); err != nil {
 		if errors.Is(err, repository.ErrPushSubscriptionLimit) {
@@ -329,12 +330,12 @@ func (h *NotificationHandler) SaveSubscription(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "このPush購読は別のユーザーに登録されています"})
 			return
 		}
-		log.Printf("[notification] 購読情報の保存に失敗しました: userID=%s, endpointID=%s, errorType=%T\n", user.ID, endpointID, err)
+		log.Printf("[notification] 購読情報の保存に失敗しました: userID=%s, endpointID=%s, errorType=%T\n", safelog.Value(user.ID), safelog.Value(endpointID), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読情報の保存に失敗しました"})
 		return
 	}
 
-	log.Printf("[notification] 購読情報の保存に成功しました: userID=%s, endpointID=%s\n", user.ID, endpointID)
+	log.Printf("[notification] 購読情報の保存に成功しました: userID=%s, endpointID=%s\n", safelog.Value(user.ID), safelog.Value(endpointID))
 	c.JSON(http.StatusCreated, gin.H{"message": "購読情報を保存しました"})
 }
 
@@ -407,7 +408,7 @@ func (h *NotificationHandler) GetSubscription(c *gin.Context) {
 }
 
 func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
-	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%v\n", notificationID, title, notificationType, targetRoles)
+	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%s\n", notificationID, safelog.Value(title), safelog.Value(notificationType), safelog.Value(targetRoles))
 
 	if h.PushSender == nil || !h.PushSender.Enabled() {
 		log.Println("[notification] VAPIDキーが設定されていないためPush通知をスキップします")
@@ -416,10 +417,10 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 
 	userIDs, err := h.NotificationRepo.GetUserIDsByRoles(targetRoles)
 	if err != nil {
-		log.Printf("[notification] ユーザー抽出に失敗しました: %v\n", err)
+		log.Printf("[notification] ユーザー抽出に失敗しました: %s\n", safelog.Value(err))
 		return
 	}
-	log.Printf("[notification] 対象ユーザー数: %d, userIDs=%v\n", len(userIDs), userIDs)
+	log.Printf("[notification] 対象ユーザー数: %d, userIDs=%s\n", len(userIDs), safelog.Value(userIDs))
 	if len(userIDs) == 0 {
 		log.Println("[notification] 対象ユーザーが0人のためPush通知をスキップします")
 		return
@@ -428,10 +429,10 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 	// Apply notification filters
 	filteredUserIDs, err := h.filterUsersByNotificationType(userIDs, notificationType)
 	if err != nil {
-		log.Printf("[notification] 通知フィルタ適用に失敗しました: %v\n", err)
+		log.Printf("[notification] 通知フィルタ適用に失敗しました: %s\n", safelog.Value(err))
 		return
 	}
-	log.Printf("[notification] フィルタ適用後ユーザー数: %d, filteredUserIDs=%v\n", len(filteredUserIDs), filteredUserIDs)
+	log.Printf("[notification] フィルタ適用後ユーザー数: %d, filteredUserIDs=%s\n", len(filteredUserIDs), safelog.Value(filteredUserIDs))
 	if len(filteredUserIDs) == 0 {
 		log.Println("[notification] フィルタ適用後対象ユーザーが0人のためPush通知をスキップします")
 		return
@@ -439,7 +440,7 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 
 	subs, err := h.NotificationRepo.GetPushSubscriptionsByUserIDs(filteredUserIDs)
 	if err != nil {
-		log.Printf("[notification] 購読情報の取得に失敗しました: %v\n", err)
+		log.Printf("[notification] 購読情報の取得に失敗しました: %s\n", safelog.Value(err))
 		return
 	}
 
@@ -527,7 +528,7 @@ func (h *NotificationHandler) filterUsersByNotificationType(userIDs []string, no
 		g.Go(func() error {
 			user, err := h.UserRepo.GetUserWithRoles(id)
 			if err != nil {
-				log.Printf("[notification] ユーザー情報取得失敗: userID=%s, error=%v\n", id, err)
+				log.Printf("[notification] ユーザー情報取得失敗: userID=%s, error=%s\n", safelog.Value(id), safelog.Value(err))
 				return nil // continue filtering others
 			}
 			if user == nil {
