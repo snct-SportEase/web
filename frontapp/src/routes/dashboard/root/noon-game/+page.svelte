@@ -35,6 +35,8 @@
     draw_points: 0,
     participation_points: 0,
     allow_manual_points: false,
+		duration_minutes: 15,
+		participant_class_ids: [],
     points_by_rank: {
       1: 40,
       2: 30,
@@ -87,14 +89,14 @@
   let isInteractive = $state(false);
 
   const modeLabels = { mixed: 'クラス＆グループ混在', class: 'クラス対抗のみ', group: 'グループ対抗のみ' };
-  const templateKeyLabels = { year_relay: '学年対抗リレー', course_relay: 'コース対抗リレー', tug_of_war: '綱引き', typing: '競技タイピング' };
+  const templateKeyLabels = { year_relay: '学年対抗リレー', course_relay: 'コース対抗リレー', tug_of_war: '綱引き', typing: '競技タイピング', borrowing_race: '借り物競争' };
 
   function hasSessionForTemplate(templateKey) {
     return sessions.some((item) => item.template_key === templateKey);
   }
 
   function templateKeyFor(templateType) {
-    return { 'year-relay': 'year_relay', 'course-relay': 'course_relay', 'tug-of-war': 'tug_of_war', typing: 'typing' }[templateType];
+    return { 'year-relay': 'year_relay', 'course-relay': 'course_relay', 'tug-of-war': 'tug_of_war', typing: 'typing', 'borrowing-race': 'borrowing_race' }[templateType];
   }
 
   let escapeHandler = null;
@@ -773,7 +775,8 @@
       'year-relay': '学年対抗リレー',
       'course-relay': 'コース対抗リレー',
       'tug-of-war': '綱引き',
-      'typing': '競技タイピング'
+      'typing': '競技タイピング',
+			'borrowing-race': '借り物競争'
     };
 
     // テンプレートキーのマッピング（フロントエンドのキー -> バックエンドのキー）
@@ -781,7 +784,8 @@
       'year-relay': 'year_relay',
       'course-relay': 'course_relay',
       'tug-of-war': 'tug_of_war',
-      'typing': 'typing'
+      'typing': 'typing',
+			'borrowing-race': 'borrowing_race'
     };
 
     selectedTemplateType = templateType;
@@ -799,6 +803,8 @@
     };
     if (templateType === 'typing') {
       pointsByRank = { 1: 40, 2: 30, 3: 25, 4: 0, 5: 0, 6: 0 };
+		} else if (templateType === 'borrowing-race') {
+			pointsByRank = { 1: 100, 2: 90, 3: 80, 4: 70, 5: 60, 6: 50, 7: 40, 8: 30, 9: 20, 10: 10 };
     }
     let yearRelayPoints = {
       block_a: {1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5},
@@ -835,7 +841,9 @@
             }
           }
         }
-      } else {
+      } else if (templateType === 'borrowing-race') {
+				pointsByRank = { ...pointsByRank, ...(existingRun.points_by_rank.rank_points || {}) };
+			} else {
         // コース対抗リレー・綱引き・タイピングの場合
         pointsByRank = { ...existingRun.points_by_rank };
         const maxRank = templateType === 'typing' ? 6 : 4;
@@ -874,6 +882,10 @@
           draw_points: session.draw_points || 0,
           participation_points: session.participation_points || 0,
           allow_manual_points: session.allow_manual_points || false,
+				duration_minutes: existingRun?.points_by_rank?.duration_minutes || 15,
+				participant_class_ids: templateType === 'borrowing-race'
+					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter(Boolean)
+					: [],
           points_by_rank: pointsByRank,
           year_relay_points: yearRelayPoints,
           groups: defaultGroups || []
@@ -892,6 +904,8 @@
           draw_points: 0,
           participation_points: 0,
           allow_manual_points: false,
+				duration_minutes: 15,
+				participant_class_ids: templateType === 'borrowing-race' ? classes.map((item) => item.id) : [],
           points_by_rank: pointsByRank,
           year_relay_points: yearRelayPoints,
           groups: defaultGroups || []
@@ -913,6 +927,10 @@
           draw_points: session.draw_points || 0,
           participation_points: session.participation_points || 0,
           allow_manual_points: session.allow_manual_points || false,
+				duration_minutes: existingRun?.points_by_rank?.duration_minutes || 15,
+				participant_class_ids: templateType === 'borrowing-race'
+					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter(Boolean)
+					: [],
           points_by_rank: pointsByRank,
           year_relay_points: yearRelayPoints,
           groups: []
@@ -930,6 +948,8 @@
           draw_points: 0,
           participation_points: 0,
           allow_manual_points: false,
+				duration_minutes: 15,
+				participant_class_ids: templateType === 'borrowing-race' ? classes.map((item) => item.id) : [],
           points_by_rank: pointsByRank,
           year_relay_points: yearRelayPoints,
           groups: []
@@ -999,7 +1019,8 @@
         'year-relay': '学年対抗リレー',
         'course-relay': 'コース対抗リレー',
         'tug-of-war': '綱引き',
-        'typing': '競技タイピング'
+        'typing': '競技タイピング',
+				'borrowing-race': '借り物競争'
       };
 
       const payload = {
@@ -1044,6 +1065,13 @@
             payload.session.points_by_rank.overall[Number(rank)] = pointsNum;
           }
         }
+		} else if (templateType === 'borrowing-race') {
+			payload.session.duration_minutes = Number(templateConfigForm.duration_minutes);
+			payload.session.participant_class_ids = templateConfigForm.participant_class_ids.map(Number);
+			payload.session.points_by_rank = {};
+			for (const [rank, points] of Object.entries(templateConfigForm.points_by_rank)) {
+				payload.session.points_by_rank[rank] = Number(points) || 0;
+			}
       } else if (templateType === 'course-relay' || templateType === 'tug-of-war' || templateType === 'typing') {
         // コース対抗リレーと綱引きの場合
         payload.session.points_by_rank = {};
@@ -1075,7 +1103,7 @@
 
       const endpoint = templateType === 'typing'
         ? `/api/root/events/${current.id}/noon-game/templates/typing/run`
-        : (templateType === 'course-relay' || templateType === 'tug-of-war')
+        : (templateType === 'course-relay' || templateType === 'tug-of-war' || templateType === 'borrowing-race')
         ? `/api/root/events/${current.id}/noon-game/templates/${templateType}/run`
         : `/api/admin/events/${current.id}/noon-game/templates/${templateType}/run`;
       const res = await fetch(endpoint, {
@@ -1217,6 +1245,19 @@
             {hasSessionForTemplate('tug_of_war') ? 'この競技を編集' : '昼競技を作成'}
           </button>
         </div>
+
+		<div class="border rounded-lg p-4 space-y-3">
+			<h3 class="text-lg font-semibold text-gray-800">借り物競争</h3>
+			<p class="text-sm text-gray-600">
+				各クラスの競技内獲得点から同順位を含む順位を自動計算し、順位点を大会得点へ反映します。
+			</p>
+			<button
+				class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+				onclick={() => openTemplateConfig('borrowing-race')}
+				disabled={!isInteractive || creatingTemplate['borrowing-race']}>
+				{hasSessionForTemplate('borrowing_race') ? 'この競技を編集' : '昼競技を作成'}
+			</button>
+		</div>
       </div>
     </section>
 
@@ -1237,6 +1278,7 @@
               {:else if selectedTemplateType === 'course-relay'}コース対抗リレー
               {:else if selectedTemplateType === 'tug-of-war'}綱引き
               {:else if selectedTemplateType === 'typing'}競技タイピング
+						{:else if selectedTemplateType === 'borrowing-race'}借り物競争
               {/if} テンプレート設定
             </h2>
             <button class="text-gray-500 hover:text-gray-700" onclick={closeTemplateConfig}>×</button>
@@ -1262,6 +1304,12 @@
                   会場
                   <input class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.location} placeholder="例: 視聴覚室" />
                 </label>
+				{#if selectedTemplateType === 'borrowing-race'}
+					<label class="flex flex-col text-sm font-medium text-gray-700">
+						競技時間（分）
+						<input type="number" min="1" class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.duration_minutes} />
+					</label>
+				{/if}
                 <label class="flex flex-col text-sm font-medium text-gray-700">
                   公開状態
                   <select class="mt-1 border rounded px-3 py-2" bind:value={templateConfigForm.status}>
@@ -1347,6 +1395,39 @@
                     </div>
                   </div>
                 </div>
+				{:else if selectedTemplateType === 'borrowing-race'}
+					<div class="border rounded-lg p-4 space-y-4 bg-blue-50">
+						<h3 class="text-lg font-semibold text-gray-800 border-b pb-2">順位点設定</h3>
+						<p class="text-sm text-gray-600">同点は同順位となり、同じ順位点を付与します。未設定の順位は0点です。</p>
+						<div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+							{#each Array.from({ length: Math.max(10, templateConfigForm.participant_class_ids.length) }, (_, index) => index + 1) as rank (rank)}
+								<label class="flex flex-col text-xs font-medium text-gray-700">
+									{rank}位
+									<input type="number" min="0" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.points_by_rank[rank] ?? 0} oninput={(event) => {
+										templateConfigForm.points_by_rank = { ...templateConfigForm.points_by_rank, [rank]: Number(event.target.value) || 0 };
+									}} />
+								</label>
+							{/each}
+						</div>
+					</div>
+					<div class="border rounded-lg p-4 space-y-3 bg-green-50">
+						<div class="flex items-center justify-between">
+							<h3 class="text-lg font-semibold text-gray-800">参加クラス</h3>
+							<button type="button" class="text-sm text-indigo-700" onclick={() => { templateConfigForm.participant_class_ids = classes.map((item) => item.id); }}>全クラスを選択</button>
+						</div>
+						<div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+							{#each classes as classItem (classItem.id)}
+								<label class="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
+									<input type="checkbox" value={classItem.id} checked={templateConfigForm.participant_class_ids.includes(classItem.id)} onchange={(event) => {
+										templateConfigForm.participant_class_ids = event.target.checked
+											? [...templateConfigForm.participant_class_ids, classItem.id]
+											: templateConfigForm.participant_class_ids.filter((id) => id !== classItem.id);
+									}} />
+									{classItem.name}
+								</label>
+							{/each}
+						</div>
+					</div>
               {:else if selectedTemplateType === 'course-relay' || selectedTemplateType === 'tug-of-war' || selectedTemplateType === 'typing'}
                 <div class="border rounded-lg p-4 space-y-4 bg-blue-50">
                   <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">点数設定</h3>
@@ -1382,6 +1463,7 @@
                 </div>
               {/if}
 
+			{#if selectedTemplateType !== 'borrowing-race'}
               <!-- グループ設定 -->
               <div class="border rounded-lg p-4 space-y-4 bg-green-50">
                 <div class="flex justify-between items-center">
@@ -1458,6 +1540,7 @@
                   </button>
                 </div>
               </div>
+			{/if}
             </div>
 
             <div class="flex justify-end space-x-3">
