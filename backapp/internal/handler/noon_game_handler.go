@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"backapp/internal/safelog"
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
@@ -3418,7 +3419,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 	if matchKey == yearRelayMatchA || matchKey == yearRelayMatchB {
 		if err := h.calculateAndRecordYearRelayOverallBonus(runID, user); err != nil {
 			// エラーが発生しても、ブロック結果の登録は成功しているので、エラーログを出力するだけ
-			log.Printf("WARNING: failed to calculate overall bonus: run_id=%d, error=%v", runID, err)
+			log.Printf("WARNING: failed to calculate overall bonus: run_id=%d, error=%s", runID, safelog.Value(err))
 		}
 	}
 	h.normalizeMatchesToJST([]*models.NoonGameMatchWithResult{full})
@@ -3605,7 +3606,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 						if _, ok := groupToEntryID[gid]; !ok {
 							groupToEntryID[gid] = detail.EntryID
 						}
-						log.Printf("INFO: bonus calc A-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, resolvedName, gid)
+						log.Printf("INFO: bonus calc A-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, safelog.Value(resolvedName), gid)
 						found = true
 					}
 				}
@@ -3672,7 +3673,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 						if _, ok := groupToEntryID[gid]; !ok {
 							groupToEntryID[gid] = detail.EntryID
 						}
-						log.Printf("INFO: bonus calc B-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, resolvedName, gid)
+						log.Printf("INFO: bonus calc B-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, safelog.Value(resolvedName), gid)
 						found = true
 					}
 				}

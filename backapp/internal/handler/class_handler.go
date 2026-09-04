@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"backapp/internal/safelog"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -82,7 +83,7 @@ func (h *ClassHandler) UpdateStudentCountsHandler(c *gin.Context) {
 	}
 
 	if err := h.classRepo.UpdateStudentCounts(activeEventID, counts); err != nil {
-		log.Printf("UpdateStudentCounts error: %v", err)
+		log.Printf("UpdateStudentCounts error: %s", safelog.Value(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student counts"})
 		return
 	}
