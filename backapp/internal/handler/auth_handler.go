@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -208,7 +209,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	setCSRFTokenCookie(c.Writer, c.Request, csrfToken, sessionExpiration)
 
 	// Add a debug log to verify cookie flags
-	log.Printf("[auth] Session created for user %s, secure=true, origin=%s", safelog.Value(user.Email), safelog.Value(c.Request.RemoteAddr))
+	log.Printf("[auth] Session created for user %s, secure=%v, origin=%s", safelog.Value(user.Email), shouldUseSecureCookie(c.Request), safelog.Value(c.Request.RemoteAddr))
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }
@@ -610,7 +611,7 @@ func generateSecureRandomToken(size int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(value), nil
 }
 
-func setOAuthRandomCookie(w http.ResponseWriter, _ *http.Request, name string) (string, error) {
+func setOAuthRandomCookie(w http.ResponseWriter, r *http.Request, name string) (string, error) {
 	value, err := generateSecureRandomToken(32)
 	if err != nil {
 		return "", err
@@ -622,7 +623,7 @@ func setOAuthRandomCookie(w http.ResponseWriter, _ *http.Request, name string) (
 		Expires:  time.Now().Add(20 * time.Minute),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, &cookie)
@@ -630,31 +631,31 @@ func setOAuthRandomCookie(w http.ResponseWriter, _ *http.Request, name string) (
 	return value, nil
 }
 
-func setSessionTokenCookie(w http.ResponseWriter, _ *http.Request, value string, expiration time.Time) {
+func setSessionTokenCookie(w http.ResponseWriter, r *http.Request, value string, expiration time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    value,
 		Expires:  expiration,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
-func setCSRFTokenCookie(w http.ResponseWriter, _ *http.Request, value string, expiration time.Time) {
+func setCSRFTokenCookie(w http.ResponseWriter, r *http.Request, value string, expiration time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfTokenCookieName,
 		Value:    value,
 		Expires:  expiration,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteStrictMode,
 	})
 }
 
-func clearOAuthCookie(w http.ResponseWriter, _ *http.Request, name string) {
+func clearOAuthCookie(w http.ResponseWriter, r *http.Request, name string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,
 		Value:    "",
@@ -662,7 +663,7 @@ func clearOAuthCookie(w http.ResponseWriter, _ *http.Request, name string) {
 		MaxAge:   -1,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -670,6 +671,25 @@ func clearOAuthCookie(w http.ResponseWriter, _ *http.Request, name string) {
 func clearOAuthCookies(w http.ResponseWriter, r *http.Request) {
 	clearOAuthCookie(w, r, oauthStateCookieName)
 	clearOAuthCookie(w, r, oauthNonceCookieName)
+}
+
+func shouldUseSecureCookie(r *http.Request) bool {
+	host := r.Host
+	if forwardedHost := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0]); forwardedHost != "" {
+		host = forwardedHost
+	}
+
+	host = strings.ToLower(strings.TrimSpace(host))
+	if hostname, _, err := net.SplitHostPort(host); err == nil {
+		host = hostname
+	}
+	host = strings.Trim(host, "[]")
+
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return false
+	}
+
+	return middleware.IsRequestSecure(r)
 }
 
 func isLINEInAppBrowser(userAgent string) bool {
