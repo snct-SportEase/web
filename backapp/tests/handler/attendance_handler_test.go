@@ -205,6 +205,29 @@ func TestRegisterAttendanceHandler(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 
+	t.Run("Negative Attendance Is Rejected", func(t *testing.T) {
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+
+		h := handler.NewAttendanceHandler(mockClassRepo, mockEventRepo)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		jsonBody, _ := json.Marshal(handler.RegisterAttendanceRequest{
+			ClassID:         1,
+			AttendanceCount: -1,
+		})
+		c.Request, _ = http.NewRequest(http.MethodPost, "/register", bytes.NewBuffer(jsonBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.RegisterAttendanceHandler(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Attendance count cannot be negative")
+		mockClassRepo.AssertNotCalled(t, "UpdateAttendance")
+		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
+	})
+
 	t.Run("Admin can register attendance for any class", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockEventRepo := new(MockEventRepository)
