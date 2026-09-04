@@ -3,6 +3,7 @@ package middleware
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"backapp/internal/safelog"
 	"context"
 	"fmt"
 	"log"
@@ -134,7 +135,7 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cookie, err := c.Cookie("session_token")
 		if err != nil {
-			log.Printf("[auth] No session_token cookie found for path: %s", c.Request.URL.Path)
+			log.Printf("[auth] No session_token cookie found for path: %s", safelog.Value(c.Request.URL.Path))
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: No session cookie"})
 			c.Abort()
 			return
@@ -144,7 +145,7 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 		if !exists {
 			// Session cookies are bearer credentials. Never include the value in
 			// logs, even when the lookup fails.
-			log.Printf("[auth] Session token rejected for path: %s", c.Request.URL.Path)
+			log.Printf("[auth] Session token rejected for path: %s", safelog.Value(c.Request.URL.Path))
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Session expired or invalid"})
 			c.Abort()
 			return

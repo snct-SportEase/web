@@ -5,6 +5,7 @@ import (
 	"backapp/internal/middleware"
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"backapp/internal/safelog"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -105,9 +106,9 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		log.Printf(
 			"[auth] invalid oauth state: cookie_present=%v request_host=%s forwarded_host=%s forwarded_proto=%s query_state_len=%d cookie_state_len=%d",
 			cookieErr == nil,
-			c.Request.Host,
-			c.Request.Header.Get("X-Forwarded-Host"),
-			c.Request.Header.Get("X-Forwarded-Proto"),
+			safelog.Value(c.Request.Host),
+			safelog.Value(c.Request.Header.Get("X-Forwarded-Host")),
+			safelog.Value(c.Request.Header.Get("X-Forwarded-Proto")),
 			len(c.Query("state")),
 			len(oauthState),
 		)
@@ -207,7 +208,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	setCSRFTokenCookie(c.Writer, c.Request, csrfToken, sessionExpiration)
 
 	// Add a debug log to verify cookie flags
-	log.Printf("[auth] Session created for user %s, secure=true, origin=%s", user.Email, c.Request.RemoteAddr)
+	log.Printf("[auth] Session created for user %s, secure=true, origin=%s", safelog.Value(user.Email), safelog.Value(c.Request.RemoteAddr))
 
 	c.Redirect(http.StatusTemporaryRedirect, strings.TrimSuffix(h.cfg.FrontendURL, "/")+"/dashboard")
 }
