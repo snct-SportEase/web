@@ -3419,7 +3419,7 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 	if matchKey == yearRelayMatchA || matchKey == yearRelayMatchB {
 		if err := h.calculateAndRecordYearRelayOverallBonus(runID, user); err != nil {
 			// エラーが発生しても、ブロック結果の登録は成功しているので、エラーログを出力するだけ
-			log.Printf("WARNING: failed to calculate overall bonus: run_id=%d, error=%s", runID, safelog.Value(err))
+			log.Printf("WARNING: failed to calculate overall bonus: run_id=%s, error=%s", safelog.Value(runID), safelog.Value(err))
 		}
 	}
 	h.normalizeMatchesToJST([]*models.NoonGameMatchWithResult{full})
@@ -3587,7 +3587,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 							// BONUSエントリーが不一致の場合もあるので、fallbackとしてセット
 							groupToEntryID[groupID] = detail.EntryID
 						}
-						log.Printf("INFO: bonus calc A-block fallback entry lookup by id detail_entry_id=%d group_id=%d", detail.EntryID, groupID)
+						log.Printf("INFO: bonus calc A-block fallback entry lookup by id detail_entry_id=%s group_id=%s", safelog.Value(detail.EntryID), safelog.Value(groupID))
 						found = true
 					}
 				}
@@ -3606,7 +3606,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 						if _, ok := groupToEntryID[gid]; !ok {
 							groupToEntryID[gid] = detail.EntryID
 						}
-						log.Printf("INFO: bonus calc A-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, safelog.Value(resolvedName), gid)
+						log.Printf("INFO: bonus calc A-block fallback by name detail_entry_id=%s name=%q group_id=%s", safelog.Value(detail.EntryID), safelog.Value(resolvedName), safelog.Value(gid))
 						found = true
 					}
 				}
@@ -3655,7 +3655,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 						if _, ok := groupToEntryID[groupID]; !ok {
 							groupToEntryID[groupID] = detail.EntryID
 						}
-						log.Printf("INFO: bonus calc B-block fallback entry lookup by id detail_entry_id=%d group_id=%d", detail.EntryID, groupID)
+						log.Printf("INFO: bonus calc B-block fallback entry lookup by id detail_entry_id=%s group_id=%s", safelog.Value(detail.EntryID), safelog.Value(groupID))
 						found = true
 					}
 				}
@@ -3673,7 +3673,7 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 						if _, ok := groupToEntryID[gid]; !ok {
 							groupToEntryID[gid] = detail.EntryID
 						}
-						log.Printf("INFO: bonus calc B-block fallback by name detail_entry_id=%d name=%q group_id=%d", detail.EntryID, safelog.Value(resolvedName), gid)
+						log.Printf("INFO: bonus calc B-block fallback by name detail_entry_id=%s name=%q group_id=%s", safelog.Value(detail.EntryID), safelog.Value(resolvedName), safelog.Value(gid))
 						found = true
 					}
 				}

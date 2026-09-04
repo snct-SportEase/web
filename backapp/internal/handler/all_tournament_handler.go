@@ -227,7 +227,7 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 		for i := range t.ShuffledTeams {
 			shuffledTeamsPtr[i] = &t.ShuffledTeams[i]
 		}
-		log.Printf("[BulkCreateTournaments] Saving tournament for sport: %s (EventID: %d, SportID: %d)", safelog.Value(t.SportName), t.EventID, t.SportID)
+		log.Printf("[BulkCreateTournaments] Saving tournament for sport: %s (EventID: %s, SportID: %s)", safelog.Value(t.SportName), safelog.Value(t.EventID), safelog.Value(t.SportID))
 		err := h.tournRepo.SaveTournament(t.EventID, t.SportID, t.SportName, &t.TournamentData, shuffledTeamsPtr)
 		if err != nil {
 			log.Printf("[BulkCreateTournaments] ERROR: Failed to save tournament for sport %s: %s", safelog.Value(t.SportName), safelog.Value(err))
