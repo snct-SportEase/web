@@ -251,11 +251,13 @@ func (r *eventRepository) CopyClassScores(fromEventID int, toEventID int) error 
 
 	insertQuery := `
 		INSERT INTO score_logs (event_id, class_id, points, reason)
-		SELECT ?, class_id, total_points_current_event, 'initial_points'
-		FROM class_scores
-		WHERE event_id = ? AND total_points_current_event > 0
+		SELECT ?, target_class.id, scores.total_points_current_event, 'initial_points'
+		FROM class_scores scores
+		JOIN classes source_class ON source_class.id = scores.class_id
+		JOIN classes target_class ON target_class.event_id = ? AND target_class.name = source_class.name
+		WHERE scores.event_id = ? AND scores.total_points_current_event > 0
 	`
-	_, err = r.db.Exec(insertQuery, toEventID, fromEventID)
+	_, err = r.db.Exec(insertQuery, toEventID, toEventID, fromEventID)
 	return err
 }
 

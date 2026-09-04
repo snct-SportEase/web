@@ -116,6 +116,11 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		return
 	}
 	event.ID = int(id)
+	if err := h.classRepo.CreateClasses(event.ID, models.DefaultClassNames()); err != nil {
+		log.Printf("failed to create default classes for event %d: %s", event.ID, safelog.Value(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
 
 	if event.Season == "autumn" {
 		springEvent, err := h.eventRepo.GetEventByYearAndSeason(event.Year, "spring")

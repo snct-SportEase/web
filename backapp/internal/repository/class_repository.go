@@ -65,7 +65,7 @@ func (r *classRepository) GetAllClasses(eventID int) ([]*models.Class, error) {
 	}
 	defer rows.Close()
 
-	var classes []*models.Class
+	classes := make([]*models.Class, 0)
 	for rows.Next() {
 		class := &models.Class{}
 		if err := rows.Scan(&class.ID, &class.EventID, &class.Name, &class.StudentCount, &class.AttendCount); err != nil {

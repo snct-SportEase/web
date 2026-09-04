@@ -483,9 +483,11 @@ func TestEventRepository_CopyClassScores(t *testing.T) {
 	const deleteQ = "DELETE FROM score_logs WHERE event_id = ? AND reason = 'initial_points'"
 	const insertQ = `
 			INSERT INTO score_logs (event_id, class_id, points, reason)
-			SELECT ?, class_id, total_points_current_event, 'initial_points'
-			FROM class_scores
-			WHERE event_id = ? AND total_points_current_event > 0
+			SELECT ?, target_class.id, scores.total_points_current_event, 'initial_points'
+			FROM class_scores scores
+			JOIN classes source_class ON source_class.id = scores.class_id
+			JOIN classes target_class ON target_class.event_id = ? AND target_class.name = source_class.name
+			WHERE scores.event_id = ? AND scores.total_points_current_event > 0
 		`
 
 	t.Run("success", func(t *testing.T) {
@@ -493,7 +495,7 @@ func TestEventRepository_CopyClassScores(t *testing.T) {
 		defer close()
 
 		mock.ExpectExec(regexp.QuoteMeta(deleteQ)).WithArgs(2).WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec(regexp.QuoteMeta(insertQ)).WithArgs(2, 1).WillReturnResult(sqlmock.NewResult(0, 5))
+		mock.ExpectExec(regexp.QuoteMeta(insertQ)).WithArgs(2, 2, 1).WillReturnResult(sqlmock.NewResult(0, 5))
 
 		err := repo.CopyClassScores(1, 2)
 		assert.NoError(t, err)
@@ -516,7 +518,7 @@ func TestEventRepository_CopyClassScores(t *testing.T) {
 		defer close()
 
 		mock.ExpectExec(regexp.QuoteMeta(deleteQ)).WithArgs(2).WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec(regexp.QuoteMeta(insertQ)).WithArgs(2, 1).WillReturnError(errors.New("db error"))
+		mock.ExpectExec(regexp.QuoteMeta(insertQ)).WithArgs(2, 2, 1).WillReturnError(errors.New("db error"))
 
 		err := repo.CopyClassScores(1, 2)
 		assert.Error(t, err)
