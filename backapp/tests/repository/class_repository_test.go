@@ -114,7 +114,8 @@ func TestClassRepository_GetAllClasses(t *testing.T) {
 
 		classes, err := repo.GetAllClasses(999)
 		assert.NoError(t, err)
-		assert.Nil(t, classes)
+		assert.NotNil(t, classes)
+		assert.Empty(t, classes)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
