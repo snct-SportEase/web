@@ -76,6 +76,7 @@
             resolved_name: d.resolved_name,
             display_name: d.display_name,
             rank: d.rank,
+			competition_score: d.competition_score,
             points: d.points
           }))
         })));
@@ -98,6 +99,9 @@
 
   function detectTemplateFromMatch(match) {
     const title = match.title || '';
+		if (session?.template_key === 'borrowing_race') {
+			return { type: 'borrowing-race' };
+		}
     if (title.includes('学年対抗リレー')) {
       if (title.includes('Aブロック')) {
         return { type: 'year-relay', block: 'A' };
@@ -265,11 +269,16 @@
             {#if template}
               <div class="border rounded-lg p-4 bg-blue-50 space-y-3">
                 <h3 class="text-lg font-semibold text-gray-800">{match.title}</h3>
+				{#if template.type === 'borrowing-race'}
+					<p class={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${match.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+						{match.status === 'completed' ? '確定結果' : '暫定・未確定'}
+					</p>
+				{/if}
                 {#if match.result}
                   <div class="bg-white rounded p-4 space-y-2">
                     {#if match.result.details && match.result.details.length > 0}
                       <div class="space-y-2">
-                        <p class="text-sm font-semibold text-gray-700">順位・得点</p>
+						<p class="text-sm font-semibold text-gray-700">{template.type === 'borrowing-race' ? '順位・競技内獲得点・大会総合点' : '順位・得点'}</p>
                         <div class="space-y-2">
                           {#each orderByRank(match.result.details) as detail (detail.class_id || detail.id)}
                             <div class="border rounded px-3 py-2 bg-gray-50">
@@ -280,9 +289,12 @@
                                 <span class="text-sm text-gray-700">
                                   {getEntryName(detail, match.entries)}
                                 </span>
+								{#if template.type === 'borrowing-race'}
+									<span class="text-sm font-medium text-gray-700">競技内 {detail.competition_score ?? 0}点</span>
+								{/if}
                                 {#if detail.points !== null && detail.points !== undefined}
                                   <span class="text-sm font-semibold text-indigo-600">
-                                    {detail.points}点
+									{template.type === 'borrowing-race' ? `大会総合 ${detail.points}点` : `${detail.points}点`}
                                   </span>
                                 {/if}
                               </div>
