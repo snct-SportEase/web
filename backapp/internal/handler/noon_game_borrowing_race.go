@@ -88,6 +88,15 @@ func (h *NoonGameHandler) CreateBorrowingRaceRun(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "競技時間は1分以上で指定してください"})
 		return
 	}
+	var scheduledAt *time.Time
+	if req.Session.ScheduledAt != nil && strings.TrimSpace(*req.Session.ScheduledAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, *req.Session.ScheduledAt)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid scheduled_at"})
+			return
+		}
+		scheduledAt = &parsed
+	}
 
 	rankPoints := req.Session.PointsByRank
 	if len(rankPoints) == 0 {
@@ -154,6 +163,10 @@ func (h *NoonGameHandler) CreateBorrowingRaceRun(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to replace existing template run"})
 			return
 		}
+		if err := h.rebuildNoonGameScores(eventID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rebuild class scores"})
+			return
+		}
 	}
 	session.Name = strings.TrimSpace(req.Session.Name)
 	if session.Name == "" {
@@ -163,16 +176,7 @@ func (h *NoonGameHandler) CreateBorrowingRaceRun(c *gin.Context) {
 	session.Location = req.Session.Location
 	session.Mode = "class"
 	session.AllowManualPoints = false
-	if req.Session.ScheduledAt != nil && strings.TrimSpace(*req.Session.ScheduledAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, *req.Session.ScheduledAt)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid scheduled_at"})
-			return
-		}
-		session.ScheduledAt = &parsed
-	} else {
-		session.ScheduledAt = nil
-	}
+	session.ScheduledAt = scheduledAt
 	session, err = h.noonRepo.UpsertSession(session)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save session"})

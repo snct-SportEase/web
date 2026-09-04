@@ -383,7 +383,10 @@
               const entry = match.entries.find(e => e.id === existingParticipant.entry_id || e.id === existingParticipant.id);
               
               // リストの位置（インデックス+1）を順位として使用（ドラッグ&ドロップで設定した順序を保持）
-              const rankValue = String(index + 1);
+							const storedDetail = entry ? detailMap.get(entry.id) : null;
+							const rankValue = run.type === 'borrowing-race' && storedDetail?.rank
+								? String(storedDetail.rank)
+								: String(index + 1);
               
               // 名前の取得：既存の名前を最優先（既にドラッグ&ドロップで設定されている名前を保持）
               let name = existingParticipant.name;
@@ -410,7 +413,7 @@
                 points: existingParticipant.points !== null && existingParticipant.points !== undefined 
                   ? existingParticipant.points 
 									: null,
-				competition_score: existingParticipant.competition_score ?? (entry ? detailMap.get(entry.id)?.competition_score : undefined) ?? 0
+				competition_score: storedDetail?.competition_score ?? existingParticipant.competition_score ?? 0
               };
             }).filter(p => p !== null && p.entry_id);
             

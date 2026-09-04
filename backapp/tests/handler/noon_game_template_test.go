@@ -66,6 +66,56 @@ func TestNoonGameHandler_CreateBorrowingRaceRun(t *testing.T) {
 	classRepo.AssertExpectations(t)
 }
 
+func TestNoonGameHandler_RecordBorrowingRaceResultHandlesTies(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	noonRepo := new(MockNoonGameRepository)
+	classRepo := new(MockClassRepository)
+	h := handler.NewNoonGameHandler(noonRepo, classRepo, new(MockEventRepository))
+
+	run := &models.NoonGameTemplateRun{
+		ID: 30, SessionID: 10, TemplateKey: "borrowing_race",
+		PointsByRank: map[string]interface{}{"rank_points": map[string]interface{}{"1": float64(100), "3": float64(80)}},
+	}
+	entries := []*models.NoonGameMatchEntry{
+		{ID: 101, SideType: "class", ClassID: intPtr(1)},
+		{ID: 102, SideType: "class", ClassID: intPtr(2)},
+		{ID: 103, SideType: "class", ClassID: intPtr(3)},
+	}
+	match := &models.NoonGameMatchWithResult{
+		NoonGameMatch: &models.NoonGameMatch{ID: 20, SessionID: 10, Entries: entries},
+		Entries:       entries,
+	}
+	noonRepo.On("GetTemplateRunByID", 30).Return(run, nil).Once()
+	noonRepo.On("GetTemplateRunMatchByKey", 30, "MAIN").Return(&models.NoonGameTemplateRunMatch{RunID: 30, MatchID: 20}, nil).Once()
+	noonRepo.On("GetMatchByID", 20).Return(match, nil).Once()
+	noonRepo.On("GetSessionByID", 10).Return(&models.NoonGameSession{ID: 10, EventID: 8, Status: "published"}, nil).Once()
+	noonRepo.On("ClearPointsForMatch", 20).Return(nil).Once()
+	noonRepo.On("InsertPoints", mock.MatchedBy(func(points []*models.NoonGamePoint) bool {
+		return len(points) == 3 && points[0].Points == 100 && points[1].Points == 100 && points[2].Points == 80
+	})).Return(nil).Once()
+	noonRepo.On("SaveResult", mock.MatchedBy(func(result *models.NoonGameResult) bool {
+		return len(result.Details) == 3 && *result.Details[0].Rank == 1 && *result.Details[1].Rank == 1 && *result.Details[2].Rank == 3 && *result.Details[0].CompetitionScore == 20
+	})).Return(&models.NoonGameResult{ID: 50, MatchID: 20}, nil).Once()
+	noonRepo.On("SaveMatch", mock.MatchedBy(func(value *models.NoonGameMatch) bool { return value.Status == "completed" })).Return(&models.NoonGameMatch{ID: 20}, nil).Once()
+	noonRepo.On("SumConfirmedPointsByEvent", 8).Return(map[int]int{1: 100, 2: 100, 3: 80}, nil).Once()
+	classRepo.On("SetNoonGamePoints", 8, map[int]int{1: 100, 2: 100, 3: 80}).Return(nil).Once()
+	noonRepo.On("GetMatchByID", 20).Return(match, nil).Once()
+
+	body := `{"scores":[{"entry_id":101,"competition_score":20},{"entry_id":102,"competition_score":20},{"entry_id":103,"competition_score":10}],"finalize":true}`
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "run_id", Value: "30"}}
+	c.Set("user", &models.User{ID: "00000000-0000-0000-0000-000000000001"})
+	c.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/noon-game/template-runs/30/borrowing-race/result", bytes.NewBufferString(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	h.RecordBorrowingRaceResult(c)
+
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	noonRepo.AssertExpectations(t)
+	classRepo.AssertExpectations(t)
+}
+
 func (m *MockNoonGameRepository) GetSessionByID(sessionID int) (*models.NoonGameSession, error) {
 	args := m.Called(sessionID)
 	if args.Get(0) == nil {
