@@ -6,6 +6,7 @@ import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
 	"backapp/internal/router"
+	"backapp/internal/safelog"
 	"backapp/internal/websocket"
 	"database/sql"
 	"fmt"
@@ -42,12 +43,12 @@ func main() {
 	// 初期イベントを作成
 	eventID, err := initializeEvent(db, cfg)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize event: %v", err)
+		log.Printf("Warning: Failed to initialize event: %s", safelog.Value(err))
 	}
 
 	// class_scores テーブルを初期化
 	if err := initializeClassScores(db, eventID); err != nil {
-		log.Printf("Warning: Failed to initialize class scores: %v", err)
+		log.Printf("Warning: Failed to initialize class scores: %s", safelog.Value(err))
 	}
 
 	hubManager := websocket.NewHubManager()
@@ -77,7 +78,7 @@ func initializeEvent(db *sql.DB, cfg *config.Config) (int64, error) {
 
 	// イベントが既に存在する場合は、そのIDを返してスキップ
 	if err != sql.ErrNoRows {
-		log.Printf("Event '%s' already exists with ID: %d, skipping initialization.", cfg.InitEventName, existingEventID)
+		log.Printf("Event '%s' already exists with ID: %s, skipping initialization.", safelog.Value(cfg.InitEventName), safelog.Value(existingEventID))
 		return existingEventID, nil
 	}
 
@@ -116,7 +117,7 @@ func initializeEvent(db *sql.DB, cfg *config.Config) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to create event: %w", err)
 	}
-	log.Printf("Successfully created event '%s' with ID: %d", cfg.InitEventName, eventID)
+	log.Printf("Successfully created event '%s' with ID: %s", safelog.Value(cfg.InitEventName), safelog.Value(eventID))
 
 	// --- クラス作成 ---
 	classRepo := repository.NewClassRepository(db)
@@ -156,7 +157,7 @@ func initializeClassScores(db *sql.DB, eventID int64) error {
 	}
 
 	if len(classes) == 0 {
-		log.Printf("No classes found for event ID %d, skipping class scores initialization.", eventID)
+		log.Printf("No classes found for event ID %s, skipping class scores initialization.", safelog.Value(eventID))
 		return nil
 	}
 
@@ -170,6 +171,6 @@ func initializeClassScores(db *sql.DB, eventID int64) error {
 		return fmt.Errorf("failed to initialize class scores: %w", err)
 	}
 
-	log.Printf("Successfully initialized class scores for event ID: %d", eventID)
+	log.Printf("Successfully initialized class scores for event ID: %s", safelog.Value(eventID))
 	return nil
 }

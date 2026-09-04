@@ -38,6 +38,10 @@ jobs:
         working-directory: ./frontapp
         run: npm run lint
 
+      - name: Install Playwright browser
+        working-directory: ./frontapp
+        run: npx playwright install --with-deps chromium
+
       - name: Run Vitest
         working-directory: ./frontapp
         run: npm run test

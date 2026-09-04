@@ -1,7 +1,8 @@
 import { createBackendProxyHeaders } from '$lib/server/backendProxyHeaders.js';
+import { resolveBackendOrigin } from '$lib/server/backendUrl.js';
 import { applyCSRFProxyProtection } from '$lib/server/csrfProxy.js';
 
-const BACKEND_URL = process.env.BACKEND_URL;
+const BACKEND_URL = resolveBackendOrigin(process.env.BACKEND_URL);
 const BACKEND_PROXY_PREFIXES = ['/api', '/swagger'];
 
 function redirectResponse(event, status, location) {
@@ -77,7 +78,7 @@ export async function handle({ event, resolve }) {
 
   if (sessionToken) {
     try {
-      const url = `${BACKEND_URL}/api/auth/user`;
+      const url = new URL('/api/auth/user', BACKEND_URL);
       const response = await fetch(url, {
         headers: {
           'cookie': `session_token=${sessionToken}`,

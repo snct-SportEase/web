@@ -93,6 +93,10 @@ func (h *AttendanceHandler) RegisterAttendanceHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
+	if req.AttendanceCount < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Attendance count cannot be negative"})
+		return
+	}
 
 	activeEventID, err := h.eventRepo.GetActiveEvent()
 	if err != nil {

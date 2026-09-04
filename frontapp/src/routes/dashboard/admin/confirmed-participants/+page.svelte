@@ -3,9 +3,7 @@
 
 	let { data } = $props();
 
-	let { classes: initialClasses = [] } = data ?? {};
-
-	let classes = $state([...initialClasses]);
+	let classes = $derived(data?.classes ?? []);
 	let allSports = $state([]);
 	let selectedClassId = $state(null);
 	let selectedSportId = $state(null);
