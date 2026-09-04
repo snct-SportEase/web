@@ -218,6 +218,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.PUT("/noon-game/template-runs/:run_id/year-relay/overall/result", resultEntryRequired, noonHandler.RecordYearRelayOverallBonus)
 			admin.PUT("/noon-game/template-runs/:run_id/course-relay/result", resultEntryRequired, noonHandler.RecordCourseRelayResult)
 			admin.PUT("/noon-game/template-runs/:run_id/tug-of-war/result", resultEntryRequired, noonHandler.RecordTugOfWarResult)
+			admin.PUT("/noon-game/template-runs/:run_id/borrowing-race/result", resultEntryRequired, noonHandler.RecordBorrowingRaceResult)
 
 			adminUsers := admin.Group("/users")
 			{
@@ -291,6 +292,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.POST("/:id/noon-game/templates/course-relay/run", noonHandler.CreateCourseRelayRun)
 				rootEvents.POST("/:id/noon-game/templates/tug-of-war/run", noonHandler.CreateTugOfWarRun)
 				rootEvents.POST("/:id/noon-game/templates/typing/run", noonHandler.CreateTypingRun)
+				rootEvents.POST("/:id/noon-game/templates/borrowing-race/run", noonHandler.CreateBorrowingRaceRun)
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				rootEvents.POST("/:id/notify-survey", eventHandler.NotifySurvey)
 				rootEvents.POST("/:id/import-survey-scores", eventHandler.ImportSurveyScores)

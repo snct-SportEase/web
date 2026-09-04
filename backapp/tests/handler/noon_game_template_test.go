@@ -21,6 +21,51 @@ type MockNoonGameRepository struct {
 	mock.Mock
 }
 
+func TestNoonGameHandler_CreateBorrowingRaceRun(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	noonRepo := new(MockNoonGameRepository)
+	classRepo := new(MockClassRepository)
+	h := handler.NewNoonGameHandler(noonRepo, classRepo, new(MockEventRepository))
+
+	classes := []*models.Class{
+		{ID: 1, Name: "1-1"},
+		{ID: 2, Name: "1-2"},
+		{ID: 3, Name: "1-3"},
+	}
+	noonRepo.On("ListSessionsByEvent", 8, false).Return([]*models.NoonGameSession{}, nil).Once()
+	classRepo.On("GetAllClasses", 8).Return(classes, nil).Once()
+	noonRepo.On("UpsertSession", mock.MatchedBy(func(session *models.NoonGameSession) bool {
+		return session.TemplateKey == "borrowing_race" && session.Name == "借り物競争" && session.Mode == "class"
+	})).Return(&models.NoonGameSession{ID: 10, EventID: 8, TemplateKey: "borrowing_race", Name: "借り物競争", Mode: "class", Status: "draft"}, nil).Once()
+	noonRepo.On("SaveMatch", mock.MatchedBy(func(match *models.NoonGameMatch) bool {
+		return match.SessionID == 10 && len(match.Entries) == 3 && match.Entries[0].ClassID != nil && *match.Entries[0].ClassID == 1
+	})).Return(&models.NoonGameMatch{ID: 20, SessionID: 10}, nil).Once()
+	noonRepo.On("GetMatchByID", 20).Return(&models.NoonGameMatchWithResult{
+		NoonGameMatch: &models.NoonGameMatch{ID: 20, SessionID: 10},
+		Entries: []*models.NoonGameMatchEntry{
+			{ID: 101, ClassID: intPtr(1)}, {ID: 102, ClassID: intPtr(2)}, {ID: 103, ClassID: intPtr(3)},
+		},
+	}, nil).Once()
+	noonRepo.On("CreateTemplateRunWithPointsByRankJSON", 10, "borrowing_race", "借り物競争", mock.Anything, mock.Anything).
+		Return(&models.NoonGameTemplateRun{ID: 30, SessionID: 10, TemplateKey: "borrowing_race", Name: "借り物競争"}, nil).Once()
+	noonRepo.On("LinkTemplateRunMatch", 30, 20, "MAIN").
+		Return(&models.NoonGameTemplateRunMatch{ID: 40, RunID: 30, MatchID: 20, MatchKey: "MAIN"}, nil).Once()
+
+	body := `{"session":{"name":"借り物競争","duration_minutes":15,"participant_class_ids":[1,2,3]}}`
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "id", Value: "8"}}
+	c.Set("user", &models.User{ID: "00000000-0000-0000-0000-000000000001"})
+	c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events/8/noon-game/templates/borrowing-race/run", bytes.NewBufferString(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	h.CreateBorrowingRaceRun(c)
+
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	noonRepo.AssertExpectations(t)
+	classRepo.AssertExpectations(t)
+}
+
 func (m *MockNoonGameRepository) GetSessionByID(sessionID int) (*models.NoonGameSession, error) {
 	args := m.Called(sessionID)
 	if args.Get(0) == nil {
