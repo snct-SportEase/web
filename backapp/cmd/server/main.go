@@ -121,14 +121,7 @@ func initializeEvent(db *sql.DB, cfg *config.Config) (int64, error) {
 
 	// --- クラス作成 ---
 	classRepo := repository.NewClassRepository(db)
-	classNames := []string{
-		"1-1", "1-2", "1-3", "IS2", "IS3",
-		"IS4", "IS5", "IT2", "IT3", "IT4",
-		"IT5", "IE2", "IE3", "IE4", "IE5",
-		"専教",
-	}
-
-	if err := classRepo.CreateClasses(int(eventID), classNames); err != nil {
+	if err := classRepo.CreateClasses(int(eventID), models.DefaultClassNames()); err != nil {
 		return 0, fmt.Errorf("failed to create classes: %w", err)
 	}
 	log.Printf("Successfully created classes for event ID: %d", eventID)
