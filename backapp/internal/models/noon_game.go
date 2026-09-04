@@ -122,6 +122,7 @@ type NoonGameResultDetail struct {
 	ID                int     `json:"id"`
 	EntryID           int     `json:"entry_id"`
 	Rank              *int    `json:"rank,omitempty"`
+	CompetitionScore  *int    `json:"competition_score,omitempty"`
 	Points            int     `json:"points"`
 	Note              *string `json:"note,omitempty"`
 	EntryResolvedName string  `json:"entry_resolved_name"`

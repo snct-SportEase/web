@@ -1907,7 +1907,7 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 	// #nosec G201 -- placeholder is generated internally from an integer ID slice; values are bound below.
 	query := fmt.Sprintf(`
 		SELECT 
-			rd.id, r.match_id, rd.entry_id, rd.placement_rank, rd.points, rd.note, rd.entry_resolved_name,
+			rd.id, r.match_id, rd.entry_id, rd.placement_rank, rd.competition_score, rd.points, rd.note, rd.entry_resolved_name,
 			e.entry_index, e.side_type, e.class_id, e.group_id, e.display_name
 		FROM noon_game_result_details rd
 		JOIN noon_game_results r ON rd.result_id = r.id
@@ -1927,6 +1927,7 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 		var (
 			matchID           sql.NullInt64
 			rank              sql.NullInt64
+			competitionScore  sql.NullInt64
 			note              sql.NullString
 			entryResolvedName sql.NullString
 			entryIndex        sql.NullInt64
@@ -1940,6 +1941,7 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 			&matchID,
 			&detail.EntryID,
 			&rank,
+			&competitionScore,
 			&detail.Points,
 			&note,
 			&entryResolvedName,
@@ -1959,6 +1961,10 @@ func (r *noonGameRepository) fetchResultDetails(matchIDs []int) (map[int][]*mode
 		if rank.Valid {
 			val := int(rank.Int64)
 			detail.Rank = &val
+		}
+		if competitionScore.Valid {
+			val := int(competitionScore.Int64)
+			detail.CompetitionScore = &val
 		}
 		if note.Valid {
 			str := note.String
@@ -2061,8 +2067,8 @@ func (r *noonGameRepository) replaceResultDetailsTx(tx *sql.Tx, resultID int, de
 	}
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO noon_game_result_details (result_id, entry_id, placement_rank, points, note, entry_resolved_name)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO noon_game_result_details (result_id, entry_id, placement_rank, competition_score, points, note, entry_resolved_name)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -2081,6 +2087,7 @@ func (r *noonGameRepository) replaceResultDetailsTx(tx *sql.Tx, resultID int, de
 			resultID,
 			detail.EntryID,
 			nullableInt(detail.Rank),
+			nullableInt(detail.CompetitionScore),
 			detail.Points,
 			nullableString(detail.Note),
 			nullableString(&entryResolvedName),
