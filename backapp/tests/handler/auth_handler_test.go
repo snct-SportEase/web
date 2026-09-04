@@ -70,7 +70,7 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 		assert.Equal(t, "http://localhost:5173/?error=line_inapp_browser_unsupported", w.Header().Get("Location"))
 	})
 
-	t.Run("sets oauth state cookie without secure attribute for local http", func(t *testing.T) {
+	t.Run("sets secure oauth cookies for local http", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockEventRepo := new(MockEventRepository)
 		mockClassRepo := new(MockClassRepository)
@@ -93,7 +93,7 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 		}
 
 		if assert.NotNil(t, oauthStateCookie) {
-			assert.False(t, oauthStateCookie.Secure)
+			assert.True(t, oauthStateCookie.Secure)
 			assert.True(t, oauthStateCookie.HttpOnly)
 			assert.Equal(t, http.SameSiteLaxMode, oauthStateCookie.SameSite)
 		}
@@ -112,6 +112,7 @@ func TestAuthHandler_GoogleLogin(t *testing.T) {
 				assert.Equal(t, oauthNonceCookie.Value, redirectURL.Query().Get("nonce"))
 			}
 			assert.True(t, oauthNonceCookie.HttpOnly)
+			assert.True(t, oauthNonceCookie.Secure)
 			assert.Equal(t, http.SameSiteLaxMode, oauthNonceCookie.SameSite)
 		}
 	})
