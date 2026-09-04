@@ -7,43 +7,38 @@ import (
 	"time"
 )
 
-func TestSetSessionTokenCookieSecurityMatchesRequest(t *testing.T) {
+func TestSetSessionTokenCookieIsAlwaysSecure(t *testing.T) {
 	tests := []struct {
 		name          string
 		proto         string
 		forwardedHost string
 		value         string
 		expiration    time.Time
-		secure        bool
 	}{
 		{
 			name:       "creates secure session cookie for https",
 			proto:      "https",
 			value:      "session-token",
 			expiration: time.Now().Add(24 * time.Hour),
-			secure:     true,
 		},
 		{
-			name:          "creates non-secure session cookie for localhost even behind forwarded https",
+			name:          "creates secure session cookie for localhost",
 			proto:         "https",
 			forwardedHost: "localhost:3300",
 			value:         "session-token",
 			expiration:    time.Now().Add(24 * time.Hour),
-			secure:        false,
 		},
 		{
-			name:       "creates non-secure session cookie for http",
+			name:       "creates secure session cookie for http",
 			proto:      "http",
 			value:      "session-token",
 			expiration: time.Now().Add(24 * time.Hour),
-			secure:     false,
 		},
 		{
 			name:       "clears session cookie",
 			proto:      "https",
 			value:      "",
 			expiration: time.Now().Add(-1 * time.Hour),
-			secure:     true,
 		},
 	}
 
@@ -76,8 +71,8 @@ func TestSetSessionTokenCookieSecurityMatchesRequest(t *testing.T) {
 			if !cookie.HttpOnly {
 				t.Fatal("expected cookie to be HttpOnly")
 			}
-			if cookie.Secure != tt.secure {
-				t.Fatalf("expected Secure=%v, got %v", tt.secure, cookie.Secure)
+			if !cookie.Secure {
+				t.Fatal("expected Secure=true")
 			}
 			if cookie.SameSite != http.SameSiteLaxMode {
 				t.Fatalf("expected SameSite=Lax, got %v", cookie.SameSite)
