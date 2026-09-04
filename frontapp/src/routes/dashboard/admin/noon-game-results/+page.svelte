@@ -252,6 +252,9 @@
   // 試合のタイトルからテンプレートランを特定
   function detectTemplateFromMatch(match) {
     const title = match.title || '';
+		if (session?.template_key === 'borrowing_race') {
+			return { type: 'borrowing-race' };
+		}
     if (title.includes('学年対抗リレー')) {
       if (title.includes('Aブロック')) {
         return { type: 'year-relay', block: 'A' };
@@ -276,6 +279,7 @@
     const yearRelayMatches = [];
     const courseRelayMatches = [];
     const tugOfWarMatches = [];
+		const borrowingRaceMatches = [];
     
     for (const match of matchList) {
       const template = detectTemplateFromMatch(match);
@@ -290,6 +294,8 @@
         courseRelayMatches.push({ match, template });
       } else if (template.type === 'tug-of-war') {
         tugOfWarMatches.push({ match, template });
+			} else if (template.type === 'borrowing-race') {
+				borrowingRaceMatches.push({ match, template });
       }
     }
 
@@ -335,6 +341,17 @@
         runId: runId
       });
     }
+
+		for (const { match, template } of borrowingRaceMatches) {
+			const runId = await getRunIdFromMatchId(match.id);
+			const runKey = runId ? `borrowing-race-${runId}` : `borrowing-race-${match.id}`;
+			runs.set(runKey, {
+				key: runKey,
+				type: 'borrowing-race',
+				matches: [{ match, template }],
+				runId
+			});
+		}
 
     templateRuns = Array.from(runs.values());
 
@@ -392,7 +409,8 @@
                 rank: rankValue,
                 points: existingParticipant.points !== null && existingParticipant.points !== undefined 
                   ? existingParticipant.points 
-                  : null
+									: null,
+				competition_score: existingParticipant.competition_score ?? (entry ? detailMap.get(entry.id)?.competition_score : undefined) ?? 0
               };
             }).filter(p => p !== null && p.entry_id);
             
@@ -411,7 +429,8 @@
                 entry_id: entry.id,
                 name: name,
                 rank: rankValue,
-                points: detail ? detail.points : null
+				points: detail ? detail.points : null,
+				competition_score: detail?.competition_score ?? 0
               });
             }
           } else {
@@ -431,6 +450,7 @@
                 name: name,
                 rank: rankValue,
                 points: detail ? detail.points : null,
+								competition_score: detail?.competition_score ?? 0,
                 _rank: detail && detail.rank !== undefined && detail.rank !== null ? detail.rank : 999
               };
             });
@@ -460,7 +480,8 @@
               entry_id: p.entry_id,
               name: p.name,
               rank: p.rank,
-              points: p.points
+				points: p.points,
+				competition_score: p.competition_score
             }));
           }
         }
@@ -476,7 +497,7 @@
     templateRunForms = forms;
   }
 
-  async function submitTemplateResult(run, match, template) {
+  async function submitTemplateResult(run, match, template, finalize = true) {
     if (activeEventStatus !== 'active') {
       alert('試合結果は開催中の大会でのみ入力できます。');
       return;
@@ -541,6 +562,16 @@
         endpoint = `/api/admin/noon-game/template-runs/${runId}/course-relay/result`;
       } else if (template.type === 'tug-of-war') {
         endpoint = `/api/admin/noon-game/template-runs/${runId}/tug-of-war/result`;
+			} else if (template.type === 'borrowing-race') {
+				endpoint = `/api/admin/noon-game/template-runs/${runId}/borrowing-race/result`;
+				payload = {
+					scores: form.participants.map((participant) => ({
+						entry_id: participant.entry_id,
+						competition_score: Number(participant.competition_score) || 0
+					})),
+					finalize,
+					note: form.note || null
+				};
       }
 
       const res = await fetch(endpoint, {
@@ -558,7 +589,7 @@
       if (current) {
         await fetchSessions(current.id, session?.id);
       }
-      alert('試合結果を登録しました。');
+			alert(template.type === 'borrowing-race' && !finalize ? '途中経過を保存しました。' : '試合結果を登録しました。');
     } catch (err) {
       console.error(err);
       errorMessage = err.message;
@@ -731,6 +762,17 @@
     };
   }
 
+	function updateBorrowingRaceScore(formKey, index, value) {
+		const form = templateRunForms[formKey];
+		if (!form || !Array.isArray(form.participants)) return;
+		const participants = [...form.participants];
+		participants[index] = {
+			...participants[index],
+			competition_score: value === '' ? 0 : Math.max(0, Number(value) || 0)
+		};
+		templateRunForms = { ...templateRunForms, [formKey]: { ...form, participants } };
+	}
+
 </script>
 
 <style>
@@ -818,6 +860,8 @@
                   コース対抗リレー
                 {:else if run.type === 'tug-of-war'}
                   綱引き
+				{:else if run.type === 'borrowing-race'}
+					借り物競争
                 {/if}
               </h3>
               {#each run.matches as { match, template } (match.id)}
@@ -827,7 +871,25 @@
                   <div class="border rounded p-4 bg-white space-y-3">
                     <h4 class="font-semibold text-gray-700">{match.title}</h4>
                     <div class="space-y-3">
-                      <p class="text-sm font-semibold text-gray-700">順位入力（ドラッグ&ドロップで並び替え）</p>
+					{#if run.type === 'borrowing-race'}
+						<p class="text-sm text-gray-600">「競技内獲得点」を入力すると順位を自動計算します。「大会総合点」は確定時に順位点から反映されます。</p>
+						<div class="overflow-x-auto">
+							<table class="min-w-full divide-y divide-gray-200 text-sm">
+								<thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">クラス</th><th class="px-3 py-2 text-right">現在順位</th><th class="px-3 py-2 text-right">競技内獲得点</th><th class="px-3 py-2 text-right">大会総合点</th></tr></thead>
+								<tbody class="divide-y divide-gray-200">
+									{#each form.participants as participant, index (participant.id || participant.entry_id)}
+										<tr>
+											<td class="px-3 py-2 font-medium">{participant.name}</td>
+											<td class="px-3 py-2 text-right">{participant.rank ? `${participant.rank}位` : '自動計算'}</td>
+											<td class="px-3 py-2 text-right"><input type="number" min="0" class="w-28 rounded border px-2 py-1 text-right" value={participant.competition_score ?? 0} oninput={(event) => updateBorrowingRaceScore(formKey, index, event.target.value)} /></td>
+											<td class="px-3 py-2 text-right font-semibold text-indigo-700">{participant.points ?? 0}点</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{:else}
+						<p class="text-sm font-semibold text-gray-700">順位入力（ドラッグ&ドロップで並び替え）</p>
                       <div class="space-y-2">
                         <ul
                           use:dndzone={{
@@ -874,6 +936,7 @@
                           {/each}
                         </ul>
                       </div>
+					{/if}
                       <div class="space-y-2">
                         <label class="text-sm font-semibold text-gray-700" for={`template-note-${formKey}`}>備考</label>
                         <textarea
@@ -883,12 +946,15 @@
                           bind:value={form.note}
                         ></textarea>
                       </div>
-                      <div class="flex justify-end">
+					<div class="flex justify-end gap-3">
+						{#if run.type === 'borrowing-race'}
+							<button class="px-4 py-2 border border-indigo-600 text-indigo-700 rounded disabled:opacity-50" onclick={() => submitTemplateResult(run, match, template, false)} disabled={saving[formKey] || activeEventStatus !== 'active'}>途中経過を保存</button>
+						{/if}
                         <button
                           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                           onclick={() => submitTemplateResult(run, match, template)}
                           disabled={saving[formKey] || activeEventStatus !== 'active'}>
-                          {saving[formKey] ? '送信中...' : '結果を登録'}
+						{saving[formKey] ? '送信中...' : run.type === 'borrowing-race' ? '結果を確定' : '結果を登録'}
                         </button>
                       </div>
                     </div>
