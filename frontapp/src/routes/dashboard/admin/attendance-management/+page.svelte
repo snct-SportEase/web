@@ -4,7 +4,10 @@
   import { onMount } from 'svelte';
 
   let { data } = $props();
-  let { classes, managedClass, canSelectAllClasses, restrictionError } = data;
+  let classes = $derived(data?.classes ?? []);
+  let managedClass = $derived(data?.managedClass ?? null);
+  let canSelectAllClasses = $derived(data?.canSelectAllClasses ?? false);
+  let restrictionError = $derived(data?.restrictionError ?? '');
 
   let selectedClassId = $state(null);
   let classDetails = $state(null);

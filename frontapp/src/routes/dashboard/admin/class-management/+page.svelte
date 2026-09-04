@@ -1,30 +1,18 @@
 <script>
 	let { data } = $props();
 
-	const {
-		classes: initialClasses = [],
-		classMembers: initialClassMembers = [],
-		allSports: initialAllSports = [],
-		availableSports: initialAvailableSports = [],
-		selectedClassId: initialSelectedClassId = null,
-		noonSessionName: initialNoonSessionName = null,
-		noonSessionSportMatched: initialNoonSessionSportMatched = false,
-		error: initialError = null
-	} = data ?? {};
+	function normalizeClassId(value) {
+		if (value === null || value === undefined || value === '') return null;
+		if (typeof value === 'number') return value;
+		const parsed = Number(value);
+		return Number.isNaN(parsed) ? null : parsed;
+	}
 
-	const normalizedInitialSelectedClassId =
-		initialSelectedClassId !== null && typeof initialSelectedClassId !== 'number'
-			? (() => {
-					const parsedInitialClassId = Number(initialSelectedClassId);
-					return Number.isNaN(parsedInitialClassId) ? null : parsedInitialClassId;
-				})()
-			: initialSelectedClassId;
-
-	let classes = $state([...initialClasses]);
-	let selectedClassId = $state(normalizedInitialSelectedClassId);
-	let classMembers = $state([...initialClassMembers]);
-	let allSports = $state([...initialAllSports]);
-	let availableSports = $state([...initialAvailableSports]);
+	let classes = $derived(data?.classes ?? []);
+	let allSports = $derived(data?.allSports ?? []);
+	let availableSports = $derived(data?.availableSports ?? []);
+	let selectedClassId = $state(null);
+	let classMembers = $state([]);
 	let selectedSportId = $state(null);
 	let selectedMembers = $state([]);
 	let assignedMembers = $state([]);
@@ -34,11 +22,17 @@
 	let sportsLoading = $state(false);
 	let assignLoading = $state(false);
 
-	let error = $state(initialError);
+	let error = $state(null);
 	let success = $state(null);
-	const isAdmin = data.isAdmin || false;
-	const noonSessionName = initialNoonSessionName;
-	const noonSessionSportMatched = initialNoonSessionSportMatched;
+	let isAdmin = $derived(data?.isAdmin ?? false);
+	let noonSessionName = $derived(data?.noonSessionName ?? null);
+	let noonSessionSportMatched = $derived(data?.noonSessionSportMatched ?? false);
+
+	$effect(() => {
+		classMembers = [...(data?.classMembers ?? [])];
+		error = data?.error ?? null;
+		selectedClassId = normalizeClassId(data?.selectedClassId);
+	});
 
 	let searchQuery = $state('');
 

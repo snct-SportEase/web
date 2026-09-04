@@ -4,7 +4,7 @@
 
   let { isOpen = false, currentDisplayName = '', userRoles = [], onClose = () => {}, onSave = async () => {} } = $props();
 
-  let newDisplayName = $state(currentDisplayName);
+  let newDisplayName = $state('');
   let isLoading = $state(false);
   let errorMessage = $state('');
   let displayNameInput = $state();
