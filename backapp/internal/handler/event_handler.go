@@ -266,6 +266,8 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"event_id":                       event.ID,
 		"event_name":                     event.Name,
+		"status":                         event.Status,
+		"is_rainy_mode":                  event.IsRainyMode,
 		"competition_guidelines_pdf_url": event.CompetitionGuidelinesPdfUrl,
 		"survey_url":                     event.SurveyUrl,
 		"is_survey_published":            event.IsSurveyPublished,

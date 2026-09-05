@@ -63,19 +63,10 @@
 			if (!eventResponse.ok) throw new Error('Failed to get active event');
 			const eventData = await eventResponse.json();
 			activeEventId = eventData.event_id;
+			activeEventStatus = eventData.status || '';
+			isRainyMode = eventData.is_rainy_mode || false;
 
 			if (activeEventId) {
-				// アクティブイベントの詳細を取得して雨天時モードの状態を確認
-				const eventsResponse = await fetch('/api/root/events');
-				if (eventsResponse.ok) {
-					const events = await eventsResponse.json();
-					const activeEvent = events.find(e => e.id === activeEventId);
-					if (activeEvent) {
-						isRainyMode = activeEvent.is_rainy_mode || false;
-						activeEventStatus = activeEvent.status || '';
-					}
-				}
-
 				const tournamentsResponse = await fetch(`/api/admin/events/${activeEventId}/tournaments`);
 				if (!tournamentsResponse.ok) throw new Error('Failed to fetch tournaments');
 				tournaments = await tournamentsResponse.json();
