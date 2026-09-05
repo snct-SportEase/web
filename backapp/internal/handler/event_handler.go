@@ -109,36 +109,13 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		DuplicateRegistrationThreshold: duplicateRegistrationThreshold,
 	}
 
-	id, err := h.eventRepo.CreateEvent(event)
+	id, err := h.eventRepo.CreateEventWithClasses(event, models.DefaultClassNames())
 	if err != nil {
 		log.Printf("error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 	event.ID = int(id)
-	if err := h.classRepo.CreateClasses(event.ID, models.DefaultClassNames()); err != nil {
-		log.Printf("failed to create default classes for event %d: %s", event.ID, safelog.Value(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
-	}
-
-	if event.Season == "autumn" {
-		springEvent, err := h.eventRepo.GetEventByYearAndSeason(event.Year, "spring")
-		if err != nil {
-			log.Printf("error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-			return
-		}
-
-		if springEvent != nil {
-			err := h.eventRepo.CopyClassScores(springEvent.ID, event.ID)
-			if err != nil {
-				log.Printf("error: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-				return
-			}
-		}
-	}
 
 	c.JSON(http.StatusCreated, event)
 }

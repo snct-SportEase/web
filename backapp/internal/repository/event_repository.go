@@ -3,10 +3,12 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"errors"
 )
 
 type EventRepository interface {
 	CreateEvent(event *models.Event) (int64, error)
+	CreateEventWithClasses(event *models.Event, classNames []string) (int64, error)
 	GetAllEvents() ([]*models.Event, error)
 	UpdateEvent(event *models.Event) error
 	GetActiveEvent() (event_id int, err error)
@@ -92,6 +94,84 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+// CreateEventWithClasses creates the event, its default classes and autumn
+// carry-over points in one transaction. The active event is not changed when
+// any of these steps fails.
+func (r *eventRepository) CreateEventWithClasses(event *models.Event, classNames []string) (int64, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(
+		"INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, event.CompetitionGuidelinesPdfUrl, event.SurveyUrl, event.IsSurveyPublished, event.Status, event.HideScores, event.DuplicateRegistrationThreshold,
+	)
+	if err != nil {
+		return 0, err
+	}
+	eventID, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
+		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+		if event.Status == models.EventStatusPreparing {
+			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+		}
+		if _, err := tx.Exec(archiveQuery, eventID); err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec("INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)", eventID); err != nil {
+			return 0, err
+		}
+	}
+
+	classStmt, err := tx.Prepare("INSERT INTO classes (event_id, name) VALUES (?, ?)")
+	if err != nil {
+		return 0, err
+	}
+	for _, className := range classNames {
+		if _, err := classStmt.Exec(eventID, className); err != nil {
+			classStmt.Close()
+			return 0, err
+		}
+	}
+	if err := classStmt.Close(); err != nil {
+		return 0, err
+	}
+
+	if event.Season == "autumn" {
+		var springEventID int
+		err := tx.QueryRow("SELECT id FROM events WHERE `year` = ? AND season = 'spring' ORDER BY id DESC LIMIT 1", event.Year).Scan(&springEventID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return 0, err
+		}
+		if err == nil {
+			if _, err := tx.Exec("DELETE FROM score_logs WHERE event_id = ? AND reason = 'initial_points'", eventID); err != nil {
+				return 0, err
+			}
+			if _, err := tx.Exec(`
+				INSERT INTO score_logs (event_id, class_id, points, reason)
+				SELECT ?, target_class.id, scores.total_points_current_event, 'initial_points'
+				FROM class_scores scores
+				JOIN classes source_class ON source_class.id = scores.class_id
+				JOIN classes target_class ON target_class.event_id = ? AND target_class.name = source_class.name
+				WHERE scores.event_id = ? AND scores.total_points_current_event > 0
+			`, eventID, eventID, springEventID); err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return eventID, nil
 }
 
 func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {

@@ -47,8 +47,7 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 			EndDate:   endDate.Format("2006-01-02"),
 		}
 
-		mockEventRepo.On("CreateEvent", mock.AnythingOfType("*models.Event")).Return(int64(1), nil).Once()
-		mockClassRepo.On("CreateClasses", 1, models.DefaultClassNames()).Return(nil).Once()
+		mockEventRepo.On("CreateEventWithClasses", mock.AnythingOfType("*models.Event"), models.DefaultClassNames()).Return(int64(1), nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -68,10 +67,9 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		repo := new(MockEventRepository)
 		classRepo := new(MockClassRepository)
 		h := handler.NewEventHandler(repo, nil, classRepo, nil, nil, "", "")
-		repo.On("CreateEvent", mock.MatchedBy(func(event *models.Event) bool {
+		repo.On("CreateEventWithClasses", mock.MatchedBy(func(event *models.Event) bool {
 			return event.Status == models.EventStatusPreparing
-		})).Return(int64(1), nil).Once()
-		classRepo.On("CreateClasses", 1, models.DefaultClassNames()).Return(nil).Once()
+		}), models.DefaultClassNames()).Return(int64(1), nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -97,7 +95,7 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		h.CreateEvent(c)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		repo.AssertNotCalled(t, "CreateEvent", mock.Anything)
+		repo.AssertNotCalled(t, "CreateEventWithClasses", mock.Anything, mock.Anything)
 	})
 
 	t.Run("Success - Create Autumn Event with Spring Event existing", func(t *testing.T) {
@@ -109,7 +107,6 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 
 		h := handler.NewEventHandler(mockEventRepo, mockTournamentRepo, mockClassRepo, mockNotificationRepo, mockUserRepo, "", "")
 
-		springEvent := &models.Event{ID: 1, Year: 2025, Season: "spring"}
 		autumnEventReq := struct {
 			Name      string `json:"name"`
 			Year      int    `json:"year"`
@@ -124,10 +121,7 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 			EndDate:   time.Now().Add(24 * time.Hour).Format("2006-01-02"),
 		}
 
-		mockEventRepo.On("CreateEvent", mock.AnythingOfType("*models.Event")).Return(int64(2), nil).Once()
-		mockClassRepo.On("CreateClasses", 2, models.DefaultClassNames()).Return(nil).Once()
-		mockEventRepo.On("GetEventByYearAndSeason", 2025, "spring").Return(springEvent, nil).Once()
-		mockEventRepo.On("CopyClassScores", springEvent.ID, 2).Return(nil).Once()
+		mockEventRepo.On("CreateEventWithClasses", mock.AnythingOfType("*models.Event"), models.DefaultClassNames()).Return(int64(2), nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -166,9 +160,7 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 			EndDate:   time.Now().Add(24 * time.Hour).Format("2006-01-02"),
 		}
 
-		mockEventRepo.On("CreateEvent", mock.AnythingOfType("*models.Event")).Return(int64(3), nil).Once()
-		mockClassRepo.On("CreateClasses", 3, models.DefaultClassNames()).Return(nil).Once()
-		mockEventRepo.On("GetEventByYearAndSeason", 2026, "spring").Return((*models.Event)(nil), nil).Once()
+		mockEventRepo.On("CreateEventWithClasses", mock.AnythingOfType("*models.Event"), models.DefaultClassNames()).Return(int64(3), nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -180,7 +172,6 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		h.CreateEvent(c)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
-		mockEventRepo.AssertNotCalled(t, "CopyClassScores", mock.Anything, mock.Anything)
 		mockEventRepo.AssertExpectations(t)
 		mockClassRepo.AssertExpectations(t)
 	})
@@ -190,8 +181,7 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		classRepo := new(MockClassRepository)
 		h := handler.NewEventHandler(eventRepo, nil, classRepo, nil, nil, "", "")
 
-		eventRepo.On("CreateEvent", mock.AnythingOfType("*models.Event")).Return(int64(4), nil).Once()
-		classRepo.On("CreateClasses", 4, models.DefaultClassNames()).Return(errors.New("db error")).Once()
+		eventRepo.On("CreateEventWithClasses", mock.AnythingOfType("*models.Event"), models.DefaultClassNames()).Return(int64(0), errors.New("db error")).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -213,10 +203,9 @@ func TestEventHandler_DuplicateRegistrationThreshold(t *testing.T) {
 		repo := new(MockEventRepository)
 		classRepo := new(MockClassRepository)
 		h := handler.NewEventHandler(repo, nil, classRepo, nil, nil, "", "")
-		repo.On("CreateEvent", mock.MatchedBy(func(event *models.Event) bool {
+		repo.On("CreateEventWithClasses", mock.MatchedBy(func(event *models.Event) bool {
 			return event.DuplicateRegistrationThreshold == 31
-		})).Return(int64(1), nil).Once()
-		classRepo.On("CreateClasses", 1, models.DefaultClassNames()).Return(nil).Once()
+		}), models.DefaultClassNames()).Return(int64(1), nil).Once()
 
 		body := []byte(`{"name":"大会","year":2026,"season":"spring"}`)
 		w := httptest.NewRecorder()
@@ -234,10 +223,9 @@ func TestEventHandler_DuplicateRegistrationThreshold(t *testing.T) {
 		repo := new(MockEventRepository)
 		classRepo := new(MockClassRepository)
 		h := handler.NewEventHandler(repo, nil, classRepo, nil, nil, "", "")
-		repo.On("CreateEvent", mock.MatchedBy(func(event *models.Event) bool {
+		repo.On("CreateEventWithClasses", mock.MatchedBy(func(event *models.Event) bool {
 			return event.DuplicateRegistrationThreshold == 24
-		})).Return(int64(1), nil).Once()
-		classRepo.On("CreateClasses", 1, models.DefaultClassNames()).Return(nil).Once()
+		}), models.DefaultClassNames()).Return(int64(1), nil).Once()
 
 		body := []byte(`{"name":"大会","year":2026,"season":"spring","duplicate_registration_threshold":24}`)
 		w := httptest.NewRecorder()
@@ -262,7 +250,7 @@ func TestEventHandler_DuplicateRegistrationThreshold(t *testing.T) {
 		h.CreateEvent(c)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		repo.AssertNotCalled(t, "CreateEvent", mock.Anything)
+		repo.AssertNotCalled(t, "CreateEventWithClasses", mock.Anything, mock.Anything)
 	})
 
 	t.Run("update changes configured threshold", func(t *testing.T) {

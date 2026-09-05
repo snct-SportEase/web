@@ -133,6 +133,11 @@ func (m *MockEventRepository) CreateEvent(event *models.Event) (int64, error) {
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (m *MockEventRepository) CreateEventWithClasses(event *models.Event, classNames []string) (int64, error) {
+	args := m.Called(event, classNames)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 func (m *MockEventRepository) GetAllEvents() ([]*models.Event, error) {
 	args := m.Called()
 	if args.Get(0) == nil {

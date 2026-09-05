@@ -341,6 +341,29 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 	})
 }
 
+func TestEventRepository_CreateEventWithClassesRollsBackEverything(t *testing.T) {
+	const insertEvent = "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	repo, mock, close := setupEvent(t)
+	defer close()
+
+	event := newEvent()
+	event.Status = models.EventStatusUpcoming
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(insertEvent)).
+		WithArgs(event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, nil, nil, event.IsSurveyPublished, event.Status, event.HideScores, event.DuplicateRegistrationThreshold).
+		WillReturnResult(sqlmock.NewResult(10, 1))
+	classes := mock.ExpectPrepare(regexp.QuoteMeta("INSERT INTO classes (event_id, name) VALUES (?, ?)"))
+	classes.ExpectExec().WithArgs(int64(10), "1-A").WillReturnResult(sqlmock.NewResult(1, 1))
+	classes.ExpectExec().WithArgs(int64(10), "1-B").WillReturnError(errors.New("class insert failed"))
+	mock.ExpectRollback()
+
+	id, err := repo.CreateEventWithClasses(event, []string{"1-A", "1-B"})
+
+	assert.ErrorContains(t, err, "class insert failed")
+	assert.Zero(t, id)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ─── UpdateEvent ───────────────────────────────────────────────────────────
 
 func TestEventRepository_UpdateEvent(t *testing.T) {
