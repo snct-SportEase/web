@@ -44,11 +44,21 @@
 
 	async function loadSports() {
 		try {
-			const response = await authorizedFetch('/api/admin/allsports');
+			const activeResponse = await authorizedFetch('/api/events/active');
+			if (!activeResponse.ok) {
+				throw new Error('開催中の大会を取得できませんでした');
+			}
+			const active = await activeResponse.json();
+			if (!active.event_id) {
+				allSports = [];
+				return;
+			}
+			const response = await authorizedFetch(`/api/events/${active.event_id}/sports`);
 			if (!response.ok) {
 				throw new Error('競技一覧の取得に失敗しました');
 			}
-			allSports = await response.json();
+			const eventSports = await response.json();
+			allSports = eventSports.map((sport) => ({ id: sport.sport_id, name: sport.sport_name }));
 		} catch (err) {
 			console.error('Error loading sports:', err);
 			error = err.message || '競技一覧の取得に失敗しました';
