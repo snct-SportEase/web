@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { fetchPublishedNoonGameSessions } from '$lib/utils/noonGameSessions.js';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
 
@@ -95,9 +96,8 @@
             }
 
             // 2. 昼競技の取得
-            const noonRes = await fetch(`/api/student/events/${currentEvent.id}/noon-game/session`);
-            if (noonRes.ok) {
-                const session = await noonRes.json();
+            const noonSessions = await fetchPublishedNoonGameSessions(currentEvent.id);
+            for (const session of noonSessions) {
                 if (session && session.matches) {
                     for (const match of session.matches) {
                         if (match.scheduled_at) {

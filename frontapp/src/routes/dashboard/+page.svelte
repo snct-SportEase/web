@@ -8,6 +8,7 @@
   import ActionCard from '$lib/components/ActionCard.svelte';
   import Card from '$lib/components/Card.svelte';
   import DataTable from '$lib/components/DataTable.svelte';
+  import { fetchPublishedNoonGameSessions, flattenNoonGameMatches } from '$lib/utils/noonGameSessions.js';
 
   let { data } = $props();
   let user = $derived(data.user);
@@ -135,28 +136,14 @@
     relayInfoLoading = true;
     relayInfoError = '';
     try {
-      const response = await fetch(`/api/student/events/${eventId}/noon-game/session`);
-      if (!response.ok) {
-        const detail = await safeJson(response);
-        throw new Error(detail?.error || 'リレー情報を取得できませんでした。');
-      }
-
-      const payload = await response.json();
-      relayMatches = (payload.matches || []).filter(isRelayMatch);
+      const sessions = await fetchPublishedNoonGameSessions(eventId);
+      relayMatches = flattenNoonGameMatches(sessions).filter(isRelayMatch);
     } catch (error) {
       console.error('Failed to fetch relay info:', error);
       relayInfoError = error.message || 'リレー情報を取得できませんでした。';
       relayMatches = [];
     } finally {
       relayInfoLoading = false;
-    }
-  }
-
-  async function safeJson(response) {
-    try {
-      return await response.json();
-    } catch {
-      return null;
     }
   }
 

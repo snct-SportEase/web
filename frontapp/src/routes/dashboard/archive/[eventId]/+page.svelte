@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { fetchPublishedNoonGameSessions, flattenNoonGameMatches } from '$lib/utils/noonGameSessions.js';
     import { page } from '$app/stores';
     
     let eventId = $page.params.eventId;
@@ -124,14 +125,8 @@
                     : [];
             }
 
-            const relayRes = await fetch(`/api/student/events/${eventId}/noon-game/session`);
-            if (relayRes.ok) {
-                const relayPayload = await relayRes.json();
-                relayMatches = (relayPayload.matches || []).filter(isRelayMatch);
-            } else {
-                const relayDetail = await relayRes.json().catch(() => null);
-                relayError = relayDetail?.error || 'リレー結果を取得できませんでした。';
-            }
+            const relaySessions = await fetchPublishedNoonGameSessions(eventId);
+            relayMatches = flattenNoonGameMatches(relaySessions).filter(isRelayMatch);
         } catch (err) {
             error = err.message;
         } finally {
