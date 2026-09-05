@@ -51,7 +51,10 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 			return nil, err
 		}
 	} else {
-		err = tx.QueryRow("SELECT id FROM sports WHERE name = ? ORDER BY id LIMIT 1", input.Name).Scan(&sportID)
+		err = tx.QueryRow(`SELECT s.id FROM sports s
+			LEFT JOIN event_sports es ON es.event_id=? AND es.sport_id=s.id
+			WHERE s.name=? AND es.sport_id IS NULL
+			ORDER BY s.id LIMIT 1`, input.EventID, input.Name).Scan(&sportID)
 		if err == sql.ErrNoRows {
 			result, insertErr := tx.Exec("INSERT INTO sports (name) VALUES (?)", input.Name)
 			if insertErr != nil {

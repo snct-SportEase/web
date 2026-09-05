@@ -156,6 +156,25 @@ func (h *BoardGameHandler) SaveRankings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tournament ID"})
 		return
 	}
+	activeEventValue, ok := c.Get("active_event_id")
+	activeEventID, validActiveEvent := activeEventValue.(int)
+	if !ok || !validActiveEvent {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No active event found"})
+		return
+	}
+	existingRun, err := h.boardGameRepo.GetRunByID(runID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get board-game tournament"})
+		return
+	}
+	if existingRun == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Board-game tournament not found"})
+		return
+	}
+	if existingRun.EventID != activeEventID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Tournament does not belong to the active event"})
+		return
+	}
 	var req struct {
 		Rankings []models.BoardGameRankingInput `json:"rankings" binding:"required"`
 	}
@@ -401,7 +420,7 @@ func boardGameDefaultStartTime(scheduledDate *string, round, roundCount, order, 
 			}
 		}
 	}
-	location, _ := time.LoadLocation("Asia/Tokyo")
+	location := time.FixedZone("JST", 9*60*60)
 	date, _ := time.ParseInLocation("2006-01-02", *scheduledDate, location)
 	return time.Date(date.Year(), date.Month(), date.Day(), hour, minute, 0, 0, location).Format(time.RFC3339)
 }
