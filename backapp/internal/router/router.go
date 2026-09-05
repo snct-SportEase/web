@@ -58,6 +58,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)
 
 	tournHandler := handler.NewTournamentHandler(tournRepo, sportRepo, teamRepo, classRepo, eventRepo, hubManager)
+	boardGameRepo := repository.NewBoardGameRepository(db)
+	boardGameHandler := handler.NewBoardGameHandler(boardGameRepo, classRepo)
 	noonRepo := repository.NewNoonGameRepository(db)
 	noonHandler := handler.NewNoonGameHandler(noonRepo, classRepo, eventRepo).WithSportSync(sportRepo)
 
@@ -151,6 +153,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			studentEvents := student.Group("/events")
 			{
 				studentEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
+				studentEvents.GET("/:event_id/board-game-runs", boardGameHandler.ListRuns)
 				studentEvents.GET("/:event_id/noon-game/session", noonHandler.GetSession)
 				studentEvents.GET("/:event_id/noon-game/sessions", noonHandler.ListSessions)
 				studentEvents.GET("/:event_id/noon-game/sessions/:session_id", noonHandler.GetSessionByID)
@@ -181,6 +184,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			adminEvent := admin.Group("/events")
 			{
 				adminEvent.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
+				adminEvent.GET("/:event_id/board-game-runs", boardGameHandler.ListRuns)
 				adminEvent.GET("/:event_id/noon-game/session", noonHandler.GetSession)
 				adminEvent.GET("/:event_id/noon-game/sessions", noonHandler.ListSessions)
 				adminEvent.GET("/:event_id/noon-game/sessions/:session_id", noonHandler.GetSessionByID)
@@ -211,6 +215,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			admin.PUT("/matches/:match_id/rainy-mode-start-time", tournHandler.UpdateMatchRainyModeStartTimeHandler)
 			resultEntryRequired := middleware.ActiveEventStatusRequired(eventRepo, "active")
 			admin.PUT("/matches/:match_id/result", resultEntryRequired, tournHandler.UpdateMatchResultHandler)
+			admin.PUT("/board-game-runs/:run_id/tournaments/:tournament_id/rankings", resultEntryRequired, boardGameHandler.SaveRankings)
 			admin.PUT("/noon-game/matches/:match_id/result", resultEntryRequired, noonHandler.RecordMatchResult)
 			admin.POST("/noon-game/sessions/:session_id/typing-system/import", resultEntryRequired, noonHandler.ImportTypingSystemResults)
 			admin.GET("/noon-game/matches/:match_id/template-run", noonHandler.GetTemplateRunByMatchID)
@@ -282,6 +287,8 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.POST("/:id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)
 				rootEvents.GET("/:id/tournaments/export/excel", tournHandler.ExportTournamentsExcelHandler)
 				rootEvents.GET("/:id/tournaments", tournHandler.GetTournamentsByEventHandler)
+				rootEvents.GET("/:id/tournament-templates/board-game/classes", boardGameHandler.ListEligibleClasses)
+				rootEvents.POST("/:id/tournament-templates/board-game/run", boardGameHandler.CreateRun)
 				rootEvents.GET("/:id/noon-game/session", noonHandler.GetSession)
 				rootEvents.POST("/:id/noon-game/session", noonHandler.UpsertSession)
 				rootEvents.GET("/:id/noon-game/sessions", noonHandler.ListSessions)
