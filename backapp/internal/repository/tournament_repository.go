@@ -17,6 +17,7 @@ type TournamentRepository interface {
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
 	GetTournamentSportNamesByEventID(eventID int) ([]string, error)
+	GetTournamentProgressByEventID(eventID int) (map[string]string, error)
 	GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error)
 	GetMatchForEventSport(matchID int, eventID int, sportID int) (*models.MatchDB, error)
 	GetTeamsByTournamentID(tournamentID int) ([]*models.Team, error)
@@ -77,6 +78,41 @@ func (r *tournamentRepository) GetTournamentSportNamesByEventID(eventID int) ([]
 	}
 
 	return sportNames, nil
+}
+
+func (r *tournamentRepository) GetTournamentProgressByEventID(eventID int) (map[string]string, error) {
+	rows, err := r.db.Query(`
+		SELECT s.name,
+			CASE
+				WHEN COUNT(m.id) = 0 THEN '未開始'
+				WHEN SUM(CASE WHEN m.status = 'finished' THEN 1 ELSE 0 END) = COUNT(m.id) THEN '終了'
+				WHEN SUM(CASE WHEN m.status IN ('in_progress', 'finished') THEN 1 ELSE 0 END) > 0 THEN '進行中'
+				ELSE '未開始'
+			END AS progress
+		FROM tournaments t
+		JOIN sports s ON s.id = t.sport_id
+		LEFT JOIN matches m ON m.tournament_id = t.id
+		WHERE t.event_id = ?
+		GROUP BY s.id, s.name
+		ORDER BY s.name
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	progress := make(map[string]string)
+	for rows.Next() {
+		var sportName, status string
+		if err := rows.Scan(&sportName, &status); err != nil {
+			return nil, err
+		}
+		progress[sportName] = status
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return progress, nil
 }
 
 func (r *tournamentRepository) GetTournamentsByEventID(eventID int) ([]*models.Tournament, error) {

@@ -213,7 +213,10 @@ func TestStatisticsHandler_GetRealtimeEventProgress(t *testing.T) {
 		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockTournRepo.On("GetTournamentSportNamesByEventID", 1).Return([]string{"サッカー", "バスケットボール"}, nil).Once()
+		mockTournRepo.On("GetTournamentProgressByEventID", 1).Return(map[string]string{
+			"サッカー":     "終了",
+			"バスケットボール": "未開始",
+		}, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -226,8 +229,8 @@ func TestStatisticsHandler_GetRealtimeEventProgress(t *testing.T) {
 		var resp map[string]string
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, map[string]string{
-			"サッカー":     "進行中",
-			"バスケットボール": "進行中",
+			"サッカー":     "終了",
+			"バスケットボール": "未開始",
 		}, resp)
 
 		mockTournRepo.AssertNotCalled(t, "GetTournamentsByEventID", mock.Anything)
@@ -245,7 +248,7 @@ func TestStatisticsHandler_GetRealtimeEventProgress(t *testing.T) {
 		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockTournRepo.On("GetTournamentSportNamesByEventID", 1).Return([]string{}, nil).Once()
+		mockTournRepo.On("GetTournamentProgressByEventID", 1).Return(map[string]string{}, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -282,7 +285,7 @@ func TestStatisticsHandler_GetRealtimeEventProgress(t *testing.T) {
 		h.GetRealtimeEventProgress(c)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		mockTournRepo.AssertNotCalled(t, "GetTournamentSportNamesByEventID", mock.Anything)
+		mockTournRepo.AssertNotCalled(t, "GetTournamentProgressByEventID", mock.Anything)
 		mockTournRepo.AssertNotCalled(t, "GetTournamentsByEventID", mock.Anything)
 		mockSportRepo.AssertNotCalled(t, "GetSportByID", mock.Anything)
 		mockEventRepo.AssertExpectations(t)
@@ -297,7 +300,7 @@ func TestStatisticsHandler_GetRealtimeEventProgress(t *testing.T) {
 		h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
 
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
-		mockTournRepo.On("GetTournamentSportNamesByEventID", 1).Return(nil, assert.AnError).Once()
+		mockTournRepo.On("GetTournamentProgressByEventID", 1).Return(nil, assert.AnError).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -311,6 +314,37 @@ func TestStatisticsHandler_GetRealtimeEventProgress(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 		mockTournRepo.AssertExpectations(t)
 	})
+}
+
+func TestStatisticsHandler_GetParticipationRateUsesOnlyEventSports(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockEventRepo := new(MockEventRepository)
+	mockClassRepo := new(MockClassRepository)
+	mockSportRepo := new(MockSportRepository)
+	mockTournRepo := new(MockTournamentRepository)
+	h := handler.NewStatisticsHandler(mockClassRepo, mockEventRepo, mockSportRepo, mockTournRepo)
+
+	mockEventRepo.On("GetActiveEvent").Return(7, nil).Once()
+	mockSportRepo.On("GetSportsByEventID", 7).Return([]*models.EventSport{
+		{EventID: 7, SportID: 2, SportName: "バレーボール"},
+	}, nil).Once()
+	mockClassRepo.On("GetAllClasses", 7).Return([]*models.Class{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}}, nil).Once()
+	mockTournRepo.On("CountTeamsBySportForEvent", 7).Return(map[int]int{2: 3, 99: 4}, nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/statistics/participation", nil)
+	h.GetParticipationRateBySport(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var response map[string]float64
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, map[string]float64{"バレーボール": 75}, response)
+	mockSportRepo.AssertNotCalled(t, "GetAllSports")
+	mockEventRepo.AssertExpectations(t)
+	mockSportRepo.AssertExpectations(t)
+	mockClassRepo.AssertExpectations(t)
+	mockTournRepo.AssertExpectations(t)
 }
 
 func TestStatisticsHandler_GetOverallAttendanceRate(t *testing.T) {

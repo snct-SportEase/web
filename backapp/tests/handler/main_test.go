@@ -356,6 +356,14 @@ func (m *MockTournamentRepository) GetTournamentSportNamesByEventID(eventID int)
 	return args.Get(0).([]string), args.Error(1)
 }
 
+func (m *MockTournamentRepository) GetTournamentProgressByEventID(eventID int) (map[string]string, error) {
+	args := m.Called(eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]string), args.Error(1)
+}
+
 func (m *MockTournamentRepository) GetTournamentsByEventAndSportID(eventID int, sportID int) ([]*models.Tournament, error) {
 	args := m.Called(eventID, sportID)
 	if args.Get(0) == nil {

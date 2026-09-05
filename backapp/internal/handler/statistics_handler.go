@@ -59,7 +59,7 @@ func (h *StatisticsHandler) GetParticipationRateBySport(c *gin.Context) {
 		return
 	}
 
-	sports, err := h.sportRepo.GetAllSports()
+	sports, err := h.sportRepo.GetSportsByEventID(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports"})
 		return
@@ -80,12 +80,12 @@ func (h *StatisticsHandler) GetParticipationRateBySport(c *gin.Context) {
 
 	result := make(map[string]float64)
 	for _, sport := range sports {
-		participantCount := participantCounts[sport.ID]
+		participantCount := participantCounts[sport.SportID]
 		rate := 0.0
 		if totalPossible > 0 {
 			rate = float64(participantCount) / float64(totalPossible) * 100
 		}
-		result[sport.Name] = rate
+		result[sport.SportName] = rate
 	}
 
 	c.JSON(http.StatusOK, result)
@@ -146,16 +146,10 @@ func (h *StatisticsHandler) GetRealtimeEventProgress(c *gin.Context) {
 		return
 	}
 
-	// 進捗表示ではトーナメント詳細の組み立ては不要なので、sport名だけJOINで軽く取得する。
-	sportNames, err := h.tournRepo.GetTournamentSportNamesByEventID(eventID)
+	progress, err := h.tournRepo.GetTournamentProgressByEventID(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get tournaments"})
 		return
-	}
-
-	progress := make(map[string]string)
-	for _, sportName := range sportNames {
-		progress[sportName] = "進行中" // Assuming status
 	}
 
 	c.JSON(http.StatusOK, progress)

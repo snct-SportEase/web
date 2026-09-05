@@ -77,8 +77,12 @@
 			ws.onopen = () => {
 				console.log('WebSocket connected');
 			};
-			ws.onmessage = (event) => {
-				eventProgress = JSON.parse(event.data);
+			ws.onmessage = async () => {
+				try {
+					eventProgress = await fetchJson('/api/admin/statistics/progress', { headers });
+				} catch (error) {
+					console.error(error);
+				}
 			};
 			ws.onclose = () => {
 				console.log('WebSocket closed');

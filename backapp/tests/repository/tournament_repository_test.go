@@ -152,6 +152,42 @@ func TestTournamentRepository_GetTournamentSportNamesByEventID(t *testing.T) {
 	})
 }
 
+func TestTournamentRepository_GetTournamentProgressByEventID(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	r := repository.NewTournamentRepository(db)
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT s.name,
+			CASE
+				WHEN COUNT(m.id) = 0 THEN '未開始'
+				WHEN SUM(CASE WHEN m.status = 'finished' THEN 1 ELSE 0 END) = COUNT(m.id) THEN '終了'
+				WHEN SUM(CASE WHEN m.status IN ('in_progress', 'finished') THEN 1 ELSE 0 END) > 0 THEN '進行中'
+				ELSE '未開始'
+			END AS progress
+		FROM tournaments t
+		JOIN sports s ON s.id = t.sport_id
+		LEFT JOIN matches m ON m.tournament_id = t.id
+		WHERE t.event_id = ?
+		GROUP BY s.id, s.name
+		ORDER BY s.name
+	`)).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"name", "progress"}).
+		AddRow("サッカー", "終了").
+		AddRow("バレーボール", "進行中").
+		AddRow("卓球", "未開始"))
+
+	progress, err := r.GetTournamentProgressByEventID(7)
+
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"サッカー":   "終了",
+		"バレーボール": "進行中",
+		"卓球":     "未開始",
+	}, progress)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestTournamentRepository_GetTournamentsByEventID_InferWinnerForTie(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
