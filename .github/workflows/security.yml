@@ -12,34 +12,46 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dependency-review:
     name: Dependency review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Block vulnerable dependency additions
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          fail-on-severity: high
+          fail-on-severity: moderate
           deny-licenses: GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0
 
   glassworm:
     name: GlassWorm indicator scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Detect GlassWorm-style invisible payloads
         run: python3 .github/scripts/detect_glassworm.py
 
   trivy:
     name: Repository, secret, and IaC scan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Scan dependencies, secrets, IaC, and repository files
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -51,16 +63,22 @@ jobs:
           exit-code: '1'
 
   npm-audit:
-    name: Frontend production dependency audit
+    name: Frontend dependency and lockfile audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontapp/package-lock.json
-      - name: Audit frontend production dependencies
+      - name: Verify lockfile without running package scripts
+        working-directory: ./frontapp
+        run: npm ci --ignore-scripts --no-audit
+      - name: Audit all frontend dependencies
         working-directory: ./frontapp
         run: |
           run_audit() {
@@ -70,9 +88,9 @@ jobs:
 
             set +e
             if [ -n "$registry" ]; then
-              output=$(npm audit --omit=dev --audit-level=high --registry="$registry" 2>&1)
+              output=$(npm audit --audit-level=high --registry="$registry" 2>&1)
             else
-              output=$(npm audit --omit=dev --audit-level=high 2>&1)
+              output=$(npm audit --audit-level=high 2>&1)
             fi
             status=$?
             set -e
@@ -108,15 +126,19 @@ jobs:
             exit 1
           fi
 
-          echo "::warning::Both npm audit services are unavailable. Continuing because dependency review and Trivy remain blocking security checks."
+          echo "::error::Both npm audit services are unavailable. Failing closed so an unavailable scanner cannot silently pass."
+          exit 1
 
   govulncheck:
     name: Go reachable vulnerability audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       GOFLAGS: -mod=mod
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -131,8 +153,11 @@ jobs:
   gosec:
     name: Go static security analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: backapp/go.mod
@@ -146,12 +171,15 @@ jobs:
   workflow-security:
     name: GitHub Actions security audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Audit workflows with zizmor
         uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
         with:
           advanced-security: false
           persona: auditor
-          min-severity: high
+          min-severity: medium
           min-confidence: medium
