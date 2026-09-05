@@ -42,8 +42,7 @@
       if (data.event_id) {
         selectedEventId = data.event_id;
         activeEventName = data.event_name;
-        // アクティブイベントの詳細を取得して雨天時モードの状態を確認
-        await fetchActiveEventDetails();
+        isRainyMode = data.is_rainy_mode || false;
         await fetchSports();
         await fetchClasses();
         await fetchTournaments(selectedEventId);
@@ -52,27 +51,20 @@
     await renderBracket();
   });
 
-  async function fetchActiveEventDetails() {
+  async function fetchSports() {
     if (!selectedEventId) return;
-    try {
-      const res = await fetch('/api/root/events');
-      if (res.ok) {
-        const events = await res.json();
-        const activeEvent = events.find(e => e.id === selectedEventId);
-        if (activeEvent) {
-          isRainyMode = activeEvent.is_rainy_mode || false;
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch active event details:', error);
+    const res = await fetch(`/api/events/${selectedEventId}/sports`);
+    if (res.ok) {
+      const assignedSports = await res.json();
+      sports = assignedSports.map((sport) => ({ id: sport.sport_id, name: sport.sport_name }));
     }
   }
 
-  async function fetchSports() {
-    const res = await fetch('/api/admin/allsports');
-    if (res.ok) {
-      sports = await res.json();
-    }
+  async function fetchActiveEventDetails() {
+    const res = await fetch('/api/events/active');
+    if (!res.ok) return;
+    const event = await res.json();
+    isRainyMode = event.is_rainy_mode || false;
   }
 
   async function fetchClasses() {
@@ -91,7 +83,7 @@
     if (!selectedEventId || !selectedSportId) return;
     
     // Fetch teams for this sport to get class information and capacities
-    const teamsRes = await fetch(`/api/root/sports/${selectedSportId}/teams`);
+    const teamsRes = await fetch(`/api/admin/events/${selectedEventId}/sports/${selectedSportId}/teams`);
     if (teamsRes.ok) {
       const teams = await teamsRes.json();
       // Initialize class capacities from teams
@@ -627,7 +619,7 @@
     if (!selectedEventId || !selectedSportId) return;
     
     try {
-      const response = await fetch(`/api/root/events/${selectedEventId}/rainy-mode/settings`);
+      const response = await fetch(`/api/admin/events/${selectedEventId}/rainy-mode/settings`);
       if (response.ok) {
         const payload = await response.json();
         const allSettings = Array.isArray(payload) ? payload : [];
@@ -708,7 +700,7 @@
 
       try {
         const updatePromises = classes.map(async (cls) => {
-          const response = await fetch(`/api/root/events/${selectedEventId}/rainy-mode/settings`, {
+          const response = await fetch(`/api/admin/events/${selectedEventId}/rainy-mode/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -757,7 +749,7 @@
     try {
       // Save each class capacity
       const updatePromises = Object.entries(rainyModeClassCapacities).map(async ([classId, capacity]) => {
-          const response = await fetch(`/api/root/events/${selectedEventId}/rainy-mode/settings`, {
+          const response = await fetch(`/api/admin/events/${selectedEventId}/rainy-mode/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

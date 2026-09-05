@@ -23,18 +23,13 @@
             if (currentEvent) {
                 // イベント情報を再取得して雨天時モードの状態を確認
                 try {
-                    const res = await fetch('/api/root/events');
-                    if (res.ok) {
-                        const events = await res.json();
-                        const active = events.find(e => e.id === currentEvent.id);
-                        if (active) {
-                            const newIsRainyMode = active.is_rainy_mode || false;
-                            if (newIsRainyMode !== isRainyMode || newIsRainyMode) {
-                                // 雨天時モードが変更された場合、または雨天時モードが有効な場合は再取得
-                                isRainyMode = newIsRainyMode;
-                                activeEvent._set(active);
-                                await fetchTournamentsForActiveEvent();
-                            }
+                    const active = await activeEvent.init();
+                    if (active) {
+                        const newIsRainyMode = active.is_rainy_mode || false;
+                        if (newIsRainyMode !== isRainyMode || newIsRainyMode) {
+                            // 雨天時モードが変更された場合、または雨天時モードが有効な場合は再取得
+                            isRainyMode = newIsRainyMode;
+                            await fetchTournamentsForActiveEvent();
                         }
                     }
                 } catch (error) {

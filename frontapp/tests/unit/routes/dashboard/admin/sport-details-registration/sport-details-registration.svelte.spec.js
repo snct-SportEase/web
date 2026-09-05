@@ -32,22 +32,13 @@ describe('Sport Details Registration Page', () => {
       if (url === '/api/events/active') {
         return jsonResponse({
           event_id: 1,
-          event_name: '2025春季スポーツ大会'
+          event_name: '2025春季スポーツ大会',
+          is_rainy_mode: false
         });
       }
 
-      if (url === '/api/root/events') {
-        return jsonResponse([
-          {
-            id: 1,
-            name: '2025春季スポーツ大会',
-            is_rainy_mode: false
-          }
-        ]);
-      }
-
-      if (url === '/api/admin/allsports') {
-        return jsonResponse(sports);
+      if (url === '/api/events/1/sports') {
+        return jsonResponse(sports.map((sport) => ({ sport_id: sport.id, sport_name: sport.name })));
       }
 
       if (url === '/api/admin/class-team/managed-class') {
@@ -67,15 +58,15 @@ describe('Sport Details Registration Page', () => {
         });
       }
 
-      if (url === '/api/root/sports/1/teams') {
+      if (url === '/api/admin/events/1/sports/1/teams') {
         return jsonResponse([]);
       }
 
-      if (url === '/api/root/events/1/rainy-mode/settings' && !options.method) {
+      if (url === '/api/admin/events/1/rainy-mode/settings' && !options.method) {
         return jsonResponse(rainyModeSettings);
       }
 
-      if (url === '/api/root/events/1/rainy-mode/settings' && options.method === 'POST') {
+      if (url === '/api/admin/events/1/rainy-mode/settings' && options.method === 'POST') {
         const body = JSON.parse(options.body);
         const nextSetting = {
           event_id: 1,
@@ -126,6 +117,7 @@ describe('Sport Details Registration Page', () => {
       description: '',
       rules_pdf_url: null
     });
+    expect(fetchMock.mock.calls.some(([url]) => url.startsWith('/api/root/'))).toBe(false);
   });
 
   it('一括設定の雨天時定員を保存できる', async () => {
@@ -146,7 +138,7 @@ describe('Sport Details Registration Page', () => {
     await page.getByRole('button', { name: '雨天時定員設定を保存' }).click();
 
     const saveCalls = fetchMock.mock.calls.filter(([url, options]) => {
-      return url === '/api/root/events/1/rainy-mode/settings' && options?.method === 'POST';
+      return url === '/api/admin/events/1/rainy-mode/settings' && options?.method === 'POST';
     });
 
     const requestBodies = saveCalls
@@ -177,7 +169,7 @@ describe('Sport Details Registration Page', () => {
     await saveButton.click();
 
     const saveCalls = fetchMock.mock.calls.filter(([url, options]) => {
-      return url === '/api/root/events/1/rainy-mode/settings' && options?.method === 'POST';
+      return url === '/api/admin/events/1/rainy-mode/settings' && options?.method === 'POST';
     });
 
     const requestBodies = saveCalls
