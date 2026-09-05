@@ -103,7 +103,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			ws.GET("/progress", wsHandler.ServeProgressWebSocket)
 		}
 
-		api.GET("/classes", classHandler.GetAllClasses)
+		api.GET("/classes", middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"), classHandler.GetAllClasses)
 		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), classHandler.GetClassScores)
 
 		api.GET("/events/active", middleware.AuthMiddleware(userRepo), eventHandler.GetActiveEvent)

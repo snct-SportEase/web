@@ -5,6 +5,12 @@ const BACKEND_URL = env.BACKEND_URL;
 
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ locals, fetch, request }) {
+	const backendHeaders = {
+		cookie: request.headers.get('cookie') ?? ''
+	};
+	const authorization = request.headers.get('authorization');
+	if (authorization) backendHeaders.authorization = authorization;
+
   const returnData = {
     user: locals.user,
     classes: [],
@@ -18,7 +24,7 @@ export async function load({ locals, fetch, request }) {
 
   try {
     // Fetch classes
-    const classesResponse = await fetch(`${BACKEND_URL}/api/classes`);
+    const classesResponse = await fetch(`${BACKEND_URL}/api/classes`, { headers: backendHeaders });
     if (classesResponse.ok) {
       returnData.classes = await classesResponse.json();
     }
@@ -31,9 +37,7 @@ export async function load({ locals, fetch, request }) {
   if (isRoot && locals.user?.is_profile_complete) {
     try {
       const eventResponse = await fetch(`${BACKEND_URL}/api/root/events`, {
-        headers: {
-          'cookie': request.headers.get('cookie'),
-        }
+        headers: backendHeaders
       });
       if (eventResponse.ok) {
         returnData.events = await eventResponse.json();
@@ -47,9 +51,7 @@ export async function load({ locals, fetch, request }) {
   if (classId) {
     try {
       const response = await fetch(`${BACKEND_URL}/api/student/class-progress`, {
-        headers: {
-          cookie: request.headers.get('cookie')
-        }
+        headers: backendHeaders
       });
       if (response.ok) {
         const payload = await response.json();
