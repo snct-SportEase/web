@@ -429,6 +429,11 @@ func (m *MockTournamentRepository) GetTournamentIDByMatchID(matchID int) (int, e
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockTournamentRepository) GetEventIDByMatchID(matchID int) (int, error) {
+	args := m.Called(matchID)
+	return args.Int(0), args.Error(1)
+}
+
 func (m *MockTournamentRepository) ApplyRainyModeStartTimes(eventID int) error {
 	args := m.Called(eventID)
 	return args.Error(0)

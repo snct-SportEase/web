@@ -28,6 +28,7 @@ type TournamentRepository interface {
 	UpdateMatchResult(matchID, team1Score, team2Score, winnerID int) error
 	UpdateMatchResultForCorrection(matchID, team1Score, team2Score, winnerID int) error
 	GetTournamentIDByMatchID(matchID int) (int, error)
+	GetEventIDByMatchID(matchID int) (int, error)
 	ApplyRainyModeStartTimes(eventID int) error
 	IsMatchResultAlreadyEntered(matchID int) (bool, error)
 }
@@ -2060,6 +2061,17 @@ func (r *tournamentRepository) GetTournamentIDByMatchID(matchID int) (int, error
 	var tournamentID int
 	err := r.db.QueryRow("SELECT tournament_id FROM matches WHERE id = ?", matchID).Scan(&tournamentID)
 	return tournamentID, err
+}
+
+func (r *tournamentRepository) GetEventIDByMatchID(matchID int) (int, error) {
+	var eventID int
+	err := r.db.QueryRow(`
+		SELECT t.event_id
+		FROM matches m
+		INNER JOIN tournaments t ON t.id = m.tournament_id
+		WHERE m.id = ?
+	`, matchID).Scan(&eventID)
+	return eventID, err
 }
 
 // ApplyRainyModeStartTimes applies rainy_mode_start_time to match_start_time for all matches in the event's tournaments

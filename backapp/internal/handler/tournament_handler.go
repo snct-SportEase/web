@@ -60,7 +60,6 @@ func (h *TournamentHandler) UpdateMatchRainyModeStartTimeHandler(c *gin.Context)
 	c.JSON(http.StatusOK, gin.H{"message": "Match rainy mode start time updated successfully"})
 }
 
-
 type UpdateMatchResultRequest struct {
 	Team1Score int `json:"team1_score"`
 	Team2Score int `json:"team2_score"`
@@ -71,6 +70,21 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 	matchID, err := strconv.Atoi(c.Param("match_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
+		return
+	}
+	activeEventValue, ok := c.Get("active_event_id")
+	activeEventID, validActiveEvent := activeEventValue.(int)
+	if !ok || !validActiveEvent {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No active event found"})
+		return
+	}
+	matchEventID, err := h.tournRepo.GetEventIDByMatchID(matchID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
+		return
+	}
+	if matchEventID != activeEventID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Match does not belong to the active event"})
 		return
 	}
 
