@@ -1,6 +1,7 @@
 /// <reference types="@sveltejs/kit" />
 import { build, files, version } from '$service-worker';
 import { isApiPath, isCacheableStaticAsset } from '$lib/utils/serviceWorkerCachePolicy.js';
+import { openNotificationTarget } from '$lib/utils/notificationNavigation.js';
 
 // This cache must contain public static assets only. Never put application
 // routes or API responses in Cache Storage because cache keys are not scoped
@@ -110,18 +111,6 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
 	event.notification.close();
 
-	const targetUrl = '/dashboard/student/notification';
-	event.waitUntil(
-		self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-			for (const client of clientList) {
-				if ('focus' in client) {
-					client.focus();
-					return;
-				}
-			}
-			if (self.clients.openWindow) {
-				return self.clients.openWindow(targetUrl);
-			}
-		})
-	);
+	const targetUrl = new URL('/dashboard/student/notification', self.location.origin).href;
+	event.waitUntil(openNotificationTarget(self.clients, targetUrl));
 });

@@ -1,19 +1,20 @@
 <script>
   import { browser } from '$app/environment';
-  import { onMount } from 'svelte';
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
 
   let { show = false, onClose = () => {} } = $props();
 
   let isVisible = $state(false);
 
-  onMount(() => {
-    if (browser && show) {
-      // 少し遅延して表示（ページ読み込み後）
-      setTimeout(() => {
-        isVisible = true;
-      }, 500);
+  $effect(() => {
+    if (!browser || !show) {
+      isVisible = false;
+      return;
     }
+    const timer = setTimeout(() => {
+      isVisible = true;
+    }, 500);
+    return () => clearTimeout(timer);
   });
 
   function handleClose() {
