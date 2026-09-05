@@ -234,6 +234,23 @@ func TestClassRepository_UpdateAttendance(t *testing.T) {
 	})
 }
 
+func TestClassRepository_UpdateStudentCountsRejectsClassFromAnotherEvent(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+	repo := repository.NewClassRepository(db)
+
+	mock.ExpectBegin()
+	mock.ExpectPrepare(regexp.QuoteMeta("UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ?")).
+		ExpectExec().WithArgs(30, 99, 7).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectRollback()
+
+	err = repo.UpdateStudentCounts(7, map[int]int{99: 30})
+
+	assert.ErrorIs(t, err, repository.ErrClassNotFound)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ─── UpdateStudentCounts ───────────────────────────────────────────────────
 
 func TestClassRepository_UpdateStudentCounts(t *testing.T) {

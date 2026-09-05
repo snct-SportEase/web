@@ -5,12 +5,14 @@ import (
 	"backapp/internal/repository"
 	"backapp/internal/safelog"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
@@ -78,11 +80,27 @@ func (h *ClassHandler) UpdateStudentCountsHandler(c *gin.Context) {
 	}
 
 	counts := make(map[int]int)
-	for _, item := range req {
+	for index, item := range req {
+		if item.ClassID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("items[%d].class_id must be greater than zero", index)})
+			return
+		}
+		if item.StudentCount < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("items[%d].student_count must not be negative", index)})
+			return
+		}
+		if _, exists := counts[item.ClassID]; exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("items[%d].class_id is duplicated", index)})
+			return
+		}
 		counts[item.ClassID] = item.StudentCount
 	}
 
 	if err := h.classRepo.UpdateStudentCounts(activeEventID, counts); err != nil {
+		if errors.Is(err, repository.ErrClassNotFound) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Class does not belong to the active event"})
+			return
+		}
 		log.Printf("UpdateStudentCounts error: %s", safelog.Value(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student counts"})
 		return
@@ -129,8 +147,10 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 		return
 	}
 
+	rowNumber := 1
 	for {
 		record, err := reader.Read()
+		rowNumber++
 		if err == io.EOF {
 			break
 		}
@@ -140,23 +160,35 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 			return
 		}
 
+		if len(record) == 1 && strings.TrimSpace(record[0]) == "" {
+			continue
+		}
 		if len(record) < 2 {
-			continue // Skip empty or invalid rows
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d must contain class name and student count", rowNumber)})
+			return
 		}
 
-		className := record[0]
-		studentCountStr := record[1]
+		className := strings.TrimSpace(record[0])
+		studentCountStr := strings.TrimSpace(record[1])
 
 		classID, ok := classNameToID[className]
 		if !ok {
-			// If class name is not found, you might want to log this or handle it
-			continue
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d contains an unknown class: %s", rowNumber, className)})
+			return
 		}
 
 		studentCount, err := strconv.Atoi(studentCountStr)
 		if err != nil {
-			// Handle error for invalid number format
-			continue
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d contains an invalid student count", rowNumber)})
+			return
+		}
+		if studentCount < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d contains a negative student count", rowNumber)})
+			return
+		}
+		if _, exists := counts[classID]; exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d contains a duplicate class: %s", rowNumber, className)})
+			return
 		}
 
 		counts[classID] = studentCount
@@ -168,6 +200,10 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 	}
 
 	if err := h.classRepo.UpdateStudentCounts(activeEventID, counts); err != nil {
+		if errors.Is(err, repository.ErrClassNotFound) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Class does not belong to the active event"})
+			return
+		}
 		log.Printf("UpdateStudentCounts from CSV error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student counts"})
 		return

@@ -3,9 +3,12 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 )
+
+var ErrClassNotFound = errors.New("class not found in event")
 
 type ClassRepository interface {
 	GetAllClasses(eventID int) ([]*models.Class, error)
@@ -199,9 +202,16 @@ func (r *classRepository) UpdateStudentCounts(eventID int, counts map[int]int) e
 	defer stmt.Close()
 
 	for classID, count := range counts {
-		_, err := stmt.Exec(count, classID, eventID)
+		result, err := stmt.Exec(count, classID, eventID)
 		if err != nil {
 			return fmt.Errorf("failed to update student_count for class %d: %w", classID, err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to inspect student_count update for class %d: %w", classID, err)
+		}
+		if affected == 0 {
+			return fmt.Errorf("%w: %d", ErrClassNotFound, classID)
 		}
 	}
 
