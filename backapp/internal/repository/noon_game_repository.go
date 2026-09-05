@@ -28,6 +28,7 @@ type NoonGameRepository interface {
 	DeleteMatch(sessionID int, matchID int) error
 
 	SaveResult(result *models.NoonGameResult) (*models.NoonGameResult, error)
+	SaveMatchResult(result *models.NoonGameResult, points []*models.NoonGamePoint) error
 	GetResultByMatchID(matchID int) (*models.NoonGameResult, error)
 
 	ClearPointsForMatch(matchID int) error
@@ -60,6 +61,8 @@ type NoonGameRepository interface {
 	GetTemplateDefaultGroups(templateKey string) ([]*models.NoonGameTemplateDefaultGroup, error)
 	SaveTemplateDefaultGroups(templateKey string, groups []*models.NoonGameTemplateDefaultGroup) error
 }
+
+var ErrNoonGameMatchParticipantsLocked = errors.New("result-recorded match participants cannot be changed")
 
 type noonGameRepository struct {
 	db *sql.DB
@@ -465,7 +468,9 @@ func (r *noonGameRepository) GetSessionByEvent(eventID int) (*models.NoonGameSes
 		SELECT id, event_id, template_key, name, description, scheduled_at, location, mode, win_points, loss_points, draw_points,
 		       participation_points, allow_manual_points, status, created_at, updated_at
 		FROM noon_game_sessions
-		WHERE event_id = ? ORDER BY id LIMIT 1
+		WHERE event_id = ?
+		ORDER BY status = 'published' DESC, scheduled_at IS NULL, scheduled_at, id
+		LIMIT 1
 	`, eventID)
 
 	session := &models.NoonGameSession{}
@@ -1441,6 +1446,82 @@ func (r *noonGameRepository) SaveResult(result *models.NoonGameResult) (*models.
 	return r.GetResultByMatchID(result.MatchID)
 }
 
+// SaveMatchResult replaces all result-derived data for a match atomically.
+// This prevents a failed correction from leaving old points deleted or a match
+// status out of sync with its result.
+func (r *noonGameRepository) SaveMatchResult(result *models.NoonGameResult, points []*models.NoonGamePoint) error {
+	if result == nil || result.MatchID == 0 {
+		return fmt.Errorf("valid result is required")
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM noon_game_points WHERE match_id = ?`, result.MatchID); err != nil {
+		return err
+	}
+
+	if len(points) > 0 {
+		stmt, err := tx.Prepare(`
+			INSERT INTO noon_game_points (session_id, match_id, class_id, points, reason, source, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`)
+		if err != nil {
+			return err
+		}
+		for _, point := range points {
+			if point == nil {
+				continue
+			}
+			if _, err := stmt.Exec(
+				point.SessionID,
+				nullableInt(point.MatchID),
+				point.ClassID,
+				point.Points,
+				nullableString(point.Reason),
+				point.Source,
+				point.CreatedBy,
+			); err != nil {
+				stmt.Close()
+				return err
+			}
+		}
+		if err := stmt.Close(); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(`
+		INSERT INTO noon_game_results (match_id, winner, recorded_by, recorded_at, note)
+		VALUES (?, ?, ?, NOW(), ?)
+		ON DUPLICATE KEY UPDATE
+			winner = VALUES(winner),
+			recorded_by = VALUES(recorded_by),
+			recorded_at = NOW(),
+			note = VALUES(note)
+	`, result.MatchID, result.Winner, result.RecordedBy, result.Note); err != nil {
+		return err
+	}
+
+	var resultID int
+	if err := tx.QueryRow(`SELECT id FROM noon_game_results WHERE match_id = ?`, result.MatchID).Scan(&resultID); err != nil {
+		return err
+	}
+	if result.Details != nil {
+		if err := r.replaceResultDetailsTx(tx, resultID, result.Details); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`UPDATE noon_game_matches SET status = ?, updated_at = ? WHERE id = ?`, "completed", time.Now(), result.MatchID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (r *noonGameRepository) GetResultByMatchID(matchID int) (*models.NoonGameResult, error) {
 	row := r.db.QueryRow(`
 		SELECT id, match_id, winner, recorded_by, recorded_at, note
@@ -1999,22 +2080,35 @@ func (r *noonGameRepository) replaceMatchEntriesTx(tx *sql.Tx, matchID int, entr
 		return nil
 	}
 
-	if _, err := tx.Exec(`DELETE FROM noon_game_match_entries WHERE match_id = ?`, matchID); err != nil {
-		return err
+	type storedEntry struct {
+		index            int
+		sideType         string
+		classID, groupID sql.NullInt64
 	}
-
-	if len(entries) == 0 {
-		return nil
-	}
-
-	stmt, err := tx.Prepare(`
-		INSERT INTO noon_game_match_entries (match_id, entry_index, side_type, class_id, group_id, display_name)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`)
+	existing := make(map[int]storedEntry)
+	rows, err := tx.Query(`SELECT id, entry_index, side_type, class_id, group_id FROM noon_game_match_entries WHERE match_id = ?`, matchID)
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	for rows.Next() {
+		var id int
+		var stored storedEntry
+		if err := rows.Scan(&id, &stored.index, &stored.sideType, &stored.classID, &stored.groupID); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[id] = stored
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	var hasResult bool
+	if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM noon_game_results WHERE match_id = ?)`, matchID).Scan(&hasResult); err != nil {
+		return err
+	}
+
+	seen := make(map[int]bool)
 
 	for index, entry := range entries {
 		if entry == nil {
@@ -2035,8 +2129,36 @@ func (r *noonGameRepository) replaceMatchEntriesTx(tx *sql.Tx, matchID int, entr
 			classVal = nil
 		}
 
-		if _, err := stmt.Exec(matchID, index, sideType, classVal, groupVal, displayVal); err != nil {
-			return err
+		if entry.ID > 0 {
+			stored, ok := existing[entry.ID]
+			if !ok || seen[entry.ID] {
+				return fmt.Errorf("invalid noon game match entry id: %d", entry.ID)
+			}
+			if hasResult && (stored.index != index || stored.sideType != sideType || !sameNullableInt(stored.classID, entry.ClassID) || !sameNullableInt(stored.groupID, entry.GroupID)) {
+				return ErrNoonGameMatchParticipantsLocked
+			}
+			if _, err := tx.Exec(`
+				UPDATE noon_game_match_entries
+				SET entry_index = ?, side_type = ?, class_id = ?, group_id = ?, display_name = ?
+				WHERE id = ? AND match_id = ?
+			`, index, sideType, classVal, groupVal, displayVal, entry.ID, matchID); err != nil {
+				return err
+			}
+			seen[entry.ID] = true
+		} else {
+			if hasResult {
+				return ErrNoonGameMatchParticipantsLocked
+			}
+			res, err := tx.Exec(`
+				INSERT INTO noon_game_match_entries (match_id, entry_index, side_type, class_id, group_id, display_name)
+				VALUES (?, ?, ?, ?, ?, ?)
+			`, matchID, index, sideType, classVal, groupVal, displayVal)
+			if err != nil {
+				return err
+			}
+			if id, err := res.LastInsertId(); err == nil {
+				entry.ID = int(id)
+			}
 		}
 
 		entry.MatchID = matchID
@@ -2050,7 +2172,26 @@ func (r *noonGameRepository) replaceMatchEntriesTx(tx *sql.Tx, matchID int, entr
 		}
 	}
 
+	for id := range existing {
+		if seen[id] {
+			continue
+		}
+		if hasResult {
+			return ErrNoonGameMatchParticipantsLocked
+		}
+		if _, err := tx.Exec(`DELETE FROM noon_game_match_entries WHERE id = ? AND match_id = ?`, id, matchID); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func sameNullableInt(stored sql.NullInt64, value *int) bool {
+	if !stored.Valid {
+		return value == nil
+	}
+	return value != nil && int(stored.Int64) == *value
 }
 
 func (r *noonGameRepository) replaceResultDetailsTx(tx *sql.Tx, resultID int, details []*models.NoonGameResultDetail) error {

@@ -272,6 +272,9 @@ func (h *NoonGameHandler) RecordBorrowingRaceResult(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "session not found"})
 		return
 	}
+	if !ensureNoonSessionIsActive(c, session) {
+		return
+	}
 
 	entryByID := make(map[int]*models.NoonGameMatchEntry, len(match.Entries))
 	for _, entry := range match.Entries {

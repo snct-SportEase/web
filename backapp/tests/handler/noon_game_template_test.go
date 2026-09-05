@@ -219,6 +219,11 @@ func (m *MockNoonGameRepository) SaveResult(result *models.NoonGameResult) (*mod
 	return args.Get(0).(*models.NoonGameResult), args.Error(1)
 }
 
+func (m *MockNoonGameRepository) SaveMatchResult(result *models.NoonGameResult, points []*models.NoonGamePoint) error {
+	args := m.Called(result, points)
+	return args.Error(0)
+}
+
 func (m *MockNoonGameRepository) GetResultByMatchID(matchID int) (*models.NoonGameResult, error) {
 	args := m.Called(matchID)
 	if args.Get(0) == nil {
