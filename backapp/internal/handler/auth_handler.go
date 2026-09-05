@@ -61,6 +61,7 @@ func NewAuthHandler(cfg *config.Config, userRepo repository.UserRepository, even
 			ClientSecret: cfg.GoogleClientSecret,
 			RedirectURL:  cfg.GoogleRedirectURL,
 			Scopes:       []string{"openid", "email"},
+			// #nosec G101 -- These are public Google OAuth provider endpoints, not credentials.
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
 				TokenURL: "https://oauth2.googleapis.com/token",

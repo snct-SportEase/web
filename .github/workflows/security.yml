@@ -166,7 +166,48 @@ jobs:
         working-directory: ./backapp
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
-          gosec -quiet -severity medium -confidence medium ./...
+          gosec -quiet -severity medium -confidence low ./...
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+      - name: Set up Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: backapp/go.mod
+          cache-dependency-path: backapp/go.sum
+      - name: Build Go application for CodeQL
+        if: matrix.language == 'go'
+        working-directory: ./backapp
+        run: go build ./...
+      - name: Analyze
+        uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+        with:
+          category: /language:${{ matrix.language }}
 
   workflow-security:
     name: GitHub Actions security audit
