@@ -188,6 +188,31 @@ func TestTournamentRepository_GetTournamentProgressByEventID(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestTournamentRepository_DeleteTournamentsClosesRowsBeforeDelete(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	r := repository.NewTournamentRepository(db)
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM tournaments WHERE event_id = ?")).
+		WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10).AddRow(11)).
+		RowsWillBeClosed()
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM matches WHERE tournament_id IN (?,?)")).
+		WithArgs(10, 11).
+		WillReturnResult(sqlmock.NewResult(0, 4))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM tournaments WHERE id IN (?,?)")).
+		WithArgs(10, 11).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectCommit()
+
+	err = r.DeleteTournamentsByEventID(7)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestTournamentRepository_GetTournamentsByEventID_InferWinnerForTie(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

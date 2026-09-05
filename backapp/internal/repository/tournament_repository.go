@@ -1352,8 +1352,6 @@ func (r *tournamentRepository) DeleteTournamentsByEventID(eventID int) error {
 		tx.Rollback()
 		return err
 	}
-	defer rows.Close()
-
 	var tournamentIDs []int
 	for rows.Next() {
 		var id int
@@ -1362,6 +1360,15 @@ func (r *tournamentRepository) DeleteTournamentsByEventID(eventID int) error {
 			return err
 		}
 		tournamentIDs = append(tournamentIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		tx.Rollback()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		tx.Rollback()
+		return err
 	}
 
 	if len(tournamentIDs) > 0 {
@@ -1402,8 +1409,6 @@ func (r *tournamentRepository) DeleteTournamentsByEventAndSportID(eventID int, s
 		tx.Rollback()
 		return err
 	}
-	defer rows.Close()
-
 	var tournamentIDs []int
 	for rows.Next() {
 		var id int
@@ -1412,6 +1417,15 @@ func (r *tournamentRepository) DeleteTournamentsByEventAndSportID(eventID int, s
 			return err
 		}
 		tournamentIDs = append(tournamentIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		tx.Rollback()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		tx.Rollback()
+		return err
 	}
 
 	if len(tournamentIDs) > 0 {
