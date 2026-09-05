@@ -1181,4 +1181,21 @@ func TestSportHandler_UpdateSportDetailsHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
+
+	t.Run("Not Found - Sport is not assigned to event", func(t *testing.T) {
+		mockSportRepo := new(MockSportRepository)
+		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
+		mockSportRepo.On("UpdateSportDetails", 1, 99, mock.Anything).Return(repository.ErrEventSportNotFound).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "event_id", Value: "1"}, {Key: "sport_id", Value: "99"}}
+		c.Request = httptest.NewRequest(http.MethodPut, "/", bytes.NewBufferString(`{"description":"test"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpdateSportDetailsHandler(c)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		mockSportRepo.AssertExpectations(t)
+	})
 }

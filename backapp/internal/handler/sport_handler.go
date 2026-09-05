@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -307,6 +308,10 @@ func (h *SportHandler) UpdateSportDetailsHandler(c *gin.Context) {
 	}
 
 	if err := h.sportRepo.UpdateSportDetails(eventID, sportID, details); err != nil {
+		if errors.Is(err, repository.ErrEventSportNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Sport is not assigned to this event"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update sport details"})
 		return
 	}
@@ -354,6 +359,10 @@ func (h *SportHandler) UpdateCapacityHandler(c *gin.Context) {
 	currentDetails.MaxCapacity = req.MaxCapacity
 
 	if err := h.sportRepo.UpdateSportDetails(eventID, sportID, *currentDetails); err != nil {
+		if errors.Is(err, repository.ErrEventSportNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Sport is not assigned to this event"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update capacity"})
 		return
 	}

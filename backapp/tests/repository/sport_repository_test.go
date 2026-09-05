@@ -75,6 +75,17 @@ func TestSportRepository_GetAllSports(t *testing.T) {
 		assert.Nil(t, sports)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+
+	t.Run("not assigned to event", func(t *testing.T) {
+		repo, mock, close := setupSport(t)
+		defer close()
+
+		mock.ExpectExec(regexp.QuoteMeta(q)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+
+		assert.ErrorIs(t, repo.UpdateSportDetails(1, 99, models.EventSport{}), repository.ErrEventSportNotFound)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 // ─── GetSportByID ──────────────────────────────────────────────────────────

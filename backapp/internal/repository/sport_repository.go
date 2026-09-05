@@ -22,6 +22,8 @@ type SportRepository interface {
 	UpdateSportDetails(eventID int, sportID int, details models.EventSport) error
 }
 
+var ErrEventSportNotFound = errors.New("sport is not assigned to event")
+
 type sportRepository struct {
 	db *sql.DB
 }
@@ -215,6 +217,16 @@ func (r *sportRepository) GetSportDetails(eventID int, sportID int) (*models.Eve
 
 func (r *sportRepository) UpdateSportDetails(eventID int, sportID int, details models.EventSport) error {
 	query := "UPDATE event_sports SET description = ?, rules_pdf_url = ?, min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ?"
-	_, err := r.db.Exec(query, details.Description, details.RulesPdfURL, details.MinCapacity, details.MaxCapacity, eventID, sportID)
-	return err
+	result, err := r.db.Exec(query, details.Description, details.RulesPdfURL, details.MinCapacity, details.MaxCapacity, eventID, sportID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrEventSportNotFound
+	}
+	return nil
 }
