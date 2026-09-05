@@ -54,8 +54,10 @@
                 fetch(`/api/admin/events/${currentEvent.id}/board-game-runs`),
             ]);
             if (!classesResponse.ok || !runsResponse.ok) throw new Error('盤上競技設定の取得に失敗しました');
-            boardGameClasses = await classesResponse.json();
-            boardGameRuns = await runsResponse.json();
+            const classesData = await classesResponse.json();
+            const runsData = await runsResponse.json();
+            boardGameClasses = Array.isArray(classesData) ? classesData : [];
+            boardGameRuns = Array.isArray(runsData) ? runsData : [];
             loadBoardGameForm(boardGameType);
         } catch (error) {
             console.error('Error fetching board-game setup:', error);

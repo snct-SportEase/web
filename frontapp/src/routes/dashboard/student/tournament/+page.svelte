@@ -84,7 +84,12 @@
                 console.error('Failed to fetch tournaments');
                 allTournaments = [];
             }
-            boardGameRuns = boardGameResponse.ok ? await boardGameResponse.json() : [];
+			if (boardGameResponse.ok) {
+				const boardGameData = await boardGameResponse.json();
+				boardGameRuns = Array.isArray(boardGameData) ? boardGameData : [];
+			} else {
+				boardGameRuns = [];
+			}
         } catch (error) {
             console.error('Error fetching tournaments:', error);
             allTournaments = [];

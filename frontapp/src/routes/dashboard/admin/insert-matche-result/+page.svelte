@@ -169,7 +169,10 @@
 	async function fetchBoardGameRuns() {
 		if (!activeEventId) return;
 		const response = await fetch(`/api/admin/events/${activeEventId}/board-game-runs`);
-		if (response.ok) boardGameRuns = await response.json();
+		if (response.ok) {
+			const data = await response.json();
+			boardGameRuns = Array.isArray(data) ? data : [];
+		}
 	}
 
 	function updateRankingSelection(index, value) {
