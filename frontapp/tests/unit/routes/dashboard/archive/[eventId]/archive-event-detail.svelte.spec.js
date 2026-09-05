@@ -138,10 +138,21 @@ describe('Archive Event Detail Page', () => {
         });
       }
 
-      if (url === '/api/student/events/1/noon-game/session') {
+      if (url === '/api/student/events/1/noon-game/sessions') {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
+            sessions: [{ id: 3, name: '学年対抗リレー' }]
+          })
+        });
+      }
+
+      if (url === '/api/student/events/1/noon-game/sessions/3') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: 3,
+            name: '学年対抗リレー',
             matches: mockRelayMatches
           })
         });
