@@ -18,6 +18,10 @@
 	let showConfirmModal = $state(false);
 	let scoresToSubmit = $state(null);
 	let isRainyMode = $state(false);
+	let boardGameRuns = $state([]);
+	let rankingSelections = $state([]);
+	let rankingTournamentId = $state(null);
+	let isSavingRankings = $state(false);
 
 	let ws;
 
@@ -39,6 +43,7 @@
 						.then((data) => {
 							tournaments = data;
 						});
+					fetchBoardGameRuns();
 				}
 			};
 
@@ -74,6 +79,7 @@
 				const tournamentsResponse = await fetch(`/api/admin/events/${activeEventId}/tournaments`);
 				if (!tournamentsResponse.ok) throw new Error('Failed to fetch tournaments');
 				tournaments = await tournamentsResponse.json();
+				await fetchBoardGameRuns();
 			}
 		} catch (error) {
 			console.error(error);
@@ -144,6 +150,7 @@
 			// Refresh tournaments data
 			const tournamentsResponse = await fetch(`/api/admin/events/${activeEventId}/tournaments`);
 			tournaments = await tournamentsResponse.json();
+			await fetchBoardGameRuns();
 		} else {
 			let errorMessage = '試合結果の更新に失敗しました';
 			if (response.status === 403) {
@@ -160,6 +167,53 @@
 	}
 
 	let selectedTournament = $derived(tournaments.find((t) => t.id === selectedTournamentId));
+	let selectedBoardGame = $derived.by(() => {
+		for (const run of boardGameRuns) {
+			const tournament = run.tournaments?.find((item) => item.id === selectedTournamentId);
+			if (tournament) return { run, tournament };
+		}
+		return null;
+	});
+
+	async function fetchBoardGameRuns() {
+		if (!activeEventId) return;
+		const response = await fetch(`/api/admin/events/${activeEventId}/board-game-runs`);
+		if (response.ok) boardGameRuns = await response.json();
+	}
+
+	function updateRankingSelection(index, value) {
+		const next = [...rankingSelections];
+		next[index] = value ? Number(value) : '';
+		rankingSelections = next;
+	}
+
+	async function saveBoardGameRankings() {
+		if (!selectedBoardGame || activeEventStatus !== 'active') {
+			alert('順位は開催中の大会でのみ登録できます。');
+			return;
+		}
+		const required = Math.min(4, selectedBoardGame.tournament.entries.length);
+		if (rankingSelections.slice(0, required).some((value) => !value) || new Set(rankingSelections.slice(0, required)).size !== required) {
+			alert('1位から順に、重複しない出場枠を選択してください。');
+			return;
+		}
+		isSavingRankings = true;
+		try {
+			const response = await fetch(`/api/admin/board-game-runs/${selectedBoardGame.run.id}/tournaments/${selectedBoardGame.tournament.id}/rankings`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ rankings: rankingSelections.slice(0, required).map((entryID, index) => ({ entry_id: entryID, rank: index + 1 })) }),
+			});
+			const result = await response.json();
+			if (!response.ok) throw new Error(result.error || '順位の登録に失敗しました');
+			boardGameRuns = boardGameRuns.map((run) => run.id === result.id ? result : run);
+			alert('順位点を登録しました。');
+		} catch (error) {
+			alert(error.message || '順位の登録に失敗しました');
+		} finally {
+			isSavingRankings = false;
+		}
+	}
 	// 敗者戦トーナメントが選択されていて、雨天時モードが無効な場合は選択を解除
 	$effect(() => {
 		if (selectedTournament && selectedTournament.name.includes('敗者戦') && !isRainyMode) {
@@ -193,6 +247,17 @@
 			renderBracket();
 		}
 	});
+
+	$effect(() => {
+		if (selectedBoardGame && rankingTournamentId !== selectedBoardGame.tournament.id) {
+			rankingTournamentId = selectedBoardGame.tournament.id;
+			const byRank = [...(selectedBoardGame.tournament.rankings || [])].sort((a, b) => a.rank - b.rank);
+			rankingSelections = byRank.map((ranking) => ranking.entry_id);
+		} else if (!selectedBoardGame) {
+			rankingTournamentId = null;
+			rankingSelections = [];
+		}
+	});
 </script>
 
 <h1 class="text-2xl font-bold mb-4">試合結果入力</h1>
@@ -224,6 +289,34 @@
 
 {#if selectedTournament}
 	<h2 class="text-xl font-bold mt-6 mb-2">{selectedTournament.name}</h2>
+	{#if selectedBoardGame}
+		<section class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<h3 class="font-semibold">盤上競技の順位登録</h3>
+					<p class="text-sm text-gray-600">会場: {selectedBoardGame.run.location}／1勝 {selectedBoardGame.run.win_points}点。全試合の結果入力後に確定してください。</p>
+				</div>
+				{#if selectedBoardGame.run.rules_pdf_url}
+					<a class="text-sm text-blue-700 underline" href={selectedBoardGame.run.rules_pdf_url} target="_blank" rel="noreferrer">ルールPDF</a>
+				{/if}
+			</div>
+			<div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+				{#each Array.from({ length: Math.min(4, selectedBoardGame.tournament.entries.length) }, (_, index) => index) as rankIndex (rankIndex)}
+					<label class="text-sm font-medium">{rankIndex + 1}位（{selectedBoardGame.run.rank_points?.[String(rankIndex + 1)] ?? 0}点）
+						<select class="mt-1 w-full rounded-md border-gray-300" value={rankingSelections[rankIndex] || ''} onchange={(event) => updateRankingSelection(rankIndex, event.currentTarget.value)}>
+							<option value="">選択してください</option>
+							{#each selectedBoardGame.tournament.entries as entry (entry.id)}
+								<option value={entry.id}>{entry.team_name}</option>
+							{/each}
+						</select>
+					</label>
+				{/each}
+			</div>
+			<button class="mt-3 rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50" disabled={isSavingRankings || activeEventStatus !== 'active'} onclick={saveBoardGameRankings}>
+				{isSavingRankings ? '登録中...' : selectedBoardGame.tournament.rankings?.length ? '順位を修正して再集計' : '順位を確定して得点へ反映'}
+			</button>
+		</section>
+	{/if}
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 		{#each selectedTournament.data.matches as match (match.id)}
 			{@const isLoserBracketMatch = match.isLoserBracketMatch}
