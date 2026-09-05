@@ -106,6 +106,9 @@ func (h *TournamentHandler) generateTournamentsPreviewForSport(eventID int, even
 	if eventSport.Location == "noon_game" {
 		return generatedTournaments
 	}
+	if eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament" {
+		return generatedTournaments
+	}
 	roundBusyClasses := make(map[int]map[int]bool)
 	sport, err := h.sportRepo.GetSportByID(eventSport.SportID)
 	if err != nil {

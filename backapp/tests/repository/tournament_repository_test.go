@@ -11,6 +11,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTournamentRepository_GetTournamentsByEventID(t *testing.T) {
@@ -708,5 +709,55 @@ func TestTournamentRepository_IsMatchResultAlreadyEntered(t *testing.T) {
 	alreadyEntered, err := r.IsMatchResultAlreadyEntered(42)
 	assert.NoError(t, err)
 	assert.True(t, alreadyEntered)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTournamentRepository_UpdateMatchResultAwardsBoardGameWinPoints(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := repository.NewTournamentRepository(db)
+	const (
+		matchID      = 80
+		tournamentID = 40
+		eventID      = 3
+		runID        = 9
+		classID      = 12
+	)
+	team1ID, team2ID := int64(101), int64(102)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		WithArgs(matchID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
+			AddRow(matchID, tournamentID, 1, 0, team1ID, team2ID, nil, "scheduled", nil, "", false, false, nil, nil, nil))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
+		WithArgs(tournamentID).
+		WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(eventID, 7, "other"))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_rainy_mode FROM events WHERE id = ?")).
+		WithArgs(eventID).
+		WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?")).
+		WithArgs(1, 0, matchID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT MAX(round) FROM matches WHERE tournament_id = ?")).
+		WithArgs(tournamentID).
+		WillReturnRows(sqlmock.NewRows([]string{"max"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
+		WithArgs(tournamentID).
+		WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(eventID, 7, "other"))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT r.id,r.win_points FROM board_game_runs r JOIN tournaments t ON t.event_id=r.event_id AND t.sport_id=r.sport_id WHERE t.id=?")).
+		WithArgs(tournamentID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "win_points"}).AddRow(runID, 5))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
+		WithArgs(team1ID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team1ID, "IS3 A", classID, 7, eventID))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id) VALUES (?,?,?,?,?,?)")).
+		WithArgs(eventID, classID, 5, "board_game_win_points", matchID, runID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	require.NoError(t, repo.UpdateMatchResult(matchID, 1, 0, 0))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

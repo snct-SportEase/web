@@ -14,6 +14,7 @@ type EventSport struct {
 	Description *string `json:"description"`
 	RulesPdfURL *string `json:"rules_pdf_url"`
 	Location    string  `json:"location"`
+	TemplateKey *string `json:"template_key,omitempty"`
 	MinCapacity *int    `json:"min_capacity"`
 	MaxCapacity *int    `json:"max_capacity"`
 }

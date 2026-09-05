@@ -1032,6 +1032,21 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 	if err != nil {
 		return err
 	}
+	if location == "other" {
+		if runID, winPoints, ok, err := boardGameScoringConfig(tx, match.TournamentID); err != nil {
+			return err
+		} else if ok {
+			winnerTeam, err := r.getTeamByIDTx(tx, winnerID)
+			if err != nil {
+				return err
+			}
+			if winnerTeam == nil || winnerTeam.EventID != eventID {
+				return nil
+			}
+			_, err = tx.Exec(`INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id) VALUES (?,?,?,?,?,?)`, eventID, winnerTeam.ClassID, winPoints, "board_game_win_points", match.ID, runID)
+			return err
+		}
+	}
 
 	if location == "noon_game" {
 		return nil
@@ -1880,6 +1895,14 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	if previousWinnerID == 0 || previousLoserID == 0 {
 		return nil
 	}
+	if location == "other" {
+		if _, _, ok, err := boardGameScoringConfig(tx, match.TournamentID); err != nil {
+			return err
+		} else if ok {
+			_, err = tx.Exec("DELETE FROM score_logs WHERE source_match_id=? AND reason='board_game_win_points'", match.ID)
+			return err
+		}
+	}
 
 	if location == "noon_game" {
 		return nil
@@ -1960,6 +1983,18 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	}
 
 	return nil
+}
+
+func boardGameScoringConfig(tx *sql.Tx, tournamentID int) (int, int, bool, error) {
+	var runID, winPoints int
+	err := tx.QueryRow(`SELECT r.id,r.win_points FROM board_game_runs r JOIN tournaments t ON t.event_id=r.event_id AND t.sport_id=r.sport_id WHERE t.id=?`, tournamentID).Scan(&runID, &winPoints)
+	if err == sql.ErrNoRows {
+		return 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return runID, winPoints, true, nil
 }
 
 func isEffectiveBronzeMatch(match *models.MatchDB, totalRounds int) bool {

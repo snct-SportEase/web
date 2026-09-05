@@ -17,6 +17,16 @@
     let teamsForEditing = $state([]);
     const flipDurationMs = 300;
 
+    let boardGameClasses = $state([]);
+    let boardGameRuns = $state([]);
+    let boardGameType = $state('shogi');
+    let selectedBoardClassIDs = $state([]);
+    let boardRosters = $state({});
+    let boardSeedOrders = $state({ A: [], B: [], MAIN: [] });
+    let boardGameForm = $state({ name: '将棋', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 5, rank1: 40, rank2: 30, rank3: 20, rank4: 10, regularMinutes: 15, finalMinutes: 30, rulesPdfUrl: '' });
+    let boardGamePdfFile = $state(null);
+    let isSavingBoardGame = $state(false);
+
     onMount(async () => {
         if (browser) {
             const bracketryModule = await import('bracketry');
@@ -25,9 +35,180 @@
         await activeEvent.init();
         const currentEvent = get(activeEvent);
         if (currentEvent) {
-            fetchTournamentsForActiveEvent();
+            await Promise.all([fetchTournamentsForActiveEvent(), fetchBoardGameSetup()]);
         }
     });
+
+    function defaultBoardGameForm(type) {
+        return type === 'shogi'
+            ? { name: '将棋', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 5, rank1: 40, rank2: 30, rank3: 20, rank4: 10, regularMinutes: 15, finalMinutes: 30, rulesPdfUrl: '' }
+            : { name: 'オセロ', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 10, rank1: 50, rank2: 40, rank3: 30, rank4: 20, regularMinutes: 10, finalMinutes: 20, rulesPdfUrl: '' };
+    }
+
+    async function fetchBoardGameSetup() {
+        const currentEvent = get(activeEvent);
+        if (!currentEvent) return;
+        try {
+            const [classesResponse, runsResponse] = await Promise.all([
+                fetch(`/api/root/events/${currentEvent.id}/tournament-templates/board-game/classes`),
+                fetch(`/api/admin/events/${currentEvent.id}/board-game-runs`),
+            ]);
+            if (!classesResponse.ok || !runsResponse.ok) throw new Error('盤上競技設定の取得に失敗しました');
+            const classesData = await classesResponse.json();
+            const runsData = await runsResponse.json();
+            boardGameClasses = Array.isArray(classesData) ? classesData : [];
+            boardGameRuns = Array.isArray(runsData) ? runsData : [];
+            loadBoardGameForm(boardGameType);
+        } catch (error) {
+            console.error('Error fetching board-game setup:', error);
+        }
+    }
+
+    function loadBoardGameForm(type) {
+        boardGameType = type;
+        boardGamePdfFile = null;
+        const run = boardGameRuns.find((item) => item.game_type === type);
+        if (!run) {
+            boardGameForm = defaultBoardGameForm(type);
+            selectedBoardClassIDs = [];
+            boardRosters = {};
+            boardSeedOrders = { A: [], B: [], MAIN: [] };
+            return;
+        }
+        boardGameForm = {
+            name: run.name,
+            description: run.description || '',
+            location: run.location,
+            scheduledDate: run.scheduled_date || '',
+            winPoints: run.win_points,
+            rank1: run.rank_points?.['1'] ?? 0,
+            rank2: run.rank_points?.['2'] ?? 0,
+            rank3: run.rank_points?.['3'] ?? 0,
+            rank4: run.rank_points?.['4'] ?? 0,
+            regularMinutes: run.regular_minutes,
+            finalMinutes: run.final_minutes,
+            rulesPdfUrl: run.rules_pdf_url || '',
+        };
+        const firstTournament = run.tournaments?.[0];
+        selectedBoardClassIDs = (firstTournament?.entries || []).map((entry) => entry.class_id);
+        const nextRosters = {};
+        for (const tournament of run.tournaments || []) {
+            const sortedEntries = [...(tournament.entries || [])].sort((a, b) => a.seed_number - b.seed_number);
+            boardSeedOrders[tournament.slot_key] = sortedEntries.map((entry) => entry.class_id);
+            for (const entry of sortedEntries) {
+                nextRosters[entry.class_id] ||= { players: [], substitutes: [] };
+                const players = entry.members.filter((member) => !member.is_substitute).map((member) => member.user_id);
+                const substitutes = entry.members.filter((member) => member.is_substitute).map((member) => member.user_id);
+                if (type === 'shogi') {
+                    const playerIndex = tournament.slot_key === 'B' ? 1 : 0;
+                    nextRosters[entry.class_id].players[playerIndex] = players[0] || '';
+                    nextRosters[entry.class_id].substitutes = substitutes;
+                } else {
+                    nextRosters[entry.class_id].players = players;
+                }
+            }
+        }
+        boardRosters = nextRosters;
+        boardSeedOrders = { ...boardSeedOrders };
+    }
+
+    function toggleBoardClass(classID, checked) {
+        if (checked) {
+            selectedBoardClassIDs = [...selectedBoardClassIDs, classID];
+            boardRosters = { ...boardRosters, [classID]: { players: [], substitutes: [] } };
+            for (const slot of ['A', 'B', 'MAIN']) boardSeedOrders[slot] = [...boardSeedOrders[slot], classID];
+        } else {
+            selectedBoardClassIDs = selectedBoardClassIDs.filter((id) => id !== classID);
+            const nextRosters = { ...boardRosters };
+            delete nextRosters[classID];
+            boardRosters = nextRosters;
+            for (const slot of ['A', 'B', 'MAIN']) boardSeedOrders[slot] = boardSeedOrders[slot].filter((id) => id !== classID);
+        }
+        boardSeedOrders = { ...boardSeedOrders };
+    }
+
+    function updateRoster(classID, kind, index, value) {
+        const roster = boardRosters[classID] || { players: [], substitutes: [] };
+        const values = [...(roster[kind] || [])];
+        values[index] = value;
+        boardRosters = { ...boardRosters, [classID]: { ...roster, [kind]: values } };
+    }
+
+    function moveBoardSeed(slot, index, direction) {
+        const target = index + direction;
+        const order = [...boardSeedOrders[slot]];
+        if (target < 0 || target >= order.length) return;
+        [order[index], order[target]] = [order[target], order[index]];
+        boardSeedOrders = { ...boardSeedOrders, [slot]: order };
+    }
+
+    function boardClassName(classID) {
+        return boardGameClasses.find((item) => item.id === classID)?.name || String(classID);
+    }
+
+    function boardMemberLabel(member) {
+        return member.display_name || member.email;
+    }
+
+    async function uploadBoardGamePdf() {
+        if (!boardGamePdfFile) return boardGameForm.rulesPdfUrl || null;
+        const formData = new FormData();
+        formData.append('pdf', boardGamePdfFile);
+        const response = await fetch('/api/admin/pdfs', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'ルールPDFのアップロードに失敗しました');
+        return result.url;
+    }
+
+    async function saveBoardGameRun() {
+        const currentEvent = get(activeEvent);
+        if (!currentEvent) return;
+        if (selectedBoardClassIDs.length < 2 || (selectedBoardClassIDs.length & (selectedBoardClassIDs.length - 1)) !== 0) {
+            alert('参加クラス数は2、4、8、16…のいずれかにしてください。');
+            return;
+        }
+        isSavingBoardGame = true;
+        try {
+            const rulesPdfUrl = await uploadBoardGamePdf();
+            const participants = selectedBoardClassIDs.map((classID) => {
+                const roster = boardRosters[classID] || { players: [], substitutes: [] };
+                return {
+                    class_id: classID,
+                    player_ids: (roster.players || []).filter(Boolean),
+                    substitute_ids: boardGameType === 'shogi' ? (roster.substitutes || []).filter(Boolean) : [],
+                };
+            });
+            const slots = boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN'];
+            const seedOrders = Object.fromEntries(slots.map((slot) => [slot, boardSeedOrders[slot]]));
+            const response = await fetch(`/api/root/events/${currentEvent.id}/tournament-templates/board-game/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    game_type: boardGameType,
+                    name: boardGameForm.name,
+                    description: boardGameForm.description || null,
+                    location: boardGameForm.location,
+                    rules_pdf_url: rulesPdfUrl,
+                    scheduled_date: boardGameForm.scheduledDate || null,
+                    win_points: Number(boardGameForm.winPoints),
+                    rank_points: { '1': Number(boardGameForm.rank1), '2': Number(boardGameForm.rank2), '3': Number(boardGameForm.rank3), '4': Number(boardGameForm.rank4) },
+                    regular_minutes: Number(boardGameForm.regularMinutes),
+                    final_minutes: Number(boardGameForm.finalMinutes),
+                    status: 'published',
+                    participants,
+                    seed_orders: seedOrders,
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || '盤上競技トーナメントの保存に失敗しました');
+            alert(`${result.name}のトーナメントを保存しました。`);
+            await Promise.all([fetchTournamentsForActiveEvent(), fetchBoardGameSetup()]);
+        } catch (error) {
+            alert(error.message || '盤上競技トーナメントの保存に失敗しました');
+        } finally {
+            isSavingBoardGame = false;
+        }
+    }
 
     async function previewAllTournaments() {
         if (!browser) return;
@@ -339,6 +520,125 @@
 </style>
 
 <h1 class="text-2xl font-bold mb-4">トーナメント生成・管理</h1>
+
+<section class="mb-12 rounded-lg border border-amber-200 bg-amber-50 p-5">
+    <div class="mb-4">
+        <h2 class="text-xl font-semibold">盤上競技トーナメント</h2>
+        <p class="mt-1 text-sm text-gray-600">将棋・オセロ専用の設定から、通常のトーナメントと試合を作成します。試合結果の登録後は組み合わせを変更できません。</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+        <label class="block text-sm font-medium">競技
+            <select class="mt-1 w-full rounded-md border-gray-300" value={boardGameType} onchange={(event) => loadBoardGameForm(event.currentTarget.value)}>
+                <option value="shogi">将棋（A・B 個人戦）</option>
+                <option value="othello">オセロ（クラス対抗）</option>
+            </select>
+        </label>
+        <label class="block text-sm font-medium">競技名
+            <input class="mt-1 w-full rounded-md border-gray-300" bind:value={boardGameForm.name} />
+        </label>
+        <label class="block text-sm font-medium">実施日
+            <input class="mt-1 w-full rounded-md border-gray-300" type="date" bind:value={boardGameForm.scheduledDate} />
+        </label>
+        <label class="block text-sm font-medium">会場
+            <input class="mt-1 w-full rounded-md border-gray-300" bind:value={boardGameForm.location} />
+        </label>
+        <label class="block text-sm font-medium">1勝の得点
+            <input class="mt-1 w-full rounded-md border-gray-300" type="number" min="0" bind:value={boardGameForm.winPoints} />
+        </label>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <label class="block text-sm font-medium">1位点<input class="mt-1 w-full rounded-md border-gray-300" type="number" min="0" bind:value={boardGameForm.rank1} /></label>
+            <label class="block text-sm font-medium">2位点<input class="mt-1 w-full rounded-md border-gray-300" type="number" min="0" bind:value={boardGameForm.rank2} /></label>
+            <label class="block text-sm font-medium">3位点<input class="mt-1 w-full rounded-md border-gray-300" type="number" min="0" bind:value={boardGameForm.rank3} /></label>
+            <label class="block text-sm font-medium">4位点<input class="mt-1 w-full rounded-md border-gray-300" type="number" min="0" bind:value={boardGameForm.rank4} /></label>
+        </div>
+        <label class="block text-sm font-medium">通常試合（分）
+            <input class="mt-1 w-full rounded-md border-gray-300" type="number" min="1" bind:value={boardGameForm.regularMinutes} />
+        </label>
+        <label class="block text-sm font-medium">決勝（分）
+            <input class="mt-1 w-full rounded-md border-gray-300" type="number" min="1" bind:value={boardGameForm.finalMinutes} />
+        </label>
+        <label class="block text-sm font-medium md:col-span-2">説明
+            <textarea class="mt-1 w-full rounded-md border-gray-300" rows="2" bind:value={boardGameForm.description}></textarea>
+        </label>
+        <label class="block text-sm font-medium md:col-span-2">ルール PDF
+            <input class="mt-1 block w-full text-sm" type="file" accept="application/pdf,.pdf" onchange={(event) => boardGamePdfFile = event.currentTarget.files?.[0] || null} />
+            {#if boardGameForm.rulesPdfUrl}<a class="mt-1 inline-block text-sm text-blue-700 underline" href={boardGameForm.rulesPdfUrl} target="_blank" rel="noreferrer">登録済みPDFを開く</a>{/if}
+        </label>
+    </div>
+
+    <fieldset class="mt-6">
+        <legend class="font-semibold">参加クラス（2、4、8、16…クラス）</legend>
+        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {#each boardGameClasses as classItem (classItem.id)}
+                <label class="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
+                    <input type="checkbox" checked={selectedBoardClassIDs.includes(classItem.id)} onchange={(event) => toggleBoardClass(classItem.id, event.currentTarget.checked)} />
+                    {classItem.name}
+                </label>
+            {/each}
+        </div>
+    </fieldset>
+
+    {#if selectedBoardClassIDs.length > 0}
+        <div class="mt-6 space-y-3">
+            <h3 class="font-semibold">代表選手・補欠</h3>
+            {#each selectedBoardClassIDs as classID (classID)}
+                {@const classItem = boardGameClasses.find((item) => item.id === classID)}
+                <div class="rounded border bg-white p-3">
+                    <p class="mb-2 font-medium">{classItem?.name}</p>
+                    <div class="grid gap-2 md:grid-cols-3">
+                        {#each Array.from({ length: boardGameType === 'shogi' ? 2 : 3 }, (_, index) => index) as playerIndex (playerIndex)}
+                            <label class="text-sm">代表{playerIndex + 1}{boardGameType === 'othello' && playerIndex > 0 ? '（任意）' : ''}
+                                <select class="mt-1 w-full rounded-md border-gray-300" value={boardRosters[classID]?.players?.[playerIndex] || ''} onchange={(event) => updateRoster(classID, 'players', playerIndex, event.currentTarget.value)}>
+                                    <option value="">選択してください</option>
+                                    {#each classItem?.members || [] as member (member.id)}
+                                        <option value={member.id}>{boardMemberLabel(member)}</option>
+                                    {/each}
+                                </select>
+                            </label>
+                        {/each}
+                        {#if boardGameType === 'shogi'}
+                            <label class="text-sm">補欠（任意・1名）
+                                <select class="mt-1 w-full rounded-md border-gray-300" value={boardRosters[classID]?.substitutes?.[0] || ''} onchange={(event) => updateRoster(classID, 'substitutes', 0, event.currentTarget.value)}>
+                                    <option value="">選択しない</option>
+                                    {#each classItem?.members || [] as member (member.id)}
+                                        <option value={member.id}>{boardMemberLabel(member)}</option>
+                                    {/each}
+                                </select>
+                            </label>
+                        {/if}
+                    </div>
+                </div>
+            {/each}
+        </div>
+
+        <div class="mt-6 grid gap-4 md:grid-cols-2">
+            {#each (boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN']) as slot (slot)}
+                <div class="rounded border bg-white p-3">
+                    <h3 class="mb-2 font-semibold">{slot === 'MAIN' ? '本戦' : `${slot}ブロック`} シード順</h3>
+                    <ol class="space-y-1">
+                        {#each boardSeedOrders[slot] as classID, index (classID)}
+                            <li class="flex items-center justify-between rounded bg-gray-50 px-3 py-2 text-sm">
+                                <span>{index + 1}. {boardClassName(classID)}</span>
+                                <span class="flex gap-1">
+                                    <button type="button" class="rounded border px-2 py-1 disabled:opacity-40" disabled={index === 0} onclick={() => moveBoardSeed(slot, index, -1)} aria-label="上へ移動">↑</button>
+                                    <button type="button" class="rounded border px-2 py-1 disabled:opacity-40" disabled={index === boardSeedOrders[slot].length - 1} onclick={() => moveBoardSeed(slot, index, 1)} aria-label="下へ移動">↓</button>
+                                </span>
+                            </li>
+                        {/each}
+                    </ol>
+                </div>
+            {/each}
+        </div>
+    {/if}
+
+    <div class="mt-6 rounded bg-white p-3 text-sm text-gray-600">
+        既定時刻: 一次予選① 09:45／一次予選② 10:45／二次予選 13:00／準決勝 14:00／決勝・3位決定戦 15:00
+    </div>
+    <button class="mt-4 w-full rounded-md bg-amber-700 px-4 py-2 font-medium text-white hover:bg-amber-800 disabled:opacity-50" disabled={isSavingBoardGame || selectedBoardClassIDs.length === 0} onclick={saveBoardGameRun}>
+        {isSavingBoardGame ? '保存中...' : boardGameRuns.some((run) => run.game_type === boardGameType) ? '盤上競技トーナメントを再作成' : '盤上競技トーナメントを作成'}
+    </button>
+</section>
 
 <div>
     <div>

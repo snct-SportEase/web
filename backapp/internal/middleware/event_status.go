@@ -39,6 +39,7 @@ func ActiveEventStatusRequired(eventRepo repository.EventRepository, allowedStat
 
 		for _, status := range allowedStatuses {
 			if event.Status == status {
+				c.Set("active_event_id", eventID)
 				c.Next()
 				return
 			}

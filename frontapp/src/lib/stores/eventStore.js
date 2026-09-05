@@ -27,6 +27,16 @@ export const activeEvent = {
                     set(active);
                     return active;
                 }
+				const active = {
+					id: data.event_id,
+					name: data.event_name,
+					status: data.status,
+					is_rainy_mode: data.is_rainy_mode || false,
+					competition_guidelines_pdf_url: data.competition_guidelines_pdf_url,
+					hide_scores: data.hide_scores || false,
+				};
+				set(active);
+				return active;
             }
             set(null);
             return null;
