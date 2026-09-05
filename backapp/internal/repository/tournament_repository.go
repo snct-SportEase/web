@@ -3,12 +3,18 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"backapp/internal/models"
+)
+
+var (
+	ErrMatchParticipantsUndecided = errors.New("対戦相手が確定していない試合には結果を登録できません")
+	ErrInvalidTieWinner           = errors.New("同点時の勝者は対戦中のチームから選択してください")
 )
 
 type TournamentRepository interface {
@@ -41,6 +47,27 @@ type matchWinnerLookup struct {
 	team2ID     sql.NullInt64
 	nextMatchID sql.NullInt64
 	status      string
+}
+
+func determineMatchOutcome(match *models.MatchDB, team1Score, team2Score, winnerIDInput int) (int64, int64, error) {
+	if match == nil || !match.Team1ID.Valid || !match.Team2ID.Valid || match.Team1ID.Int64 <= 0 || match.Team2ID.Int64 <= 0 || match.Team1ID.Int64 == match.Team2ID.Int64 {
+		return 0, 0, ErrMatchParticipantsUndecided
+	}
+	if team1Score > team2Score {
+		return match.Team1ID.Int64, match.Team2ID.Int64, nil
+	}
+	if team2Score > team1Score {
+		return match.Team2ID.Int64, match.Team1ID.Int64, nil
+	}
+	winnerID := int64(winnerIDInput)
+	switch winnerID {
+	case match.Team1ID.Int64:
+		return winnerID, match.Team2ID.Int64, nil
+	case match.Team2ID.Int64:
+		return winnerID, match.Team1ID.Int64, nil
+	default:
+		return 0, 0, ErrInvalidTieWinner
+	}
 }
 
 func NewTournamentRepository(db *sql.DB) TournamentRepository {
@@ -234,11 +261,10 @@ func (r *tournamentRepository) getMatchesByEventID(eventID int) (map[int][]*mode
 			m.team2_id,
 			m.team1_score,
 			m.team2_score,
-			CASE
+			COALESCE(m.winner_team_id, CASE
 				WHEN m.team1_score > m.team2_score THEN m.team1_id
 				WHEN m.team2_score > m.team1_score THEN m.team2_id
-				ELSE NULL
-			END AS winner_team_id,
+			END) AS winner_team_id,
 			m.status,
 			m.next_match_id,
 			m.match_start_time,
@@ -343,11 +369,10 @@ func (r *tournamentRepository) GetMatchesForTeam(eventID int, teamID int) ([]*mo
 			m.team2_id,
 			m.team1_score,
 			m.team2_score,
-			CASE 
-				WHEN m.team1_score > m.team2_score THEN m.team1_id 
-				WHEN m.team2_score > m.team1_score THEN m.team2_id 
-				ELSE NULL 
-			END AS winner_team_id,
+			COALESCE(m.winner_team_id, CASE
+				WHEN m.team1_score > m.team2_score THEN m.team1_id
+				WHEN m.team2_score > m.team1_score THEN m.team2_id
+			END) AS winner_team_id,
 			m.status,
 			m.next_match_id,
 			m.match_start_time,
@@ -436,11 +461,10 @@ func (r *tournamentRepository) GetMatchesForTeams(eventID int, teamIDs []int) (m
 			m.team2_id,
 			m.team1_score,
 			m.team2_score,
-			CASE
+			COALESCE(m.winner_team_id, CASE
 				WHEN m.team1_score > m.team2_score THEN m.team1_id
 				WHEN m.team2_score > m.team1_score THEN m.team2_id
-				ELSE NULL
-			END AS winner_team_id,
+			END) AS winner_team_id,
 			m.status,
 			m.next_match_id,
 			m.match_start_time,
@@ -548,7 +572,7 @@ func (r *tournamentRepository) getSide(teamID int64, contestantCounter *int, tea
 }
 
 func (r *tournamentRepository) getMatchesByTournamentID(tournamentID int64) ([]*models.MatchDB, error) {
-	rows, err := r.db.Query("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, team1_score, team2_score, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
+	rows, err := r.db.Query("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, team1_score, team2_score, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE tournament_id = ? ORDER BY round, match_number_in_round", tournamentID)
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +712,7 @@ func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.Ma
 	var m models.MatchDB
 	var loserBracketRound sql.NullInt64
 	var loserBracketBlock sql.NullString
-	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?", matchID)
+	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?", matchID)
 	if err := row.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch, &m.IsLoserBracketMatch, &loserBracketRound, &loserBracketBlock, &m.RainyModeStartTime); err != nil {
 		return nil, err
 	}
@@ -715,11 +739,10 @@ func (r *tournamentRepository) GetMatchForEventSport(matchID int, eventID int, s
 			m.team2_id,
 			m.team1_score,
 			m.team2_score,
-			CASE
+			COALESCE(m.winner_team_id, CASE
 				WHEN m.team1_score > m.team2_score THEN m.team1_id
 				WHEN m.team2_score > m.team1_score THEN m.team2_id
-				ELSE NULL
-			END AS winner_team_id,
+			END) AS winner_team_id,
 			m.status,
 			m.next_match_id,
 			m.match_start_time,
@@ -768,7 +791,7 @@ func (r *tournamentRepository) GetMatchForEventSport(matchID int, eventID int, s
 func (r *tournamentRepository) IsMatchResultAlreadyEntered(matchID int) (bool, error) {
 	var winnerID sql.NullInt64
 	var status string
-	err := r.db.QueryRow("SELECT CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status FROM matches WHERE id = ?", matchID).Scan(&winnerID, &status)
+	err := r.db.QueryRow("SELECT COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status FROM matches WHERE id = ?", matchID).Scan(&winnerID, &status)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, fmt.Errorf("match not found")
@@ -1448,23 +1471,12 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 
 	alreadyFinished := match.WinnerID.Valid && match.Status == "finished"
 
-	var winnerID, loserID int64
-	if team1Score > team2Score {
-		winnerID = match.Team1ID.Int64
-		loserID = match.Team2ID.Int64
-	} else if team2Score > team1Score {
-		winnerID = match.Team2ID.Int64
-		loserID = match.Team1ID.Int64
-	} else {
-		winnerID = int64(winnerIDInput)
-		if winnerID == match.Team1ID.Int64 {
-			loserID = match.Team2ID.Int64
-		} else {
-			loserID = match.Team1ID.Int64
-		}
+	winnerID, loserID, err := determineMatchOutcome(match, team1Score, team2Score, winnerIDInput)
+	if err != nil {
+		return err
 	}
 
-	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, matchID)
+	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, winnerID, matchID)
 	if err != nil {
 		return err
 	}
@@ -1638,29 +1650,21 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 	}
 
 	// 新しい勝者を決定
-	var newWinnerID, loserID int64
-	if team1Score > team2Score {
-		newWinnerID = match.Team1ID.Int64
-		loserID = match.Team2ID.Int64
-	} else if team2Score > team1Score {
-		newWinnerID = match.Team2ID.Int64
-		loserID = match.Team1ID.Int64
-	} else {
-		newWinnerID = int64(winnerIDInput)
-		if newWinnerID == match.Team1ID.Int64 {
-			loserID = match.Team2ID.Int64
-		} else {
-			loserID = match.Team1ID.Int64
-		}
+	newWinnerID, loserID, err := determineMatchOutcome(match, team1Score, team2Score, winnerIDInput)
+	if err != nil {
+		return err
 	}
 
 	// 勝者が変わらない場合は通常の更新メソッドと同じ処理
 	if previousWinnerID == newWinnerID {
-		_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, matchID)
+		_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, newWinnerID, matchID)
 		if err != nil {
 			return err
 		}
 		return tx.Commit()
+	}
+	if err := invalidateBoardGameRankingsForTournament(tx, match.TournamentID); err != nil {
+		return err
 	}
 
 	// 前回の勝者と敗者のチーム情報を取得
@@ -1682,7 +1686,7 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 	}
 
 	// 試合結果を更新
-	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, matchID)
+	_, err = tx.Exec("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?", team1Score, team2Score, newWinnerID, matchID)
 	if err != nil {
 		return err
 	}
@@ -1695,32 +1699,9 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 		}
 
 		// 次の試合が既に終了している場合、その試合の結果を無効化
-		if nextMatch.WinnerID.Valid && nextMatch.Status == "finished" {
-			// 次の試合の勝者と敗者を取得
-			nextMatchWinnerID := nextMatch.WinnerID.Int64
-			nextMatchLoserID := nextMatch.Team1ID.Int64
-			if nextMatchLoserID == nextMatchWinnerID {
-				nextMatchLoserID = nextMatch.Team2ID.Int64
-			}
-
-			// 次の試合の勝者に付与された点数をリセット
-			if nextMatchWinnerID != 0 && nextMatchLoserID != 0 {
-				if err := r.revertScoring(tx, nextMatch, nextMatchWinnerID, nextMatchLoserID, eventID, location); err != nil {
-					return err
-				}
-			}
-
-			// 次の試合の結果を無効化
-			_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, status = 'pending' WHERE id = ?", nextMatch.ID)
-			if err != nil {
+		if nextMatch.Status == "finished" {
+			if err := r.invalidateSubsequentMatches(tx, nextMatch.ID, eventID, location); err != nil {
 				return err
-			}
-
-			// さらにその次の試合も連鎖的に無効化（再帰的に処理）
-			if nextMatch.NextMatchID.Valid {
-				if err := r.invalidateSubsequentMatches(tx, int(nextMatch.NextMatchID.Int64), eventID, location); err != nil {
-					return err
-				}
 			}
 		}
 
@@ -1782,6 +1763,11 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 				// 前の敗者を敗者戦から削除
 				bronzeMatch, err := r.getMatchByID(tx, int(bronzeMatchID))
 				if err == nil {
+					if bronzeMatch.Status == "finished" {
+						if err := r.invalidateFinishedMatchResult(tx, bronzeMatch, eventID, location); err != nil {
+							return err
+						}
+					}
 					if bronzeMatch.Team1ID.Valid && bronzeMatch.Team1ID.Int64 == previousLoserID {
 						_, err = tx.Exec("UPDATE matches SET team1_id = NULL WHERE id = ?", bronzeMatchID)
 					} else if bronzeMatch.Team2ID.Valid && bronzeMatch.Team2ID.Int64 == previousLoserID {
@@ -1987,7 +1973,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 
 func boardGameScoringConfig(tx *sql.Tx, tournamentID int) (int, int, bool, error) {
 	var runID, winPoints int
-	err := tx.QueryRow(`SELECT r.id,r.win_points FROM board_game_runs r JOIN tournaments t ON t.event_id=r.event_id AND t.sport_id=r.sport_id WHERE t.id=?`, tournamentID).Scan(&runID, &winPoints)
+	err := tx.QueryRow(`SELECT DISTINCT r.id,r.win_points FROM board_game_runs r JOIN board_game_entries e ON e.run_id=r.id WHERE e.tournament_id=?`, tournamentID).Scan(&runID, &winPoints)
 	if err == sql.ErrNoRows {
 		return 0, 0, false, nil
 	}
@@ -1995,6 +1981,97 @@ func boardGameScoringConfig(tx *sql.Tx, tournamentID int) (int, int, bool, error
 		return 0, 0, false, err
 	}
 	return runID, winPoints, true, nil
+}
+
+func invalidateBoardGameRankingsForTournament(tx *sql.Tx, tournamentID int) error {
+	var runID int
+	err := tx.QueryRow("SELECT run_id FROM board_game_entries WHERE tournament_id=? LIMIT 1", tournamentID).Scan(&runID)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE sl FROM score_logs sl JOIN matches m ON m.id=sl.source_match_id WHERE sl.board_game_run_id=? AND sl.reason='board_game_rank_points' AND m.tournament_id=?`, runID, tournamentID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM board_game_rankings WHERE run_id=? AND tournament_id=?", runID, tournamentID); err != nil {
+		return err
+	}
+	_, err = tx.Exec("UPDATE board_game_runs SET status='published' WHERE id=? AND status='completed'", runID)
+	return err
+}
+
+func (r *tournamentRepository) invalidateFinishedMatchResult(tx *sql.Tx, match *models.MatchDB, eventID int, location string) error {
+	if match == nil || match.Status != "finished" {
+		return nil
+	}
+	winnerID, err := r.inferStoredWinnerID(tx, match)
+	if err != nil {
+		return err
+	}
+	if winnerID != 0 {
+		loserID := match.Team1ID.Int64
+		if loserID == winnerID {
+			loserID = match.Team2ID.Int64
+		}
+		if loserID != 0 {
+			if err := r.revertScoring(tx, match, winnerID, loserID, eventID, location); err != nil {
+				return err
+			}
+			if err := r.invalidateBronzeDependency(tx, match, loserID, eventID, location); err != nil {
+				return err
+			}
+		}
+	} else if _, _, ok, err := boardGameScoringConfig(tx, match.TournamentID); err != nil {
+		return err
+	} else if ok {
+		if _, err := tx.Exec("DELETE FROM score_logs WHERE source_match_id=? AND reason='board_game_win_points'", match.ID); err != nil {
+			return err
+		}
+	}
+	_, err = tx.Exec("UPDATE matches SET team1_score=NULL, team2_score=NULL, winner_team_id=NULL, status='pending' WHERE id=?", match.ID)
+	return err
+}
+
+func (r *tournamentRepository) invalidateBronzeDependency(tx *sql.Tx, match *models.MatchDB, previousLoserID int64, eventID int, location string) error {
+	if match == nil || match.IsBronzeMatch || previousLoserID == 0 {
+		return nil
+	}
+	var maxRound sql.NullInt64
+	if err := tx.QueryRow("SELECT MAX(round) FROM matches WHERE tournament_id=?", match.TournamentID).Scan(&maxRound); err != nil {
+		return err
+	}
+	if !maxRound.Valid || match.Round != int(maxRound.Int64)-1 {
+		return nil
+	}
+	bronzeMatch, err := r.getBronzeMatch(tx, match.TournamentID)
+	if err != nil {
+		return err
+	}
+	if bronzeMatch == nil {
+		return nil
+	}
+	if err := r.invalidateFinishedMatchResult(tx, bronzeMatch, eventID, location); err != nil {
+		return err
+	}
+	_, err = tx.Exec(`UPDATE matches
+		SET team1_id=CASE WHEN team1_id=? THEN NULL ELSE team1_id END,
+		    team2_id=CASE WHEN team2_id=? THEN NULL ELSE team2_id END
+		WHERE id=?`, previousLoserID, previousLoserID, bronzeMatch.ID)
+	return err
+}
+
+func (r *tournamentRepository) getBronzeMatch(tx *sql.Tx, tournamentID int) (*models.MatchDB, error) {
+	var bronzeMatchID int
+	err := tx.QueryRow("SELECT id FROM matches WHERE tournament_id=? AND is_bronze_match=TRUE", tournamentID).Scan(&bronzeMatchID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.getMatchByID(tx, bronzeMatchID)
 }
 
 func isEffectiveBronzeMatch(match *models.MatchDB, totalRounds int) bool {
@@ -2022,27 +2099,14 @@ func (r *tournamentRepository) invalidateSubsequentMatches(tx *sql.Tx, matchID i
 	}
 
 	// 既に終了していない場合は何もしない
-	if !match.WinnerID.Valid || match.Status != "finished" {
+	if match.Status != "finished" {
 		return nil
 	}
-
-	// この試合の勝者と敗者を取得
-	winnerID := match.WinnerID.Int64
-	loserID := match.Team1ID.Int64
-	if loserID == winnerID {
-		loserID = match.Team2ID.Int64
-	}
-
-	// この試合の勝者に付与された点数をリセット
-	if winnerID != 0 && loserID != 0 {
-		if err := r.revertScoring(tx, match, winnerID, loserID, eventID, location); err != nil {
-			return err
-		}
-	}
-
-	// この試合の結果を無効化
-	_, err = tx.Exec("UPDATE matches SET team1_score = NULL, team2_score = NULL, status = 'pending' WHERE id = ?", matchID)
+	winnerID, err := r.inferStoredWinnerID(tx, match)
 	if err != nil {
+		return err
+	}
+	if err := r.invalidateFinishedMatchResult(tx, match, eventID, location); err != nil {
 		return err
 	}
 
@@ -2050,6 +2114,14 @@ func (r *tournamentRepository) invalidateSubsequentMatches(tx *sql.Tx, matchID i
 	if match.NextMatchID.Valid {
 		if err := r.invalidateSubsequentMatches(tx, int(match.NextMatchID.Int64), eventID, location); err != nil {
 			return err
+		}
+		if winnerID != 0 {
+			if _, err := tx.Exec(`UPDATE matches
+				SET team1_id=CASE WHEN team1_id=? THEN NULL ELSE team1_id END,
+				    team2_id=CASE WHEN team2_id=? THEN NULL ELSE team2_id END
+				WHERE id=?`, winnerID, winnerID, match.NextMatchID.Int64); err != nil {
+				return err
+			}
 		}
 	}
 

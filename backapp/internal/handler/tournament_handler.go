@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 
 	"backapp/internal/models"
+	"backapp/internal/repository"
 
 	"github.com/gin-gonic/gin"
 )
@@ -59,7 +61,6 @@ func (h *TournamentHandler) UpdateMatchRainyModeStartTimeHandler(c *gin.Context)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Match rainy mode start time updated successfully"})
 }
-
 
 type UpdateMatchResultRequest struct {
 	Team1Score int `json:"team1_score"`
@@ -120,6 +121,10 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 	if alreadyEntered {
 		if err := h.tournRepo.UpdateMatchResultForCorrection(matchID, req.Team1Score, req.Team2Score, req.WinnerID); err != nil {
 			log.Printf("UpdateMatchResultForCorrection error: %v", err)
+			if errors.Is(err, repository.ErrMatchParticipantsUndecided) || errors.Is(err, repository.ErrInvalidTieWinner) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to correct match result"})
 			return
 		}
@@ -127,6 +132,10 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 		// 未入力の場合は通常の更新メソッドを使用
 		if err := h.tournRepo.UpdateMatchResult(matchID, req.Team1Score, req.Team2Score, req.WinnerID); err != nil {
 			log.Printf("UpdateMatchResult error: %v", err)
+			if errors.Is(err, repository.ErrMatchParticipantsUndecided) || errors.Is(err, repository.ErrInvalidTieWinner) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match result"})
 			return
 		}

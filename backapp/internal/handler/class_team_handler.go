@@ -246,7 +246,6 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Sport not found"})
 		return
 	}
-
 	// Get or create team
 	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, req.SportID, activeEventID)
 	if err != nil {
@@ -254,7 +253,17 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		return
 	}
 
+	var eventSport *models.EventSport
 	if team == nil {
+		eventSport, err = h.sportRepo.GetSportDetails(activeEventID, req.SportID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sport details"})
+			return
+		}
+		if eventSport != nil && eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "盤上競技の選手はトーナメント設定画面から管理してください"})
+			return
+		}
 		// Create team if it doesn't exist
 		newTeam := &models.Team{
 			Name:    managedClass.Name,
@@ -284,7 +293,9 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		maxCapacity = team.MaxCapacity
 	} else {
 		// 2. Check event sport default capacity
-		eventSport, err := h.sportRepo.GetSportDetails(activeEventID, req.SportID)
+		if eventSport == nil {
+			eventSport, err = h.sportRepo.GetSportDetails(activeEventID, req.SportID)
+		}
 		if err == nil && eventSport != nil {
 			maxCapacity = eventSport.MaxCapacity
 		}
@@ -426,7 +437,6 @@ func (h *ClassTeamHandler) RemoveTeamMemberHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Sport not found"})
 		return
 	}
-
 	// Get team
 	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, req.SportID, activeEventID)
 	if err != nil {
@@ -497,7 +507,6 @@ func (h *ClassTeamHandler) GetTeamMembersHandler(c *gin.Context) {
 		c.JSON(statusCode, gin.H{"error": errMsg})
 		return
 	}
-
 	// Get team
 	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, sportID, activeEventID)
 	if err != nil {
@@ -560,7 +569,6 @@ func (h *ClassTeamHandler) GetConfirmedTeamMembersHandler(c *gin.Context) {
 		c.JSON(statusCode, gin.H{"error": errMsg})
 		return
 	}
-
 	// Get team
 	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, sportID, activeEventID)
 	if err != nil {

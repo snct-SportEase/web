@@ -98,6 +98,7 @@ func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.
 		INNER JOIN classes c ON t.class_id = c.id
 		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
 		WHERE t.class_id = ? AND c.event_id = ? AND es.location <> 'noon_game'
+		  AND (es.template_key IS NULL OR es.template_key <> 'board_game_tournament')
 	`
 	rows, err := r.db.Query(query, classID, eventID)
 	if err != nil {
@@ -143,7 +144,7 @@ func (r *teamRepository) GetNoonGameTeamsByClassID(classID int, eventID int) ([]
 }
 
 func (r *teamRepository) GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error) {
-	query := "SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, t.min_capacity, t.max_capacity FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.class_id = ? AND t.sport_id = ? AND c.event_id = ?"
+	query := "SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, t.min_capacity, t.max_capacity FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.class_id = ? AND t.sport_id = ? AND c.event_id = ? AND t.entry_key = 'default'"
 	row := r.db.QueryRow(query, classID, sportID, eventID)
 
 	team := &models.Team{}

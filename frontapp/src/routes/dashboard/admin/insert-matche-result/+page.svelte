@@ -348,11 +348,14 @@
 								>結果を修正（rootのみ）</button
 							>
 						{/if}
-					{:else}
-						<button onclick={() => openModal(match)} class="text-blue-500 hover:underline"
-							>結果を入力</button
-						>
-					{/if}
+						{:else}
+							{@const participantsReady = Boolean(match.sides?.[0]?.teamId && match.sides?.[1]?.teamId)}
+							<button
+								onclick={() => openModal(match)}
+								disabled={!participantsReady}
+								class="text-blue-500 hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline"
+							>{participantsReady ? '結果を入力' : '対戦相手の確定待ち'}</button>
+						{/if}
 				</div>
 			{/if}
 		{/each}

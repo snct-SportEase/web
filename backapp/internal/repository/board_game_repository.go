@@ -38,7 +38,7 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 	}
 	if err == nil {
 		var finished int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM matches m JOIN tournaments t ON t.id=m.tournament_id WHERE t.event_id=? AND t.sport_id=? AND m.status='finished'`, input.EventID, sportID).Scan(&finished); err != nil {
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM matches m JOIN board_game_entries e ON e.tournament_id=m.tournament_id WHERE e.run_id=? AND m.status='finished'`, existingRunID).Scan(&finished); err != nil {
 			return nil, err
 		}
 		if finished > 0 {
@@ -47,27 +47,26 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 		if err := deleteBoardGameRunData(tx, existingRunID, input.EventID, sportID); err != nil {
 			return nil, err
 		}
-		if _, err := tx.Exec("UPDATE sports SET name=? WHERE id=?", input.Name, sportID); err != nil {
+		var sportUsageCount int
+		if err := tx.QueryRow("SELECT COUNT(*) FROM event_sports WHERE sport_id=?", sportID).Scan(&sportUsageCount); err != nil {
 			return nil, err
+		}
+		if sportUsageCount == 1 {
+			if _, err := tx.Exec("UPDATE sports SET name=? WHERE id=?", input.Name, sportID); err != nil {
+				return nil, err
+			}
 		}
 	} else {
-		err = tx.QueryRow(`SELECT s.id FROM sports s
-			LEFT JOIN event_sports es ON es.event_id=? AND es.sport_id=s.id
-			WHERE s.name=? AND es.sport_id IS NULL
-			ORDER BY s.id LIMIT 1`, input.EventID, input.Name).Scan(&sportID)
-		if err == sql.ErrNoRows {
-			result, insertErr := tx.Exec("INSERT INTO sports (name) VALUES (?)", input.Name)
-			if insertErr != nil {
-				return nil, insertErr
-			}
-			id, idErr := result.LastInsertId()
-			if idErr != nil {
-				return nil, idErr
-			}
-			sportID = int(id)
-		} else if err != nil {
-			return nil, err
+		// 盤上競技は大会ごとに設定と名称を持つため、共有の競技マスタを再利用しない。
+		result, insertErr := tx.Exec("INSERT INTO sports (name) VALUES (?)", input.Name)
+		if insertErr != nil {
+			return nil, insertErr
 		}
+		id, idErr := result.LastInsertId()
+		if idErr != nil {
+			return nil, idErr
+		}
+		sportID = int(id)
 	}
 
 	templateKey := "board_game_tournament"
@@ -166,11 +165,29 @@ func deleteBoardGameRunData(tx *sql.Tx, runID, eventID, sportID int) error {
 	if _, err := tx.Exec("DELETE FROM score_logs WHERE board_game_run_id=?", runID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("DELETE m FROM matches m JOIN tournaments t ON t.id=m.tournament_id WHERE t.event_id=? AND t.sport_id=?", eventID, sportID); err != nil {
+	tournamentRows, err := tx.Query("SELECT DISTINCT tournament_id FROM board_game_entries WHERE run_id=?", runID)
+	if err != nil {
 		return err
 	}
-	if _, err := tx.Exec("DELETE FROM tournaments WHERE event_id=? AND sport_id=?", eventID, sportID); err != nil {
+	var tournamentIDs []int
+	for tournamentRows.Next() {
+		var tournamentID int
+		if err := tournamentRows.Scan(&tournamentID); err != nil {
+			tournamentRows.Close()
+			return err
+		}
+		tournamentIDs = append(tournamentIDs, tournamentID)
+	}
+	if err := tournamentRows.Close(); err != nil {
 		return err
+	}
+	for _, tournamentID := range tournamentIDs {
+		if _, err := tx.Exec("DELETE FROM matches WHERE tournament_id=?", tournamentID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM tournaments WHERE id=? AND event_id=? AND sport_id=?", tournamentID, eventID, sportID); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.Exec("DELETE FROM board_game_runs WHERE id=?", runID); err != nil {
 		return err
@@ -428,7 +445,7 @@ func (r *boardGameRepository) SaveRankings(runID, tournamentID int, inputs []mod
 	var winPoints int
 	var rankJSON []byte
 	var eventID int
-	if err := tx.QueryRow(`SELECT r.win_points,r.rank_points,r.event_id FROM board_game_runs r JOIN tournaments t ON t.event_id=r.event_id AND t.sport_id=r.sport_id WHERE r.id=? AND t.id=?`, runID, tournamentID).Scan(&winPoints, &rankJSON, &eventID); err != nil {
+	if err := tx.QueryRow(`SELECT DISTINCT r.win_points,r.rank_points,r.event_id FROM board_game_runs r JOIN board_game_entries e ON e.run_id=r.id WHERE r.id=? AND e.tournament_id=?`, runID, tournamentID).Scan(&winPoints, &rankJSON, &eventID); err != nil {
 		return nil, err
 	}
 	rankPoints := map[string]int{}
@@ -452,6 +469,9 @@ func (r *boardGameRepository) SaveRankings(runID, tournamentID int, inputs []mod
 	}
 	if unfinished > 0 {
 		return nil, fmt.Errorf("all matches must be finished before saving rankings")
+	}
+	if err := validateBoardGameRankingOrder(tx, runID, tournamentID, required, inputs); err != nil {
+		return nil, err
 	}
 	seenEntries, seenRanks := map[int]bool{}, map[int]bool{}
 	var finalMatchID sql.NullInt64
@@ -507,4 +527,65 @@ func (r *boardGameRepository) SaveRankings(runID, tournamentID int, inputs []mod
 		return nil, err
 	}
 	return r.GetRunByID(runID)
+}
+
+func validateBoardGameRankingOrder(tx *sql.Tx, runID, tournamentID, required int, inputs []models.BoardGameRankingInput) error {
+	if required != 2 && required != 4 {
+		return fmt.Errorf("unsupported ranking size: %d", required)
+	}
+	orderedTeamIDs := make([]int, 0, required)
+	appendMatchOrder := func(bronze bool) error {
+		var team1ID, team2ID, winnerID sql.NullInt64
+		err := tx.QueryRow(`SELECT team1_id,team2_id,COALESCE(winner_team_id,CASE WHEN team1_score>team2_score THEN team1_id WHEN team2_score>team1_score THEN team2_id END)
+			FROM matches WHERE tournament_id=? AND is_bronze_match=? ORDER BY round DESC,match_number_in_round LIMIT 1`, tournamentID, bronze).Scan(&team1ID, &team2ID, &winnerID)
+		if err != nil {
+			return err
+		}
+		if !team1ID.Valid || !team2ID.Valid || !winnerID.Valid {
+			return fmt.Errorf("決勝または3位決定戦の勝者が確定していません")
+		}
+		loserID := team1ID.Int64
+		if loserID == winnerID.Int64 {
+			loserID = team2ID.Int64
+		} else if team2ID.Int64 != winnerID.Int64 {
+			return fmt.Errorf("試合の勝者が対戦チームと一致しません")
+		}
+		orderedTeamIDs = append(orderedTeamIDs, int(winnerID.Int64), int(loserID))
+		return nil
+	}
+	if err := appendMatchOrder(false); err != nil {
+		return err
+	}
+	if required == 4 {
+		if err := appendMatchOrder(true); err != nil {
+			return err
+		}
+	}
+	entryByTeam := make(map[int]int, required)
+	rows, err := tx.Query("SELECT team_id,id FROM board_game_entries WHERE run_id=? AND tournament_id=?", runID, tournamentID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var teamID, entryID int
+		if err := rows.Scan(&teamID, &entryID); err != nil {
+			rows.Close()
+			return err
+		}
+		entryByTeam[teamID] = entryID
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	entryByRank := make(map[int]int, len(inputs))
+	for _, input := range inputs {
+		entryByRank[input.Rank] = input.EntryID
+	}
+	for index, teamID := range orderedTeamIDs {
+		rank := index + 1
+		if entryByTeam[teamID] == 0 || entryByRank[rank] != entryByTeam[teamID] {
+			return fmt.Errorf("%d位が試合結果と一致しません", rank)
+		}
+	}
+	return nil
 }

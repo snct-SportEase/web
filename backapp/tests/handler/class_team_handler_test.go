@@ -168,6 +168,39 @@ func TestClassTeamHandler_AssignTeamMembersHandler(t *testing.T) {
 		mockTeamRepo.AssertExpectations(t)
 	})
 
+	t.Run("Error - Board Game Roster Is Managed By Tournament Setup", func(t *testing.T) {
+		classRepo := new(MockClassRepository)
+		teamRepo := new(MockTeamRepository)
+		userRepo := new(MockUserRepository)
+		eventRepo := new(MockEventRepository)
+		sportRepo := new(MockSportRepository)
+		h := handler.NewClassTeamHandler(classRepo, teamRepo, userRepo, eventRepo, sportRepo)
+
+		const eventID, classID, sportID = 1, 10, 9
+		currentUser := &models.User{ID: "rep-user-id", ClassID: classTeamIntPtr(classID)}
+		managedClass := &models.Class{ID: classID, Name: "1A"}
+		templateKey := "board_game_tournament"
+		eventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		eventRepo.On("GetEventByID", eventID).Return(&models.Event{ID: eventID, DuplicateRegistrationThreshold: 31}, nil).Once()
+		classRepo.On("GetClassByID", classID).Return(managedClass, nil).Once()
+		sportRepo.On("GetSportByID", sportID).Return(&models.Sport{ID: sportID, Name: "将棋"}, nil).Once()
+		teamRepo.On("GetTeamByClassAndSport", classID, sportID, eventID).Return(nil, nil).Once()
+		sportRepo.On("GetSportDetails", eventID, sportID).Return(&models.EventSport{TemplateKey: &templateKey}, nil).Once()
+
+		body, _ := json.Marshal(gin.H{"sport_id": sportID, "user_ids": []string{"user1"}})
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodPost, "/assign", bytes.NewBuffer(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("user", currentUser)
+
+		h.AssignTeamMembersHandler(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "トーナメント設定画面")
+		teamRepo.AssertNotCalled(t, "CreateTeam", mock.Anything)
+	})
+
 	t.Run("Error - Duplicate Registration For Regular Class", func(t *testing.T) {
 		mockClassRepo := new(MockClassRepository)
 		mockTeamRepo := new(MockTeamRepository)
