@@ -89,14 +89,15 @@ func TestNoonGameHandler_RecordBorrowingRaceResultHandlesTies(t *testing.T) {
 	noonRepo.On("GetTemplateRunMatchByKey", 30, "MAIN").Return(&models.NoonGameTemplateRunMatch{RunID: 30, MatchID: 20}, nil).Once()
 	noonRepo.On("GetMatchByID", 20).Return(match, nil).Once()
 	noonRepo.On("GetSessionByID", 10).Return(&models.NoonGameSession{ID: 10, EventID: 8, Status: "published"}, nil).Once()
-	noonRepo.On("ClearPointsForMatch", 20).Return(nil).Once()
-	noonRepo.On("InsertPoints", mock.MatchedBy(func(points []*models.NoonGamePoint) bool {
-		return len(points) == 3 && points[0].Points == 100 && points[1].Points == 100 && points[2].Points == 80
-	})).Return(nil).Once()
-	noonRepo.On("SaveResult", mock.MatchedBy(func(result *models.NoonGameResult) bool {
-		return len(result.Details) == 3 && *result.Details[0].Rank == 1 && *result.Details[1].Rank == 1 && *result.Details[2].Rank == 3 && *result.Details[0].CompetitionScore == 20
-	})).Return(&models.NoonGameResult{ID: 50, MatchID: 20}, nil).Once()
-	noonRepo.On("SaveMatch", mock.MatchedBy(func(value *models.NoonGameMatch) bool { return value.Status == "completed" })).Return(&models.NoonGameMatch{ID: 20}, nil).Once()
+	noonRepo.On("SaveMatchResultWithStatus",
+		mock.MatchedBy(func(result *models.NoonGameResult) bool {
+			return len(result.Details) == 3 && *result.Details[0].Rank == 1 && *result.Details[1].Rank == 1 && *result.Details[2].Rank == 3 && *result.Details[0].CompetitionScore == 20
+		}),
+		mock.MatchedBy(func(points []*models.NoonGamePoint) bool {
+			return len(points) == 3 && points[0].Points == 100 && points[1].Points == 100 && points[2].Points == 80
+		}),
+		"completed",
+	).Return(nil).Once()
 	noonRepo.On("SumConfirmedPointsByEvent", 8).Return(map[int]int{1: 100, 2: 100, 3: 80}, nil).Once()
 	classRepo.On("SetNoonGamePoints", 8, map[int]int{1: 100, 2: 100, 3: 80}).Return(nil).Once()
 	noonRepo.On("GetMatchByID", 20).Return(match, nil).Once()
@@ -221,6 +222,11 @@ func (m *MockNoonGameRepository) SaveResult(result *models.NoonGameResult) (*mod
 
 func (m *MockNoonGameRepository) SaveMatchResult(result *models.NoonGameResult, points []*models.NoonGamePoint) error {
 	args := m.Called(result, points)
+	return args.Error(0)
+}
+
+func (m *MockNoonGameRepository) SaveMatchResultWithStatus(result *models.NoonGameResult, points []*models.NoonGamePoint, status string) error {
+	args := m.Called(result, points, status)
 	return args.Error(0)
 }
 

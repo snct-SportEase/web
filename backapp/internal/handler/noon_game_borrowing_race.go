@@ -331,17 +331,6 @@ func (h *NoonGameHandler) RecordBorrowingRaceResult(c *gin.Context) {
 		}
 	}
 
-	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
-		return
-	}
-	if req.Finalize && len(points) > 0 {
-		if err := h.noonRepo.InsertPoints(points); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
-			return
-		}
-	}
-
 	winner := "draw"
 	if bestCount == 1 && len(match.Entries) >= 2 {
 		if match.Entries[0].ID == bestEntryID {
@@ -350,19 +339,14 @@ func (h *NoonGameHandler) RecordBorrowingRaceResult(c *gin.Context) {
 			winner = "away"
 		}
 	}
-	if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
-		MatchID: match.ID, Winner: winner, RecordedBy: user.ID, Note: req.Note, Details: details,
-	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save result"})
-		return
-	}
+	status := "in_progress"
 	if req.Finalize {
-		match.Status = "completed"
-	} else {
-		match.Status = "in_progress"
+		status = "completed"
 	}
-	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
+	if err := h.noonRepo.SaveMatchResultWithStatus(&models.NoonGameResult{
+		MatchID: match.ID, Winner: winner, RecordedBy: user.ID, Note: req.Note, Details: details,
+	}, points, status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save result"})
 		return
 	}
 	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
