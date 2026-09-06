@@ -814,19 +814,7 @@ func TestNoonGameHandler_RecordYearRelayBlockResult(t *testing.T) {
 		for groupID, members := range groupMembers {
 			mockNoonRepo.On("GetGroupMembers", groupID).Return(members, nil).Once()
 		}
-
-		// ポイントクリア
-		mockNoonRepo.On("ClearPointsForMatch", matchID).Return(nil).Once()
-
-		// ポイント挿入（30+25+20+15+10+5 = 105点が各クラスに配分）
-		mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
-
-		// 結果保存
-		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 501}, nil).Once()
-
-		// 試合ステータス更新
-		updatedMatch := &models.NoonGameMatch{ID: matchID, Status: "completed"}
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatch, nil).Once()
+		mockNoonRepo.On("SaveMatchResult", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
 
 		// ポイント集計
 		summary := map[int]int{1: 30, 2: 30, 3: 30, 4: 25, 5: 25, 6: 25, 7: 20, 8: 20, 9: 20, 10: 15, 11: 15, 12: 15, 13: 10, 14: 10, 15: 10, 16: 5}
@@ -1127,17 +1115,7 @@ func TestNoonGameHandler_CalculateYearRelayOverallBonus(t *testing.T) {
 		for groupID, members := range groupMembers {
 			mockNoonRepo.On("GetGroupMembers", groupID).Return(members, nil).Once()
 		}
-
-		// Aブロックのポイントクリアと挿入
-		mockNoonRepo.On("ClearPointsForMatch", matchAID).Return(nil).Once()
-		mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
-
-		// Aブロックの結果保存
-		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 501}, nil).Once()
-
-		// Aブロックの試合ステータス更新
-		updatedMatchA := &models.NoonGameMatch{ID: matchAID, Status: "completed"}
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatchA, nil).Once()
+		mockNoonRepo.On("SaveMatchResult", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
 
 		// ポイント集計（Aブロックのみ）
 		summaryA := map[int]int{1: 30, 2: 30, 3: 30, 4: 25, 5: 25, 6: 25, 7: 20, 8: 20, 9: 20}
@@ -1232,17 +1210,7 @@ func TestNoonGameHandler_CalculateYearRelayOverallBonus(t *testing.T) {
 		for groupID, members := range groupMembers {
 			mockNoonRepo.On("GetGroupMembers", groupID).Return(members, nil).Once()
 		}
-
-		// Bブロックのポイントクリアと挿入
-		mockNoonRepo.On("ClearPointsForMatch", matchBID).Return(nil).Once()
-		mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
-
-		// Bブロックの結果保存
-		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 502}, nil).Once()
-
-		// Bブロックの試合ステータス更新
-		updatedMatchB := &models.NoonGameMatch{ID: matchBID, Status: "completed"}
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatchB, nil).Once()
+		mockNoonRepo.On("SaveMatchResult", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
 
 		// ポイント集計（Bブロックのみ）
 		summaryB := map[int]int{1: 20, 2: 20, 3: 20, 4: 30, 5: 30, 6: 30, 7: 25, 8: 25, 9: 25}
@@ -1549,6 +1517,7 @@ func TestNoonGameHandler_RecalculateYearRelayBonusOverwrite(t *testing.T) {
 	mockNoonRepo.On("ClearPointsForMatch", mock.AnythingOfType("int")).Return(nil).Maybe()
 	mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Maybe()
 	mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 9002}, nil).Maybe()
+	mockNoonRepo.On("SaveMatchResult", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Maybe()
 	mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(&models.NoonGameMatch{ID: matchBonusID, Status: "completed"}, nil).Maybe()
 	mockNoonRepo.On("SumPointsByClass", sessionID).Return(map[int]int{1: 30, 2: 30, 3: 20, 4: 20}, nil).Maybe()
 	mockClassRepo.On("SetNoonGamePoints", eventID, map[int]int{1: 30, 2: 30, 3: 20, 4: 20}).Return(nil).Maybe()
@@ -1917,19 +1886,7 @@ func TestNoonGameHandler_RecordCourseRelayResult(t *testing.T) {
 		for groupID, members := range groupMembers {
 			mockNoonRepo.On("GetGroupMembers", groupID).Return(members, nil).Once()
 		}
-
-		// ポイントクリア
-		mockNoonRepo.On("ClearPointsForMatch", matchID).Return(nil).Once()
-
-		// ポイント挿入（40+30+20+10 = 100点が各クラスに配分）
-		mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
-
-		// 結果保存
-		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 601}, nil).Once()
-
-		// 試合ステータス更新
-		updatedMatch := &models.NoonGameMatch{ID: matchID, Status: "completed"}
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatch, nil).Once()
+		mockNoonRepo.On("SaveMatchResult", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
 
 		// ポイント集計
 		summary := map[int]int{1: 40, 2: 30, 3: 20, 4: 30, 5: 20, 6: 40, 7: 30, 8: 20, 9: 40, 10: 30, 11: 20, 12: 40, 13: 30, 14: 20, 15: 40, 16: 10}
@@ -2353,19 +2310,7 @@ func TestNoonGameHandler_RecordTugOfWarResult(t *testing.T) {
 		for groupID, members := range groupMembers {
 			mockNoonRepo.On("GetGroupMembers", groupID).Return(members, nil).Once()
 		}
-
-		// ポイントクリア
-		mockNoonRepo.On("ClearPointsForMatch", matchID).Return(nil).Once()
-
-		// ポイント挿入（40+30+20+10 = 100点が各クラスに配分）
-		mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
-
-		// 結果保存
-		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 701}, nil).Once()
-
-		// 試合ステータス更新
-		updatedMatch := &models.NoonGameMatch{ID: matchID, Status: "completed"}
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatch, nil).Once()
+		mockNoonRepo.On("SaveMatchResult", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Once()
 
 		// ポイント集計
 		summary := map[int]int{1: 40, 2: 30, 3: 20, 4: 40, 5: 30, 6: 20, 7: 40, 8: 30, 9: 20, 10: 40, 11: 30, 12: 20, 13: 40, 14: 30, 15: 20, 16: 10}
