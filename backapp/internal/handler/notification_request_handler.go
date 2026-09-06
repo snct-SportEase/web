@@ -49,12 +49,21 @@ type createNotificationRequestPayload struct {
 	TargetText string `json:"target_text"`
 }
 
+const (
+	maxNotificationRequestTitleRunes  = 100
+	maxNotificationRequestBodyRunes   = 2000
+	maxNotificationRequestTargetRunes = 500
+	maxNotificationMessageRunes       = 2000
+	maxNotificationRequestBytes       = 32 << 10
+)
+
 func (h *NotificationRequestHandler) CreateRequest(c *gin.Context) {
 	user := currentUser(c)
 	if user == nil {
 		return
 	}
 
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxNotificationRequestBytes)
 	var payload createNotificationRequestPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "不正なリクエスト形式です"})
@@ -67,6 +76,12 @@ func (h *NotificationRequestHandler) CreateRequest(c *gin.Context) {
 
 	if payload.Title == "" || payload.Body == "" || payload.TargetText == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "タイトル・内容・対象情報は必須です"})
+		return
+	}
+	if len([]rune(payload.Title)) > maxNotificationRequestTitleRunes ||
+		len([]rune(payload.Body)) > maxNotificationRequestBodyRunes ||
+		len([]rune(payload.TargetText)) > maxNotificationRequestTargetRunes {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "申請内容が文字数上限を超えています"})
 		return
 	}
 
@@ -181,6 +196,7 @@ func (h *NotificationRequestHandler) AddMessage(c *gin.Context) {
 		return
 	}
 
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxNotificationRequestBytes)
 	var payload addMessagePayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "不正なリクエスト形式です"})
@@ -189,6 +205,10 @@ func (h *NotificationRequestHandler) AddMessage(c *gin.Context) {
 	payload.Message = strings.TrimSpace(payload.Message)
 	if payload.Message == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "メッセージは必須です"})
+		return
+	}
+	if len([]rune(payload.Message)) > maxNotificationMessageRunes {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "メッセージは2000文字以内で入力してください"})
 		return
 	}
 

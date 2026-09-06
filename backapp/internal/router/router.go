@@ -162,9 +162,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			studentNotificationRequests := student.Group("/notification-requests")
 			{
 				studentNotificationRequests.GET("", notificationRequestHandler.ListStudentRequests)
-				studentNotificationRequests.POST("", notificationRequestHandler.CreateRequest)
+				studentNotificationRequests.POST("", middleware.UserRateLimit(10, time.Hour, "notification-request-create"), notificationRequestHandler.CreateRequest)
 				studentNotificationRequests.GET("/:request_id", notificationRequestHandler.GetRequestDetail)
-				studentNotificationRequests.POST("/:request_id/messages", notificationRequestHandler.AddMessage)
+				studentNotificationRequests.POST("/:request_id/messages", middleware.UserRateLimit(60, time.Hour, "notification-request-message"), notificationRequestHandler.AddMessage)
 			}
 		}
 

@@ -169,6 +169,9 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 			limit = v
 		}
 	}
+	if limit > 100 {
+		limit = 100
+	}
 
 	notifications, err := h.NotificationRepo.GetNotificationsForAccess(userRoles, user.ID, includeAuthored, limit)
 	if err != nil {
