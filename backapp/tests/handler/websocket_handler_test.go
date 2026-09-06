@@ -5,6 +5,7 @@ import (
 	"backapp/internal/websocket"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -222,4 +223,16 @@ func TestWebSocketHandler_ServeProgressWebSocket(t *testing.T) {
 		require.True(t, ok, "progress client should receive the broadcast")
 		assert.JSONEq(t, `{"type":"progress_update"}`, msg)
 	})
+}
+
+func TestWebSocketHandler_RejectsInvalidTournamentIDBeforeUpgrade(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	wsHandler := handler.NewWebSocketHandler(websocket.NewHubManager(), "")
+	router := gin.New()
+	router.GET("/ws/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/ws/tournaments/not-a-number", nil))
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
 }

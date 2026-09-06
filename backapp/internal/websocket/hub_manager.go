@@ -21,7 +21,14 @@ func (m *HubManager) GetHub(topic string) *Hub {
 		return hub
 	}
 
-	hub := NewHub()
+	var hub *Hub
+	hub = NewHub(func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if m.hubs[topic] == hub {
+			delete(m.hubs, topic)
+		}
+	})
 	m.hubs[topic] = hub
 	go hub.Run()
 	return hub
