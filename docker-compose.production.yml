@@ -119,6 +119,13 @@ services:
       - "traefik.http.routers.uploads-https.tls=true"
       - "traefik.http.routers.uploads-https.tls.certresolver=myresolver"
       - "traefik.http.services.uploads.loadbalancer.server.port=8080"
+      - "traefik.http.routers.websocket-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.websocket-https.entrypoints=websecure"
+      - "traefik.http.routers.websocket-https.tls=true"
+      - "traefik.http.routers.websocket-https.tls.certresolver=myresolver"
+      - "traefik.http.routers.websocket-https.priority=100"
+      - "traefik.http.routers.websocket-https.service=websocket"
+      - "traefik.http.services.websocket.loadbalancer.server.port=8080"
 
   sportease-frontapp:
     build:
