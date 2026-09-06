@@ -25,6 +25,8 @@ test.describe('大会情報登録・管理 (root)', () => {
   });
 
   test('新しい大会を作成できる', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
     await page.getByRole('button', { name: '新規作成' }).click();
 
     await expect(page.getByText('大会作成')).toBeVisible();
@@ -60,6 +62,8 @@ test.describe('大会情報登録・管理 (root)', () => {
     });
 
     await expect(page.getByText('大会作成')).not.toBeVisible();
+    await expect(page.getByText('2026秋季スポーツ大会')).toBeVisible();
+    expect(pageErrors).toEqual([]);
   });
 
   test('新規作成でスコア非表示設定を保存できる', async ({ page }) => {

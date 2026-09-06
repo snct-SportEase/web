@@ -416,7 +416,7 @@ createServer(async (req, res) => {
     const body = await readJson(req);
     const nextEvent = {
       ...body,
-      id: 2,
+      id: Math.max(0, ...events.map((event) => event.id)) + 1,
       start_date: `${body.start_date}T00:00:00Z`,
       end_date: `${body.end_date}T00:00:00Z`
     };
