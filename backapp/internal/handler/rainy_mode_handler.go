@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -51,6 +52,14 @@ func (h *RainyModeHandler) UpsertRainyModeSettingHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
+	if req.MinCapacity != nil && *req.MinCapacity < 0 || req.MaxCapacity != nil && *req.MaxCapacity < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Capacities must be non-negative"})
+		return
+	}
+	if req.MinCapacity != nil && req.MaxCapacity != nil && *req.MinCapacity > *req.MaxCapacity {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "min_capacity must not exceed max_capacity"})
+		return
+	}
 
 	setting := &models.RainyModeSetting{
 		EventID:        eventID,
@@ -63,6 +72,10 @@ func (h *RainyModeHandler) UpsertRainyModeSettingHandler(c *gin.Context) {
 
 	err = h.rainyModeRepo.UpsertSetting(setting)
 	if err != nil {
+		if errors.Is(err, repository.ErrInvalidRainyModeSetting) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save rainy mode setting"})
 		return
 	}
