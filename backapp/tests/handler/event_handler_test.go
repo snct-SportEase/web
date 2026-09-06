@@ -741,7 +741,7 @@ func TestEventHandler_NotifySurvey(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-		c.Set("user_id", "test-user-id")
+		c.Set("user", &models.User{ID: "test-user-id"})
 		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events/1/notify-survey", nil)
 
 		h.NotifySurvey(c)

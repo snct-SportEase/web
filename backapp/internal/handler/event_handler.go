@@ -465,9 +465,11 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 	title := "大会アンケートのお願い"
 	body := "大会に関するアンケート機能が公開されました。「" + event.Name + "」についてダッシュボードの一番上のリンクからアンケートにご協力ください。"
 	createdBy := "" // System notification
-	userIDVal, exists := c.Get("user_id")
+	userValue, exists := c.Get("user")
 	if exists {
-		createdBy = userIDVal.(string)
+		if user, ok := userValue.(*models.User); ok && user != nil {
+			createdBy = user.ID
+		}
 	}
 
 	notifID, err := h.notificationRepo.CreateNotification(title, body, "general", createdBy, &event.ID)
