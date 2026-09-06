@@ -312,6 +312,7 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		for _, uid := range req.UserIDs {
 			if !existingMemberMap[uid] {
 				addCount++
+				existingMemberMap[uid] = true
 			}
 		}
 
