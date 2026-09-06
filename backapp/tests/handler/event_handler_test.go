@@ -83,6 +83,28 @@ func TestEventHandler_CreateEvent(t *testing.T) {
 		classRepo.AssertExpectations(t)
 	})
 
+	t.Run("Rejects invalid event fields", func(t *testing.T) {
+		cases := []string{
+			`{"name":"","year":2026,"season":"spring"}`,
+			`{"name":"大会","year":0,"season":"spring"}`,
+			`{"name":"大会","year":2026,"season":"winter"}`,
+			`{"name":"大会","year":2026,"season":"spring","start_date":"2026-05-02","end_date":"2026-05-01"}`,
+		}
+		for _, body := range cases {
+			repo := new(MockEventRepository)
+			h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events", bytes.NewBufferString(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+
+			h.CreateEvent(c)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			repo.AssertNotCalled(t, "CreateEventWithClasses", mock.Anything, mock.Anything)
+		}
+	})
+
 	t.Run("Rejects Unknown Status", func(t *testing.T) {
 		repo := new(MockEventRepository)
 		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
