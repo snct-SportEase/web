@@ -516,6 +516,14 @@ func (m *MockSportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, er
 	return args.Get(0).([]*models.Team), args.Error(1)
 }
 
+func (m *MockSportRepository) GetTeamsByEventAndSportID(eventID int, sportID int) ([]*models.Team, error) {
+	args := m.Called(eventID, sportID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Team), args.Error(1)
+}
+
 func (m *MockSportRepository) GetSportDetails(eventID int, sportID int) (*models.EventSport, error) {
 	args := m.Called(eventID, sportID)
 	if args.Get(0) == nil {

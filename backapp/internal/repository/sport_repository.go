@@ -18,6 +18,7 @@ type SportRepository interface {
 	AssignSportToEvent(eventSport *models.EventSport) error
 	DeleteSportFromEvent(eventID int, sportID int) error
 	GetTeamsBySportID(sportID int) ([]*models.Team, error)
+	GetTeamsByEventAndSportID(eventID int, sportID int) ([]*models.Team, error)
 	GetSportDetails(eventID int, sportID int) (*models.EventSport, error)
 	UpdateSportDetails(eventID int, sportID int, details models.EventSport) error
 }
@@ -200,6 +201,39 @@ func (r *sportRepository) GetTeamsBySportID(sportID int) ([]*models.Team, error)
 		teams = append(teams, team)
 	}
 	return teams, nil
+}
+
+func (r *sportRepository) GetTeamsByEventAndSportID(eventID int, sportID int) ([]*models.Team, error) {
+	query := `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, t.min_capacity, t.max_capacity
+		FROM teams t
+		JOIN classes c ON t.class_id = c.id
+		WHERE c.event_id = ? AND t.sport_id = ?
+	`
+	rows, err := r.db.Query(query, eventID, sportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []*models.Team
+	for rows.Next() {
+		team := &models.Team{}
+		var minCap, maxCap sql.NullInt64
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &minCap, &maxCap); err != nil {
+			return nil, err
+		}
+		if minCap.Valid {
+			value := int(minCap.Int64)
+			team.MinCapacity = &value
+		}
+		if maxCap.Valid {
+			value := int(maxCap.Int64)
+			team.MaxCapacity = &value
+		}
+		teams = append(teams, team)
+	}
+	return teams, rows.Err()
 }
 
 func (r *sportRepository) GetSportDetails(eventID int, sportID int) (*models.EventSport, error) {

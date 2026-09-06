@@ -1123,11 +1123,11 @@ func TestSportHandler_GetTeamsBySportHandler(t *testing.T) {
 		h := handler.NewSportHandler(mockSportRepo, nil, nil, nil, nil)
 
 		teams := []*models.Team{{ID: 1, Name: "Team 1"}}
-		mockSportRepo.On("GetTeamsBySportID", 1).Return(teams, nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", 7, 1).Return(teams, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		c.Params = gin.Params{{Key: "event_id", Value: "7"}, {Key: "id", Value: "1"}}
 		h.GetTeamsBySportHandler(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)

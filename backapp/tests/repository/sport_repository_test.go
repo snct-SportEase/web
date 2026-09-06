@@ -407,6 +407,27 @@ func TestSportRepository_GetTeamsBySportID(t *testing.T) {
 	})
 }
 
+func TestSportRepository_GetTeamsByEventAndSportID(t *testing.T) {
+	const q = `
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, t.min_capacity, t.max_capacity
+		FROM teams t
+		JOIN classes c ON t.class_id = c.id
+		WHERE c.event_id = ? AND t.sport_id = ?
+	`
+	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "min_capacity", "max_capacity"}
+	repo, mock, close := setupSport(t)
+	defer close()
+
+	mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(7, 2).
+		WillReturnRows(sqlmock.NewRows(cols).AddRow(10, "IS3-A", 5, 2, 7, 3, 8))
+
+	teams, err := repo.GetTeamsByEventAndSportID(7, 2)
+	require.NoError(t, err)
+	require.Len(t, teams, 1)
+	assert.Equal(t, 7, teams[0].EventID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ─── GetSportDetails ───────────────────────────────────────────────────────
 
 func TestSportRepository_GetSportDetails(t *testing.T) {
