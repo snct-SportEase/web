@@ -813,7 +813,7 @@ createServer(async (req, res) => {
     return;
   }
 
-  const rainyModeSettingsMatch = url.pathname.match(/^\/api\/root\/events\/(\d+)\/rainy-mode\/settings(?:\/(\d+)\/(\d+))?$/);
+  const rainyModeSettingsMatch = url.pathname.match(/^\/api\/(?:admin|root)\/events\/(\d+)\/rainy-mode\/settings(?:\/(\d+)\/(\d+))?$/);
   if (rainyModeSettingsMatch && req.method === 'GET') {
     const eventId = Number(rainyModeSettingsMatch[1]);
     sendJson(res, 200, rainyModeSettings.filter((item) => item.event_id === eventId));

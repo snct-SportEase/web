@@ -5,6 +5,9 @@ const mockBackendUrl = process.env.MOCK_BACKEND_URL ?? 'http://127.0.0.1:8081';
 test.describe('雨天時定員設定 (root)', () => {
   test.beforeEach(async ({ page, context, request }) => {
     await request.post(`${mockBackendUrl}/__reset`);
+    await request.post(`${mockBackendUrl}/api/admin/events/1/sports`, {
+      data: { sport_id: 1, description: '', location: 'gym1' }
+    });
     await context.addCookies([{ name: 'session_token', value: 'test-session-token', domain: 'localhost', path: '/' }]);
     await page.goto('/dashboard/admin/sport-details-registration');
   });
@@ -14,7 +17,7 @@ test.describe('雨天時定員設定 (root)', () => {
 
     page.on('request', (request) => {
       if (
-        request.url().endsWith('/api/root/events/1/rainy-mode/settings') &&
+        request.url().endsWith('/api/admin/events/1/rainy-mode/settings') &&
         request.method() === 'POST'
       ) {
         saveRequests.push(JSON.parse(request.postData() ?? '{}'));
@@ -26,7 +29,7 @@ test.describe('雨天時定員設定 (root)', () => {
 
     await Promise.all([
       page.waitForResponse((response) =>
-        response.url().endsWith('/api/root/events/1/rainy-mode/settings') &&
+        response.url().endsWith('/api/admin/events/1/rainy-mode/settings') &&
         response.request().method() === 'GET'
       ),
       page.getByLabel('競技選択').selectOption('1')
