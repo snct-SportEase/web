@@ -3,12 +3,18 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"backapp/internal/models"
+)
+
+var (
+	ErrMatchResultAlreadyEntered = errors.New("match result already entered")
+	ErrInvalidMatchResult        = errors.New("invalid match result")
 )
 
 type TournamentRepository interface {
@@ -725,7 +731,7 @@ func (r *tournamentRepository) getMatchByID(tx *sql.Tx, matchID int) (*models.Ma
 	var m models.MatchDB
 	var loserBracketRound sql.NullInt64
 	var loserBracketBlock sql.NullString
-	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?", matchID)
+	row := tx.QueryRow("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ? FOR UPDATE", matchID)
 	if err := row.Scan(&m.ID, &m.TournamentID, &m.Round, &m.MatchNumberInRound, &m.Team1ID, &m.Team2ID, &m.WinnerID, &m.Status, &m.NextMatchID, &m.StartTime, &m.IsBronzeMatch, &m.IsLoserBracketMatch, &loserBracketRound, &loserBracketBlock, &m.RainyModeStartTime); err != nil {
 		return nil, err
 	}
@@ -1482,6 +1488,12 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 	if err != nil {
 		return err
 	}
+	if match.Status == "finished" {
+		return ErrMatchResultAlreadyEntered
+	}
+	if err := validateMatchResult(match, team1Score, team2Score, winnerIDInput); err != nil {
+		return err
+	}
 
 	// 雨天時モードのチェック: 昼競技とグラウンド競技をブロック
 	eventID, sportID, location, err := r.getTournamentMetadata(tx, match.TournamentID)
@@ -1496,8 +1508,6 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 	} else {
 		return err
 	}
-
-	alreadyFinished := match.WinnerID.Valid && match.Status == "finished"
 
 	var winnerID, loserID int64
 	if team1Score > team2Score {
@@ -1632,10 +1642,8 @@ func (r *tournamentRepository) UpdateMatchResult(matchID, team1Score, team2Score
 		}
 	}
 
-	if !alreadyFinished {
-		if err := r.applyScoring(tx, match, winnerID, loserID, totalRounds); err != nil {
-			return err
-		}
+	if err := r.applyScoring(tx, match, winnerID, loserID, totalRounds); err != nil {
+		return err
 	}
 
 	return tx.Commit()
@@ -1657,6 +1665,9 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 	// 既に入力済みでない場合はエラー
 	if match.Status != "finished" {
 		return fmt.Errorf("試合結果がまだ入力されていません。通常の更新メソッドを使用してください")
+	}
+	if err := validateMatchResult(match, team1Score, team2Score, winnerIDInput); err != nil {
+		return err
 	}
 
 	// 雨天時モードのチェック: 昼競技とグラウンド競技をブロック
@@ -1939,6 +1950,22 @@ func (r *tournamentRepository) UpdateMatchResultForCorrection(matchID, team1Scor
 	}
 
 	return tx.Commit()
+}
+
+func validateMatchResult(match *models.MatchDB, team1Score, team2Score, winnerIDInput int) error {
+	if team1Score < 0 || team2Score < 0 {
+		return fmt.Errorf("%w: scores must be non-negative", ErrInvalidMatchResult)
+	}
+	if !match.Team1ID.Valid || !match.Team2ID.Valid {
+		return fmt.Errorf("%w: both teams must be assigned", ErrInvalidMatchResult)
+	}
+	if team1Score == team2Score {
+		winnerID := int64(winnerIDInput)
+		if winnerID != match.Team1ID.Int64 && winnerID != match.Team2ID.Int64 {
+			return fmt.Errorf("%w: tie winner must be one of the participating teams", ErrInvalidMatchResult)
+		}
+	}
+	return nil
 }
 
 // revertScoring reverts the points that were awarded to the previous winner and loser
