@@ -274,7 +274,11 @@ func (h *AuthHandler) GetUser(c *gin.Context) {
 		return
 	}
 
-	user := userCtx.(*models.User)
+	user, ok := userCtx.(*models.User)
+	if !ok || user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user in context"})
+		return
+	}
 
 	// ロール情報を含むユーザー情報を取得
 	userWithRoles, err := h.userRepo.GetUserWithRoles(user.ID)
@@ -305,7 +309,11 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	user := userCtx.(*models.User)
+	user, ok := userCtx.(*models.User)
+	if !ok || user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user in context"})
+		return
+	}
 
 	var req models.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
