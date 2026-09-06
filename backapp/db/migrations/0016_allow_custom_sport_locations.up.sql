@@ -1,0 +1,2 @@
+ALTER TABLE event_sports
+    MODIFY COLUMN location VARCHAR(255) NOT NULL DEFAULT 'other';
