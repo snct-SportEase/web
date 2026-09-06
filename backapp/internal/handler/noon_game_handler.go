@@ -2144,7 +2144,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 			entryName := ""
 			if entry, ok := entryLookup[ranking.EntryID]; ok && entry != nil {
 				// classMap と groupMap を取得
-				classes, _ := h.classRepo.GetAllClasses(match.SessionID)
+				classes, _ := h.classRepo.GetAllClasses(session.EventID)
 				classMap := make(map[int]*models.Class)
 				for _, class := range classes {
 					classMap[class.ID] = class
