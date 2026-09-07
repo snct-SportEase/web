@@ -30,10 +30,10 @@
 
 {#if show && (installed || installable)}
   <div
-    class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-300 {isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}"
+    class="pointer-events-none fixed top-20 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 transform transition-all duration-300 {isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}"
     role="alert"
   >
-    <div class="max-w-md mx-auto bg-indigo-600 text-white rounded-lg shadow-lg p-4 flex items-start space-x-3">
+    <div class="mx-auto flex items-start space-x-3 rounded-lg bg-indigo-600 p-4 text-white shadow-lg">
       <div class="flex-shrink-0">
         {#if installed}
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +62,7 @@
         type="button"
         onclick={handleClose}
         aria-label="通知を閉じる"
-        class="flex-shrink-0 text-indigo-200 hover:text-white transition-colors"
+        class="pointer-events-auto flex-shrink-0 text-indigo-200 transition-colors hover:text-white"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
