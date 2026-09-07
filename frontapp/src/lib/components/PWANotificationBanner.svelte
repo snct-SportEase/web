@@ -30,7 +30,7 @@
 
 {#if show && (installed || installable)}
   <div
-    class="pointer-events-none fixed top-20 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 transform transition-all duration-300 {isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}"
+    class="app-layer-notification pointer-events-none fixed top-20 left-1/2 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 transform transition-all duration-300 {isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}"
     role="alert"
   >
     <div class="mx-auto flex items-start space-x-3 rounded-lg bg-indigo-600 p-4 text-white shadow-lg">

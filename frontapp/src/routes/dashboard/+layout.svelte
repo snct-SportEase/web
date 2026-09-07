@@ -125,7 +125,7 @@
 
 <div class="min-h-screen bg-gray-50 flex flex-col">
   {#if (!$isSidebarOpen || (browser && !isMobile)) && user?.is_profile_complete}
-    <header class="bg-white shadow-sm p-4 sticky top-0 z-[100] pointer-events-auto">
+    <header class="app-layer-header bg-white shadow-sm p-4 sticky top-0 pointer-events-auto">
       <div class="flex justify-between items-center pointer-events-auto">
         <div class="flex items-center pointer-events-auto">
           <button type="button" onclick={openSidebar} class="mr-4 p-2 rounded-md hover:bg-gray-100 pointer-events-auto" aria-label="サイドバーを開く">

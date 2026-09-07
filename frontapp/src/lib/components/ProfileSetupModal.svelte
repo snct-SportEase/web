@@ -78,7 +78,7 @@
 </script>
 
 <!-- モーダルの背景 -->
-<div class="fixed top-0 left-0 right-0 bottom-0 z-50 flex items-center justify-center bg-black min-h-screen w-full overflow-hidden">
+<div class="app-layer-modal fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center bg-black min-h-screen w-full overflow-hidden">
   <!-- モーダルの本体 -->
   <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
     <h2 class="text-2xl font-bold text-center text-gray-800">プロフィールを設定してください</h2>

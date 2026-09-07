@@ -47,7 +47,7 @@
 
 {#if $pwaInstallDialogOpen}
   <div
-    class="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+    class="app-layer-modal fixed inset-0 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
     role="presentation"
     onclick={closeDialog}
     onkeydown={handleKeydown}

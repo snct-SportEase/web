@@ -2,6 +2,28 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+/*
+ * Application layer policy.
+ * Keep viewport-fixed UI on semantic layers instead of assigning z-index in
+ * individual components. Blocking overlays must stay above the sticky header
+ * and passive notifications.
+ */
+:root {
+  --app-layer-sidebar-backdrop: 40;
+  --app-layer-sidebar: 50;
+  --app-layer-header: 100;
+  --app-layer-notification: 110;
+  --app-layer-modal: 200;
+  --app-layer-modal-raised: 210;
+}
+
+.app-layer-sidebar-backdrop { z-index: var(--app-layer-sidebar-backdrop); }
+.app-layer-sidebar { z-index: var(--app-layer-sidebar); }
+.app-layer-header { z-index: var(--app-layer-header); }
+.app-layer-notification { z-index: var(--app-layer-notification); }
+.app-layer-modal { z-index: var(--app-layer-modal); }
+.app-layer-modal-raised { z-index: var(--app-layer-modal-raised); }
+
 html, body {
   min-height: 100%;
   margin: 0;
@@ -79,7 +101,7 @@ aside.closed {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  z-index: 40;
+  z-index: var(--app-layer-sidebar-backdrop);
   transition: opacity 0.3s ease;
   border: none;
   padding: 0;
