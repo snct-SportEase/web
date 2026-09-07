@@ -20,5 +20,7 @@ describe('PWANotificationBanner', () => {
 		await expect.element(banner).toHaveClass(/opacity-100/);
 		await expect.element(banner).toHaveClass(/top-20/);
 		await expect.element(banner).toHaveClass(/z-\[110\]/);
+		await expect.element(banner).toHaveClass(/pointer-events-none/);
+		await expect.element(page.getByRole('button', { name: '通知を閉じる' })).toHaveClass(/pointer-events-auto/);
 	});
 });
