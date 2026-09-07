@@ -140,7 +140,7 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 	if alreadyEntered {
 		if err := h.tournRepo.UpdateMatchResultForCorrection(matchID, req.Team1Score, req.Team2Score, req.WinnerID); err != nil {
 			log.Printf("UpdateMatchResultForCorrection error: %v", err)
-			if errors.Is(err, repository.ErrInvalidMatchResult) {
+			if errors.Is(err, repository.ErrInvalidMatchResult) || errors.Is(err, repository.ErrMatchParticipantsUndecided) || errors.Is(err, repository.ErrInvalidTieWinner) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
@@ -157,6 +157,10 @@ func (h *TournamentHandler) UpdateMatchResultHandler(c *gin.Context) {
 			}
 			if errors.Is(err, repository.ErrMatchResultAlreadyEntered) {
 				c.JSON(http.StatusConflict, gin.H{"error": "Match result was already entered"})
+				return
+			}
+			if errors.Is(err, repository.ErrMatchParticipantsUndecided) || errors.Is(err, repository.ErrInvalidTieWinner) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match result"})

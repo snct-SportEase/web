@@ -86,10 +86,12 @@ export async function load({ fetch, locals, request }) {
 			if (sportRes.ok) {
 				const sportPayload = await sportRes.json();
 				eventSports = Array.isArray(sportPayload) ? sportPayload : [];
-				allSports = eventSports.map((eventSport) => ({
-					id: eventSport.sport_id,
-					name: eventSport.sport_name
-				}));
+					allSports = eventSports
+						.filter((eventSport) => eventSport.template_key !== 'board_game_tournament')
+						.map((eventSport) => ({
+						id: eventSport.sport_id,
+						name: eventSport.sport_name
+					}));
 			}
 
 			const noonSessionRes = await fetch(
