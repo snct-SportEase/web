@@ -18,5 +18,7 @@ describe('PWANotificationBanner', () => {
 		const banner = page.getByRole('alert');
 		await expect.element(banner).toBeInTheDocument();
 		await expect.element(banner).toHaveClass(/opacity-100/);
+		await expect.element(banner).toHaveClass(/top-20/);
+		await expect.element(banner).toHaveClass(/z-\[110\]/);
 	});
 });
