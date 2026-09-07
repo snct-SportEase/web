@@ -297,6 +297,12 @@ jobs:
                 );
             "'
 
+            dirty_16="$(docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysql -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" --batch --skip-column-names -e "SELECT COUNT(*) FROM schema_migrations WHERE version = 16 AND dirty = TRUE;"')"
+            if [ "$dirty_16" = "1" ]; then
+              docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysql -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
+                < backapp/db/recovery/0016_dirty_recovery.sql
+            fi
+
             docker compose -f docker-compose.production.yml --profile migration run --rm migrate
 
             docker compose -f docker-compose.production.yml build --no-cache

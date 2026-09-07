@@ -257,7 +257,7 @@ func (h *SportHandler) GetTeamsBySportHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return
 	}
-	sportIDStr := c.Param("id")
+	sportIDStr := c.Param("sport_id")
 	sportID, err := strconv.Atoi(sportIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sport ID"})
