@@ -54,7 +54,7 @@
 
   function openCompetitionGuidelines() {
     if (competitionGuidelinesUrl) {
-      window.open(competitionGuidelinesUrl, '_blank');
+      window.open(competitionGuidelinesUrl, '_blank', 'noopener,noreferrer');
     }
   }
 

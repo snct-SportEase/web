@@ -176,6 +176,11 @@ services:
       - "traefik.http.routers.uploads.rule=(Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/uploads`)"
       - "traefik.http.routers.uploads.entrypoints=local3300"
       - "traefik.http.services.uploads.loadbalancer.server.port=8080"
+      - "traefik.http.routers.websocket-local.rule=(Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.websocket-local.entrypoints=local3300"
+      - "traefik.http.routers.websocket-local.priority=100"
+      - "traefik.http.routers.websocket-local.service=websocket-local"
+      - "traefik.http.services.websocket-local.loadbalancer.server.port=8080"
 
   sportease-frontapp:
     build:

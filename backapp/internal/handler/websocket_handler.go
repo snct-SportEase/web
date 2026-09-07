@@ -2,6 +2,8 @@ package handler
 
 import (
 	"backapp/internal/websocket"
+	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,11 +23,15 @@ func NewWebSocketHandler(hubManager *websocket.HubManager, allowedOrigin ...stri
 
 func (h *WebSocketHandler) ServeTournamentWebSocket(c *gin.Context) {
 	tournamentID := c.Param("tournament_id")
-	hub := h.hubManager.GetHub("tournament:" + tournamentID)
-	websocket.ServeWs(hub, c.Writer, c.Request, h.allowedOrigin)
+	parsedID, err := strconv.Atoi(tournamentID)
+	if err != nil || parsedID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tournament ID"})
+		return
+	}
+	topic := "tournament:" + strconv.Itoa(parsedID)
+	websocket.ServeWs(func() *websocket.Hub { return h.hubManager.GetHub(topic) }, c.Writer, c.Request, h.allowedOrigin)
 }
 
 func (h *WebSocketHandler) ServeProgressWebSocket(c *gin.Context) {
-	hub := h.hubManager.GetHub("progress")
-	websocket.ServeWs(hub, c.Writer, c.Request, h.allowedOrigin)
+	websocket.ServeWs(func() *websocket.Hub { return h.hubManager.GetHub("progress") }, c.Writer, c.Request, h.allowedOrigin)
 }

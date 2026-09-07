@@ -47,6 +47,15 @@ func setupEvent(t *testing.T) (repository.EventRepository, sqlmock.Sqlmock, func
 	return repository.NewEventRepository(db), mock, func() { db.Close() }
 }
 
+func expectUserTransition(mock sqlmock.Sqlmock, eventID any) {
+	mock.ExpectExec(`(?s)DELETE u\s+FROM users u.*current_class\.name IN \('IS5', 'IE5', 'IT5'\)`).
+		WithArgs(eventID).
+		WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectExec(`(?s)UPDATE users u.*previous_event\.year = next_event\.year.*WHERE ae\.event_id <> next_event\.id`).
+		WithArgs(eventID).
+		WillReturnResult(sqlmock.NewResult(0, 10))
+}
+
 // ─── GetEventByID ──────────────────────────────────────────────────────────
 
 func TestEventRepository_GetEventByID(t *testing.T) {
@@ -364,6 +373,33 @@ func TestEventRepository_CreateEventWithClassesRollsBackEverything(t *testing.T)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestEventRepository_CreateEventWithClassesMigratesUsersWhenEventBecomesCurrent(t *testing.T) {
+	const insertEvent = "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+	const activeQ = "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
+	repo, mock, close := setupEvent(t)
+	defer close()
+
+	event := newEvent()
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(insertEvent)).
+		WithArgs(event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, nil, nil, event.IsSurveyPublished, event.Status, event.HideScores, event.DuplicateRegistrationThreshold).
+		WillReturnResult(sqlmock.NewResult(10, 1))
+	classes := mock.ExpectPrepare(regexp.QuoteMeta("INSERT INTO classes (event_id, name) VALUES (?, ?)"))
+	classes.ExpectExec().WithArgs(int64(10), "IS5").WillReturnResult(sqlmock.NewResult(1, 1))
+	classes.ExpectExec().WithArgs(int64(10), "IS4").WillReturnResult(sqlmock.NewResult(2, 1))
+	expectUserTransition(mock, int64(10))
+	mock.ExpectExec(regexp.QuoteMeta(archiveQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(activeQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	id, err := repo.CreateEventWithClasses(event, []string{"IS5", "IS4"})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), id)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ─── UpdateEvent ───────────────────────────────────────────────────────────
 
 func TestEventRepository_UpdateEvent(t *testing.T) {
@@ -384,6 +420,7 @@ func TestEventRepository_UpdateEvent(t *testing.T) {
 		mock.ExpectExec(regexp.QuoteMeta(updateQ)).
 			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold, e.ID).
 			WillReturnResult(sqlmock.NewResult(0, 1))
+		expectUserTransition(mock, e.ID)
 		mock.ExpectExec(regexp.QuoteMeta(archiveQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(activeQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
@@ -404,6 +441,7 @@ func TestEventRepository_UpdateEvent(t *testing.T) {
 		mock.ExpectExec(regexp.QuoteMeta(updateQ)).
 			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold, e.ID).
 			WillReturnResult(sqlmock.NewResult(0, 1))
+		expectUserTransition(mock, e.ID)
 		mock.ExpectExec(regexp.QuoteMeta(archivePreparingQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(activeQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
@@ -461,6 +499,7 @@ func TestEventRepository_SetActiveEvent(t *testing.T) {
 
 		eventID := 3
 		mock.ExpectBegin()
+		expectUserTransition(mock, eventID)
 		mock.ExpectExec(regexp.QuoteMeta(upsertQ)).WithArgs(eventID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(archiveOthersQ)).WithArgs(eventID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(activateQ)).WithArgs(eventID).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -491,6 +530,7 @@ func TestEventRepository_SetActiveEvent(t *testing.T) {
 
 		eventID := 3
 		mock.ExpectBegin()
+		expectUserTransition(mock, eventID)
 		mock.ExpectExec(regexp.QuoteMeta(upsertQ)).WillReturnError(errors.New("db error"))
 		mock.ExpectRollback()
 

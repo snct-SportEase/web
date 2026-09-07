@@ -2144,7 +2144,7 @@ func (h *NoonGameHandler) RecordMatchResult(c *gin.Context) {
 			entryName := ""
 			if entry, ok := entryLookup[ranking.EntryID]; ok && entry != nil {
 				// classMap と groupMap を取得
-				classes, _ := h.classRepo.GetAllClasses(match.SessionID)
+				classes, _ := h.classRepo.GetAllClasses(session.EventID)
 				classMap := make(map[int]*models.Class)
 				for _, class := range classes {
 					classMap[class.ID] = class
@@ -3313,12 +3313,6 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		}
 	}
 
-	// 既存ポイントを消す
-	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
-		return
-	}
-
 	pointsEntries := make([]*models.NoonGamePoint, 0)
 	resultDetails := make([]*models.NoonGameResultDetail, 0)
 
@@ -3397,11 +3391,6 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		}
 	}
 
-	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
-		return
-	}
-
 	winner := "draw"
 	if bestCount == 1 && bestEntryID != 0 && len(match.Entries) >= 2 {
 		// entry_index 0/1 を home/away に割り当てている前提
@@ -3413,20 +3402,14 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		}
 	}
 
-	if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
+	if err := h.noonRepo.SaveMatchResult(&models.NoonGameResult{
 		MatchID:    match.ID,
 		Winner:     winner,
 		RecordedBy: user.ID,
 		Note:       req.Note,
 		Details:    resultDetails,
-	}); err != nil {
+	}, pointsEntries); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result"})
-		return
-	}
-
-	match.Status = "completed"
-	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
 		return
 	}
 
@@ -4069,12 +4052,6 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		}
 	}
 
-	// 既存ポイントを消す
-	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
-		return
-	}
-
 	pointsEntries := make([]*models.NoonGamePoint, 0)
 	resultDetails := make([]*models.NoonGameResultDetail, 0)
 
@@ -4153,11 +4130,6 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		}
 	}
 
-	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
-		return
-	}
-
 	winner := "draw"
 	if bestCount == 1 && bestEntryID != 0 && len(match.Entries) >= 2 {
 		// entry_index 0/1 を home/away に割り当てている前提
@@ -4169,20 +4141,14 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		}
 	}
 
-	if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
+	if err := h.noonRepo.SaveMatchResult(&models.NoonGameResult{
 		MatchID:    match.ID,
 		Winner:     winner,
 		RecordedBy: user.ID,
 		Note:       req.Note,
 		Details:    resultDetails,
-	}); err != nil {
+	}, pointsEntries); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result"})
-		return
-	}
-
-	match.Status = "completed"
-	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
 		return
 	}
 
@@ -4353,12 +4319,6 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		}
 	}
 
-	// 既存ポイントを消す
-	if err := h.noonRepo.ClearPointsForMatch(match.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear existing points"})
-		return
-	}
-
 	pointsEntries := make([]*models.NoonGamePoint, 0)
 	resultDetails := make([]*models.NoonGameResultDetail, 0)
 
@@ -4437,11 +4397,6 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		}
 	}
 
-	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store points"})
-		return
-	}
-
 	winner := "draw"
 	if bestCount == 1 && bestEntryID != 0 && len(match.Entries) >= 2 {
 		// entry_index 0/1 を home/away に割り当てている前提
@@ -4453,20 +4408,14 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		}
 	}
 
-	if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
+	if err := h.noonRepo.SaveMatchResult(&models.NoonGameResult{
 		MatchID:    match.ID,
 		Winner:     winner,
 		RecordedBy: user.ID,
 		Note:       req.Note,
 		Details:    resultDetails,
-	}); err != nil {
+	}, pointsEntries); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store match result"})
-		return
-	}
-
-	match.Status = "completed"
-	if _, err := h.noonRepo.SaveMatch(match.NoonGameMatch); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update match status"})
 		return
 	}
 

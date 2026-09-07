@@ -3,7 +3,11 @@ package repository
 import (
 	"backapp/internal/models"
 	"database/sql"
+	"errors"
+	"fmt"
 )
+
+var ErrInvalidRainyModeSetting = errors.New("invalid rainy mode setting")
 
 type RainyModeRepository interface {
 	GetSettingsByEventID(eventID int) ([]*models.RainyModeSetting, error)
@@ -112,6 +116,28 @@ func (r *rainyModeRepository) GetSetting(eventID int, sportID int, classID int) 
 }
 
 func (r *rainyModeRepository) UpsertSetting(setting *models.RainyModeSetting) error {
+	if setting.MinCapacity != nil && *setting.MinCapacity < 0 || setting.MaxCapacity != nil && *setting.MaxCapacity < 0 {
+		return fmt.Errorf("%w: capacities must be non-negative", ErrInvalidRainyModeSetting)
+	}
+	if setting.MinCapacity != nil && setting.MaxCapacity != nil && *setting.MinCapacity > *setting.MaxCapacity {
+		return fmt.Errorf("%w: min_capacity must not exceed max_capacity", ErrInvalidRainyModeSetting)
+	}
+
+	var classBelongsToEvent, sportAssignedToEvent bool
+	if err := r.db.QueryRow(`
+		SELECT
+			EXISTS(SELECT 1 FROM classes WHERE id = ? AND event_id = ?),
+			EXISTS(SELECT 1 FROM event_sports WHERE event_id = ? AND sport_id = ?)
+	`, setting.ClassID, setting.EventID, setting.EventID, setting.SportID).Scan(&classBelongsToEvent, &sportAssignedToEvent); err != nil {
+		return err
+	}
+	if !classBelongsToEvent {
+		return fmt.Errorf("%w: class does not belong to event", ErrInvalidRainyModeSetting)
+	}
+	if !sportAssignedToEvent {
+		return fmt.Errorf("%w: sport is not assigned to event", ErrInvalidRainyModeSetting)
+	}
+
 	query := `
 		INSERT INTO rainy_mode_settings (event_id, sport_id, class_id, min_capacity, max_capacity, match_start_time)
 		VALUES (?, ?, ?, ?, ?, ?)

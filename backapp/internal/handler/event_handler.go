@@ -7,6 +7,7 @@ import (
 	"backapp/internal/safelog"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -79,6 +80,10 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 			return
 		}
 		endDate = &t
+	}
+	if err := validateEventInput(req.Name, req.Year, req.Season, startDate, endDate); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	if req.Status == "" {
@@ -177,7 +182,6 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		}
 		endDate = &t
 	}
-
 	existingEvent, err := h.eventRepo.GetEventByID(id)
 	if err != nil {
 		log.Printf("error: %v", err)
@@ -186,6 +190,10 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	}
 	if existingEvent == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+	if err := validateEventInput(req.Name, req.Year, req.Season, startDate, endDate); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if req.Status == "" {
@@ -215,6 +223,22 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, existingEvent)
+}
+
+func validateEventInput(name string, year int, season string, startDate, endDate *time.Time) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("name is required")
+	}
+	if year <= 0 {
+		return fmt.Errorf("year must be greater than zero")
+	}
+	if season != "spring" && season != "autumn" {
+		return fmt.Errorf("season must be spring or autumn")
+	}
+	if startDate != nil && endDate != nil && endDate.Before(*startDate) {
+		return fmt.Errorf("end_date must not be before start_date")
+	}
+	return nil
 }
 
 func (h *EventHandler) GetActiveEvent(c *gin.Context) {
@@ -441,9 +465,11 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 	title := "大会アンケートのお願い"
 	body := "大会に関するアンケート機能が公開されました。「" + event.Name + "」についてダッシュボードの一番上のリンクからアンケートにご協力ください。"
 	createdBy := "" // System notification
-	userIDVal, exists := c.Get("user_id")
+	userValue, exists := c.Get("user")
 	if exists {
-		createdBy = userIDVal.(string)
+		if user, ok := userValue.(*models.User); ok && user != nil {
+			createdBy = user.ID
+		}
 	}
 
 	notifID, err := h.notificationRepo.CreateNotification(title, body, "general", createdBy, &event.ID)

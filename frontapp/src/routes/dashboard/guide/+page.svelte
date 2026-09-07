@@ -35,7 +35,7 @@
 
   function openCompetitionGuidelines() {
     if (competitionGuidelinesUrl) {
-      window.open(competitionGuidelinesUrl, '_blank');
+      window.open(competitionGuidelinesUrl, '_blank', 'noopener,noreferrer');
     }
   }
 </script>
@@ -108,7 +108,7 @@
         {#each guideDocuments as document (document.id)}
           <button
             type="button"
-            onclick={() => window.open(document.pdf_url, '_blank')}
+            onclick={() => window.open(document.pdf_url, '_blank', 'noopener,noreferrer')}
             class="group block rounded-lg border border-indigo-100 bg-white p-6 shadow-sm transition hover:border-indigo-300 hover:shadow text-left w-full"
           >
             <div class="flex items-center mb-3">

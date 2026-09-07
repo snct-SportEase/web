@@ -29,6 +29,7 @@ type NoonGameRepository interface {
 
 	SaveResult(result *models.NoonGameResult) (*models.NoonGameResult, error)
 	SaveMatchResult(result *models.NoonGameResult, points []*models.NoonGamePoint) error
+	SaveMatchResultWithStatus(result *models.NoonGameResult, points []*models.NoonGamePoint, status string) error
 	GetResultByMatchID(matchID int) (*models.NoonGameResult, error)
 
 	ClearPointsForMatch(matchID int) error
@@ -1450,8 +1451,15 @@ func (r *noonGameRepository) SaveResult(result *models.NoonGameResult) (*models.
 // This prevents a failed correction from leaving old points deleted or a match
 // status out of sync with its result.
 func (r *noonGameRepository) SaveMatchResult(result *models.NoonGameResult, points []*models.NoonGamePoint) error {
+	return r.SaveMatchResultWithStatus(result, points, "completed")
+}
+
+func (r *noonGameRepository) SaveMatchResultWithStatus(result *models.NoonGameResult, points []*models.NoonGamePoint, status string) error {
 	if result == nil || result.MatchID == 0 {
 		return fmt.Errorf("valid result is required")
+	}
+	if status != "in_progress" && status != "completed" {
+		return fmt.Errorf("invalid match status")
 	}
 
 	tx, err := r.db.Begin()
@@ -1515,7 +1523,7 @@ func (r *noonGameRepository) SaveMatchResult(result *models.NoonGameResult, poin
 			return err
 		}
 	}
-	if _, err := tx.Exec(`UPDATE noon_game_matches SET status = ?, updated_at = ? WHERE id = ?`, "completed", time.Now(), result.MatchID); err != nil {
+	if _, err := tx.Exec(`UPDATE noon_game_matches SET status = ?, updated_at = ? WHERE id = ?`, status, time.Now(), result.MatchID); err != nil {
 		return err
 	}
 

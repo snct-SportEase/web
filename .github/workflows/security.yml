@@ -17,6 +17,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend-tests:
+    name: Backend tests before release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: backapp/go.mod
+          cache-dependency-path: backapp/go.sum
+      - name: Run backend tests with race detector
+        working-directory: ./backapp
+        run: go test -race -count=1 ./...
+
+  frontend-tests:
+    name: Frontend tests before release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontapp/package-lock.json
+      - name: Install locked frontend dependencies
+        working-directory: ./frontapp
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: ./frontapp
+        run: npx playwright install --with-deps chromium
+      - name: Run frontend checks
+        working-directory: ./frontapp
+        run: |
+          npm run lint
+          npm run test
+          npm run build
+
   dependency-review:
     name: Dependency review
     if: github.event_name == 'pull_request'
@@ -168,47 +210,8 @@ jobs:
           go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           gosec -quiet -severity medium -confidence low ./...
 
-  codeql:
-    name: CodeQL (${{ matrix.language }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: go
-            build-mode: manual
-          - language: javascript-typescript
-            build-mode: none
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-          queries: security-extended
-      - name: Set up Go
-        if: matrix.language == 'go'
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-        with:
-          go-version-file: backapp/go.mod
-          cache-dependency-path: backapp/go.sum
-      - name: Build Go application for CodeQL
-        if: matrix.language == 'go'
-        working-directory: ./backapp
-        run: go build ./...
-      - name: Analyze
-        uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
-        with:
-          category: /language:${{ matrix.language }}
-
+  # CodeQL is managed by the repository's default setup. GitHub does not allow
+  # default setup and an advanced workflow configuration to upload together.
   workflow-security:
     name: GitHub Actions security audit
     runs-on: ubuntu-latest
@@ -224,3 +227,81 @@ jobs:
           persona: auditor
           min-severity: medium
           min-confidence: medium
+
+  deploy:
+    name: Deploy to Server
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - backend-tests
+      - frontend-tests
+      - glassworm
+      - trivy
+      - npm-audit
+      - govulncheck
+      - gosec
+      - workflow-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    permissions: {}
+    steps:
+      - name: Deploy using SSH
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          timeout: 30m
+          envs: TARGET_SHA
+          script: |
+            set -e
+
+            cd "$HOME/SportEase"
+
+            git fetch origin main
+            git checkout main
+            git merge --ff-only origin/main
+            test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+            docker compose -f docker-compose.production.yml up -d sportease-db
+
+            docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'i=0; until mysqladmin ping -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" --silent; do i=$((i + 1)); if [ "$i" -ge 60 ]; then exit 1; fi; sleep 2; done'
+
+            mkdir -p "$HOME/db-backups"
+            docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysqldump -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
+              > "$HOME/db-backups/sportease_before_deploy_$(date +%Y%m%d_%H%M%S).sql"
+
+            docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'mysql -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" -e "
+              CREATE TABLE IF NOT EXISTS schema_migrations (version bigint not null primary key, dirty boolean not null);
+              INSERT INTO schema_migrations (version, dirty)
+              SELECT
+                CASE
+                  WHEN EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = DATABASE()
+                      AND table_name = '\''round_check_ins'\''
+                  ) THEN 3
+                  ELSE 2
+                END,
+                false
+              WHERE NOT EXISTS (SELECT 1 FROM schema_migrations)
+                AND EXISTS (
+                  SELECT 1
+                  FROM information_schema.tables
+                  WHERE table_schema = DATABASE()
+                    AND table_name = '\''guide_documents'\''
+                );
+            "'
+
+            docker compose -f docker-compose.production.yml --profile migration run --rm migrate
+
+            docker compose -f docker-compose.production.yml build --no-cache
+            docker compose -f docker-compose.production.yml up -d --build
+
+            sleep 10
+
+            docker compose -f docker-compose.production.yml up -d --build

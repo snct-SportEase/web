@@ -146,6 +146,21 @@ func TestRainyModeHandler_UpsertRainyModeSettingHandler(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		mockRainyModeRepo.AssertNotCalled(t, "UpsertSetting", mock.Anything)
 	})
+
+	t.Run("Error - Negative capacity", func(t *testing.T) {
+		mockRainyModeRepo := new(MockRainyModeRepository)
+		h := handler.NewRainyModeHandler(mockRainyModeRepo, new(MockEventRepository))
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events/1/rainy-mode/settings", bytes.NewBufferString(`{"sport_id":1,"class_id":1,"min_capacity":-1}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.UpsertRainyModeSettingHandler(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockRainyModeRepo.AssertNotCalled(t, "UpsertSetting", mock.Anything)
+	})
 }
 
 func TestRainyModeHandler_DeleteRainyModeSettingHandler(t *testing.T) {

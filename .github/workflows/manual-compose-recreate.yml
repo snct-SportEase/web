@@ -10,6 +10,7 @@ jobs:
     name: Compose Recreate On Server
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: production
 
     steps:
       - name: Run production compose recreate

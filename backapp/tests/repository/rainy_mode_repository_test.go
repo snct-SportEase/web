@@ -187,6 +187,11 @@ func TestRainyModeRepository_GetSetting(t *testing.T) {
 }
 
 func TestRainyModeRepository_UpsertSetting(t *testing.T) {
+	const scopeQuery = `
+		SELECT
+			EXISTS(SELECT 1 FROM classes WHERE id = ? AND event_id = ?),
+			EXISTS(SELECT 1 FROM event_sports WHERE event_id = ? AND sport_id = ?)
+	`
 	t.Run("Success - Insert new setting", func(t *testing.T) {
 		db, mock, err := sqlmock.New()
 		if err != nil {
@@ -212,6 +217,8 @@ func TestRainyModeRepository_UpsertSetting(t *testing.T) {
 			MatchStartTime: &matchStartTime,
 		}
 
+		mock.ExpectQuery(regexp.QuoteMeta(scopeQuery)).WithArgs(classID, eventID, eventID, sportID).
+			WillReturnRows(sqlmock.NewRows([]string{"class_exists", "sport_exists"}).AddRow(true, true))
 		mock.ExpectExec(regexp.QuoteMeta(`
 		INSERT INTO rainy_mode_settings (event_id, sport_id, class_id, min_capacity, max_capacity, match_start_time)
 		VALUES (?, ?, ?, ?, ?, ?)
@@ -253,6 +260,8 @@ func TestRainyModeRepository_UpsertSetting(t *testing.T) {
 			MaxCapacity: &maxCapacity,
 		}
 
+		mock.ExpectQuery(regexp.QuoteMeta(scopeQuery)).WithArgs(classID, eventID, eventID, sportID).
+			WillReturnRows(sqlmock.NewRows([]string{"class_exists", "sport_exists"}).AddRow(true, true))
 		mock.ExpectExec(regexp.QuoteMeta(`
 		INSERT INTO rainy_mode_settings (event_id, sport_id, class_id, min_capacity, max_capacity, match_start_time)
 		VALUES (?, ?, ?, ?, ?, ?)
@@ -291,6 +300,8 @@ func TestRainyModeRepository_UpsertSetting(t *testing.T) {
 			MaxCapacity: &maxCapacity,
 		}
 
+		mock.ExpectQuery(regexp.QuoteMeta(scopeQuery)).WithArgs(1, 1, 1, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"class_exists", "sport_exists"}).AddRow(true, true))
 		mock.ExpectExec(regexp.QuoteMeta(`
 		INSERT INTO rainy_mode_settings (event_id, sport_id, class_id, min_capacity, max_capacity, match_start_time)
 		VALUES (?, ?, ?, ?, ?, ?)
@@ -306,6 +317,21 @@ func TestRainyModeRepository_UpsertSetting(t *testing.T) {
 
 		assert.Error(t, err)
 
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("class from another event is rejected", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		assert.NoError(t, err)
+		defer db.Close()
+		r := repository.NewRainyModeRepository(db)
+		setting := &models.RainyModeSetting{EventID: 1, SportID: 2, ClassID: 99}
+
+		mock.ExpectQuery(regexp.QuoteMeta(scopeQuery)).WithArgs(99, 1, 1, 2).
+			WillReturnRows(sqlmock.NewRows([]string{"class_exists", "sport_exists"}).AddRow(false, true))
+
+		err = r.UpsertSetting(setting)
+		assert.ErrorIs(t, err, repository.ErrInvalidRainyModeSetting)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }

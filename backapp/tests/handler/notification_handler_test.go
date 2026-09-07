@@ -126,6 +126,24 @@ func TestNotificationHandler_ListNotifications_Success(t *testing.T) {
 	mockRoleRepo.AssertExpectations(t)
 }
 
+func TestNotificationHandler_ListNotifications_ClampsLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockNotifRepo := new(MockNotificationRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, new(MockEventRepository), new(MockRoleRepository), new(MockUserRepository), "", "")
+	mockNotifRepo.On("GetNotificationsForAccess", []string{"student"}, "user-1", false, 100).
+		Return([]models.Notification{}, nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/notifications?limit=100000", nil)
+	c.Set("user", &models.User{ID: "user-1", Roles: []models.Role{{Name: "student"}}})
+
+	h.ListNotifications(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	mockNotifRepo.AssertExpectations(t)
+}
+
 func TestNotificationHandler_SaveAndDeleteSubscription(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

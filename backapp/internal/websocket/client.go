@@ -115,7 +115,7 @@ func (c *Client) writePump() {
 }
 
 // ServeWs handles websocket requests from the peer.
-func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request, allowedOrigin string) {
+func ServeWs(hubProvider func() *Hub, w http.ResponseWriter, r *http.Request, allowedOrigin string) {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -129,6 +129,7 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request, allowedOrigin str
 		log.Println(err)
 		return
 	}
+	hub := hubProvider()
 	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
 	client.hub.register <- client
 

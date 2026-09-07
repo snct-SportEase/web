@@ -119,6 +119,13 @@ services:
       - "traefik.http.routers.uploads-https.tls=true"
       - "traefik.http.routers.uploads-https.tls.certresolver=myresolver"
       - "traefik.http.services.uploads.loadbalancer.server.port=8080"
+      - "traefik.http.routers.websocket-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.websocket-https.entrypoints=websecure"
+      - "traefik.http.routers.websocket-https.tls=true"
+      - "traefik.http.routers.websocket-https.tls.certresolver=myresolver"
+      - "traefik.http.routers.websocket-https.priority=100"
+      - "traefik.http.routers.websocket-https.service=websocket"
+      - "traefik.http.services.websocket.loadbalancer.server.port=8080"
 
   sportease-frontapp:
     build:
@@ -171,7 +178,6 @@ services:
       - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"
       - "traefik.http.middlewares.security-headers.headers.stsPreload=true"
       - "traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
-      - "traefik.http.middlewares.security-headers.headers.customResponseHeaders.Content-Security-Policy=default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
 
       # サービス設定（変更なし）
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"

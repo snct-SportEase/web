@@ -158,6 +158,12 @@ func AuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if user == nil {
+			DeleteSession(cookie)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User no longer exists"})
+			c.Abort()
+			return
+		}
 
 		c.Set("user", user)
 		c.Next()
@@ -174,7 +180,7 @@ func RoleRequired(roles ...string) gin.HandlerFunc {
 		}
 
 		userModel, ok := user.(*models.User)
-		if !ok {
+		if !ok || userModel == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type in context"})
 			c.Abort()
 			return

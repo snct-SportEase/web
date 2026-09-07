@@ -416,7 +416,7 @@ createServer(async (req, res) => {
     const body = await readJson(req);
     const nextEvent = {
       ...body,
-      id: 2,
+      id: Math.max(0, ...events.map((event) => event.id)) + 1,
       start_date: `${body.start_date}T00:00:00Z`,
       end_date: `${body.end_date}T00:00:00Z`
     };
@@ -813,7 +813,7 @@ createServer(async (req, res) => {
     return;
   }
 
-  const rainyModeSettingsMatch = url.pathname.match(/^\/api\/root\/events\/(\d+)\/rainy-mode\/settings(?:\/(\d+)\/(\d+))?$/);
+  const rainyModeSettingsMatch = url.pathname.match(/^\/api\/(?:admin|root)\/events\/(\d+)\/rainy-mode\/settings(?:\/(\d+)\/(\d+))?$/);
   if (rainyModeSettingsMatch && req.method === 'GET') {
     const eventId = Number(rainyModeSettingsMatch[1]);
     sendJson(res, 200, rainyModeSettings.filter((item) => item.event_id === eventId));

@@ -252,6 +252,11 @@ func (h *SportHandler) DeleteSportFromEventHandler(c *gin.Context) {
 
 // GetTeamsBySportHandler handles the request to get all teams for a specific sport.
 func (h *SportHandler) GetTeamsBySportHandler(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("event_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
 	sportIDStr := c.Param("id")
 	sportID, err := strconv.Atoi(sportIDStr)
 	if err != nil {
@@ -259,7 +264,7 @@ func (h *SportHandler) GetTeamsBySportHandler(c *gin.Context) {
 		return
 	}
 
-	teams, err := h.sportRepo.GetTeamsBySportID(sportID)
+	teams, err := h.sportRepo.GetTeamsByEventAndSportID(eventID, sportID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve teams for the sport"})
 		return

@@ -25,6 +25,50 @@ type eventRepository struct {
 	db *sql.DB
 }
 
+const migrateUserProfilesForEventTransitionQuery = `
+	UPDATE users u
+	JOIN active_event ae ON ae.id = 1 AND ae.event_id IS NOT NULL
+	JOIN events previous_event ON previous_event.id = ae.event_id
+	JOIN events next_event ON next_event.id = ?
+	LEFT JOIN classes previous_class ON previous_class.id = u.class_id
+	LEFT JOIN classes next_class
+		ON next_class.event_id = next_event.id
+		AND next_class.name = previous_class.name
+	SET
+		u.class_id = CASE
+			WHEN previous_event.year = next_event.year THEN next_class.id
+			ELSE NULL
+		END,
+		u.display_name = CASE
+			WHEN previous_event.year = next_event.year THEN u.display_name
+			ELSE NULL
+		END,
+		u.is_profile_complete = CASE
+			WHEN previous_event.year = next_event.year AND next_class.id IS NOT NULL
+				THEN u.is_profile_complete
+			ELSE FALSE
+		END
+	WHERE ae.event_id <> next_event.id`
+
+const deleteGraduatingUsersForEventTransitionQuery = `
+	DELETE u
+	FROM users u
+	JOIN classes current_class ON current_class.id = u.class_id
+	JOIN active_event ae ON ae.id = 1 AND ae.event_id IS NOT NULL
+	JOIN events previous_event ON previous_event.id = ae.event_id
+	JOIN events next_event ON next_event.id = ?
+	WHERE ae.event_id <> next_event.id
+		AND previous_event.year <> next_event.year
+		AND current_class.name IN ('IS5', 'IE5', 'IT5')`
+
+func migrateUserProfilesForEventTransition(tx *sql.Tx, nextEventID any) error {
+	if _, err := tx.Exec(deleteGraduatingUsersForEventTransitionQuery, nextEventID); err != nil {
+		return err
+	}
+	_, err := tx.Exec(migrateUserProfilesForEventTransitionQuery, nextEventID)
+	return err
+}
+
 func NewEventRepository(db *sql.DB) EventRepository {
 	return &eventRepository{db: db}
 }
@@ -118,7 +162,21 @@ func (r *eventRepository) CreateEventWithClasses(event *models.Event, classNames
 		return 0, err
 	}
 
+	classStmt, err := tx.Prepare("INSERT INTO classes (event_id, name) VALUES (?, ?)")
+	if err != nil {
+		return 0, err
+	}
+	for _, className := range classNames {
+		if _, err := classStmt.Exec(eventID, className); err != nil {
+			classStmt.Close()
+			return 0, err
+		}
+	}
+
 	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
+		if err := migrateUserProfilesForEventTransition(tx, eventID); err != nil {
+			return 0, err
+		}
 		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
 		if event.Status == models.EventStatusPreparing {
 			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
@@ -127,17 +185,6 @@ func (r *eventRepository) CreateEventWithClasses(event *models.Event, classNames
 			return 0, err
 		}
 		if _, err := tx.Exec("INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)", eventID); err != nil {
-			return 0, err
-		}
-	}
-
-	classStmt, err := tx.Prepare("INSERT INTO classes (event_id, name) VALUES (?, ?)")
-	if err != nil {
-		return 0, err
-	}
-	for _, className := range classNames {
-		if _, err := classStmt.Exec(eventID, className); err != nil {
-			classStmt.Close()
 			return 0, err
 		}
 	}
@@ -215,6 +262,10 @@ func (r *eventRepository) UpdateEvent(event *models.Event) error {
 	}
 
 	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
+		if err := migrateUserProfilesForEventTransition(tx, event.ID); err != nil {
+			tx.Rollback()
+			return err
+		}
 		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
 		if event.Status == models.EventStatusPreparing {
 			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
@@ -272,6 +323,10 @@ func (r *eventRepository) SetActiveEvent(event_id *int) error {
 	if event_id == nil {
 		_, execErr = tx.Exec(query, nil)
 	} else {
+		if err := migrateUserProfilesForEventTransition(tx, *event_id); err != nil {
+			tx.Rollback()
+			return err
+		}
 		_, execErr = tx.Exec(query, *event_id)
 	}
 	if execErr != nil {

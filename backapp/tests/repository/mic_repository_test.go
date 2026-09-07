@@ -266,7 +266,7 @@ func TestMICRepository_GetMICClass(t *testing.T) {
 		}
 
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-		mock.ExpectQuery(`SELECT\s+c.name,\s+\(cs.total_points_overall \+ cs.mic_points\) AS total_points,\s+COUNT\(mv.id\) AS vote_count`).WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points", "vote_count"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints, expectedResult.VoteCount))
+		mock.ExpectQuery(`SELECT\s+c.name,\s+cs.total_points_overall AS total_points,\s+COUNT\(mv.id\) AS vote_count`).WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points", "vote_count"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints, expectedResult.VoteCount))
 
 		result, err := r.GetMICClass(eventID)
 		assert.NoError(t, err)
@@ -285,7 +285,7 @@ func TestMICRepository_GetMICClass(t *testing.T) {
 		}
 
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("autumn"))
-		mock.ExpectQuery(`SELECT\s+c.name,\s+\(cs.total_points_overall \+ cs.mic_points\) AS total_points,\s+COUNT\(mv.id\) AS vote_count`).WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points", "vote_count"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints, expectedResult.VoteCount))
+		mock.ExpectQuery(`SELECT\s+c.name,\s+cs.total_points_overall AS total_points,\s+COUNT\(mv.id\) AS vote_count`).WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"name", "total_points", "vote_count"}).AddRow(expectedResult.ClassName, expectedResult.TotalPoints, expectedResult.VoteCount))
 
 		result, err := r.GetMICClass(eventID)
 		assert.NoError(t, err)
@@ -309,7 +309,7 @@ func TestMICRepository_GetMICClass(t *testing.T) {
 		eventID := 3
 
 		mock.ExpectQuery("SELECT season FROM events").WithArgs(eventID).WillReturnRows(sqlmock.NewRows([]string{"season"}).AddRow("spring"))
-		mock.ExpectQuery(`SELECT\s+c.name,\s+\(cs.total_points_overall \+ cs.mic_points\) AS total_points,\s+COUNT\(mv.id\) AS vote_count`).WithArgs(eventID).WillReturnError(sql.ErrNoRows)
+		mock.ExpectQuery(`SELECT\s+c.name,\s+cs.total_points_overall AS total_points,\s+COUNT\(mv.id\) AS vote_count`).WithArgs(eventID).WillReturnError(sql.ErrNoRows)
 
 		result, err := r.GetMICClass(eventID)
 		assert.NoError(t, err)

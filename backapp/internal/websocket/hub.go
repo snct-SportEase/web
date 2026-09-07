@@ -16,18 +16,28 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	unregister chan *Client
+
+	stopped chan struct{}
+	onEmpty func()
 }
 
-func NewHub() *Hub {
+func NewHub(onEmpty ...func()) *Hub {
+	var emptyCallback func()
+	if len(onEmpty) > 0 {
+		emptyCallback = onEmpty[0]
+	}
 	return &Hub{
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
+		stopped:    make(chan struct{}),
+		onEmpty:    emptyCallback,
 	}
 }
 
 func (h *Hub) Run() {
+	defer close(h.stopped)
 	for {
 		select {
 		case client := <-h.register:
@@ -36,6 +46,10 @@ func (h *Hub) Run() {
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
+				if len(h.clients) == 0 && h.onEmpty != nil {
+					h.onEmpty()
+					return
+				}
 			}
 		case message := <-h.broadcast:
 			for client := range h.clients {
@@ -51,7 +65,10 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) Broadcast(message []byte) {
-	h.broadcast <- message
+	select {
+	case h.broadcast <- message:
+	case <-h.stopped:
+	}
 }
 
 func (h *Hub) BroadcastJSON(v interface{}) {
@@ -60,5 +77,5 @@ func (h *Hub) BroadcastJSON(v interface{}) {
 		// handle error
 		return
 	}
-	h.broadcast <- msg
+	h.Broadcast(msg)
 }

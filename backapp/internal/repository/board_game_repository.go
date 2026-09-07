@@ -281,7 +281,7 @@ func boardGameNullableString(value string) interface{} {
 }
 
 func (r *boardGameRepository) GetRunByID(runID int) (*models.BoardGameRun, error) {
-	rows, err := r.db.Query(`SELECT r.id,r.event_id,r.sport_id,r.game_type,r.name,r.description,r.location,r.rules_pdf_url,r.scheduled_date,r.win_points,r.rank_points,r.regular_minutes,r.final_minutes,r.players_per_class,r.substitutes_per_class,r.status,r.created_by,r.created_at,r.updated_at
+	rows, err := r.db.Query(`SELECT r.id,r.event_id,r.sport_id,r.game_type,r.name,r.description,r.location,r.rules_pdf_url,r.scheduled_date,r.win_points,r.rank_points,r.regular_minutes,r.final_minutes,r.players_per_class,r.substitutes_per_class,r.status,COALESCE(r.created_by, ''),r.created_at,r.updated_at
 		FROM board_game_runs r WHERE r.id=?`, runID)
 	if err != nil {
 		return nil, err
@@ -297,10 +297,10 @@ func (r *boardGameRepository) ListRuns(eventID int, publishedOnly bool) ([]*mode
 	var rows *sql.Rows
 	var err error
 	if publishedOnly {
-		rows, err = r.db.Query(`SELECT r.id,r.event_id,r.sport_id,r.game_type,r.name,r.description,r.location,r.rules_pdf_url,r.scheduled_date,r.win_points,r.rank_points,r.regular_minutes,r.final_minutes,r.players_per_class,r.substitutes_per_class,r.status,r.created_by,r.created_at,r.updated_at
+		rows, err = r.db.Query(`SELECT r.id,r.event_id,r.sport_id,r.game_type,r.name,r.description,r.location,r.rules_pdf_url,r.scheduled_date,r.win_points,r.rank_points,r.regular_minutes,r.final_minutes,r.players_per_class,r.substitutes_per_class,r.status,COALESCE(r.created_by, ''),r.created_at,r.updated_at
 			FROM board_game_runs r WHERE r.event_id=? AND r.status IN ('published','completed') ORDER BY r.id`, eventID)
 	} else {
-		rows, err = r.db.Query(`SELECT r.id,r.event_id,r.sport_id,r.game_type,r.name,r.description,r.location,r.rules_pdf_url,r.scheduled_date,r.win_points,r.rank_points,r.regular_minutes,r.final_minutes,r.players_per_class,r.substitutes_per_class,r.status,r.created_by,r.created_at,r.updated_at
+		rows, err = r.db.Query(`SELECT r.id,r.event_id,r.sport_id,r.game_type,r.name,r.description,r.location,r.rules_pdf_url,r.scheduled_date,r.win_points,r.rank_points,r.regular_minutes,r.final_minutes,r.players_per_class,r.substitutes_per_class,r.status,COALESCE(r.created_by, ''),r.created_at,r.updated_at
 			FROM board_game_runs r WHERE r.event_id=? ORDER BY r.id`, eventID)
 	}
 	if err != nil {
