@@ -1263,7 +1263,7 @@
 
     <!-- テンプレート設定モーダル -->
     {#if selectedTemplateType}
-      <div class="fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center z-[110] min-h-screen overflow-y-auto">
+      <div class="app-layer-modal fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center min-h-screen overflow-y-auto">
         <button
           type="button"
           class="absolute inset-0 bg-black bg-opacity-50"

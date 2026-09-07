@@ -52,7 +52,7 @@
 </script>
 
 {#if showModal && user}
-<div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
+<div class="app-layer-modal fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
     <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
         <h2 class="text-xl font-bold mb-4">ロールの編集</h2>
         <p class="mb-2"><strong>ユーザー:</strong> {user.email}</p>

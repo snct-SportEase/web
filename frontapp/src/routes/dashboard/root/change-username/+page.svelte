@@ -547,7 +547,7 @@ import { onMount } from 'svelte';
 <!-- 編集モーダル -->
 {#if showModal && selectedUser}
   <div
-    class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+    class="app-layer-modal fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
     transition:fade={{ duration: 150 }}
     onintrostart={() => (document.body.style.overflow = 'hidden')}
     onoutroend={() => (document.body.style.overflow = 'auto')}

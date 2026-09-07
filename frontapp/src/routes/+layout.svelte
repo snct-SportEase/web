@@ -75,7 +75,7 @@
     {#if $isSidebarOpen}
       <button 
         type="button"
-        class="sidebar-overlay md:hidden"
+        class="app-layer-sidebar-backdrop sidebar-overlay md:hidden"
         onclick={closeSidebar}
         ontouchstart={(e) => { e.stopPropagation(); closeSidebar(e); }}
         onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? closeSidebar() : null}

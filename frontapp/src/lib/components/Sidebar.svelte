@@ -146,7 +146,7 @@
   }
 </script>
 
-<aside class="w-full md:w-64 bg-gray-800 text-white flex flex-col transition-all duration-300 fixed md:relative inset-y-0 left-0 z-50 md:z-auto" class:closed={!$isSidebarOpen}>
+<aside class="app-layer-sidebar w-full md:w-64 bg-gray-800 text-white flex flex-col transition-all duration-300 fixed md:relative inset-y-0 left-0 md:z-auto" class:closed={!$isSidebarOpen}>
   <div class="h-16 flex items-center justify-between px-4 relative">
     <a href="/dashboard" class="flex items-center z-10" onclick={handleLinkClick}><span class="text-2xl font-bold">SportEase</span></a>
     <button

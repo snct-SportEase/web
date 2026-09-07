@@ -147,11 +147,10 @@
   {/if}
 
   {#if loading}
-    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div class="app-layer-modal fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
       <div class="bg-white p-4 rounded-md">
         <p class="text-gray-700">処理中...</p>
       </div>
     </div>
   {/if}
 </div>
-

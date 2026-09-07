@@ -937,7 +937,7 @@
 
 	{#if verificationResult}
 		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+			class="app-layer-modal fixed inset-0 flex items-center justify-center bg-black/50 px-4"
 			role="presentation"
 			onclick={closeResultModal}
 		>
@@ -986,7 +986,7 @@
 
 	{#if checkInStatusModalMode}
 		<div
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+			class="app-layer-modal fixed inset-0 flex items-center justify-center bg-black/50 px-4"
 			role="presentation"
 			onclick={closeCheckInStatusModal}
 		>
