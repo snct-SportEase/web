@@ -15,6 +15,13 @@ type RainyModeHandler struct {
 	eventRepo     repository.EventRepository
 }
 
+func eventIDParam(c *gin.Context) string {
+	if eventID := c.Param("event_id"); eventID != "" {
+		return eventID
+	}
+	return c.Param("id")
+}
+
 func NewRainyModeHandler(rainyModeRepo repository.RainyModeRepository, eventRepo repository.EventRepository) *RainyModeHandler {
 	return &RainyModeHandler{
 		rainyModeRepo: rainyModeRepo,
@@ -24,7 +31,7 @@ func NewRainyModeHandler(rainyModeRepo repository.RainyModeRepository, eventRepo
 
 // GetRainyModeSettingsHandler は指定されたイベントの雨天時設定一覧を取得します
 func (h *RainyModeHandler) GetRainyModeSettingsHandler(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("id"))
+	eventID, err := strconv.Atoi(eventIDParam(c))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return
@@ -41,7 +48,7 @@ func (h *RainyModeHandler) GetRainyModeSettingsHandler(c *gin.Context) {
 
 // UpsertRainyModeSettingHandler は雨天時設定を作成または更新します
 func (h *RainyModeHandler) UpsertRainyModeSettingHandler(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("id"))
+	eventID, err := strconv.Atoi(eventIDParam(c))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return
@@ -85,7 +92,7 @@ func (h *RainyModeHandler) UpsertRainyModeSettingHandler(c *gin.Context) {
 
 // DeleteRainyModeSettingHandler は雨天時設定を削除します
 func (h *RainyModeHandler) DeleteRainyModeSettingHandler(c *gin.Context) {
-	eventID, err := strconv.Atoi(c.Param("id"))
+	eventID, err := strconv.Atoi(eventIDParam(c))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 		return

@@ -190,11 +190,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				adminEvent.GET("/:event_id/noon-game/sessions/:session_id", noonHandler.GetSessionByID)
 				// Templates (noon-game)
 				adminEvent.POST("/:event_id/noon-game/templates/year-relay/run", noonHandler.CreateYearRelayRun)
-				adminEvent.GET("/:id/rainy-mode/settings", rainyModeHandler.GetRainyModeSettingsHandler)
-				adminEvent.POST("/:id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
-				adminEvent.PUT("/:id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
-				adminEvent.DELETE("/:id/rainy-mode/settings/:sport_id/:class_id", rainyModeHandler.DeleteRainyModeSettingHandler)
-				adminEvent.GET("/:event_id/sports/:id/teams", sportHandler.GetTeamsBySportHandler)
+				adminEvent.GET("/:event_id/rainy-mode/settings", rainyModeHandler.GetRainyModeSettingsHandler)
+				adminEvent.POST("/:event_id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
+				adminEvent.PUT("/:event_id/rainy-mode/settings", rainyModeHandler.UpsertRainyModeSettingHandler)
+				adminEvent.DELETE("/:event_id/rainy-mode/settings/:sport_id/:class_id", rainyModeHandler.DeleteRainyModeSettingHandler)
+				adminEvent.GET("/:event_id/sports/:sport_id/teams", sportHandler.GetTeamsBySportHandler)
 			}
 
 			admin.GET("/events", eventHandler.GetAllEvents)

@@ -1127,7 +1127,7 @@ func TestSportHandler_GetTeamsBySportHandler(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Params = gin.Params{{Key: "event_id", Value: "7"}, {Key: "id", Value: "1"}}
+		c.Params = gin.Params{{Key: "event_id", Value: "7"}, {Key: "sport_id", Value: "1"}}
 		h.GetTeamsBySportHandler(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
