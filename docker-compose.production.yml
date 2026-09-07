@@ -1,32 +1,4 @@
 services:
-  sportease-traefik:
-    image: traefik:v2.11
-    container_name: sportease-traefik
-    command:
-      # - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.forwardedHeaders.insecure=false"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.websecure.forwardedHeaders.insecure=false"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.myresolver.acme.email=${LETSENCRYPT_EMAIL}" # IMPORTANT: Change this in .env file!
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-      # - "8080:8080" # Traefik Dashboard
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - "./letsencrypt:/letsencrypt"
-    networks:
-      - spotease-public
-    restart: unless-stopped
-
   sportease-db:
     image: mysql:8.0
     container_name: sportease-db
@@ -102,7 +74,7 @@ services:
       - APP_ENV=production
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
     networks:
-      - spotease-public
+      - proxy
       - spotease-internal
     restart: unless-stopped
     healthcheck:
@@ -114,18 +86,19 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=sportease-public"
-      - "traefik.http.routers.uploads-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/uploads`)"
-      - "traefik.http.routers.uploads-https.entrypoints=websecure"
-      - "traefik.http.routers.uploads-https.tls=true"
-      - "traefik.http.routers.uploads-https.tls.certresolver=myresolver"
-      - "traefik.http.services.uploads.loadbalancer.server.port=8080"
-      - "traefik.http.routers.websocket-https.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/api/ws`)"
-      - "traefik.http.routers.websocket-https.entrypoints=websecure"
-      - "traefik.http.routers.websocket-https.tls=true"
-      - "traefik.http.routers.websocket-https.tls.certresolver=myresolver"
-      - "traefik.http.routers.websocket-https.priority=100"
-      - "traefik.http.routers.websocket-https.service=websocket"
-      - "traefik.http.services.websocket.loadbalancer.server.port=8080"
+      - "traefik.http.routers.sportease-uploads.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/uploads`)"
+      - "traefik.http.routers.sportease-uploads.entrypoints=websecure"
+      - "traefik.http.routers.sportease-uploads.tls=true"
+      - "traefik.http.routers.sportease-uploads.tls.certresolver=myresolver"
+      - "traefik.http.routers.sportease-uploads.service=sportease-uploads"
+      - "traefik.http.services.sportease-uploads.loadbalancer.server.port=8080"
+      - "traefik.http.routers.sportease-websocket.rule=Host(`nitsche-gyouji.com`) && PathPrefix(`/api/ws`)"
+      - "traefik.http.routers.sportease-websocket.entrypoints=websecure"
+      - "traefik.http.routers.sportease-websocket.tls=true"
+      - "traefik.http.routers.sportease-websocket.tls.certresolver=myresolver"
+      - "traefik.http.routers.sportease-websocket.priority=100"
+      - "traefik.http.routers.sportease-websocket.service=sportease-websocket"
+      - "traefik.http.services.sportease-websocket.loadbalancer.server.port=8080"
 
   sportease-frontapp:
     build:
@@ -146,7 +119,7 @@ services:
       sportease-backapp:
         condition: service_healthy
     networks:
-      - spotease-public
+      - proxy
       - spotease-internal
     restart: unless-stopped
     healthcheck:
@@ -158,32 +131,16 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=sportease-public"
-
-      # nitsche-gyouji.com用（80/443）
-      - "traefik.http.routers.frontend-http.rule=Host(`nitsche-gyouji.com`)"
-      - "traefik.http.routers.frontend-http.entrypoints=web"
-
-      # 3. 既存のHTTPS用ルーター（nitsche-gyouji.comのみ）
-      - "traefik.http.routers.frontend-https.rule=Host(`nitsche-gyouji.com`)"
-      - "traefik.http.routers.frontend-https.entrypoints=websecure"
-      - "traefik.http.routers.frontend-https.tls=true"
-      - "traefik.http.routers.frontend-https.tls.certresolver=myresolver"
-      - "traefik.http.routers.frontend-https.middlewares=security-headers"
-
-      # セキュリティヘッダーミドルウェア
-      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
-      - "traefik.http.middlewares.security-headers.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.security-headers.headers.stsSeconds=31536000"
-      - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.security-headers.headers.stsPreload=true"
-      - "traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
-
-      # サービス設定（変更なし）
-      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.sportease-frontend.rule=Host(`nitsche-gyouji.com`)"
+      - "traefik.http.routers.sportease-frontend.entrypoints=websecure"
+      - "traefik.http.routers.sportease-frontend.tls=true"
+      - "traefik.http.routers.sportease-frontend.tls.certresolver=myresolver"
+      - "traefik.http.routers.sportease-frontend.middlewares=security-headers@file"
+      - "traefik.http.routers.sportease-frontend.service=sportease-frontend"
+      - "traefik.http.services.sportease-frontend.loadbalancer.server.port=3000"
 
 networks:
-  spotease-public:
+  proxy:
     name: sportease-public
     external: true
   spotease-internal:

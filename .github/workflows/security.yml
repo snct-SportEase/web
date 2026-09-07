@@ -266,6 +266,9 @@ jobs:
             git merge --ff-only origin/main
             test "$(git rev-parse HEAD)" = "$TARGET_SHA"
 
+            docker network inspect sportease-public >/dev/null
+            test "$(docker inspect -f '{{.State.Health.Status}}' sportease-edge-traefik)" = "healthy"
+
             docker compose -f docker-compose.production.yml up -d sportease-db
 
             docker compose -f docker-compose.production.yml exec -T sportease-db sh -c 'i=0; until mysqladmin ping -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" --silent; do i=$((i + 1)); if [ "$i" -ge 60 ]; then exit 1; fi; sleep 2; done'
@@ -311,3 +314,4 @@ jobs:
             sleep 10
 
             docker compose -f docker-compose.production.yml up -d --build
+            curl -fsS --retry 10 --retry-delay 2 --retry-all-errors https://nitsche-gyouji.com/api/health >/dev/null

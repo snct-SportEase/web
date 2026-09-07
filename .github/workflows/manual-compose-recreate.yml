@@ -27,6 +27,9 @@ jobs:
 
             cd "$HOME/SportEase"
 
+            docker network inspect sportease-public >/dev/null
+            test "$(docker inspect -f '{{.State.Health.Status}}' sportease-edge-traefik)" = "healthy"
+
             docker compose -f docker-compose.production.yml up -d sportease-db
 
             mkdir -p "$HOME/db-backups"
@@ -64,3 +67,4 @@ jobs:
 
             docker compose -f docker-compose.production.yml --profile migration run --rm migrate
             docker compose -f docker-compose.production.yml up -d --build --force-recreate
+            curl -fsS --retry 10 --retry-delay 2 --retry-all-errors https://nitsche-gyouji.com/api/health >/dev/null

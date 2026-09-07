@@ -94,7 +94,6 @@ SportEaseは、学校行事のスポーツ大会運営をオンラインで一�
 | `WEBPUSH_PUBLIC_KEY` | Web PushのVAPID公開鍵（Base64, URL Safe） |
 | `WEBPUSH_PRIVATE_KEY` | Web PushのVAPID秘密鍵 |
 | `WEBPUSH_ALLOWED_HOSTS` | 許可するPushサービスのホスト名／先頭`*.`ワイルドカード（カンマ区切り）。未設定時はFCM、Mozilla Push、Apple Web Push、Microsoft WNSを許可 |
-| `LETSENCRYPT_EMAIL` | Traefik用のLet's Encrypt通知メールアドレス |
 
 > `WEBPUSH_*` は `openssl` 等でVAPID鍵を生成して設定してください。開発中にPush通知を使用しない場合は未設定でも動作しますが、対応機能は無効化されます。
 
@@ -143,7 +142,7 @@ npm run dev -- --host --port 5000
 docker compose --profile migration run --rm migrate
 docker compose up --build
 ```
-開発用Traefikは3300番ポートだけを公開します。`http://localhost:3300` でフロントエンドと `/api` プレフィックスのバックエンドを利用でき、HTTPSリダイレクトは行いません。80/443番とLet's Encryptを使う本番設定は `docker-compose.production.yml` に分離されています。
+開発用Traefikは3300番ポートだけを公開します。`http://localhost:3300` でフロントエンドと `/api` プレフィックスのバックエンドを利用でき、HTTPSリダイレクトは行いません。本番の80/443番とLet's Encryptは、独立した`traefik`リポジトリで管理します。
 
 #### PWA・Push通知の状態表示
 
@@ -238,6 +237,10 @@ docker compose -f docker-compose.production.yml exec sportease-db \
 ```bash
 docker compose -f docker-compose.production.yml up -d --build
 ```
+
+本番Composeはexternal network `sportease-public` 上の独立Traefikを前提とします。Traefikの初回移行・起動を先に実施してください。
+
+本番CDも独立Traefikのヘルスチェックに成功した場合だけデプロイを続行し、完了時に公開APIの疎通を確認します。そのため、Traefikリポジトリの初回CDを先に成功させてください。
 
 `down` はデータ削除を伴う可能性があるため、本番環境では緊急時以外実行しないでください。
 
