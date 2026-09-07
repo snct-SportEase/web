@@ -42,11 +42,10 @@ func TestTournamentRepository_GetTournamentsByEventID(t *testing.T) {
 			m.team2_id,
 			m.team1_score,
 			m.team2_score,
-			CASE
+			COALESCE(m.winner_team_id, CASE
 				WHEN m.team1_score > m.team2_score THEN m.team1_id
 				WHEN m.team2_score > m.team1_score THEN m.team2_id
-				ELSE NULL
-			END AS winner_team_id,
+			END) AS winner_team_id,
 			m.status,
 			m.next_match_id,
 			m.match_start_time,
@@ -241,11 +240,10 @@ func TestTournamentRepository_GetTournamentsByEventID_InferWinnerForTie(t *testi
 			m.team2_id,
 			m.team1_score,
 			m.team2_score,
-			CASE
+			COALESCE(m.winner_team_id, CASE
 				WHEN m.team1_score > m.team2_score THEN m.team1_id
 				WHEN m.team2_score > m.team1_score THEN m.team2_id
-				ELSE NULL
-			END AS winner_team_id,
+			END) AS winner_team_id,
 			m.status,
 			m.next_match_id,
 			m.match_start_time,
@@ -469,7 +467,7 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		// Mock getMatchByID for the current match
 		rows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(matchID, tournamentID, 1, 1, team1ID, team2ID, nil, "inprogress", nextMatchID, "", false, false, nil, nil, nil)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 			WithArgs(matchID).WillReturnRows(rows)
 
 		// Mock for rainy mode check (happens right after getMatchByID)
@@ -482,13 +480,13 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
 
 		// Mock update current match
-		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?")).
-			WithArgs(team1Score, team2Score, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?")).
+			WithArgs(team1Score, team2Score, winnerID, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
 
 		// Mock getMatchByID for the next match
 		nextMatchRows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(nextMatchID, tournamentID, 2, 1, nil, nil, nil, "pending", nil, "", false, false, nil, nil, nil)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 			WithArgs(nextMatchID).WillReturnRows(nextMatchRows)
 
 		// Mock update next match
@@ -546,7 +544,7 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		// Mock getMatchByID for the current match (semi-final)
 		rows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(matchID, tournamentID, 2, 1, team1ID, team2ID, nil, "inprogress", nextMatchID, "", false, false, nil, nil, nil)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 			WithArgs(matchID).WillReturnRows(rows)
 
 		// Mock for rainy mode check (happens right after getMatchByID)
@@ -559,13 +557,13 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
 
 		// Mock update current match
-		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?")).
-			WithArgs(team1Score, team2Score, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?")).
+			WithArgs(team1Score, team2Score, winnerID, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
 
 		// Mock getMatchByID for the next match (final)
 		nextMatchRows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(nextMatchID, tournamentID, 3, 1, nil, nil, nil, "pending", nil, "", false, false, nil, nil, nil)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 			WithArgs(nextMatchID).WillReturnRows(nextMatchRows)
 
 		// Mock update next match
@@ -579,7 +577,7 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		// Mock getMatchByID for the bronze match
 		bronzeMatchRows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(bronzeMatchID, tournamentID, 3, 2, nil, nil, nil, "pending", nil, "", true, false, nil, nil, nil)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 			WithArgs(bronzeMatchID).WillReturnRows(bronzeMatchRows)
 
 		// Mock update bronze match
@@ -636,7 +634,7 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 		// Mock getMatchByID for the loser bracket round 2 match
 		rows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(matchID, tournamentID, 1, 0, team1ID, team2ID, nil, "inprogress", nil, "", false, true, loserBracketRound, loserBracketBlock, nil)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 			WithArgs(matchID).WillReturnRows(rows)
 
 		// Mock for rainy mode check
@@ -649,8 +647,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
 
 		// Mock update current match
-		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?")).
-			WithArgs(team1Score, team2Score, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?")).
+			WithArgs(team1Score, team2Score, winnerID, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
 
 		// NextMatchID is nil for loser bracket round 2, so no next match update
 
@@ -708,7 +706,7 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 
 		rows := sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(matchID, tournamentID, 3, 1, team1ID, team2ID, nil, "inprogress", nil, "", false, false, nil, nil, nil)
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 			WithArgs(matchID).WillReturnRows(rows)
 
 		mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
@@ -719,8 +717,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(eventID).
 			WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
 
-		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?")).
-			WithArgs(team1Score, team2Score, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?")).
+			WithArgs(team1Score, team2Score, winnerID, matchID).WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectQuery(regexp.QuoteMeta("SELECT MAX(round) FROM matches WHERE tournament_id = ?")).
 			WithArgs(tournamentID).
@@ -763,7 +761,7 @@ func TestTournamentRepository_IsMatchResultAlreadyEntered(t *testing.T) {
 
 	r := repository.NewTournamentRepository(db)
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status FROM matches WHERE id = ?")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status FROM matches WHERE id = ?")).
 		WithArgs(42).
 		WillReturnRows(sqlmock.NewRows([]string{"winner_team_id", "status"}).AddRow(nil, "finished"))
 
@@ -789,7 +787,7 @@ func TestTournamentRepository_UpdateMatchResultAwardsBoardGameWinPoints(t *testi
 	team1ID, team2ID := int64(101), int64(102)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id ELSE NULL END AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, tournament_id, round, match_number_in_round, team1_id, team2_id, COALESCE(winner_team_id, CASE WHEN team1_score > team2_score THEN team1_id WHEN team2_score > team1_score THEN team2_id END) AS winner_team_id, status, next_match_id, match_start_time, is_bronze_match, is_loser_bracket_match, loser_bracket_round, loser_bracket_block, rainy_mode_start_time FROM matches WHERE id = ?")).
 		WithArgs(matchID).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "tournament_id", "round", "match_number_in_round", "team1_id", "team2_id", "winner_team_id", "status", "next_match_id", "start_time", "is_bronze_match", "is_loser_bracket_match", "loser_bracket_round", "loser_bracket_block", "rainy_mode_start_time"}).
 			AddRow(matchID, tournamentID, 1, 0, team1ID, team2ID, nil, "scheduled", nil, "", false, false, nil, nil, nil))
@@ -799,8 +797,8 @@ func TestTournamentRepository_UpdateMatchResultAwardsBoardGameWinPoints(t *testi
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT is_rainy_mode FROM events WHERE id = ?")).
 		WithArgs(eventID).
 		WillReturnRows(sqlmock.NewRows([]string{"is_rainy_mode"}).AddRow(false))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, status = 'finished' WHERE id = ?")).
-		WithArgs(1, 0, matchID).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET team1_score = ?, team2_score = ?, winner_team_id = ?, status = 'finished' WHERE id = ?")).
+		WithArgs(1, 0, team1ID, matchID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT MAX(round) FROM matches WHERE tournament_id = ?")).
 		WithArgs(tournamentID).
@@ -808,7 +806,7 @@ func TestTournamentRepository_UpdateMatchResultAwardsBoardGameWinPoints(t *testi
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT t.event_id, t.sport_id, es.location FROM tournaments t LEFT JOIN event_sports es ON es.event_id = t.event_id AND es.sport_id = t.sport_id WHERE t.id = ?")).
 		WithArgs(tournamentID).
 		WillReturnRows(sqlmock.NewRows([]string{"event_id", "sport_id", "location"}).AddRow(eventID, 7, "other"))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT r.id,r.win_points FROM board_game_runs r JOIN tournaments t ON t.event_id=r.event_id AND t.sport_id=r.sport_id WHERE t.id=?")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT DISTINCT r.id,r.win_points FROM board_game_runs r JOIN board_game_entries e ON e.run_id=r.id WHERE e.tournament_id=?")).
 		WithArgs(tournamentID).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "win_points"}).AddRow(runID, 5))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
