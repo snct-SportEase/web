@@ -651,6 +651,36 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/student/class-progress' && req.method === 'GET') {
+    sendJson(res, 200, {
+      class_id: 1,
+      class_name: '1A',
+      class_info: {
+        id: 1,
+        name: '1A',
+        student_count: 40,
+        attend_count: 36
+      },
+      progress: [
+        {
+          sport_name: 'バスケットボール',
+          team_name: '1A',
+          tournament_name: 'バスケットボール',
+          status: '進行中',
+          current_round: '決勝',
+          next_match: {
+            match_id: 1,
+            round_label: '決勝',
+            opponent_name: '1B',
+            match_status: '進行中',
+            start_time: '2025-04-01 09:30:00'
+          }
+        }
+      ]
+    });
+    return;
+  }
+
   if (url.pathname === '/api/barcode/check-in' && req.method === 'POST') {
     const body = await readJson(req);
     const barcode = String(body.barcode_data ?? '').trim();
