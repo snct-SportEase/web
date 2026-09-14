@@ -1023,6 +1023,15 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/notifications/filters' && req.method === 'PUT') {
+    const body = await readJson(req);
+    const requestedFilters = Array.isArray(body.filters) ? body.filters : [];
+    const filters = ['general', ...requestedFilters.filter((filter) => filter !== 'general')];
+    currentUser = { ...currentUser, notification_filters: filters };
+    sendJson(res, 200, { message: '通知フィルタを更新しました', filters });
+    return;
+  }
+
   if (url.pathname === '/api/root/notifications' && req.method === 'POST') {
     const body = await readJson(req);
     const nextNotification = {
