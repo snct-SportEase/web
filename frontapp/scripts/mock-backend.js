@@ -134,16 +134,16 @@ const defaultDefaultGroups = () => ({
   ]
 });
 
-const sampleTournamentData = () => ({
+const sampleTournamentData = ({ matchId = 1, startTime = '2025-04-01 09:30:00' } = {}) => ({
   rounds: [
     { name: '決勝' }
   ],
   matches: [
     {
-      id: 1,
+      id: matchId,
       roundIndex: 0,
       order: 0,
-      startTime: '2025-04-01 09:30:00',
+      startTime,
       matchStatus: 'IN_PROGRESS',
       sides: [
         { contestantId: 'c0', teamId: studentTeamId, scores: [{ mainScore: 3 }], isWinner: true },
@@ -181,7 +181,7 @@ const defaultTournaments = () => ([
     id: 2,
     name: 'バスケットボール 敗者復活',
     sport_id: 1,
-    data: sampleTournamentData()
+    data: sampleTournamentData({ matchId: 2, startTime: '2025-04-01 10:30:00' })
   }
 ]);
 
