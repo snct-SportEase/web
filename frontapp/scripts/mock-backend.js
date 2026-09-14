@@ -1457,6 +1457,11 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/admin/events/1/noon-game/sessions' && req.method === 'GET') {
+    sendJson(res, 200, { sessions: noonSession ? [noonSession] : [] });
+    return;
+  }
+
   const noonSessionByIDMatch = url.pathname.match(/^\/api\/root\/events\/1\/noon-game\/sessions\/(\d+)$/);
   if (noonSessionByIDMatch && req.method === 'GET') {
     if (!noonSession || noonSession.id !== Number(noonSessionByIDMatch[1])) {
@@ -1474,6 +1479,16 @@ createServer(async (req, res) => {
       return;
     }
     noonSession = { ...noonSession, ...body };
+    sendJson(res, 200, noonSessionPayload());
+    return;
+  }
+
+  const adminNoonSessionByIDMatch = url.pathname.match(/^\/api\/admin\/events\/1\/noon-game\/sessions\/(\d+)$/);
+  if (adminNoonSessionByIDMatch && req.method === 'GET') {
+    if (!noonSession || noonSession.id !== Number(adminNoonSessionByIDMatch[1])) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
     sendJson(res, 200, noonSessionPayload());
     return;
   }
@@ -1640,6 +1655,44 @@ createServer(async (req, res) => {
     }, classIds);
     noonGroups = noonGroups.map((group) => group.id === requestedGroupId ? updatedGroup : group);
     sendJson(res, 200, { group: updatedGroup });
+    return;
+  }
+
+  const noonMatchMatch = url.pathname.match(/^\/api\/root\/noon-game\/sessions\/(\d+)\/matches$/);
+  if (noonMatchMatch && req.method === 'POST') {
+    const sessionId = Number(noonMatchMatch[1]);
+    const body = await readJson(req);
+    if (!noonSession || noonSession.id !== sessionId) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+    const nextMatch = {
+      id: noonMatches.reduce((maxId, match) => Math.max(maxId, match.id ?? 0), 0) + 1,
+      session_id: sessionId,
+      title: body.title,
+      home_display_name: body.home_display_name,
+      away_display_name: body.away_display_name,
+      scheduled_at: body.scheduled_at ?? null,
+      status: body.status ?? 'scheduled',
+      allow_draw: Boolean(body.allow_draw),
+      entries: body.entries ?? [],
+      result: null
+    };
+    noonMatches = [...noonMatches, nextMatch];
+    sendJson(res, 201, { match: nextMatch });
+    return;
+  }
+
+  const adminNoonResultMatch = url.pathname.match(/^\/api\/admin\/noon-game\/matches\/(\d+)\/result$/);
+  if (adminNoonResultMatch && req.method === 'PUT') {
+    const matchId = Number(adminNoonResultMatch[1]);
+    const body = await readJson(req);
+    noonMatches = noonMatches.map((match) =>
+      match.id === matchId
+        ? { ...match, status: 'finished', result: { winner: body.winner, note: body.note, details: body.rankings ?? [] } }
+        : match
+    );
+    sendJson(res, 200, { ok: true });
     return;
   }
 
