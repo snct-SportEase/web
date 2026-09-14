@@ -134,15 +134,17 @@ const defaultDefaultGroups = () => ({
   ]
 });
 
-const sampleTournamentData = () => ({
+const sampleTournamentData = ({ matchId = 1, startTime = '2025-04-01 09:30:00' } = {}) => ({
   rounds: [
     { name: '決勝' }
   ],
   matches: [
     {
-      id: 1,
+      id: matchId,
       roundIndex: 0,
       order: 0,
+      startTime,
+      matchStatus: 'IN_PROGRESS',
       sides: [
         { contestantId: 'c0', teamId: studentTeamId, scores: [{ mainScore: 3 }], isWinner: true },
         { contestantId: 'c1', teamId: 102, scores: [{ mainScore: 1 }] }
@@ -179,7 +181,7 @@ const defaultTournaments = () => ([
     id: 2,
     name: 'バスケットボール 敗者復活',
     sport_id: 1,
-    data: sampleTournamentData()
+    data: sampleTournamentData({ matchId: 2, startTime: '2025-04-01 10:30:00' })
   }
 ]);
 
@@ -221,6 +223,9 @@ let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let noonTypingResults = [];
 let rainyModeSettings = [];
+let attendanceByClass = new Map();
+let assignedTeamMembers = new Map();
+let micVotes = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -362,6 +367,9 @@ createServer(async (req, res) => {
     noonTemplateRuns = [];
     noonTypingResults = [];
     rainyModeSettings = [];
+    attendanceByClass = new Map();
+    assignedTeamMembers = new Map();
+    micVotes = new Map();
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
     return;
@@ -392,6 +400,24 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/__set-match-pending' && req.method === 'POST') {
+    tournaments = tournaments.map((tournament) => ({
+      ...tournament,
+      data: {
+        ...tournament.data,
+        matches: tournament.data.matches.map((match) => ({
+          ...match,
+          sides: match.sides.map((side) => {
+            const { scores: _scores, isWinner: _isWinner, ...pendingSide } = side;
+            return pendingSide;
+          })
+        }))
+      }
+    }));
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   if (url.pathname === '/api/auth/user' && req.method === 'GET') {
     if (getSessionToken(req) === 'test-session-token') {
       sendJson(res, 200, currentUser);
@@ -407,7 +433,46 @@ createServer(async (req, res) => {
     return;
   }
 
+  const attendanceClassMatch = url.pathname.match(/^\/api\/admin\/attendance\/class-details\/(\d+)$/);
+  if (attendanceClassMatch && req.method === 'GET') {
+    const classId = Number(attendanceClassMatch[1]);
+    const cls = classes.find((item) => item.id === classId);
+    if (!cls) {
+      sendJson(res, 404, { error: 'Class details not found' });
+      return;
+    }
+    sendJson(res, 200, {
+      ...cls,
+      attendance_count: attendanceByClass.get(classId) ?? 0,
+      attendance_points: attendanceByClass.get(classId) ?? 0
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/attendance/register' && req.method === 'POST') {
+    const body = await readJson(req);
+    const cls = classes.find((item) => item.id === Number(body.class_id));
+    if (!cls) {
+      sendJson(res, 404, { error: 'Class details not found' });
+      return;
+    }
+    if (body.attendance_count < 0 || body.attendance_count > cls.student_count) {
+      sendJson(res, 400, { error: 'Invalid attendance count' });
+      return;
+    }
+    attendanceByClass.set(cls.id, Number(body.attendance_count));
+    sendJson(res, 200, {
+      message: `Successfully registered attendance for class ${cls.name}. Points awarded: ${body.attendance_count}`
+    });
+    return;
+  }
+
   if (url.pathname === '/api/root/events' && req.method === 'GET') {
+    sendJson(res, 200, events);
+    return;
+  }
+
+  if (url.pathname === '/api/events' && req.method === 'GET') {
     sendJson(res, 200, events);
     return;
   }
@@ -558,7 +623,9 @@ createServer(async (req, res) => {
             event_name: activeEvent.name,
             id: activeEvent.id,
             name: activeEvent.name,
-            hide_scores: activeEvent.hide_scores
+            hide_scores: activeEvent.hide_scores,
+            status: activeEvent.status,
+            is_rainy_mode: Boolean(activeEvent.is_rainy_mode)
           }
         : null
     );
@@ -576,6 +643,46 @@ createServer(async (req, res) => {
         sport_name: 'バスケットボール'
       }
     ]);
+    return;
+  }
+
+  if (url.pathname === '/api/student/events/1/tournaments' && req.method === 'GET') {
+    sendJson(res, 200, tournaments);
+    return;
+  }
+
+  if (url.pathname === '/api/student/events/1/board-game-runs' && req.method === 'GET') {
+    sendJson(res, 200, []);
+    return;
+  }
+
+  if (url.pathname === '/api/student/class-progress' && req.method === 'GET') {
+    sendJson(res, 200, {
+      class_id: 1,
+      class_name: '1A',
+      class_info: {
+        id: 1,
+        name: '1A',
+        student_count: 40,
+        attend_count: 36
+      },
+      progress: [
+        {
+          sport_name: 'バスケットボール',
+          team_name: '1A',
+          tournament_name: 'バスケットボール',
+          status: '進行中',
+          current_round: '決勝',
+          next_match: {
+            match_id: 1,
+            round_label: '決勝',
+            opponent_name: '1B',
+            match_status: '進行中',
+            start_time: '2025-04-01 09:30:00'
+          }
+        }
+      ]
+    });
     return;
   }
 
@@ -750,7 +857,8 @@ createServer(async (req, res) => {
       return {
         ...eventSport,
         id: eventSport.sport_id,
-        name: sport?.name ?? `競技${eventSport.sport_id}`
+        name: sport?.name ?? `競技${eventSport.sport_id}`,
+        sport_name: sport?.name ?? `競技${eventSport.sport_id}`
       };
     }));
     return;
@@ -764,8 +872,8 @@ createServer(async (req, res) => {
       description: body.description ?? '',
       location: body.location ?? 'other',
       rules_pdf_url: null,
-      min_capacity: null,
-      max_capacity: null
+      min_capacity: body.min_capacity ?? null,
+      max_capacity: body.max_capacity ?? null
     };
 
     eventSports = [...eventSports, nextEventSport];
@@ -778,8 +886,92 @@ createServer(async (req, res) => {
     return;
   }
 
+  const classMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/classes\/(\d+)\/members$/);
+  if (classMembersMatch && req.method === 'GET') {
+    const classId = Number(classMembersMatch[1]);
+    sendJson(res, 200, users.filter((user) => user.class_id === classId));
+    return;
+  }
+
+  const teamMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/sports\/(\d+)\/members$/);
+  if (teamMembersMatch && req.method === 'GET') {
+    const sportId = Number(teamMembersMatch[1]);
+    const classId = Number(url.searchParams.get('class_id'));
+    const key = `${sportId}:${classId}`;
+    sendJson(res, 200, assignedTeamMembers.get(key) ?? []);
+    return;
+  }
+
+  const confirmedMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/sports\/(\d+)\/confirmed-members$/);
+  if (confirmedMembersMatch && req.method === 'GET') {
+    const sportId = Number(confirmedMembersMatch[1]);
+    const classId = Number(url.searchParams.get('class_id'));
+    const members = assignedTeamMembers.get(`${sportId}:${classId}`) ?? [];
+    const eventSport = eventSports.find((item) => item.sport_id === sportId);
+    const minCapacity = eventSport?.min_capacity ?? null;
+    sendJson(res, 200, {
+      members,
+      confirmed_count: members.length,
+      min_capacity: minCapacity,
+      capacity_ok: minCapacity === null || members.length >= minCapacity
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/class-team/assign-members' && req.method === 'POST') {
+    const body = await readJson(req);
+    const key = `${Number(body.sport_id)}:${Number(body.class_id)}`;
+    const selectedUsers = users.filter((user) => body.user_ids?.includes(user.id));
+    const existing = assignedTeamMembers.get(key) ?? [];
+    assignedTeamMembers.set(key, [
+      ...existing,
+      ...selectedUsers.filter((user) => !existing.some((item) => item.id === user.id))
+    ]);
+    sendJson(res, 200, { message: 'メンバーの割り当てが完了しました' });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/class-team/remove-member' && req.method === 'DELETE') {
+    const body = await readJson(req);
+    const key = `${Number(body.sport_id)}:${Number(body.class_id)}`;
+    assignedTeamMembers.set(
+      key,
+      (assignedTeamMembers.get(key) ?? []).filter((user) => user.id !== body.user_id)
+    );
+    sendJson(res, 200, { message: 'メンバーを削除しました' });
+    return;
+  }
+
   if (url.pathname === '/api/admin/events/1/tournaments' && req.method === 'GET') {
     sendJson(res, 200, tournaments);
+    return;
+  }
+
+  const matchResultMatch = url.pathname.match(/^\/api\/admin\/matches\/(\d+)\/result$/);
+  if (matchResultMatch && req.method === 'PUT') {
+    const matchId = Number(matchResultMatch[1]);
+    const body = await readJson(req);
+    tournaments = tournaments.map((tournament) => ({
+      ...tournament,
+      data: {
+        ...tournament.data,
+        matches: tournament.data.matches.map((match) => {
+          if (match.id !== matchId) return match;
+          const winnerIndex = body.winner_id
+            ? match.sides.findIndex((side) => side.teamId === Number(body.winner_id))
+            : body.team1_score > body.team2_score ? 0 : 1;
+          return {
+            ...match,
+            sides: match.sides.map((side, index) => ({
+              ...side,
+              scores: [{ mainScore: index === 0 ? body.team1_score : body.team2_score }],
+              isWinner: index === winnerIndex
+            }))
+          };
+        })
+      }
+    }));
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -795,6 +987,48 @@ createServer(async (req, res) => {
       min_capacity: null,
       max_capacity: null
     });
+    return;
+  }
+
+  if (sportDetailsMatch && req.method === 'PUT') {
+    const eventId = Number(sportDetailsMatch[1]);
+    const sportId = Number(sportDetailsMatch[2]);
+    const body = await readJson(req);
+    eventSports = eventSports.map((item) =>
+      item.event_id === eventId && item.sport_id === sportId
+        ? { ...item, description: body.description, rules_pdf_url: body.rules_pdf_url }
+        : item
+    );
+    sendJson(res, 200, { message: 'updated' });
+    return;
+  }
+
+  const sportCapacityMatch = url.pathname.match(/^\/api\/admin\/events\/(\d+)\/sports\/(\d+)\/capacity$/);
+  if (sportCapacityMatch && req.method === 'PUT') {
+    const eventId = Number(sportCapacityMatch[1]);
+    const sportId = Number(sportCapacityMatch[2]);
+    const body = await readJson(req);
+    eventSports = eventSports.map((item) =>
+      item.event_id === eventId && item.sport_id === sportId
+        ? { ...item, min_capacity: body.min_capacity, max_capacity: body.max_capacity }
+        : item
+    );
+    sendJson(res, 200, { message: 'updated' });
+    return;
+  }
+
+  const adminSportTeamsMatch = url.pathname.match(/^\/api\/admin\/events\/(\d+)\/sports\/(\d+)\/teams$/);
+  if (adminSportTeamsMatch && req.method === 'GET') {
+    const eventId = Number(adminSportTeamsMatch[1]);
+    const sportId = Number(adminSportTeamsMatch[2]);
+    sendJson(res, 200, classes.map((cls) => ({
+      id: sportId * 100 + cls.id,
+      event_id: eventId,
+      sport_id: sportId,
+      class_id: cls.id,
+      min_capacity: null,
+      max_capacity: null
+    })));
     return;
   }
 
@@ -878,6 +1112,15 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/notifications/filters' && req.method === 'PUT') {
+    const body = await readJson(req);
+    const requestedFilters = Array.isArray(body.filters) ? body.filters : [];
+    const filters = ['general', ...requestedFilters.filter((filter) => filter !== 'general')];
+    currentUser = { ...currentUser, notification_filters: filters };
+    sendJson(res, 200, { message: '通知フィルタを更新しました', filters });
+    return;
+  }
+
   if (url.pathname === '/api/root/notifications' && req.method === 'POST') {
     const body = await readJson(req);
     const nextNotification = {
@@ -894,6 +1137,56 @@ createServer(async (req, res) => {
     sendJson(res, 200, {
       requests: notificationRequests.map(({ ...request }) => request)
     });
+    return;
+  }
+
+  if (url.pathname === '/api/student/notification-requests' && req.method === 'GET') {
+    sendJson(res, 200, {
+      requests: notificationRequests.map(({ ...request }) => request)
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/student/notification-requests' && req.method === 'POST') {
+    const body = await readJson(req);
+    const nextId = Math.max(0, ...notificationRequests.map((item) => item.id)) + 1;
+    const nextRequest = {
+      id: nextId,
+      title: body.title,
+      body: body.body,
+      status: 'pending',
+      target_text: body.target_text,
+      requester: currentUser,
+      messages: []
+    };
+    notificationRequests = [nextRequest, ...notificationRequests];
+    sendJson(res, 201, { request_id: nextId });
+    return;
+  }
+
+  const studentNotificationRequestMatch = url.pathname.match(/^\/api\/student\/notification-requests\/(\d+)$/);
+  if (studentNotificationRequestMatch && req.method === 'GET') {
+    const id = Number(studentNotificationRequestMatch[1]);
+    const request = notificationRequests.find((item) => item.id === id) ?? null;
+    sendJson(res, request ? 200 : 404, request ? { request } : { error: 'Request not found' });
+    return;
+  }
+
+  const studentNotificationMessageMatch = url.pathname.match(/^\/api\/student\/notification-requests\/(\d+)\/messages$/);
+  if (studentNotificationMessageMatch && req.method === 'POST') {
+    const id = Number(studentNotificationMessageMatch[1]);
+    const body = await readJson(req);
+    notificationRequests = notificationRequests.map((item) => {
+      if (item.id !== id) return item;
+      const nextMessage = {
+        id: item.messages.length + 1,
+        message: body.message,
+        created_at: '2025-04-02T11:00:00Z',
+        sender: currentUser
+      };
+      return { ...item, messages: [...item.messages, nextMessage] };
+    });
+    sendJson(res, 201, { ok: true });
     return;
   }
 
@@ -959,6 +1252,59 @@ createServer(async (req, res) => {
       vote_count: 5,
       total_points: 120,
       season: 'spring'
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/mic/eligible-classes' && req.method === 'GET') {
+    sendJson(res, 200, classes);
+    return;
+  }
+
+  if (url.pathname === '/api/admin/mic/user-vote' && req.method === 'GET') {
+    const eventId = Number(url.searchParams.get('event_id'));
+    const vote = micVotes.get(`${currentUser.id}:${eventId}`) ?? null;
+    sendJson(res, 200, vote ? { voted: true, vote } : { voted: false });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/mic/vote' && req.method === 'POST') {
+    const body = await readJson(req);
+    const vote = {
+      user_id: currentUser.id,
+      voted_for_class_id: Number(body.voted_for_class_id),
+      event_id: Number(body.event_id),
+      reason: body.reason
+    };
+    micVotes.set(`${currentUser.id}:${vote.event_id}`, vote);
+    sendJson(res, 200, { message: 'Vote recorded' });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/attendance' && req.method === 'GET') {
+    sendJson(res, 200, { attendance_rate: 92.5 });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/participation' && req.method === 'GET') {
+    sendJson(res, 200, { バスケットボール: 88, バレーボール: 76 });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/scores' && req.method === 'GET') {
+    sendJson(res, 200, {
+      '2025春季スポーツ大会': [
+        { class_name: '1A', total_points_current_event: 120 },
+        { class_name: '1B', total_points_current_event: 100 }
+      ]
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/progress' && req.method === 'GET') {
+    sendJson(res, 200, {
+      バスケットボール: '決勝戦を実施中',
+      バレーボール: '準決勝まで完了'
     });
     return;
   }
@@ -1050,6 +1396,11 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/admin/users' && req.method === 'GET') {
+    sendJson(res, 200, users);
+    return;
+  }
+
   if (url.pathname === '/api/admin/users/role' && req.method === 'DELETE') {
     const body = await readJson(req);
     users = users.map((user) => user.id === body.user_id ? {
@@ -1111,6 +1462,11 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/admin/events/1/noon-game/sessions' && req.method === 'GET') {
+    sendJson(res, 200, { sessions: noonSession ? [noonSession] : [] });
+    return;
+  }
+
   const noonSessionByIDMatch = url.pathname.match(/^\/api\/root\/events\/1\/noon-game\/sessions\/(\d+)$/);
   if (noonSessionByIDMatch && req.method === 'GET') {
     if (!noonSession || noonSession.id !== Number(noonSessionByIDMatch[1])) {
@@ -1128,6 +1484,16 @@ createServer(async (req, res) => {
       return;
     }
     noonSession = { ...noonSession, ...body };
+    sendJson(res, 200, noonSessionPayload());
+    return;
+  }
+
+  const adminNoonSessionByIDMatch = url.pathname.match(/^\/api\/admin\/events\/1\/noon-game\/sessions\/(\d+)$/);
+  if (adminNoonSessionByIDMatch && req.method === 'GET') {
+    if (!noonSession || noonSession.id !== Number(adminNoonSessionByIDMatch[1])) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
     sendJson(res, 200, noonSessionPayload());
     return;
   }
@@ -1294,6 +1660,44 @@ createServer(async (req, res) => {
     }, classIds);
     noonGroups = noonGroups.map((group) => group.id === requestedGroupId ? updatedGroup : group);
     sendJson(res, 200, { group: updatedGroup });
+    return;
+  }
+
+  const noonMatchMatch = url.pathname.match(/^\/api\/root\/noon-game\/sessions\/(\d+)\/matches$/);
+  if (noonMatchMatch && req.method === 'POST') {
+    const sessionId = Number(noonMatchMatch[1]);
+    const body = await readJson(req);
+    if (!noonSession || noonSession.id !== sessionId) {
+      sendJson(res, 404, { error: 'Noon game session not found' });
+      return;
+    }
+    const nextMatch = {
+      id: noonMatches.reduce((maxId, match) => Math.max(maxId, match.id ?? 0), 0) + 1,
+      session_id: sessionId,
+      title: body.title,
+      home_display_name: body.home_display_name,
+      away_display_name: body.away_display_name,
+      scheduled_at: body.scheduled_at ?? null,
+      status: body.status ?? 'scheduled',
+      allow_draw: Boolean(body.allow_draw),
+      entries: body.entries ?? [],
+      result: null
+    };
+    noonMatches = [...noonMatches, nextMatch];
+    sendJson(res, 201, { match: nextMatch });
+    return;
+  }
+
+  const adminNoonResultMatch = url.pathname.match(/^\/api\/admin\/noon-game\/matches\/(\d+)\/result$/);
+  if (adminNoonResultMatch && req.method === 'PUT') {
+    const matchId = Number(adminNoonResultMatch[1]);
+    const body = await readJson(req);
+    noonMatches = noonMatches.map((match) =>
+      match.id === matchId
+        ? { ...match, status: 'finished', result: { winner: body.winner, note: body.note, details: body.rankings ?? [] } }
+        : match
+    );
+    sendJson(res, 200, { ok: true });
     return;
   }
 

@@ -81,7 +81,7 @@
                                 }
 
                                 rawItems.push({
-                                    id: `match-${match.id || Math.random()}`,
+                                    id: `tournament-${tour.id}-match-${match.id || Math.random()}`,
                                     type: 'sport',
                                     title: tour.name,
                                     subtitle: `${team1} vs ${team2}`,

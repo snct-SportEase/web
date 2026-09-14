@@ -883,7 +883,7 @@
 						<div class="mt-1 text-sm text-gray-600">
 							<p>対戦:</p>
 							<ul class="mt-1 space-y-1">
-								{#each selectedMatch.matchupLabels as matchupLabel (matchupLabel)}
+								{#each selectedMatch.matchupLabels as matchupLabel, index (`${matchupLabel}:${index}`)}
 									<li>{matchupLabel}</li>
 								{/each}
 							</ul>
