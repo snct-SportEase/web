@@ -1133,6 +1133,34 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/admin/statistics/attendance' && req.method === 'GET') {
+    sendJson(res, 200, { attendance_rate: 92.5 });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/participation' && req.method === 'GET') {
+    sendJson(res, 200, { バスケットボール: 88, バレーボール: 76 });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/scores' && req.method === 'GET') {
+    sendJson(res, 200, {
+      '2025春季スポーツ大会': [
+        { class_name: '1A', total_points_current_event: 120 },
+        { class_name: '1B', total_points_current_event: 100 }
+      ]
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/statistics/progress' && req.method === 'GET') {
+    sendJson(res, 200, {
+      バスケットボール: '決勝戦を実施中',
+      バレーボール: '準決勝まで完了'
+    });
+    return;
+  }
+
   if (url.pathname === '/api/admin/pdfs' && req.method === 'POST') {
     sendJson(res, 200, { url: 'https://example.com/guidelines.pdf' });
     return;
