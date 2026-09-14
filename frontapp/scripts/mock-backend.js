@@ -803,8 +803,8 @@ createServer(async (req, res) => {
       description: body.description ?? '',
       location: body.location ?? 'other',
       rules_pdf_url: null,
-      min_capacity: null,
-      max_capacity: null
+      min_capacity: body.min_capacity ?? null,
+      max_capacity: body.max_capacity ?? null
     };
 
     eventSports = [...eventSports, nextEventSport];
@@ -830,6 +830,22 @@ createServer(async (req, res) => {
     const classId = Number(url.searchParams.get('class_id'));
     const key = `${sportId}:${classId}`;
     sendJson(res, 200, assignedTeamMembers.get(key) ?? []);
+    return;
+  }
+
+  const confirmedMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/sports\/(\d+)\/confirmed-members$/);
+  if (confirmedMembersMatch && req.method === 'GET') {
+    const sportId = Number(confirmedMembersMatch[1]);
+    const classId = Number(url.searchParams.get('class_id'));
+    const members = assignedTeamMembers.get(`${sportId}:${classId}`) ?? [];
+    const eventSport = eventSports.find((item) => item.sport_id === sportId);
+    const minCapacity = eventSport?.min_capacity ?? null;
+    sendJson(res, 200, {
+      members,
+      confirmed_count: members.length,
+      min_capacity: minCapacity,
+      capacity_ok: minCapacity === null || members.length >= minCapacity
+    });
     return;
   }
 
