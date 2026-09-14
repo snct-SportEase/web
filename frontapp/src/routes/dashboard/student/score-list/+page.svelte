@@ -5,7 +5,7 @@
 	let scores = $derived(data.scores || []);
 	let errorMessage = $derived(data.error || '');
 	let season = $derived(scores.length > 0 ? scores[0].season : '');
-	let sportNames = $derived(scores.length > 0 ? scores[0].sport_names : {});
+	let sportNames = $derived(scores.length > 0 ? (scores[0].sport_names || {}) : {});
 
 	// Helper function to get sport name for a given location
 	function getSportName(location) {
