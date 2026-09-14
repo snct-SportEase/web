@@ -19,6 +19,7 @@ test.describe('出席点管理 (admin)', () => {
     }]);
 
     await page.goto('/dashboard/admin/attendance-management');
+    await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: '出席点管理' })).toBeVisible();
   });
 
