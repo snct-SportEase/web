@@ -223,6 +223,7 @@ let noonTypingResults = [];
 let rainyModeSettings = [];
 let attendanceByClass = new Map();
 let assignedTeamMembers = new Map();
+let micVotes = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -366,6 +367,7 @@ createServer(async (req, res) => {
     rainyModeSettings = [];
     attendanceByClass = new Map();
     assignedTeamMembers = new Map();
+    micVotes = new Map();
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
     return;
@@ -1103,6 +1105,31 @@ createServer(async (req, res) => {
       total_points: 120,
       season: 'spring'
     });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/mic/eligible-classes' && req.method === 'GET') {
+    sendJson(res, 200, classes);
+    return;
+  }
+
+  if (url.pathname === '/api/admin/mic/user-vote' && req.method === 'GET') {
+    const eventId = Number(url.searchParams.get('event_id'));
+    const vote = micVotes.get(`${currentUser.id}:${eventId}`) ?? null;
+    sendJson(res, 200, vote ? { voted: true, vote } : { voted: false });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/mic/vote' && req.method === 'POST') {
+    const body = await readJson(req);
+    const vote = {
+      user_id: currentUser.id,
+      voted_for_class_id: Number(body.voted_for_class_id),
+      event_id: Number(body.event_id),
+      reason: body.reason
+    };
+    micVotes.set(`${currentUser.id}:${vote.event_id}`, vote);
+    sendJson(res, 200, { message: 'Vote recorded' });
     return;
   }
 
