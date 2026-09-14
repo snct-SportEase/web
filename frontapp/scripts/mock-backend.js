@@ -1051,6 +1051,56 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/student/notification-requests' && req.method === 'GET') {
+    sendJson(res, 200, {
+      requests: notificationRequests.map(({ ...request }) => request)
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/student/notification-requests' && req.method === 'POST') {
+    const body = await readJson(req);
+    const nextId = Math.max(0, ...notificationRequests.map((item) => item.id)) + 1;
+    const nextRequest = {
+      id: nextId,
+      title: body.title,
+      body: body.body,
+      status: 'pending',
+      target_text: body.target_text,
+      requester: currentUser,
+      messages: []
+    };
+    notificationRequests = [nextRequest, ...notificationRequests];
+    sendJson(res, 201, { request_id: nextId });
+    return;
+  }
+
+  const studentNotificationRequestMatch = url.pathname.match(/^\/api\/student\/notification-requests\/(\d+)$/);
+  if (studentNotificationRequestMatch && req.method === 'GET') {
+    const id = Number(studentNotificationRequestMatch[1]);
+    const request = notificationRequests.find((item) => item.id === id) ?? null;
+    sendJson(res, request ? 200 : 404, request ? { request } : { error: 'Request not found' });
+    return;
+  }
+
+  const studentNotificationMessageMatch = url.pathname.match(/^\/api\/student\/notification-requests\/(\d+)\/messages$/);
+  if (studentNotificationMessageMatch && req.method === 'POST') {
+    const id = Number(studentNotificationMessageMatch[1]);
+    const body = await readJson(req);
+    notificationRequests = notificationRequests.map((item) => {
+      if (item.id !== id) return item;
+      const nextMessage = {
+        id: item.messages.length + 1,
+        message: body.message,
+        created_at: '2025-04-02T11:00:00Z',
+        sender: currentUser
+      };
+      return { ...item, messages: [...item.messages, nextMessage] };
+    });
+    sendJson(res, 201, { ok: true });
+    return;
+  }
+
   const notificationRequestMatch = url.pathname.match(/^\/api\/root\/notification-requests\/(\d+)$/);
   if (notificationRequestMatch && req.method === 'GET') {
     const id = Number(notificationRequestMatch[1]);
