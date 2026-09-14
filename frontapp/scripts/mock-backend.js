@@ -222,6 +222,7 @@ let noonTemplateRuns = [];
 let noonTypingResults = [];
 let rainyModeSettings = [];
 let attendanceByClass = new Map();
+let assignedTeamMembers = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -364,6 +365,7 @@ createServer(async (req, res) => {
     noonTypingResults = [];
     rainyModeSettings = [];
     attendanceByClass = new Map();
+    assignedTeamMembers = new Map();
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
     return;
@@ -786,7 +788,8 @@ createServer(async (req, res) => {
       return {
         ...eventSport,
         id: eventSport.sport_id,
-        name: sport?.name ?? `競技${eventSport.sport_id}`
+        name: sport?.name ?? `競技${eventSport.sport_id}`,
+        sport_name: sport?.name ?? `競技${eventSport.sport_id}`
       };
     }));
     return;
@@ -811,6 +814,46 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/admin/class-team/managed-class' && req.method === 'GET') {
     sendJson(res, 200, classes);
+    return;
+  }
+
+  const classMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/classes\/(\d+)\/members$/);
+  if (classMembersMatch && req.method === 'GET') {
+    const classId = Number(classMembersMatch[1]);
+    sendJson(res, 200, users.filter((user) => user.class_id === classId));
+    return;
+  }
+
+  const teamMembersMatch = url.pathname.match(/^\/api\/admin\/class-team\/sports\/(\d+)\/members$/);
+  if (teamMembersMatch && req.method === 'GET') {
+    const sportId = Number(teamMembersMatch[1]);
+    const classId = Number(url.searchParams.get('class_id'));
+    const key = `${sportId}:${classId}`;
+    sendJson(res, 200, assignedTeamMembers.get(key) ?? []);
+    return;
+  }
+
+  if (url.pathname === '/api/admin/class-team/assign-members' && req.method === 'POST') {
+    const body = await readJson(req);
+    const key = `${Number(body.sport_id)}:${Number(body.class_id)}`;
+    const selectedUsers = users.filter((user) => body.user_ids?.includes(user.id));
+    const existing = assignedTeamMembers.get(key) ?? [];
+    assignedTeamMembers.set(key, [
+      ...existing,
+      ...selectedUsers.filter((user) => !existing.some((item) => item.id === user.id))
+    ]);
+    sendJson(res, 200, { message: 'メンバーの割り当てが完了しました' });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/class-team/remove-member' && req.method === 'DELETE') {
+    const body = await readJson(req);
+    const key = `${Number(body.sport_id)}:${Number(body.class_id)}`;
+    assignedTeamMembers.set(
+      key,
+      (assignedTeamMembers.get(key) ?? []).filter((user) => user.id !== body.user_id)
+    );
+    sendJson(res, 200, { message: 'メンバーを削除しました' });
     return;
   }
 
