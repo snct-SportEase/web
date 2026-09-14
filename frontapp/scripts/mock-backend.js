@@ -472,6 +472,11 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/events' && req.method === 'GET') {
+    sendJson(res, 200, events);
+    return;
+  }
+
   if (url.pathname === '/api/root/events' && req.method === 'POST') {
     const body = await readJson(req);
     const nextEvent = {
