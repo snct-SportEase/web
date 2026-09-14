@@ -396,6 +396,24 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/__set-match-pending' && req.method === 'POST') {
+    tournaments = tournaments.map((tournament) => ({
+      ...tournament,
+      data: {
+        ...tournament.data,
+        matches: tournament.data.matches.map((match) => ({
+          ...match,
+          sides: match.sides.map((side) => {
+            const { scores: _scores, isWinner: _isWinner, ...pendingSide } = side;
+            return pendingSide;
+          })
+        }))
+      }
+    }));
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   if (url.pathname === '/api/auth/user' && req.method === 'GET') {
     if (getSessionToken(req) === 'test-session-token') {
       sendJson(res, 200, currentUser);
@@ -596,7 +614,9 @@ createServer(async (req, res) => {
             event_name: activeEvent.name,
             id: activeEvent.id,
             name: activeEvent.name,
-            hide_scores: activeEvent.hide_scores
+            hide_scores: activeEvent.hide_scores,
+            status: activeEvent.status,
+            is_rainy_mode: Boolean(activeEvent.is_rainy_mode)
           }
         : null
     );
@@ -875,6 +895,34 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/admin/events/1/tournaments' && req.method === 'GET') {
     sendJson(res, 200, tournaments);
+    return;
+  }
+
+  const matchResultMatch = url.pathname.match(/^\/api\/admin\/matches\/(\d+)\/result$/);
+  if (matchResultMatch && req.method === 'PUT') {
+    const matchId = Number(matchResultMatch[1]);
+    const body = await readJson(req);
+    tournaments = tournaments.map((tournament) => ({
+      ...tournament,
+      data: {
+        ...tournament.data,
+        matches: tournament.data.matches.map((match) => {
+          if (match.id !== matchId) return match;
+          const winnerIndex = body.winner_id
+            ? match.sides.findIndex((side) => side.teamId === Number(body.winner_id))
+            : body.team1_score > body.team2_score ? 0 : 1;
+          return {
+            ...match,
+            sides: match.sides.map((side, index) => ({
+              ...side,
+              scores: [{ mainScore: index === 0 ? body.team1_score : body.team2_score }],
+              isWinner: index === winnerIndex
+            }))
+          };
+        })
+      }
+    }));
+    sendJson(res, 200, { ok: true });
     return;
   }
 
