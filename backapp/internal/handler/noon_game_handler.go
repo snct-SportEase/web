@@ -2829,15 +2829,36 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 			return
 		}
 	}
+	type typingRoundGroup struct {
+		ID   int
+		Name string
+	}
+	savedGroups := make([]typingRoundGroup, 0, len(groups))
 	for index, group := range groups {
-		if _, err := h.noonRepo.SaveGroup(&models.NoonGameGroup{SessionID: saved.ID, Name: group.GroupName}, groupClassIDs[index]); err != nil {
+		savedGroup, err := h.noonRepo.SaveGroup(&models.NoonGameGroup{SessionID: saved.ID, Name: group.GroupName}, groupClassIDs[index])
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save typing team"})
 			return
 		}
+		if savedGroup == nil || savedGroup.NoonGameGroup == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save typing team"})
+			return
+		}
+		savedGroups = append(savedGroups, typingRoundGroup{ID: savedGroup.ID, Name: group.GroupName})
 	}
 	for round := 1; round <= 3; round++ {
 		title := fmt.Sprintf("競技タイピング 第%dラウンド", round)
 		format := "6チーム同時"
+		entries := make([]*models.NoonGameMatchEntry, 0, len(savedGroups))
+		for _, group := range savedGroups {
+			groupID := group.ID
+			displayName := group.Name
+			entries = append(entries, &models.NoonGameMatchEntry{
+				SideType:    "group",
+				GroupID:     &groupID,
+				DisplayName: &displayName,
+			})
+		}
 		if _, err := h.noonRepo.SaveMatch(&models.NoonGameMatch{
 			SessionID:   saved.ID,
 			Title:       &title,
@@ -2845,6 +2866,7 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 			Location:    saved.Location,
 			Status:      "scheduled",
 			Format:      &format,
+			Entries:     entries,
 		}); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create typing round"})
 			return

@@ -435,9 +435,24 @@ func TestNoonGameHandler_CreateTypingRunHonorsRequestedStatus(t *testing.T) {
 	noonRepo.On("UpsertSession", mock.MatchedBy(func(session *models.NoonGameSession) bool {
 		return session.TemplateKey == "typing" && session.Status == "published"
 	})).Return(&models.NoonGameSession{ID: 10, EventID: eventID, TemplateKey: "typing", Name: "競技タイピング", Status: "published"}, nil).Once()
-	noonRepo.On("SaveGroup", mock.AnythingOfType("*models.NoonGameGroup"), []int{1}).Return(&models.NoonGameGroupWithMembers{}, nil).Times(6)
+	for index, groupName := range []string{"1年生", "2年生", "3年生", "4年生", "5年生", "専攻科・教員"} {
+		groupID := index + 1
+		noonRepo.On("SaveGroup", mock.MatchedBy(func(group *models.NoonGameGroup) bool {
+			return group.SessionID == 10 && group.Name == groupName
+		}), []int{1}).Return(&models.NoonGameGroupWithMembers{
+			NoonGameGroup: &models.NoonGameGroup{ID: groupID, SessionID: 10, Name: groupName},
+		}, nil).Once()
+	}
 	noonRepo.On("SaveMatch", mock.MatchedBy(func(match *models.NoonGameMatch) bool {
-		return match.SessionID == 10 && match.Title != nil && match.Status == "scheduled"
+		if match.SessionID != 10 || match.Title == nil || match.Status != "scheduled" || len(match.Entries) != 6 {
+			return false
+		}
+		for index, entry := range match.Entries {
+			if entry == nil || entry.SideType != "group" || entry.GroupID == nil || *entry.GroupID != index+1 || entry.DisplayName == nil {
+				return false
+			}
+		}
+		return true
 	})).Return(&models.NoonGameMatch{}, nil).Times(3)
 	noonRepo.On("CreateTemplateRunWithPointsByRankJSON", 10, "typing", "競技タイピング", userID, mock.Anything).Return(&models.NoonGameTemplateRun{ID: 1}, nil).Once()
 
