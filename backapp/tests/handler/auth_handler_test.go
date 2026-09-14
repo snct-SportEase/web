@@ -295,3 +295,131 @@ func TestAuthHandler_DemoteUserByRoot(t *testing.T) {
 	assert.JSONEq(t, `{"error":"マスタロールは剥奪ではなく交換してください"}`, w.Body.String())
 	mockUserRepo.AssertNotCalled(t, "DeleteUserRole", mock.Anything, mock.Anything)
 }
+
+func TestAuthHandler_AdminUserManagement(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("finds users with the requested search mode", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		authHandler := handler.NewAuthHandler(
+			&config.Config{},
+			mockUserRepo,
+			new(MockEventRepository),
+			new(MockClassRepository),
+		)
+		expected := []*models.User{{ID: "student-1", Email: "student1@sendai-nct.jp"}}
+		mockUserRepo.On("FindUsers", "student1", "email").Return(expected, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/admin/users?query=student1&searchType=email", nil)
+		authHandler.FindUsersHandler(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "student1@sendai-nct.jp")
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("updates a display name as admin", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		authHandler := handler.NewAuthHandler(
+			&config.Config{},
+			mockUserRepo,
+			new(MockEventRepository),
+			new(MockClassRepository),
+		)
+		actor := &models.User{ID: "admin-1"}
+		mockUserRepo.On("GetUserWithRoles", actor.ID).Return(&models.User{
+			ID: actor.ID,
+			Roles: []models.Role{{Name: "admin"}},
+		}, nil).Once()
+		mockUserRepo.On("UpdateUserDisplayName", "student-1", "大会係").Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", actor)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/users/display-name", bytes.NewBufferString(`{"user_id":"student-1","display_name":"大会係"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		authHandler.UpdateUserDisplayNameByAdmin(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("assigns and deletes a custom role as admin", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		authHandler := handler.NewAuthHandler(
+			&config.Config{},
+			mockUserRepo,
+			new(MockEventRepository),
+			new(MockClassRepository),
+		)
+		actor := &models.User{ID: "admin-1"}
+		adminWithRoles := &models.User{ID: actor.ID, Roles: []models.Role{{Name: "admin"}}}
+		mockUserRepo.On("GetUserWithRoles", actor.ID).Return(adminWithRoles, nil).Twice()
+		mockUserRepo.On("UpdateUserRole", "student-1", "scorekeeper", (*int)(nil)).Return(nil).Once()
+		mockUserRepo.On("DeleteUserRole", "student-1", "scorekeeper").Return(nil).Once()
+
+		assignResponse := httptest.NewRecorder()
+		assignContext, _ := gin.CreateTestContext(assignResponse)
+		assignContext.Set("user", actor)
+		assignContext.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/users/role", bytes.NewBufferString(`{"user_id":"student-1","role":"scorekeeper"}`))
+		assignContext.Request.Header.Set("Content-Type", "application/json")
+		authHandler.UpdateUserRoleByAdmin(assignContext)
+		assert.Equal(t, http.StatusOK, assignResponse.Code)
+
+		deleteResponse := httptest.NewRecorder()
+		deleteContext, _ := gin.CreateTestContext(deleteResponse)
+		deleteContext.Set("user", actor)
+		deleteContext.Request, _ = http.NewRequest(http.MethodDelete, "/api/admin/users/role", bytes.NewBufferString(`{"user_id":"student-1","role":"scorekeeper"}`))
+		deleteContext.Request.Header.Set("Content-Type", "application/json")
+		authHandler.DeleteUserRoleByAdmin(deleteContext)
+		assert.Equal(t, http.StatusOK, deleteResponse.Code)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("rejects protected roles before repository access", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		authHandler := handler.NewAuthHandler(
+			&config.Config{},
+			mockUserRepo,
+			new(MockEventRepository),
+			new(MockClassRepository),
+		)
+
+		defaultRoleResponse := httptest.NewRecorder()
+		defaultRoleContext, _ := gin.CreateTestContext(defaultRoleResponse)
+		defaultRoleContext.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/users/role", bytes.NewBufferString(`{"user_id":"student-1","role":"admin"}`))
+		defaultRoleContext.Request.Header.Set("Content-Type", "application/json")
+		authHandler.UpdateUserRoleByAdmin(defaultRoleContext)
+		assert.Equal(t, http.StatusBadRequest, defaultRoleResponse.Code)
+
+		classRoleResponse := httptest.NewRecorder()
+		classRoleContext, _ := gin.CreateTestContext(classRoleResponse)
+		classRoleContext.Request, _ = http.NewRequest(http.MethodDelete, "/api/admin/users/role", bytes.NewBufferString(`{"user_id":"student-1","role":"1A_basketball"}`))
+		classRoleContext.Request.Header.Set("Content-Type", "application/json")
+		authHandler.DeleteUserRoleByAdmin(classRoleContext)
+		assert.Equal(t, http.StatusBadRequest, classRoleResponse.Code)
+
+		mockUserRepo.AssertNotCalled(t, "UpdateUserRole", mock.Anything, mock.Anything, mock.Anything)
+		mockUserRepo.AssertNotCalled(t, "DeleteUserRole", mock.Anything, mock.Anything)
+	})
+}
+
+func TestAuthHandler_LogoutWithoutSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authHandler := handler.NewAuthHandler(
+		&config.Config{},
+		new(MockUserRepository),
+		new(MockEventRepository),
+		new(MockClassRepository),
+	)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request, _ = http.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	authHandler.Logout(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.JSONEq(t, `{"message":"not logged in"}`, w.Body.String())
+}
