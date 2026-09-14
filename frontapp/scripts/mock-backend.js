@@ -1349,6 +1349,11 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/admin/users' && req.method === 'GET') {
+    sendJson(res, 200, users);
+    return;
+  }
+
   if (url.pathname === '/api/admin/users/role' && req.method === 'DELETE') {
     const body = await readJson(req);
     users = users.map((user) => user.id === body.user_id ? {
