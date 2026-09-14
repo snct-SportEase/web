@@ -985,6 +985,48 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (sportDetailsMatch && req.method === 'PUT') {
+    const eventId = Number(sportDetailsMatch[1]);
+    const sportId = Number(sportDetailsMatch[2]);
+    const body = await readJson(req);
+    eventSports = eventSports.map((item) =>
+      item.event_id === eventId && item.sport_id === sportId
+        ? { ...item, description: body.description, rules_pdf_url: body.rules_pdf_url }
+        : item
+    );
+    sendJson(res, 200, { message: 'updated' });
+    return;
+  }
+
+  const sportCapacityMatch = url.pathname.match(/^\/api\/admin\/events\/(\d+)\/sports\/(\d+)\/capacity$/);
+  if (sportCapacityMatch && req.method === 'PUT') {
+    const eventId = Number(sportCapacityMatch[1]);
+    const sportId = Number(sportCapacityMatch[2]);
+    const body = await readJson(req);
+    eventSports = eventSports.map((item) =>
+      item.event_id === eventId && item.sport_id === sportId
+        ? { ...item, min_capacity: body.min_capacity, max_capacity: body.max_capacity }
+        : item
+    );
+    sendJson(res, 200, { message: 'updated' });
+    return;
+  }
+
+  const adminSportTeamsMatch = url.pathname.match(/^\/api\/admin\/events\/(\d+)\/sports\/(\d+)\/teams$/);
+  if (adminSportTeamsMatch && req.method === 'GET') {
+    const eventId = Number(adminSportTeamsMatch[1]);
+    const sportId = Number(adminSportTeamsMatch[2]);
+    sendJson(res, 200, classes.map((cls) => ({
+      id: sportId * 100 + cls.id,
+      event_id: eventId,
+      sport_id: sportId,
+      class_id: cls.id,
+      min_capacity: null,
+      max_capacity: null
+    })));
+    return;
+  }
+
   const sportTeamsMatch = url.pathname.match(/^\/api\/root\/sports\/(\d+)\/teams$/);
   if (sportTeamsMatch && req.method === 'GET') {
     const sportId = Number(sportTeamsMatch[1]);
