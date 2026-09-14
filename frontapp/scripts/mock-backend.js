@@ -639,6 +639,16 @@ createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/student/events/1/tournaments' && req.method === 'GET') {
+    sendJson(res, 200, tournaments);
+    return;
+  }
+
+  if (url.pathname === '/api/student/events/1/board-game-runs' && req.method === 'GET') {
+    sendJson(res, 200, []);
+    return;
+  }
+
   if (url.pathname === '/api/barcode/check-in' && req.method === 'POST') {
     const body = await readJson(req);
     const barcode = String(body.barcode_data ?? '').trim();
