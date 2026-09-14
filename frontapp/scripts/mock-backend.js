@@ -221,6 +221,7 @@ let noonPointsSummary = [];
 let noonTemplateRuns = [];
 let noonTypingResults = [];
 let rainyModeSettings = [];
+let attendanceByClass = new Map();
 
 function buildNoonGroupMembers(groupId, classIds = []) {
   return classIds
@@ -362,6 +363,7 @@ createServer(async (req, res) => {
     noonTemplateRuns = [];
     noonTypingResults = [];
     rainyModeSettings = [];
+    attendanceByClass = new Map();
     currentUser = rootUser;
     sendJson(res, 200, { ok: true });
     return;
@@ -404,6 +406,40 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/auth/logout' && req.method === 'POST') {
     sendJson(res, 200, { message: 'Logged out' });
+    return;
+  }
+
+  const attendanceClassMatch = url.pathname.match(/^\/api\/admin\/attendance\/class-details\/(\d+)$/);
+  if (attendanceClassMatch && req.method === 'GET') {
+    const classId = Number(attendanceClassMatch[1]);
+    const cls = classes.find((item) => item.id === classId);
+    if (!cls) {
+      sendJson(res, 404, { error: 'Class details not found' });
+      return;
+    }
+    sendJson(res, 200, {
+      ...cls,
+      attendance_count: attendanceByClass.get(classId) ?? 0,
+      attendance_points: attendanceByClass.get(classId) ?? 0
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/admin/attendance/register' && req.method === 'POST') {
+    const body = await readJson(req);
+    const cls = classes.find((item) => item.id === Number(body.class_id));
+    if (!cls) {
+      sendJson(res, 404, { error: 'Class details not found' });
+      return;
+    }
+    if (body.attendance_count < 0 || body.attendance_count > cls.student_count) {
+      sendJson(res, 400, { error: 'Invalid attendance count' });
+      return;
+    }
+    attendanceByClass.set(cls.id, Number(body.attendance_count));
+    sendJson(res, 200, {
+      message: `Successfully registered attendance for class ${cls.name}. Points awarded: ${body.attendance_count}`
+    });
     return;
   }
 
