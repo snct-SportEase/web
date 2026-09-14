@@ -143,6 +143,8 @@ const sampleTournamentData = () => ({
       id: 1,
       roundIndex: 0,
       order: 0,
+      startTime: '2025-04-01 09:30:00',
+      matchStatus: 'IN_PROGRESS',
       sides: [
         { contestantId: 'c0', teamId: studentTeamId, scores: [{ mainScore: 3 }], isWinner: true },
         { contestantId: 'c1', teamId: 102, scores: [{ mainScore: 1 }] }
