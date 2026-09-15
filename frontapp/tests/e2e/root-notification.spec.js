@@ -74,4 +74,28 @@ test.describe('通知管理 (root)', () => {
     await expect(page.getByLabel('タイトル')).toHaveValue('');
     await expect(page.getByLabel('本文')).toHaveValue('');
   });
+
+  test('ユーザーを検索して個人宛て通知を送信できる', async ({ page }) => {
+    await page.getByRole('radio', { name: '個人単位' }).check();
+    await page.getByLabel('ユーザー検索キーワード').fill('student1');
+    await page.getByRole('button', { name: '検索' }).click();
+    await page.getByRole('checkbox', { name: /山田太郎/ }).check();
+    await page.getByLabel('タイトル').fill('個人連絡');
+    await page.getByLabel('本文').fill('受付へ来てください。');
+
+    const createRequest = page.waitForRequest((request) => {
+      if (!request.url().endsWith('/api/root/notifications') || request.method() !== 'POST') return false;
+      return JSON.parse(request.postData() ?? '{}').title === '個人連絡';
+    });
+    await page.getByRole('button', { name: '通知を送信' }).click();
+
+    const request = await createRequest;
+    expect(JSON.parse(request.postData() ?? '{}')).toEqual({
+      title: '個人連絡',
+      body: '受付へ来てください。',
+      type: 'general',
+      target_user_ids: ['user-1']
+    });
+    await expect(page.getByText('個人 1名')).toBeVisible();
+  });
 });

@@ -619,6 +619,11 @@ func (m *MockNotificationRepository) AddNotificationTargets(notificationID int64
 	return args.Error(0)
 }
 
+func (m *MockNotificationRepository) AddNotificationRecipients(notificationID int64, userIDs []string) error {
+	args := m.Called(notificationID, userIDs)
+	return args.Error(0)
+}
+
 func (m *MockNotificationRepository) GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error) {
 	args := m.Called(roleNames, authorID, includeAuthored, limit)
 	if args.Get(0) == nil {
@@ -651,8 +656,8 @@ func (m *MockNotificationRepository) GetPushSubscriptionsByUserID(userID string)
 	return args.Get(0).([]models.PushSubscription), args.Error(1)
 }
 
-func (m *MockNotificationRepository) GetPushSubscriptionStatsByRoles(roleNames []string) (models.PushSubscriptionStats, error) {
-	args := m.Called(roleNames)
+func (m *MockNotificationRepository) GetPushSubscriptionStatsByTargets(roleNames, userIDs []string) (models.PushSubscriptionStats, error) {
+	args := m.Called(roleNames, userIDs)
 	return args.Get(0).(models.PushSubscriptionStats), args.Error(1)
 }
 

@@ -55,6 +55,7 @@ describe('Notification Management Page', () => {
         notifications.unshift({
           id: 2,
           ...body,
+          target_user_count: body.target_user_ids?.length ?? 0,
           created_at: '2025-04-02T10:00:00Z'
         });
 
@@ -81,6 +82,20 @@ describe('Notification Management Page', () => {
               subscription_endpoint_count: 10
             }
           })
+        });
+      }
+
+      if (typeof url === 'string' && url.startsWith('/api/root/users?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            {
+              id: 'user-1',
+              email: 'student1@sendai-nct.jp',
+              display_name: '山田太郎',
+              roles: [{ id: 1, name: 'student' }]
+            }
+          ])
         });
       }
 
@@ -136,5 +151,30 @@ describe('Notification Management Page', () => {
 
     await expect.element(page.getByText('通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。')).toBeInTheDocument();
     await expect.element(page.getByText('競技開始時間変更')).toBeInTheDocument();
+  });
+
+  it('検索したユーザーを選択して個人宛て通知を送信できる', async () => {
+    render(Page);
+
+    await page.getByRole('radio', { name: '個人単位' }).click();
+    await page.getByLabelText('ユーザー検索キーワード').fill('student1');
+    await page.getByRole('button', { name: '検索' }).click();
+    await page.getByRole('checkbox', { name: /山田太郎/ }).click();
+    await page.getByLabelText('タイトル').fill('個人連絡');
+    await page.getByLabelText('本文').fill('受付へ来てください。');
+    await page.getByRole('button', { name: '通知を送信' }).click();
+
+    const createCall = fetchMock.mock.calls.find(([url, options]) => {
+      if (url !== '/api/root/notifications' || options?.method !== 'POST') return false;
+      return JSON.parse(options.body).title === '個人連絡';
+    });
+    expect(JSON.parse(createCall[1].body)).toEqual({
+      title: '個人連絡',
+      body: '受付へ来てください。',
+      type: 'general',
+      target_user_ids: ['user-1']
+    });
+
+    await expect.element(page.getByText('個人 1名')).toBeInTheDocument();
   });
 });
