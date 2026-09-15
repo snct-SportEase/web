@@ -46,10 +46,11 @@ func (h *NotificationHandler) WithPushSender(sender push.Sender) *NotificationHa
 }
 
 type createNotificationRequest struct {
-	Title       string   `json:"title"`
-	Body        string   `json:"body"`
-	Type        string   `json:"type"`
-	TargetRoles []string `json:"target_roles"`
+	Title         string   `json:"title"`
+	Body          string   `json:"body"`
+	Type          string   `json:"type"`
+	TargetRoles   []string `json:"target_roles"`
+	TargetUserIDs []string `json:"target_user_ids"`
 }
 
 func (h *NotificationHandler) CreateNotification(c *gin.Context) {
@@ -96,15 +97,36 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 		return
 	}
 
-	availableRoles, err := h.RoleRepo.GetAllRoles()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ロール情報の取得に失敗しました"})
-		return
+	targetRoles := []string{}
+	if len(req.TargetRoles) > 0 {
+		availableRoles, err := h.RoleRepo.GetAllRoles()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ロール情報の取得に失敗しました"})
+			return
+		}
+
+		targetRoles, err = normalizeTargetRoles(req.TargetRoles, availableRoles)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
-	targetRoles, err := normalizeTargetRoles(req.TargetRoles, availableRoles)
+	targetUserIDs, err := normalizeTargetUserIDs(req.TargetUserIDs)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(targetRoles) == 0 && len(targetUserIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "少なくとも1つの宛先を選択してください"})
+		return
+	}
+	if err := h.validateTargetUsers(targetUserIDs); err != nil {
+		if errors.Is(err, errTargetUserNotFound) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "存在しないユーザーが含まれています"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "宛先ユーザーの確認に失敗しました"})
 		return
 	}
 
@@ -125,12 +147,20 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 		return
 	}
 
-	if err := h.NotificationRepo.AddNotificationTargets(notificationID, targetRoles); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "通知の対象ロール登録に失敗しました"})
-		return
+	if len(targetRoles) > 0 {
+		if err := h.NotificationRepo.AddNotificationTargets(notificationID, targetRoles); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "通知の対象ロール登録に失敗しました"})
+			return
+		}
+	}
+	if len(targetUserIDs) > 0 {
+		if err := h.NotificationRepo.AddNotificationRecipients(notificationID, targetUserIDs); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "通知の個人宛先登録に失敗しました"})
+			return
+		}
 	}
 
-	go h.dispatchPushNotifications(int(notificationID), req.Title, req.Body, req.Type, targetRoles)
+	go h.dispatchPushNotifications(int(notificationID), req.Title, req.Body, req.Type, targetRoles, targetUserIDs)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":        "通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます",
@@ -192,27 +222,42 @@ func (h *NotificationHandler) ListAvailableRoles(c *gin.Context) {
 }
 
 func (h *NotificationHandler) GetPushSubscriptionStats(c *gin.Context) {
-	availableRoles, err := h.RoleRepo.GetAllRoles()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ロール情報の取得に失敗しました"})
-		return
+	targetRoles := []string{}
+	requestedRoles := c.QueryArray("roles")
+	if len(requestedRoles) > 0 {
+		availableRoles, err := h.RoleRepo.GetAllRoles()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ロール情報の取得に失敗しました"})
+			return
+		}
+
+		targetRoles, err = normalizeTargetRoles(requestedRoles, availableRoles)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
-	targetRoles, err := normalizeTargetRoles(c.QueryArray("roles"), availableRoles)
+	targetUserIDs, err := normalizeTargetUserIDs(c.QueryArray("user_ids"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if len(targetRoles) == 0 && len(targetUserIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "少なくとも1つの宛先を選択してください"})
+		return
+	}
 
-	stats, err := h.NotificationRepo.GetPushSubscriptionStatsByRoles(targetRoles)
+	stats, err := h.NotificationRepo.GetPushSubscriptionStatsByTargets(targetRoles, targetUserIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "購読状況の取得に失敗しました"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"target_roles": targetRoles,
-		"stats":        stats,
+		"target_roles":    targetRoles,
+		"target_user_ids": targetUserIDs,
+		"stats":           stats,
 	})
 }
 
@@ -410,19 +455,24 @@ func (h *NotificationHandler) GetSubscription(c *gin.Context) {
 	})
 }
 
-func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
-	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%s\n", notificationID, safelog.Value(title), safelog.Value(notificationType), safelog.Value(targetRoles))
+func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles, targetUserIDs []string) {
+	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%s, targetUserCount=%d\n", notificationID, safelog.Value(title), safelog.Value(notificationType), safelog.Value(targetRoles), len(targetUserIDs))
 
 	if h.PushSender == nil || !h.PushSender.Enabled() {
 		log.Println("[notification] VAPIDキーが設定されていないためPush通知をスキップします")
 		return
 	}
 
-	userIDs, err := h.NotificationRepo.GetUserIDsByRoles(targetRoles)
-	if err != nil {
-		log.Printf("[notification] ユーザー抽出に失敗しました: %s\n", safelog.Value(err))
-		return
+	userIDs := append([]string{}, targetUserIDs...)
+	if len(targetRoles) > 0 {
+		roleUserIDs, err := h.NotificationRepo.GetUserIDsByRoles(targetRoles)
+		if err != nil {
+			log.Printf("[notification] ユーザー抽出に失敗しました: %s\n", safelog.Value(err))
+			return
+		}
+		userIDs = append(userIDs, roleUserIDs...)
 	}
+	userIDs = uniqueSortedStrings(userIDs)
 	log.Printf("[notification] 対象ユーザー数: %d, userIDs=%s\n", len(userIDs), safelog.Value(userIDs))
 	if len(userIDs) == 0 {
 		log.Println("[notification] 対象ユーザーが0人のためPush通知をスキップします")
@@ -512,6 +562,48 @@ func normalizeTargetRoles(requested []string, available []models.Role) ([]string
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+const maxIndividualNotificationRecipients = 100
+
+var errTargetUserNotFound = errors.New("target user not found")
+
+func normalizeTargetUserIDs(requested []string) ([]string, error) {
+	result := uniqueSortedStrings(requested)
+	if len(result) > maxIndividualNotificationRecipients {
+		return nil, errors.New("個人宛先は100人まで選択できます")
+	}
+	return result, nil
+}
+
+func uniqueSortedStrings(values []string) []string {
+	unique := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			unique[value] = struct{}{}
+		}
+	}
+
+	result := make([]string, 0, len(unique))
+	for value := range unique {
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func (h *NotificationHandler) validateTargetUsers(userIDs []string) error {
+	for _, userID := range userIDs {
+		user, err := h.UserRepo.GetUserWithRoles(userID)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return errTargetUserNotFound
+		}
+	}
+	return nil
 }
 
 func (h *NotificationHandler) filterUsersByNotificationType(userIDs []string, notificationType string) ([]string, error) {

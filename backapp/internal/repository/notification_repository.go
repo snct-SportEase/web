@@ -16,11 +16,12 @@ var (
 type NotificationRepository interface {
 	CreateNotification(title, body, notificationType, createdBy string, eventID *int) (int64, error)
 	AddNotificationTargets(notificationID int64, roles []string) error
+	AddNotificationRecipients(notificationID int64, userIDs []string) error
 	GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error)
 	GetUserIDsByRoles(roleNames []string) ([]string, error)
 	GetPushSubscriptionsByUserIDs(userIDs []string) ([]models.PushSubscription, error)
 	GetPushSubscriptionsByUserID(userID string) ([]models.PushSubscription, error)
-	GetPushSubscriptionStatsByRoles(roleNames []string) (models.PushSubscriptionStats, error)
+	GetPushSubscriptionStatsByTargets(roleNames, userIDs []string) (models.PushSubscriptionStats, error)
 	UpsertPushSubscription(userID, endpoint, authKey, p256dhKey string, maxPerUser int) error
 	DeletePushSubscription(userID, endpoint string) error
 }
@@ -82,6 +83,32 @@ func (r *notificationRepository) AddNotificationTargets(notificationID int64, ro
 	return tx.Commit()
 }
 
+func (r *notificationRepository) AddNotificationRecipients(notificationID int64, userIDs []string) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("INSERT IGNORE INTO notification_recipients (notification_id, user_id) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, userID := range userIDs {
+		if _, err := stmt.Exec(notificationID, userID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error) {
 	var args []interface{}
 	var filters []string
@@ -92,6 +119,11 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 		for _, role := range roleNames {
 			args = append(args, role)
 		}
+	}
+
+	if authorID != "" {
+		filters = append(filters, "nr.user_id = ?")
+		args = append(args, authorID)
 	}
 
 	if includeAuthored && authorID != "" {
@@ -108,9 +140,11 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 			n.created_by,
 			n.event_id,
 			n.created_at,
-			GROUP_CONCAT(DISTINCT nt.role_name ORDER BY nt.role_name SEPARATOR ',') AS target_roles
+			GROUP_CONCAT(DISTINCT nt.role_name ORDER BY nt.role_name SEPARATOR ',') AS target_roles,
+			COUNT(DISTINCT nr.user_id) AS target_user_count
 		FROM notifications n
 		LEFT JOIN notification_targets nt ON n.id = nt.notification_id
+		LEFT JOIN notification_recipients nr ON n.id = nr.notification_id
 	`
 
 	if len(filters) > 0 {
@@ -150,6 +184,7 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 			&eventID,
 			&notif.CreatedAt,
 			&targetRoles,
+			&notif.TargetUserCount,
 		); err != nil {
 			return nil, err
 		}
@@ -167,7 +202,6 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 		} else {
 			notif.TargetRoles = []string{}
 		}
-
 		notifications = append(notifications, notif)
 	}
 
@@ -273,28 +307,37 @@ func (r *notificationRepository) GetPushSubscriptionsByUserID(userID string) ([]
 	return subs, nil
 }
 
-func (r *notificationRepository) GetPushSubscriptionStatsByRoles(roleNames []string) (models.PushSubscriptionStats, error) {
-	if len(roleNames) == 0 {
+func (r *notificationRepository) GetPushSubscriptionStatsByTargets(roleNames, userIDs []string) (models.PushSubscriptionStats, error) {
+	if len(roleNames) == 0 && len(userIDs) == 0 {
 		return models.PushSubscriptionStats{}, nil
 	}
 
-	placeholders := strings.Repeat(",?", len(roleNames)-1)
 	query := `
 		SELECT
 			COUNT(DISTINCT u.id) AS target_user_count,
 			COUNT(DISTINCT ps.user_id) AS subscribed_user_count,
 			COUNT(DISTINCT ps.endpoint) AS subscription_endpoint_count
 		FROM users u
-		INNER JOIN user_roles ur ON u.id = ur.user_id
-		INNER JOIN roles r ON ur.role_id = r.id
+		LEFT JOIN user_roles ur ON u.id = ur.user_id
+		LEFT JOIN roles r ON ur.role_id = r.id
 		LEFT JOIN push_subscriptions ps ON u.id = ps.user_id
-		WHERE r.name IN (?` + placeholders + `)
 	`
 
-	args := make([]interface{}, len(roleNames))
-	for i, role := range roleNames {
-		args[i] = role
+	var filters []string
+	var args []interface{}
+	if len(roleNames) > 0 {
+		filters = append(filters, "r.name IN (?"+strings.Repeat(",?", len(roleNames)-1)+")")
+		for _, role := range roleNames {
+			args = append(args, role)
+		}
 	}
+	if len(userIDs) > 0 {
+		filters = append(filters, "u.id IN (?"+strings.Repeat(",?", len(userIDs)-1)+")")
+		for _, userID := range userIDs {
+			args = append(args, userID)
+		}
+	}
+	query += " WHERE (" + strings.Join(filters, " OR ") + ")" // #nosec G202 -- filters contain only fixed SQL and generated placeholders.
 
 	var stats models.PushSubscriptionStats
 	err := r.db.QueryRow(query, args...).Scan(

@@ -61,6 +61,93 @@ func TestNotificationHandler_CreateNotification_Success(t *testing.T) {
 	mockRoleRepo.AssertExpectations(t)
 }
 
+func TestNotificationHandler_CreateNotification_ForIndividualUsers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockNotifRepo := new(MockNotificationRepository)
+	mockEventRepo := new(MockEventRepository)
+	mockRoleRepo := new(MockRoleRepository)
+	mockUserRepo := new(MockUserRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, mockRoleRepo, mockUserRepo, "", "")
+
+	mockUserRepo.On("GetUserWithRoles", "user-1").Return(&models.User{ID: "user-1"}, nil).Once()
+	mockUserRepo.On("GetUserWithRoles", "user-2").Return(&models.User{ID: "user-2"}, nil).Once()
+	mockEventRepo.On("GetActiveEvent").Return(3, nil).Once()
+	mockNotifRepo.On("CreateNotification", "個人連絡", "集合場所を確認してください", "general", "root-1", mock.Anything).
+		Return(int64(12), nil).Once()
+	mockNotifRepo.On("AddNotificationRecipients", int64(12), []string{"user-1", "user-2"}).Return(nil).Once()
+
+	payload, _ := json.Marshal(map[string]any{
+		"title":           "個人連絡",
+		"body":            "集合場所を確認してください",
+		"target_user_ids": []string{" user-2 ", "user-1", "user-1"},
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/notifications", bytes.NewReader(payload))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user", &models.User{ID: "root-1"})
+
+	h.CreateNotification(c)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	mockRoleRepo.AssertNotCalled(t, "GetAllRoles")
+	mockNotifRepo.AssertNotCalled(t, "AddNotificationTargets", mock.Anything, mock.Anything)
+	mockNotifRepo.AssertExpectations(t)
+	mockEventRepo.AssertExpectations(t)
+	mockUserRepo.AssertExpectations(t)
+}
+
+func TestNotificationHandler_CreateNotification_RejectsMissingTargets(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := handler.NewNotificationHandler(
+		new(MockNotificationRepository),
+		new(MockEventRepository),
+		new(MockRoleRepository),
+		new(MockUserRepository),
+		"",
+		"",
+	)
+
+	payload, _ := json.Marshal(map[string]any{"title": "お知らせ", "body": "本文"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/notifications", bytes.NewReader(payload))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user", &models.User{ID: "root-1"})
+
+	h.CreateNotification(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "少なくとも1つの宛先を選択してください")
+}
+
+func TestNotificationHandler_CreateNotification_RejectsUnknownIndividualUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockNotifRepo := new(MockNotificationRepository)
+	mockUserRepo := new(MockUserRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, new(MockEventRepository), new(MockRoleRepository), mockUserRepo, "", "")
+	mockUserRepo.On("GetUserWithRoles", "missing-user").Return(nil, nil).Once()
+
+	payload, _ := json.Marshal(map[string]any{
+		"title":           "個人連絡",
+		"body":            "本文",
+		"target_user_ids": []string{"missing-user"},
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/notifications", bytes.NewReader(payload))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user", &models.User{ID: "root-1"})
+
+	h.CreateNotification(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "存在しないユーザーが含まれています")
+	mockNotifRepo.AssertNotCalled(t, "CreateNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockUserRepo.AssertExpectations(t)
+}
+
 func TestNotificationHandler_CreateNotification_UnauthorizedWithoutUser(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -427,7 +514,7 @@ func TestNotificationHandler_GetPushSubscriptionStats_Success(t *testing.T) {
 		{ID: 1, Name: "student"},
 		{ID: 2, Name: "admin"},
 	}, nil).Once()
-	mockNotifRepo.On("GetPushSubscriptionStatsByRoles", []string{"admin", "student"}).
+	mockNotifRepo.On("GetPushSubscriptionStatsByTargets", []string{"admin", "student"}, []string{}).
 		Return(models.PushSubscriptionStats{
 			TargetUserCount:           10,
 			SubscribedUserCount:       6,
@@ -454,6 +541,31 @@ func TestNotificationHandler_GetPushSubscriptionStats_Success(t *testing.T) {
 	assert.Equal(t, float64(8), stats["subscription_endpoint_count"])
 
 	mockRoleRepo.AssertExpectations(t)
+	mockNotifRepo.AssertExpectations(t)
+}
+
+func TestNotificationHandler_GetPushSubscriptionStats_ForIndividualUsers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockNotifRepo := new(MockNotificationRepository)
+	mockRoleRepo := new(MockRoleRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, new(MockEventRepository), mockRoleRepo, new(MockUserRepository), "", "")
+
+	mockNotifRepo.On("GetPushSubscriptionStatsByTargets", []string{}, []string{"user-1", "user-2"}).
+		Return(models.PushSubscriptionStats{
+			TargetUserCount:           2,
+			SubscribedUserCount:       1,
+			SubscriptionEndpointCount: 2,
+		}, nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/root/notifications/subscription-stats?user_ids=user-2&user_ids=user-1", nil)
+
+	h.GetPushSubscriptionStats(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"target_user_ids":["user-1","user-2"]`)
+	mockRoleRepo.AssertNotCalled(t, "GetAllRoles")
 	mockNotifRepo.AssertExpectations(t)
 }
 

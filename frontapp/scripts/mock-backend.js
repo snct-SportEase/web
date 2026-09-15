@@ -1095,13 +1095,15 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/root/notifications/subscription-stats' && req.method === 'GET') {
     const roles = url.searchParams.getAll('roles');
-    const roleCount = roles.length || 1;
+    const userIds = url.searchParams.getAll('user_ids');
+    const targetCount = userIds.length || roles.length * 10 || 1;
     sendJson(res, 200, {
       target_roles: roles,
+      target_user_ids: userIds,
       stats: {
-        target_user_count: roleCount * 10,
-        subscribed_user_count: roleCount * 6,
-        subscription_endpoint_count: roleCount * 8
+        target_user_count: targetCount,
+        subscribed_user_count: userIds.length ? userIds.length : roles.length * 6,
+        subscription_endpoint_count: userIds.length ? userIds.length : roles.length * 8
       }
     });
     return;
@@ -1126,6 +1128,7 @@ createServer(async (req, res) => {
     const nextNotification = {
       id: notifications.length + 1,
       ...body,
+      target_user_count: body.target_user_ids?.length ?? 0,
       created_at: '2025-04-02T10:00:00Z'
     };
     notifications = [nextNotification, ...notifications];

@@ -50,7 +50,14 @@
   let title = $state('');
   let body = $state('');
   let selectedType = $state('general');
+  let deliveryMode = $state('role');
   let selectedRoles = $state(createDefaultSelections(availableRoles));
+  let selectedUsers = $state({});
+  let userSearchQuery = $state('');
+  let userSearchType = $state('email');
+  let userSearchResults = $state([]);
+  let userSearchError = $state('');
+  let isSearchingUsers = $state(false);
 
   let message = $state('');
   let errorMessage = $state('');
@@ -81,18 +88,77 @@
     return getSelectedRoles().map((role) => roleLabelMap[role] ?? role).join('、');
   }
 
+  function getSelectedUserIDs() {
+    return Object.keys(selectedUsers).sort();
+  }
+
+  function getTargetLabel() {
+    if (deliveryMode === 'individual') {
+      const count = getSelectedUserIDs().length;
+      return count > 0 ? `個人 ${count}名` : '未選択';
+    }
+    return getSelectedRoleLabels() || '未選択';
+  }
+
+  function changeDeliveryMode(mode) {
+    deliveryMode = mode;
+    subscriptionStats = null;
+    refreshSubscriptionStats();
+  }
+
+  function toggleUser(user) {
+    const next = { ...selectedUsers };
+    if (next[user.id]) {
+      delete next[user.id];
+    } else {
+      next[user.id] = user;
+    }
+    selectedUsers = next;
+    refreshSubscriptionStats();
+  }
+
+  async function searchUsers() {
+    userSearchError = '';
+    if (!userSearchQuery.trim()) {
+      userSearchError = '検索キーワードを入力してください。';
+      userSearchResults = [];
+      return;
+    }
+
+    isSearchingUsers = true;
+    try {
+      const params = new URLSearchParams({
+        query: userSearchQuery.trim(),
+        searchType: userSearchType
+      });
+      const response = await fetch(`/api/root/users?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('ユーザーの検索に失敗しました。');
+      }
+      const result = await response.json();
+      userSearchResults = Array.isArray(result) ? result : [];
+    } catch (error) {
+      userSearchError = error.message;
+      userSearchResults = [];
+    } finally {
+      isSearchingUsers = false;
+    }
+  }
+
   async function refreshSubscriptionStats() {
-    const targetRoles = getSelectedRoles();
-    if (targetRoles.length === 0) {
+    const targetRoles = deliveryMode === 'role' ? getSelectedRoles() : [];
+    const targetUserIDs = deliveryMode === 'individual' ? getSelectedUserIDs() : [];
+    if (targetRoles.length === 0 && targetUserIDs.length === 0) {
       subscriptionStats = null;
       return;
     }
 
     isStatsLoading = true;
     try {
-      const query = targetRoles
-        .map((role) => `roles=${encodeURIComponent(role)}`)
-        .join('&');
+      const query = [
+        ...targetRoles.map((role) => `roles=${encodeURIComponent(role)}`),
+        ...targetUserIDs.map((userID) => `user_ids=${encodeURIComponent(userID)}`)
+      ].join('&');
 
       const response = await fetch(`/api/root/notifications/subscription-stats?${query}`);
       if (!response.ok) {
@@ -114,14 +180,17 @@
     message = '';
     errorMessage = '';
 
-    const targetRoles = getSelectedRoles();
+    const targetRoles = deliveryMode === 'role' ? getSelectedRoles() : [];
+    const targetUserIDs = deliveryMode === 'individual' ? getSelectedUserIDs() : [];
     if (!title.trim() || !body.trim()) {
       errorMessage = 'タイトルと本文を入力してください。';
       return;
     }
 
-    if (targetRoles.length === 0) {
-      errorMessage = '少なくとも1つの宛先ロールを選択してください。';
+    if (targetRoles.length === 0 && targetUserIDs.length === 0) {
+      errorMessage = deliveryMode === 'individual'
+        ? '少なくとも1人の宛先ユーザーを選択してください。'
+        : '少なくとも1つの宛先ロールを選択してください。';
       return;
     }
 
@@ -136,7 +205,9 @@
           title,
           body,
           type: selectedType,
-          target_roles: targetRoles
+          ...(deliveryMode === 'individual'
+            ? { target_user_ids: targetUserIDs }
+            : { target_roles: targetRoles })
         })
       });
 
@@ -149,6 +220,7 @@
       title = '';
       body = '';
       resetSelectedRoles();
+      selectedUsers = {};
 
       await refreshNotifications();
       await refreshSubscriptionStats();
@@ -228,19 +300,45 @@
   <section class="bg-white shadow rounded-lg p-6 space-y-6">
     <h2 class="text-xl font-semibold text-gray-800">新しい通知を作成</h2>
 
+    <fieldset>
+      <legend class="block text-sm font-medium text-gray-700 mb-2">宛先の指定方法</legend>
+      <div class="flex flex-wrap gap-4">
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="radio"
+            name="delivery-mode"
+            value="role"
+            checked={deliveryMode === 'role'}
+            onchange={() => changeDeliveryMode('role')}
+          />
+          ロール単位
+        </label>
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="radio"
+            name="delivery-mode"
+            value="individual"
+            checked={deliveryMode === 'individual'}
+            onchange={() => changeDeliveryMode('individual')}
+          />
+          個人単位
+        </label>
+      </div>
+    </fieldset>
+
     <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 class="text-sm font-semibold text-indigo-900">Push通知の受信可能状況</h3>
           <p class="mt-1 text-sm text-indigo-800">
-            宛先: {getSelectedRoleLabels() || '未選択'}
+            宛先: {getTargetLabel()}
           </p>
         </div>
         <button
           type="button"
           class="rounded-md border border-indigo-300 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
           onclick={refreshSubscriptionStats}
-          disabled={!isInteractive || isStatsLoading || getSelectedRoles().length === 0}
+          disabled={!isInteractive || isStatsLoading || (deliveryMode === 'role' ? getSelectedRoles().length === 0 : getSelectedUserIDs().length === 0)}
         >
           {isStatsLoading ? '確認中...' : '再確認'}
         </button>
@@ -262,7 +360,7 @@
         </div>
       {:else}
         <p class="mt-4 text-sm text-indigo-800">
-          宛先ロールを選択すると、Push通知を受け取れる人数を確認できます。
+          宛先を選択すると、Push通知を受け取れる人数を確認できます。
         </p>
       {/if}
     </div>
@@ -300,6 +398,7 @@
         ></textarea>
       </FormField>
 
+      {#if deliveryMode === 'role'}
       <div>
         <span class="block text-sm font-medium text-gray-700 mb-2">宛先ロール</span>
         {#if availableRoles.length === 0}
@@ -320,13 +419,84 @@
           </div>
         {/if}
       </div>
+      {:else}
+        <div class="space-y-3">
+          <span class="block text-sm font-medium text-gray-700">宛先ユーザー</span>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <select
+              aria-label="ユーザー検索対象"
+              class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              bind:value={userSearchType}
+            >
+              <option value="email">メールアドレス</option>
+              <option value="display_name">表示名</option>
+            </select>
+            <input
+              aria-label="ユーザー検索キーワード"
+              type="search"
+              class="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              bind:value={userSearchQuery}
+              onkeydown={(event) => event.key === 'Enter' && searchUsers()}
+              placeholder="宛先ユーザーを検索"
+            />
+            <button
+              type="button"
+              class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              onclick={searchUsers}
+              disabled={isSearchingUsers}
+            >
+              {isSearchingUsers ? '検索中...' : '検索'}
+            </button>
+          </div>
+
+          {#if userSearchError}
+            <p class="text-sm text-red-600">{userSearchError}</p>
+          {/if}
+
+          {#if userSearchResults.length > 0}
+            <div class="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-md border border-gray-200">
+              {#each userSearchResults as user (user.id)}
+                <label class="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={!!selectedUsers[user.id]}
+                    onchange={() => toggleUser(user)}
+                  />
+                  <span class="min-w-0 text-sm text-gray-700">
+                    <span class="font-medium">{user.display_name || '表示名未設定'}</span>
+                    <span class="ml-2 text-gray-500">{user.email}</span>
+                  </span>
+                </label>
+              {/each}
+            </div>
+          {:else if userSearchQuery && !isSearchingUsers && !userSearchError}
+            <p class="text-sm text-gray-500">該当するユーザーが見つかりませんでした。</p>
+          {/if}
+
+          {#if getSelectedUserIDs().length > 0}
+            <div class="flex flex-wrap gap-2" aria-label="選択済みユーザー">
+              {#each Object.values(selectedUsers) as user (user.id)}
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                  onclick={() => toggleUser(user)}
+                  aria-label={`${user.display_name || user.email}を宛先から外す`}
+                >
+                  {user.display_name || user.email}
+                  <span aria-hidden="true">×</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <Button
       type="button"
       size="sm"
       onclick={(e) => { e.preventDefault(); handleSubmit(e); }}
-      disabled={!isInteractive || availableRoles.length === 0}
+      disabled={!isInteractive || (deliveryMode === 'role' && availableRoles.length === 0)}
       loading={isSubmitting}
       loadingLabel="送信中..."
     >
@@ -351,13 +521,18 @@
               <span class="text-sm text-gray-500">{formatDate(notification.created_at)}</span>
             </div>
             <p class="mt-2 text-gray-700 whitespace-pre-wrap">{notification.body}</p>
-            {#if notification.target_roles?.length}
+            {#if notification.target_roles?.length || notification.target_user_count > 0}
               <div class="mt-3 flex flex-wrap gap-2">
                 {#each notification.target_roles as role (role)}
                   <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
                     {roleLabelMap[role] ?? role}
                   </span>
                 {/each}
+                {#if notification.target_user_count > 0}
+                  <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                    個人 {notification.target_user_count}名
+                  </span>
+                {/if}
               </div>
             {/if}
           </li>
