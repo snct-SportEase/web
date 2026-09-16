@@ -363,7 +363,8 @@ func TestTeamRepository_GetTeamMembers(t *testing.T) {
 
 		users, err := repo.GetTeamMembers(999)
 		assert.NoError(t, err)
-		assert.Nil(t, users)
+		assert.NotNil(t, users)
+		assert.Empty(t, users)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 

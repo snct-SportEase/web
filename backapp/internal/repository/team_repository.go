@@ -189,7 +189,7 @@ func (r *teamRepository) GetTeamMembers(teamID int) ([]*models.User, error) {
 	}
 	defer rows.Close()
 
-	var users []*models.User
+	users := make([]*models.User, 0)
 	for rows.Next() {
 		user := &models.User{}
 		var tempClassID sql.NullInt32
@@ -211,7 +211,7 @@ func (r *teamRepository) GetTeamMembers(teamID int) ([]*models.User, error) {
 		users = append(users, user)
 	}
 
-	return users, nil
+	return users, rows.Err()
 }
 
 func (r *teamRepository) GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*models.User, error) {

@@ -1,9 +1,11 @@
 import { page } from '@vitest/browser/context';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { settled } from 'svelte';
 import Page from '$src/routes/dashboard/root/noon-game/+page.svelte';
 
 const mocks = vi.hoisted(() => ({
+  listeners: new Set(),
   active: {
     id: 1,
     name: '2025春季スポーツ大会'
@@ -13,8 +15,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('$lib/stores/eventStore.js', () => ({
   activeEvent: {
     subscribe(fn) {
+      mocks.listeners.add(fn);
       fn(mocks.active);
-      return () => {};
+      return () => mocks.listeners.delete(fn);
     },
     init: vi.fn(async () => mocks.active)
   }
@@ -33,6 +36,7 @@ describe('Noon Game Page', () => {
   ];
 
   beforeEach(() => {
+    mocks.active = { id: 1, name: '2025春季スポーツ大会' };
     session = null;
     groups = [];
 
@@ -108,6 +112,62 @@ describe('Noon Game Page', () => {
 
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('alert', vi.fn());
+  });
+
+  it('セッション選択や同じ大会の再通知で重複取得しない', async () => {
+    const fallback = fetchMock.getMockImplementation();
+    const sessionList = [
+      { id: 10, name: '学年対抗リレー', status: 'draft', mode: 'mixed' },
+      { id: 11, name: '綱引き', status: 'draft', mode: 'mixed' }
+    ];
+    fetchMock.mockImplementation((url, options) => {
+      if (/\/noon-game\/sessions$/.test(url)) {
+        return Promise.resolve({ ok: true, json: async () => ({ sessions: sessionList }) });
+      }
+      if (/\/noon-game\/sessions\/\d+$/.test(url)) {
+        return Promise.resolve({ ok: true, json: async () => ({
+          session: sessionList.find((item) => url.endsWith(`/${item.id}`)), classes
+        }) });
+      }
+      return fallback(url, options);
+    });
+    const listCalls = () => fetchMock.mock.calls.filter(([url]) => /\/noon-game\/sessions$/.test(url));
+    render(Page);
+    await expect.element(page.getByLabelText('編集中の昼競技')).toHaveValue('10');
+    await settled();
+    expect(listCalls()).toHaveLength(1);
+
+    await page.getByLabelText('編集中の昼競技').selectOptions('11');
+    await expect.element(page.getByLabelText('セッション名')).toHaveValue('綱引き');
+    await settled();
+    expect(listCalls()).toHaveLength(2);
+
+    mocks.active = { ...mocks.active, name: '大会名を変更' };
+    mocks.listeners.forEach((fn) => fn(mocks.active));
+    await settled();
+    expect(listCalls()).toHaveLength(2);
+
+    mocks.active = { id: 2, name: '秋大会' };
+    mocks.listeners.forEach((fn) => fn(mocks.active));
+    await expect.element(page.getByLabelText('編集中の昼競技')).toHaveValue('10');
+    await settled();
+    expect(listCalls()).toHaveLength(3);
+    expect(listCalls().at(-1)[0]).toBe('/api/root/events/2/noon-game/sessions');
+  });
+
+  it('詳細取得が500でもエラーを表示し、自動で再取得を繰り返さない', async () => {
+    fetchMock.mockImplementation(async (url) => ({
+      ok: url.endsWith('/sessions'),
+      status: url.endsWith('/sessions') ? 200 : 500,
+      json: async () => ({ sessions: [{ id: 10, name: '綱引き', status: 'draft' }] })
+    }));
+    render(Page);
+    await expect.element(page.getByText('昼競技の取得に失敗しました', { exact: true })).toBeInTheDocument();
+    await settled();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/root/events/1/noon-game/sessions',
+      '/api/root/events/1/noon-game/sessions/10'
+    ]);
   });
 
   it('初期表示で昼競技管理画面を表示できる', async () => {

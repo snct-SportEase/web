@@ -80,7 +80,8 @@
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'クラスメンバーの取得に失敗しました');
 			}
-			classMembers = await response.json();
+			const members = await response.json();
+			classMembers = Array.isArray(members) ? members : [];
 			selectedMembers = [];
 		} catch (err) {
 			console.error('Error loading class members:', err);
@@ -110,7 +111,8 @@
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'チームメンバーの取得に失敗しました');
 			}
-			assignedMembers = await response.json();
+			const members = await response.json();
+			assignedMembers = Array.isArray(members) ? members : [];
 		} catch (err) {
 			console.error('Error loading team members:', err);
 			error = err.message || 'チームメンバーの取得に失敗しました';

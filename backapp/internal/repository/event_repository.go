@@ -27,10 +27,9 @@ type eventRepository struct {
 
 const migrateUserProfilesForEventTransitionQuery = `
 	UPDATE users u
-	JOIN active_event ae ON ae.id = 1 AND ae.event_id IS NOT NULL
-	JOIN events previous_event ON previous_event.id = ae.event_id
+	JOIN classes previous_class ON previous_class.id = u.class_id
+	JOIN events previous_event ON previous_event.id = previous_class.event_id
 	JOIN events next_event ON next_event.id = ?
-	LEFT JOIN classes previous_class ON previous_class.id = u.class_id
 	LEFT JOIN classes next_class
 		ON next_class.event_id = next_event.id
 		AND next_class.name = previous_class.name
@@ -48,20 +47,21 @@ const migrateUserProfilesForEventTransitionQuery = `
 				THEN u.is_profile_complete
 			ELSE FALSE
 		END
-	WHERE ae.event_id <> next_event.id`
+	WHERE previous_event.id <> next_event.id`
 
 const deleteGraduatingUsersForEventTransitionQuery = `
 	DELETE u
 	FROM users u
 	JOIN classes current_class ON current_class.id = u.class_id
-	JOIN active_event ae ON ae.id = 1 AND ae.event_id IS NOT NULL
-	JOIN events previous_event ON previous_event.id = ae.event_id
+	JOIN events previous_event ON previous_event.id = current_class.event_id
 	JOIN events next_event ON next_event.id = ?
-	WHERE ae.event_id <> next_event.id
+	WHERE previous_event.id <> next_event.id
 		AND previous_event.year <> next_event.year
 		AND current_class.name IN ('IS5', 'IE5', 'IT5')`
 
 func migrateUserProfilesForEventTransition(tx *sql.Tx, nextEventID any) error {
+	// 春大会を終了して active_event が空でも、所属クラスの年度から引き継ぐ。
+	// 同じ大会の再選択でも、別の季節に残った所属を修復する。
 	if _, err := tx.Exec(deleteGraduatingUsersForEventTransitionQuery, nextEventID); err != nil {
 		return err
 	}

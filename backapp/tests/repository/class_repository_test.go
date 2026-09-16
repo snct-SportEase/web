@@ -237,7 +237,8 @@ func TestClassRepository_GetClassMembers(t *testing.T) {
 
 		users, err := repo.GetClassMembers(999)
 		assert.NoError(t, err)
-		assert.Nil(t, users)
+		assert.NotNil(t, users)
+		assert.Empty(t, users)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
