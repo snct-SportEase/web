@@ -56,16 +56,38 @@ PWAをインストール済みでも通常のブラウザタブから開いて�
 ## 診断手順
 
 ### ステップ0: バックエンドのログを確認（最重要）
+更新したバックエンドをデプロイした後、サーバー上で次のコマンドを実行し、Android端末から通知を送信します。
+
+```bash
+docker logs --follow --since 5m --timestamps sportease-backend
+```
+
+コンテナ名がリポジトリの`docker-compose.production.yml`どおりの場合は、上記の`sportease-backend`を`sportease-backapp`に置き換えてください。
+
 通知送信時に以下のログが出力されます。**本番環境のバックエンドログを確認してください**：
 
 ```
 [notification] 通知送信開始: notificationID=1, title=..., targetRoles=[...]
 [notification] 対象ユーザー数: X, userIDs=[...]
 [notification] 購読情報数: X
-[notification] X件の購読に対してPush通知を送信します (ants pool)
-[notification] [1/X] Push送信試行: userID=..., endpoint=...
-[notification] [1/X] Push送信成功: userID=..., endpoint=..., status=201
+[notification] X件の購読に対してPush通知を送信します
+[notification] [1/X] Push送信成功: userID=..., endpointID=fcm.googleapis.com#..., status=201
+[notification] [2/X] Pushサービスがエラーを返しました: userID=..., endpointID=web.push.apple.com#..., status=403, reason="BadJwtToken"
 ```
+
+上記は出力例です。`endpointID`のホスト名でAndroid向けのFCMとApple向けの結果を区別できます。末尾は購読URLのハッシュで、同じ配信先のログを照合できます。
+
+| ログ | 確認する内容 |
+| --- | --- |
+| `status=403, reason="BadJwtToken"` | VAPID JWTの連絡先（sub）、署名、送信先（aud）、有効期限を確認する。これだけではどの項目が不正かは確定しない |
+| `reason="VapidPkHashMismatch"` | 購読時と送信時のVAPID公開鍵が一致しているか確認する |
+| `status=410` | 購読が失効している。サーバーから削除されるため、端末で通知を再度有効化する |
+| `status=201` | Pushサービスが送信要求を受理した。端末での表示完了を保証するものではない |
+| `reason="unknown"` | 本文がJSONでない、既知のエラーコードがない、または形式が異なる |
+| `reason="response_too_large"` | エラー本文が読み取り上限の4 KiBを超えた |
+| `reason="response_read_failed"` | エラー本文の読み取りに失敗した。HTTPステータスとエラー型も確認する |
+
+`reason`にはAppleの`reason`またはFCMの`error.status`から既知のコードだけを記録します。購読URL全体、認証鍵、エラー本文そのものは出力しません。Apple向けの結果が一件もない場合は、iPadの購読登録と通知の宛先を確認してください。
 
 アンケート公開通知は `event_handler.go` から送信されるため、同じ内容が `[event-notification]` prefix で出力されます。
 

@@ -215,6 +215,65 @@ func TestSendBatchHonorsConcurrencyLimit(t *testing.T) {
 	}
 }
 
+func TestSendBatchRecordsServiceReason(t *testing.T) {
+	authKey, p256dhKey := validSubscriptionKeys(t)
+	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	subscription := models.PushSubscription{
+		UserID: "user-1", Endpoint: "https://web.push.apple.com/push/sensitive-token",
+		AuthKey: authKey, P256dhKey: p256dhKey,
+	}
+	tests := []struct {
+		name   string
+		status int
+		body   string
+		reason string
+	}{
+		{"Apple authentication rejected", http.StatusForbidden, `{"reason":"BadJwtToken"}`, "BadJwtToken"},
+		{"expired subscription", http.StatusGone, `{"reason":"Unregistered"}`, "Unregistered"},
+		{"unstructured error", http.StatusBadGateway, "sensitive-response", "unknown"},
+		{"success", http.StatusCreated, "", ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := &trackedResponseBody{Reader: strings.NewReader(test.body)}
+			client := responseHTTPClient{response: &http.Response{StatusCode: test.status, Body: body}}
+			sender := newSender(Config{VAPIDPublicKey: publicKey, VAPIDPrivateKey: privateKey}, newHostPolicy(nil), client)
+			results := sender.SendBatch(context.Background(), []byte(`{"title":"test"}`), []models.PushSubscription{subscription}, 60)
+			result := results[0]
+			if result.Err != nil || result.StatusCode != test.status || result.ServiceReason != test.reason {
+				t.Fatalf("unexpected result: status=%d reason=%q err=%v", result.StatusCode, result.ServiceReason, result.Err)
+			}
+			if result.InvalidSubscription {
+				t.Fatal("provider rejection must preserve existing subscription cleanup behavior")
+			}
+			if !body.closed {
+				t.Fatal("response body was not closed")
+			}
+		})
+	}
+}
+
+type responseHTTPClient struct {
+	response *http.Response
+}
+
+func (c responseHTTPClient) Do(*http.Request) (*http.Response, error) {
+	return c.response, nil
+}
+
+type trackedResponseBody struct {
+	io.Reader
+	closed bool
+}
+
+func (b *trackedResponseBody) Close() error {
+	b.closed = true
+	return nil
+}
+
 func validSubscriptionKeys(t *testing.T) (string, string) {
 	t.Helper()
 	auth := []byte("0123456789abcdef")
