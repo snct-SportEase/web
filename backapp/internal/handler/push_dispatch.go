@@ -29,12 +29,12 @@ func dispatchPushBatch(sender push.Sender, repo repository.NotificationRepositor
 			continue
 		}
 		if result.Err != nil {
-			// Network errors can embed the capability URL, so log only the type.
-			log.Printf("[%s] [%d/%d] Push送信に失敗しました: userID=%s, endpointID=%s, errorType=%T\n", logPrefix, index+1, len(results), result.Subscription.UserID, endpointID, result.Err)
+			// 通信エラーには購読URLが含まれるため、エラー型と安全な診断情報だけを記録する。
+			log.Printf("[%s] [%d/%d] Push送信に失敗しました: userID=%s, endpointID=%s, status=%d, reason=%q, errorType=%T\n", logPrefix, index+1, len(results), result.Subscription.UserID, endpointID, result.StatusCode, result.ServiceReason, result.Err)
 			continue
 		}
 		if result.StatusCode >= 400 {
-			log.Printf("[%s] [%d/%d] Pushサービスがエラーを返しました: userID=%s, endpointID=%s, status=%d\n", logPrefix, index+1, len(results), result.Subscription.UserID, endpointID, result.StatusCode)
+			log.Printf("[%s] [%d/%d] Pushサービスがエラーを返しました: userID=%s, endpointID=%s, status=%d, reason=%q\n", logPrefix, index+1, len(results), result.Subscription.UserID, endpointID, result.StatusCode, result.ServiceReason)
 			cleanupExpiredPushSubscription(repo, result.Subscription, result.StatusCode, logPrefix)
 			continue
 		}

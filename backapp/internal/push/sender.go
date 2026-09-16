@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -46,6 +45,7 @@ type Sender interface {
 type Result struct {
 	Subscription        models.PushSubscription
 	StatusCode          int
+	ServiceReason       string
 	InvalidSubscription bool
 	Err                 error
 }
@@ -211,7 +211,8 @@ func (s *sender) sendOne(ctx context.Context, payload []byte, sub models.PushSub
 
 	result.StatusCode = response.StatusCode
 	if response.StatusCode >= http.StatusBadRequest {
-		_, readErr := io.Copy(io.Discard, io.LimitReader(response.Body, maxErrorBodyBytes))
+		var readErr error
+		result.ServiceReason, readErr = readServiceReason(response.Body)
 		if readErr != nil {
 			result.Err = fmt.Errorf("read push error response: %w", readErr)
 			return result
