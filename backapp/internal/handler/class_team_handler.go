@@ -459,7 +459,7 @@ func (h *ClassTeamHandler) RemoveTeamMemberHandler(c *gin.Context) {
 
 	// Remove role
 	roleName := fmt.Sprintf("%s_%s", managedClass.Name, sport.Name)
-	err = h.userRepo.DeleteUserRole(req.UserID, roleName)
+	err = h.userRepo.DeleteUserRole(req.UserID, roleName, &activeEventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove user role"})
 		return

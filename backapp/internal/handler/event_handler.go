@@ -491,12 +491,12 @@ func (h *EventHandler) NotifySurvey(c *gin.Context) {
 	}
 
 	// Send push notifications
-	go h.dispatchPushNotifications(int(notifID), "アンケート回答のお願い", "アンケートページが公開されました。期間内に回答してください。", "general", targetRoles)
+	go h.dispatchPushNotifications(int(notifID), "アンケート回答のお願い", "アンケートページが公開されました。期間内に回答してください。", "general", targetRoles, eventID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Survey notification sent successfully"})
 }
 
-func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string) {
+func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles []string, eventID int) {
 	log.Printf("[event-notification] 通知送信開始: notificationID=%d, title=%s, targetRoles=%s\n", notificationID, safelog.Value(title), safelog.Value(targetRoles))
 
 	if h.pushSender == nil || !h.pushSender.Enabled() {
@@ -504,7 +504,7 @@ func (h *EventHandler) dispatchPushNotifications(notificationID int, title, body
 		return
 	}
 
-	userIDs, err := h.notificationRepo.GetUserIDsByRoles(targetRoles)
+	userIDs, err := h.notificationRepo.GetUserIDsByRoles(targetRoles, &eventID)
 	if err != nil {
 		log.Printf("[event-notification] ユーザー抽出に失敗しました: %s\n", safelog.Value(err))
 		return

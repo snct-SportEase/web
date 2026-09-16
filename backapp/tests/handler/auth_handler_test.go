@@ -293,7 +293,7 @@ func TestAuthHandler_DemoteUserByRoot(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.JSONEq(t, `{"error":"マスタロールは剥奪ではなく交換してください"}`, w.Body.String())
-	mockUserRepo.AssertNotCalled(t, "DeleteUserRole", mock.Anything, mock.Anything)
+	mockUserRepo.AssertNotCalled(t, "DeleteUserRole", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAuthHandler_AdminUserManagement(t *testing.T) {
@@ -358,7 +358,7 @@ func TestAuthHandler_AdminUserManagement(t *testing.T) {
 		adminWithRoles := &models.User{ID: actor.ID, Roles: []models.Role{{Name: "admin"}}}
 		mockUserRepo.On("GetUserWithRoles", actor.ID).Return(adminWithRoles, nil).Twice()
 		mockUserRepo.On("UpdateUserRole", "student-1", "scorekeeper", (*int)(nil)).Return(nil).Once()
-		mockUserRepo.On("DeleteUserRole", "student-1", "scorekeeper").Return(nil).Once()
+		mockUserRepo.On("DeleteUserRole", "student-1", "scorekeeper", (*int)(nil)).Return(nil).Once()
 
 		assignResponse := httptest.NewRecorder()
 		assignContext, _ := gin.CreateTestContext(assignResponse)
@@ -401,8 +401,16 @@ func TestAuthHandler_AdminUserManagement(t *testing.T) {
 		authHandler.DeleteUserRoleByAdmin(classRoleContext)
 		assert.Equal(t, http.StatusBadRequest, classRoleResponse.Code)
 
+		// APIを直接呼んでも、大会共通の競技ロールを作成できない。
+		classAssignResponse := httptest.NewRecorder()
+		classAssignContext, _ := gin.CreateTestContext(classAssignResponse)
+		classAssignContext.Request, _ = http.NewRequest(http.MethodPut, "/api/admin/users/role", bytes.NewBufferString(`{"user_id":"student-1","role":"IS4_Basketball"}`))
+		classAssignContext.Request.Header.Set("Content-Type", "application/json")
+		authHandler.UpdateUserRoleByAdmin(classAssignContext)
+		assert.Equal(t, http.StatusBadRequest, classAssignResponse.Code)
+
 		mockUserRepo.AssertNotCalled(t, "UpdateUserRole", mock.Anything, mock.Anything, mock.Anything)
-		mockUserRepo.AssertNotCalled(t, "DeleteUserRole", mock.Anything, mock.Anything)
+		mockUserRepo.AssertNotCalled(t, "DeleteUserRole", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 

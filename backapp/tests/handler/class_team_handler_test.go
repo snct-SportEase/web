@@ -444,7 +444,7 @@ func TestClassTeamHandler_RemoveTeamMemberHandler(t *testing.T) {
 
 		// Remove role
 		roleName := fmt.Sprintf("%s_%s", managedClass.Name, sport.Name)
-		mockUserRepo.On("DeleteUserRole", "user1", roleName).Return(nil).Once()
+		mockUserRepo.On("DeleteUserRole", "user1", roleName, &activeEventID).Return(nil).Once()
 
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest(http.MethodDelete, "/remove-member", bytes.NewBuffer(jsonBody))

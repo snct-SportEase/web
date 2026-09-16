@@ -468,6 +468,11 @@ func (h *AuthHandler) UpdateUserRoleByAdmin(c *gin.Context) {
 			return
 		}
 	}
+	// 競技ロールは大会IDが確定するクラス・チーム管理からのみ付与する。
+	if isClassManagedRole(req.Role) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot assign class sport roles. Please use class/team management page."})
+		return
+	}
 
 	userCtx, exists := c.Get("user")
 	if !exists {
@@ -603,7 +608,7 @@ func (h *AuthHandler) DeleteUserRoleByAdmin(c *gin.Context) {
 		return
 	}
 
-	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role); err != nil {
+	if err := h.userRepo.DeleteUserRole(req.UserID, req.Role, req.Event); err != nil {
 		log.Printf("DeleteUserRole error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user role"})
 		return

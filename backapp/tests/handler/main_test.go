@@ -595,8 +595,8 @@ func (m *MockUserRepository) UpdateUserRole(userID string, roleName string, even
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) DeleteUserRole(userID string, roleName string) error {
-	args := m.Called(userID, roleName)
+func (m *MockUserRepository) DeleteUserRole(userID string, roleName string, eventID *int) error {
+	args := m.Called(userID, roleName, eventID)
 	return args.Error(0)
 }
 
@@ -632,8 +632,8 @@ func (m *MockNotificationRepository) GetNotificationsForAccess(roleNames []strin
 	return args.Get(0).([]models.Notification), args.Error(1)
 }
 
-func (m *MockNotificationRepository) GetUserIDsByRoles(roleNames []string) ([]string, error) {
-	args := m.Called(roleNames)
+func (m *MockNotificationRepository) GetUserIDsByRoles(roleNames []string, eventID *int) ([]string, error) {
+	args := m.Called(roleNames, eventID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

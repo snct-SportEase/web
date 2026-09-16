@@ -18,11 +18,11 @@ type UserRepository interface {
 	AddUserRoleIfNotExists(userID string, roleName string) error
 	ReplaceMasterRole(userID string, roleName string) error
 	UpdateUserRole(userID string, roleName string, eventID *int) error
-	DeleteUserRole(userID string, roleName string) error
+	DeleteUserRole(userID string, roleName string, eventID *int) error
 	UpdateNotificationFilters(userID string, filters []string) error
 }
 
-func (r *userRepository) DeleteUserRole(userID string, roleName string) error {
+func (r *userRepository) DeleteUserRole(userID string, roleName string, eventID *int) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -40,8 +40,8 @@ func (r *userRepository) DeleteUserRole(userID string, roleName string) error {
 		return err
 	}
 
-	// user_rolesテーブルからエントリを削除
-	_, err = tx.Exec("DELETE FROM user_roles WHERE user_id = ? AND role_id = ?", userID, roleID)
+	// NULLは大会共通ロールだけを、ID指定時はその大会の割り当てだけを解除する。
+	_, err = tx.Exec("DELETE FROM user_roles WHERE user_id = ? AND role_id = ? AND event_id <=> ?", userID, roleID, eventID)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (r *userRepository) AddUserRoleIfNotExists(userID string, roleName string) 
 
 	// ユーザーにそのロールが既に割り当てられているか確認
 	var exists int
-	err = tx.QueryRow("SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?", userID, roleID).Scan(&exists)
+	err = tx.QueryRow("SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ? AND event_id IS NULL", userID, roleID).Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -214,10 +214,10 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 	// Fetch roles for all users in a single query
 	// #nosec G202 -- only the number of bound placeholders is constructed from the locally collected user IDs.
 	rolesQuery := `
-		SELECT ur.user_id, r.id, r.name
+		SELECT DISTINCT ur.user_id, r.id, r.name
 		FROM roles r
 		INNER JOIN user_roles ur ON r.id = ur.role_id
-		WHERE ur.user_id IN (?` + strings.Repeat(",?", len(userIDs)-1) + `)`
+		WHERE ur.user_id IN (?` + strings.Repeat(",?", len(userIDs)-1) + `) AND ` + currentRoleAssignmentCondition
 
 	roleRows, err := r.db.Query(rolesQuery, userIDs...)
 	if err != nil {
@@ -381,11 +381,10 @@ func (r *userRepository) GetUserWithRoles(userID string) (*models.User, error) {
 
 	// ユーザーのロール情報を取得
 	rows, err := r.db.Query(`
-		SELECT r.id, r.name 
+		SELECT DISTINCT r.id, r.name
 		FROM roles r 
 		INNER JOIN user_roles ur ON r.id = ur.role_id 
-		WHERE ur.user_id = ?
-	`, userID)
+		WHERE ur.user_id = ? AND `+currentRoleAssignmentCondition, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -432,12 +431,11 @@ func (r *userRepository) UpdateUserRole(userID string, roleName string, eventID 
 		}
 	}
 
-	// REPLACE INTOを使用して、ロールの割り当てをアトミックに行う
-	// これにより、(user_id, role_id)の組み合わせが既存の場合、event_idが更新される
+	// 大会ごとの一意制約により、他大会の割り当てを上書きせず重複付与を防ぐ。
 	if eventID != nil {
-		_, err = tx.Exec("REPLACE INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, ?)", userID, roleID, *eventID)
+		_, err = tx.Exec("INSERT INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role_id = role_id", userID, roleID, *eventID)
 	} else {
-		_, err = tx.Exec("REPLACE INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, NULL)", userID, roleID)
+		_, err = tx.Exec("INSERT INTO user_roles (user_id, role_id, event_id) VALUES (?, ?, NULL) ON DUPLICATE KEY UPDATE role_id = role_id", userID, roleID)
 	}
 
 	if err != nil {
