@@ -137,6 +137,53 @@ func (h *NoonGameHandler) syncNoonGameSport(eventID int, sessionName string) err
 	return nil
 }
 
+// cleanupNoonGameSport removes the generated event-sport assignment once no
+// noon-game session in the event uses that name. Sports are master data shared
+// across events, so the sport record itself must be kept.
+func (h *NoonGameHandler) cleanupNoonGameSport(eventID int, sessionName string) error {
+	if h == nil || h.sportRepo == nil {
+		return nil
+	}
+
+	trimmedName := strings.TrimSpace(sessionName)
+	if trimmedName == "" {
+		return nil
+	}
+
+	sessions, err := h.noonRepo.ListSessionsByEvent(eventID, false)
+	if err != nil {
+		return fmt.Errorf("failed to list noon game sessions: %w", err)
+	}
+	for _, session := range sessions {
+		if session != nil && strings.TrimSpace(session.Name) == trimmedName {
+			return nil
+		}
+	}
+
+	sport, err := h.sportRepo.GetSportByName(trimmedName)
+	if err != nil {
+		return fmt.Errorf("failed to get sport by name: %w", err)
+	}
+	if sport == nil {
+		return nil
+	}
+
+	eventSports, err := h.sportRepo.GetSportsByEventID(eventID)
+	if err != nil {
+		return fmt.Errorf("failed to get event sports: %w", err)
+	}
+	for _, eventSport := range eventSports {
+		if eventSport.SportID == sport.ID && eventSport.Location == "noon_game" {
+			if err := h.sportRepo.DeleteSportFromEvent(eventID, sport.ID); err != nil {
+				return fmt.Errorf("failed to delete generated noon game sport assignment: %w", err)
+			}
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func (h *NoonGameHandler) getSessionForTemplate(eventID int, templateKey string) (*models.NoonGameSession, error) {
 	sessions, err := h.noonRepo.ListSessionsByEvent(eventID, false)
 	if err != nil {
@@ -1316,6 +1363,11 @@ func (h *NoonGameHandler) DeleteSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete noon game session"})
 		return
 	}
+	if err := h.cleanupNoonGameSport(session.EventID, session.Name); err != nil {
+		log.Printf("ERROR: DeleteSession failed to clean up noon game sport: event_id=%d, session_name=%q, error=%v", session.EventID, session.Name, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clean up noon game sport"})
+		return
+	}
 	if err := h.rebuildNoonGameScores(session.EventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rebuild class scores"})
 		return
@@ -1350,6 +1402,7 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 		return
 	}
 
+	var existingSession *models.NoonGameSession
 	session := &models.NoonGameSession{
 		EventID:             eventID,
 		TemplateKey:         strings.TrimSpace(req.TemplateKey),
@@ -1378,6 +1431,7 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Noon game session not found"})
 			return
 		}
+		existingSession = existing
 		session.ID = sessionID
 	}
 	if session.TemplateKey == "" {
@@ -1416,6 +1470,13 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 		log.Printf("ERROR: UpsertSession failed to sync noon game sport: event_id=%d, session_name=%q, error=%v", eventID, updated.Name, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync noon game sport"})
 		return
+	}
+	if existingSession != nil && strings.TrimSpace(existingSession.Name) != strings.TrimSpace(updated.Name) {
+		if err := h.cleanupNoonGameSport(eventID, existingSession.Name); err != nil {
+			log.Printf("ERROR: UpsertSession failed to clean up renamed noon game sport: event_id=%d, old_session_name=%q, error=%v", eventID, existingSession.Name, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clean up renamed noon game sport"})
+			return
+		}
 	}
 	// A newly created draft has no official score impact. State transitions to
 	// finalized/published are the point at which it becomes part of the event total.

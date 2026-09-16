@@ -1157,6 +1157,11 @@
 
 <div class="space-y-8 p-4 md:p-8">
   <h1 class="text-3xl font-bold text-gray-800 border-b pb-2">昼競技管理</h1>
+  <section class="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-950" aria-label="昼競技の登録フロー">
+    <p class="font-semibold">昼競技の登録フロー</p>
+    <p class="mt-1">テンプレートを選択して昼競技を作成し、編成・試合・得点を設定します。作成した昼競技は大会競技へ自動連携されるため、通常競技管理で重複して登録する必要はありません。</p>
+    <a href="/dashboard/root/sport-management" class="mt-3 inline-flex font-semibold text-indigo-700 underline hover:text-indigo-900">通常競技管理へ</a>
+  </section>
   {#if errorMessage}
     <div class="bg-red-100 border-l-4 border-red-400 text-red-700 p-4">
       <p class="font-semibold">エラー</p>

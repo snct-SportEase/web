@@ -89,7 +89,7 @@ describe('Sport Management Page', () => {
   it('初期表示で競技マスタ一覧とアクティブ大会が表示されること', async () => {
     render(Page);
 
-    await expect.element(page.getByRole('heading', { name: '大会競技管理ダッシュボード' })).toBeInTheDocument();
+    await expect.element(page.getByRole('heading', { name: '通常競技管理' })).toBeInTheDocument();
     await expect.element(page.getByText('2025春季スポーツ大会')).toBeInTheDocument();
     await expect.element(page.getByRole('list').getByText('バスケットボール')).toBeInTheDocument();
     await expect.element(page.getByRole('list').getByText('バレーボール')).toBeInTheDocument();
@@ -154,7 +154,7 @@ describe('Sport Management Page', () => {
       description: '屋内メイン競技'
     });
     expect(alertMock).toHaveBeenCalledWith('競技を大会に割り当てました。');
-    await expect.element(page.getByText('割り当て済み競技一覧 (1件)')).toBeInTheDocument();
+    await expect.element(page.getByText('割り当て済み通常競技一覧 (1件)')).toBeInTheDocument();
     await expect.element(page.getByRole('cell', { name: 'バスケットボール' })).toBeInTheDocument();
     await expect.element(page.getByRole('cell', { name: 'gym1' })).toBeInTheDocument();
   });

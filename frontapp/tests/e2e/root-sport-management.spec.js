@@ -4,7 +4,7 @@ const mockBackendUrl = process.env.MOCK_BACKEND_URL ?? 'http://127.0.0.1:8081';
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('競技情報登録・管理 (root)', () => {
+test.describe('通常競技管理 (root)', () => {
   test.beforeEach(async ({ page, context, request }) => {
     await request.post(`${mockBackendUrl}/__reset`);
 
@@ -20,7 +20,7 @@ test.describe('競技情報登録・管理 (root)', () => {
   });
 
   test('競技マスタ一覧を表示できる', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: '大会競技管理ダッシュボード' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '通常競技管理' })).toBeVisible();
     await expect(page.getByText('2025春季スポーツ大会')).toBeVisible();
     await expect(page.getByRole('list').getByText('バレーボール')).toBeVisible();
   });
@@ -65,7 +65,7 @@ test.describe('競技情報登録・管理 (root)', () => {
 
   test('競技未選択では大会へ割り当てボタンが無効', async ({ page }) => {
     await expect(page.getByRole('button', { name: '大会に競技を割り当てる' })).toBeDisabled();
-    await expect(page.getByText('割り当て済み競技一覧 (0件)')).toBeVisible();
+    await expect(page.getByText('割り当て済み通常競技一覧 (0件)')).toBeVisible();
   });
 
   test('競技を大会へ割り当てできる', async ({ page }) => {

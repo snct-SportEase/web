@@ -306,7 +306,16 @@
 </script>
 
 <div class="container mx-auto p-6 lg:p-10 space-y-12">
-    <h1 class="text-3xl font-extrabold text-gray-800 border-b pb-2">大会競技管理ダッシュボード</h1>
+    <div class="space-y-2 border-b pb-2">
+        <h1 class="text-3xl font-extrabold text-gray-800">通常競技管理</h1>
+        <p class="text-sm text-gray-600">通常競技のマスタ登録、大会への割り当て、会場・定員設定を行います。</p>
+    </div>
+
+    <section class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" aria-label="昼競技の案内">
+        <p class="font-semibold">昼競技は別の登録フローです</p>
+        <p class="mt-1">リレー・綱引きなどの昼競技は、テンプレート・編成・試合・得点をまとめて設定できる昼競技管理から作成してください。作成した昼競技は大会競技へ自動連携されます。</p>
+        <a href="/dashboard/root/noon-game" class="mt-3 inline-flex rounded-md bg-amber-700 px-3 py-2 font-semibold text-white hover:bg-amber-800">昼競技管理へ</a>
+    </section>
 
     <!-- Active Event Banner -->
     <div class="p-4 rounded-xl shadow-lg {currentActiveEvent ? 'bg-indigo-100 border-l-4 border-indigo-600' : 'bg-red-100 border-l-4 border-red-600'} transition-all duration-300">
@@ -366,14 +375,14 @@
         <!-- Column 2 & 3: Assign Sports to Active Event -->
         <div class="lg:col-span-2 p-8 border rounded-xl bg-white shadow-2xl space-y-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-300">
-                アクティブな大会への競技割り当て <span class="text-sm text-red-500">(admin/root権限)</span>
+                アクティブな大会への通常競技割り当て <span class="text-sm text-red-500">(admin/root権限)</span>
             </h2>
 
             {#if currentActiveEvent}
                 <div class="space-y-8">
                     <!-- Left side: Assignment Form -->
                     <div class="space-y-4 p-4 border rounded-lg bg-blue-50">
-                        <h3 class="font-bold text-blue-700 text-lg">大会への競技割り当てフォーム</h3>
+                        <h3 class="font-bold text-blue-700 text-lg">大会への通常競技割り当てフォーム</h3>
                         
                         <!-- 競技選択 -->
                         <div>
@@ -424,7 +433,7 @@
 
                     <!-- Right side: Assigned Sports List -->
                     <div>
-                        <h3 class="font-medium text-lg mb-4 text-gray-700">割り当て済み競技一覧 ({visibleEventSports.length}件)</h3>
+                        <h3 class="font-medium text-lg mb-4 text-gray-700">割り当て済み通常競技一覧 ({visibleEventSports.length}件)</h3>
                         <div class="max-h-96 overflow-y-auto border rounded-lg shadow-inner">
                             <table class="w-full text-sm">
                                 <thead class="sticky top-0 bg-gray-200">

@@ -67,7 +67,8 @@
     { title: '通知管理', description: '通知作成と配信先の管理', href: '/dashboard/root/notification' },
     { title: '通知申請管理', description: '学生からの申請を確認・承認', href: '/dashboard/root/notification-requests' },
     { title: '大会設定', description: '大会情報と開催設定', href: '/dashboard/root/event-management' },
-    { title: '競技管理', description: '競技情報とトーナメント生成', href: '/dashboard/root/sport-management' },
+    { title: '通常競技管理', description: '通常競技の登録・大会への割り当て・会場と定員の設定', href: '/dashboard/root/sport-management' },
+    { title: '昼競技管理', description: 'テンプレートから昼競技を作成し、編成・試合・得点を設定', href: '/dashboard/root/noon-game' },
     { title: '雨天時モード管理', description: '雨天時モードの切り替えと設定', href: '/dashboard/root/rainy-mode' },
     { title: 'ユーザー管理', description: 'ユーザー名やクラス人数を調整', href: '/dashboard/root/change-username' },
     { title: '権限管理', description: 'student・admin・root の切り替え', href: '/dashboard/root/user-promotion' }

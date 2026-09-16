@@ -189,9 +189,6 @@
         <a href="/dashboard/root/rainy-mode" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           雨天時モード管理
         </a>
-        <a href="/dashboard/root/sport-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
-          競技情報登録・管理
-        </a>
         <a href="/dashboard/root/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           通知管理
         </a>
@@ -201,9 +198,15 @@
         <a href="/dashboard/root/tournament-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           トーナメント生成・管理
         </a>
-        <a href="/dashboard/root/noon-game" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
-          昼競技管理
-        </a>
+        <div class="pt-3">
+          <h4 class="px-4 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">競技設定</h4>
+          <a href="/dashboard/root/sport-management" class="flex items-center px-6 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+            通常競技管理
+          </a>
+          <a href="/dashboard/root/noon-game" class="flex items-center px-6 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+            昼競技管理
+          </a>
+        </div>
         <a href="/dashboard/root/class-student-count" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           各クラス人数設定
         </a>
