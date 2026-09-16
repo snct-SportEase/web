@@ -215,7 +215,7 @@ describe('Archive Event Detail Page', () => {
 
     await expect.element(page.getByText('学年対抗リレー Aブロック')).toBeInTheDocument();
     await expect.element(page.getByText('借り物競走')).toBeInTheDocument();
-    await expect.element(page.getByText('ステータス: 終了')).toBeInTheDocument();
+    await expect.element(page.getByText('ステータス: 終了').first()).toBeInTheDocument();
     await expect.element(page.getByText('1位 1A')).toBeInTheDocument();
     await expect.element(page.getByText('10 点')).toBeInTheDocument();
     await expect.element(page.getByText('2位 1B')).toBeInTheDocument();
@@ -230,7 +230,7 @@ describe('Archive Event Detail Page', () => {
     await detailsToggle.click();
 
     await expect.element(page.getByText('出席点')).toBeInTheDocument();
-    await expect.element(page.getByText('昼競技')).toBeInTheDocument();
+    await expect.element(page.getByText('昼競技', { exact: true })).toBeInTheDocument();
     await expect.element(page.getByText('バスケットボール1勝点')).toBeInTheDocument();
   });
 });
