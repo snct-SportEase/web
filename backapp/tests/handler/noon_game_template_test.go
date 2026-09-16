@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -443,18 +444,27 @@ func TestNoonGameHandler_CreateTypingRunHonorsRequestedStatus(t *testing.T) {
 			NoonGameGroup: &models.NoonGameGroup{ID: groupID, SessionID: 10, Name: groupName},
 		}, nil).Once()
 	}
-	noonRepo.On("SaveMatch", mock.MatchedBy(func(match *models.NoonGameMatch) bool {
-		if match.SessionID != 10 || match.Title == nil || match.Status != "scheduled" || len(match.Entries) != 6 {
-			return false
-		}
-		for index, entry := range match.Entries {
-			if entry == nil || entry.SideType != "group" || entry.GroupID == nil || *entry.GroupID != index+1 || entry.DisplayName == nil {
+	for round := 1; round <= 3; round++ {
+		round := round
+		noonRepo.On("SaveMatch", mock.MatchedBy(func(match *models.NoonGameMatch) bool {
+			if match.SessionID != 10 || match.Title == nil || match.Status != "scheduled" || len(match.Entries) != 6 {
 				return false
 			}
-		}
-		return true
-	})).Return(&models.NoonGameMatch{}, nil).Times(3)
+			if *match.Title != fmt.Sprintf("競技タイピング 第%dラウンド", round) {
+				return false
+			}
+			for index, entry := range match.Entries {
+				if entry == nil || entry.SideType != "group" || entry.GroupID == nil || *entry.GroupID != index+1 || entry.DisplayName == nil {
+					return false
+				}
+			}
+			return true
+		})).Return(&models.NoonGameMatch{ID: 100 + round}, nil).Once()
+	}
 	noonRepo.On("CreateTemplateRunWithPointsByRankJSON", 10, "typing", "競技タイピング", userID, mock.Anything).Return(&models.NoonGameTemplateRun{ID: 1}, nil).Once()
+	for round := 1; round <= 3; round++ {
+		noonRepo.On("LinkTemplateRunMatch", 1, 100+round, fmt.Sprintf("ROUND_%d", round)).Return(&models.NoonGameTemplateRunMatch{}, nil).Once()
+	}
 
 	payload := map[string]any{
 		"session": map[string]any{

@@ -78,6 +78,55 @@ func TestSaveMatchResultRollsBackWhenPointInsertFails(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestDeleteTemplateRunAndRelatedDataDeletesUnlinkedLegacyMatches(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := &noonGameRepository{db: db}
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, session_id, template_key, name, created_by, created_at, updated_at, points_by_rank
+		FROM noon_game_template_runs
+		WHERE session_id = ?
+		ORDER BY created_at
+	`)).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{
+		"id", "session_id", "template_key", "name", "created_by", "created_at", "updated_at", "points_by_rank",
+	}))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE p FROM noon_game_points p
+		INNER JOIN noon_game_matches m ON m.id = p.match_id
+		WHERE m.session_id = ?
+	`)).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE rd FROM noon_game_result_details rd
+		INNER JOIN noon_game_results r ON r.id = rd.result_id
+		INNER JOIN noon_game_matches m ON m.id = r.match_id
+		WHERE m.session_id = ?
+	`)).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE r FROM noon_game_results r
+		INNER JOIN noon_game_matches m ON m.id = r.match_id
+		WHERE m.session_id = ?
+	`)).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE e FROM noon_game_match_entries e
+		INNER JOIN noon_game_matches m ON m.id = e.match_id
+		WHERE m.session_id = ?
+	`)).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM noon_game_matches WHERE session_id = ?`)).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, session_id, name, description, created_at, updated_at
+		FROM noon_game_groups
+		WHERE session_id = ?
+		ORDER BY id
+	`)).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "name", "description", "created_at", "updated_at"}))
+	mock.ExpectCommit()
+
+	require.NoError(t, repo.DeleteTemplateRunAndRelatedData(7))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestReplaceMatchEntriesPreservesExistingIDs(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)

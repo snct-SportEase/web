@@ -398,6 +398,42 @@ func (r *noonGameRepository) DeleteTemplateRunAndRelatedData(sessionID int) erro
 		}
 	}
 
+	// Older template versions created matches without a template-run link.  A
+	// template reset must remove those legacy matches too before deleting the
+	// session's groups; otherwise they retain dangling group_id references.
+	if _, err := tx.Exec(`
+		DELETE p FROM noon_game_points p
+		INNER JOIN noon_game_matches m ON m.id = p.match_id
+		WHERE m.session_id = ?
+	`, sessionID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		DELETE rd FROM noon_game_result_details rd
+		INNER JOIN noon_game_results r ON r.id = rd.result_id
+		INNER JOIN noon_game_matches m ON m.id = r.match_id
+		WHERE m.session_id = ?
+	`, sessionID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		DELETE r FROM noon_game_results r
+		INNER JOIN noon_game_matches m ON m.id = r.match_id
+		WHERE m.session_id = ?
+	`, sessionID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		DELETE e FROM noon_game_match_entries e
+		INNER JOIN noon_game_matches m ON m.id = e.match_id
+		WHERE m.session_id = ?
+	`, sessionID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM noon_game_matches WHERE session_id = ?`, sessionID); err != nil {
+		return err
+	}
+
 	// テンプレートで作成されたグループを削除
 	// テンプレート作成時に作成されたグループを削除する
 	groups, err := r.GetGroupsWithMembers(sessionID)

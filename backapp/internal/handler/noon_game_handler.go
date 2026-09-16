@@ -2909,6 +2909,7 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 		}
 		savedGroups = append(savedGroups, typingRoundGroup{ID: savedGroup.ID, Name: group.GroupName})
 	}
+	roundMatchIDs := make([]int, 0, 3)
 	for round := 1; round <= 3; round++ {
 		title := fmt.Sprintf("競技タイピング 第%dラウンド", round)
 		format := "6チーム同時"
@@ -2922,7 +2923,7 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 				DisplayName: &displayName,
 			})
 		}
-		if _, err := h.noonRepo.SaveMatch(&models.NoonGameMatch{
+		savedMatch, err := h.noonRepo.SaveMatch(&models.NoonGameMatch{
 			SessionID:   saved.ID,
 			Title:       &title,
 			ScheduledAt: saved.ScheduledAt,
@@ -2930,15 +2931,24 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 			Status:      "scheduled",
 			Format:      &format,
 			Entries:     entries,
-		}); err != nil {
+		})
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create typing round"})
 			return
 		}
+		roundMatchIDs = append(roundMatchIDs, savedMatch.ID)
 	}
 	run, err := h.noonRepo.CreateTemplateRunWithPointsByRankJSON(saved.ID, noonTemplateTyping, name, user.ID, points)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create typing template"})
 		return
+	}
+	for index, matchID := range roundMatchIDs {
+		matchKey := fmt.Sprintf("ROUND_%d", index+1)
+		if _, err := h.noonRepo.LinkTemplateRunMatch(run.ID, matchID, matchKey); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link typing round"})
+			return
+		}
 	}
 	c.JSON(http.StatusCreated, gin.H{"session": saved, "run": run})
 }
