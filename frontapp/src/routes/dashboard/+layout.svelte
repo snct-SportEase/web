@@ -134,6 +134,38 @@
           <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800">Dashboard</h1></a>
         </div>
         <div class="flex items-center pointer-events-auto">
+          <div class="mr-3 flex items-center gap-1" aria-label="報告・提案">
+            <a
+              href="https://github.com/snct-SportEase/web/issues/new?template=bug_report.yml"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="rounded-md p-2 text-gray-600 hover:bg-red-50 hover:text-red-700"
+              title="バグを報告"
+              aria-label="バグを報告"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3Z" /></svg>
+            </a>
+            <a
+              href="https://github.com/snct-SportEase/web/security/advisories/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="rounded-md p-2 text-gray-600 hover:bg-amber-50 hover:text-amber-700"
+              title="脆弱性を非公開で報告"
+              aria-label="脆弱性を非公開で報告"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3Zm0 0c-3.3 0-6 2.2-6 5v3h12v-3c0-2.8-2.7-5-6-5Zm0 4v4m-2-2h4" /></svg>
+            </a>
+            <a
+              href="https://github.com/snct-SportEase/web/issues/new?template=feature_request.yml"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="rounded-md p-2 text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
+              title="新機能を提案"
+              aria-label="新機能を提案"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a7 7 0 0 0-4 12.75V18a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.25A7 7 0 0 0 12 3Zm-2 19h4" /></svg>
+            </a>
+          </div>
           {#if shouldShowPWASetupBadge}
             <button
               type="button"

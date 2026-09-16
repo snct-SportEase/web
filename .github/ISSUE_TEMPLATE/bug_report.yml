@@ -1,0 +1,32 @@
+name: バグ報告
+description: 再現可能な不具合を報告する
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "脆弱性は公開Issueに書かず、Security Advisoryから非公開で報告してください。"
+  - type: textarea
+    id: summary
+    attributes:
+      label: 何が起きましたか？
+      description: 期待した動作と実際の動作を記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 再現手順
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 利用環境
+      placeholder: "例: iPhone / Safari 18"
+  - type: textarea
+    id: evidence
+    attributes:
+      label: スクリーンショット・ログ
+      description: 個人情報、認証情報、脆弱性の詳細は含めないでください。
