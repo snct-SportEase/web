@@ -733,7 +733,7 @@ func TestEventHandler_NotifySurvey(t *testing.T) {
 
 		// For the push dispatch explicitly matching our targetRoles
 		targetRoles := []string{"student", "admin", "root"}
-		mockNotificationRepo.On("GetUserIDsByRoles", targetRoles).Return([]string{"user1", "user2"}, nil).Once()
+		mockNotificationRepo.On("GetUserIDsByRoles", targetRoles, mock.MatchedBy(func(id *int) bool { return id != nil && *id == 1 })).Return([]string{"user1", "user2"}, nil).Once()
 
 		// Return empty subscriptions to safely pass the WebPush sending phase without making actual requests
 		mockNotificationRepo.On("GetPushSubscriptionsByUserIDs", []string{"user1", "user2"}).Return([]models.PushSubscription{}, nil).Once()

@@ -71,8 +71,8 @@ func TestGetNotificationsForAccessIncludesIndividualRecipient(t *testing.T) {
 	repo := repository.NewNotificationRepository(db)
 
 	createdAt := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(`(?s)SELECT.*LEFT JOIN notification_recipients nr.*WHERE \(nt.role_name IN \(\?\) OR nr.user_id = \?\).*GROUP BY n.id`).
-		WithArgs("student", "user-1", 50).
+	mock.ExpectQuery(`(?s)SELECT.*LEFT JOIN notification_recipients nr.*WHERE \(\(nt.role_name IN \(\?\) AND EXISTS.*access_ur.event_id = n.event_id.*OR nr.user_id = \?\).*GROUP BY n.id`).
+		WithArgs("student", "user-1", "user-1", 50).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "title", "body", "type", "created_by", "event_id", "created_at", "target_roles", "target_user_count",
 		}).AddRow(9, "個人連絡", "本文", "general", "root-1", nil, createdAt, nil, 1))

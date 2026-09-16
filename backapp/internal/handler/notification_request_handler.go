@@ -276,7 +276,7 @@ func (h *NotificationRequestHandler) notifyRootsOfNewRequest(requestID int, req 
 		return
 	}
 
-	rootIDs, err := h.NotificationRepo.GetUserIDsByRoles([]string{"root"})
+	rootIDs, err := h.NotificationRepo.GetUserIDsByRoles([]string{"root"}, nil)
 	if err != nil || len(rootIDs) == 0 {
 		return
 	}
@@ -302,7 +302,7 @@ func (h *NotificationRequestHandler) notifyParticipantsOfMessage(req *models.Not
 	if senderIsRoot {
 		targetIDs = append(targetIDs, req.RequesterID)
 	} else {
-		rootIDs, err := h.NotificationRepo.GetUserIDsByRoles([]string{"root"})
+		rootIDs, err := h.NotificationRepo.GetUserIDsByRoles([]string{"root"}, nil)
 		if err == nil {
 			targetIDs = append(targetIDs, rootIDs...)
 		}

@@ -18,7 +18,12 @@ func NewRoleRepository(db *sql.DB) RoleRepository {
 }
 
 func (r *roleRepository) GetAllRoles() ([]models.Role, error) {
-	rows, err := r.db.Query("SELECT id, name FROM roles ORDER BY id")
+	rows, err := r.db.Query(`
+		SELECT r.id, r.name FROM roles r
+		WHERE r.name IN ('root', 'admin', 'student') OR EXISTS (
+			SELECT 1 FROM user_roles ur
+			WHERE ur.role_id = r.id AND ` + currentRoleAssignmentCondition + `
+		) ORDER BY r.id`)
 	if err != nil {
 		return nil, err
 	}

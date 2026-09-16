@@ -160,7 +160,7 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 		}
 	}
 
-	go h.dispatchPushNotifications(int(notificationID), req.Title, req.Body, req.Type, targetRoles, targetUserIDs)
+	go h.dispatchPushNotifications(int(notificationID), req.Title, req.Body, req.Type, targetRoles, targetUserIDs, eventIDPtr)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":        "通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます",
@@ -455,7 +455,7 @@ func (h *NotificationHandler) GetSubscription(c *gin.Context) {
 	})
 }
 
-func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles, targetUserIDs []string) {
+func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles, targetUserIDs []string, eventID *int) {
 	log.Printf("[notification] 通知送信開始: notificationID=%d, title=%s, type=%s, targetRoles=%s, targetUserCount=%d\n", notificationID, safelog.Value(title), safelog.Value(notificationType), safelog.Value(targetRoles), len(targetUserIDs))
 
 	if h.PushSender == nil || !h.PushSender.Enabled() {
@@ -465,7 +465,7 @@ func (h *NotificationHandler) dispatchPushNotifications(notificationID int, titl
 
 	userIDs := append([]string{}, targetUserIDs...)
 	if len(targetRoles) > 0 {
-		roleUserIDs, err := h.NotificationRepo.GetUserIDsByRoles(targetRoles)
+		roleUserIDs, err := h.NotificationRepo.GetUserIDsByRoles(targetRoles, eventID)
 		if err != nil {
 			log.Printf("[notification] ユーザー抽出に失敗しました: %s\n", safelog.Value(err))
 			return

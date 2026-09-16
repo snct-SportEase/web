@@ -18,7 +18,7 @@ type NotificationRepository interface {
 	AddNotificationTargets(notificationID int64, roles []string) error
 	AddNotificationRecipients(notificationID int64, userIDs []string) error
 	GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error)
-	GetUserIDsByRoles(roleNames []string) ([]string, error)
+	GetUserIDsByRoles(roleNames []string, eventID *int) ([]string, error)
 	GetPushSubscriptionsByUserIDs(userIDs []string) ([]models.PushSubscription, error)
 	GetPushSubscriptionsByUserID(userID string) ([]models.PushSubscription, error)
 	GetPushSubscriptionStatsByTargets(roleNames, userIDs []string) (models.PushSubscriptionStats, error)
@@ -113,12 +113,19 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 	var args []interface{}
 	var filters []string
 
-	if len(roleNames) > 0 {
+	if len(roleNames) > 0 && authorID != "" {
 		placeholders := strings.Repeat(",?", len(roleNames)-1)
-		filters = append(filters, fmt.Sprintf("nt.role_name IN (?%s)", placeholders))
+		// 同名でも別大会で付与されたロールだけでは過去大会の通知を閲覧できない。
+		filters = append(filters, fmt.Sprintf(`(nt.role_name IN (?%s) AND EXISTS (
+			SELECT 1 FROM user_roles access_ur
+			JOIN roles access_role ON access_role.id = access_ur.role_id
+			WHERE access_ur.user_id = ? AND access_role.name = nt.role_name
+				AND (access_ur.event_id IS NULL OR access_ur.event_id = n.event_id)
+		))`, placeholders))
 		for _, role := range roleNames {
 			args = append(args, role)
 		}
+		args = append(args, authorID)
 	}
 
 	if authorID != "" {
@@ -208,7 +215,7 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 	return notifications, nil
 }
 
-func (r *notificationRepository) GetUserIDsByRoles(roleNames []string) ([]string, error) {
+func (r *notificationRepository) GetUserIDsByRoles(roleNames []string, eventID *int) ([]string, error) {
 	if len(roleNames) == 0 {
 		return []string{}, nil
 	}
@@ -221,12 +228,14 @@ func (r *notificationRepository) GetUserIDsByRoles(roleNames []string) ([]string
 		INNER JOIN user_roles ur ON u.id = ur.user_id
 		INNER JOIN roles r ON ur.role_id = r.id
 		WHERE r.name IN (?` + placeholders + `)
-	`
+		AND (ur.event_id IS NULL OR ur.event_id = ?)`
 
 	args := make([]interface{}, len(roleNames))
 	for i, role := range roleNames {
 		args[i] = role
 	}
+	// 非同期送信中に有効大会が変わっても、通知作成時の大会を使用する。
+	args = append(args, eventID)
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -318,7 +327,7 @@ func (r *notificationRepository) GetPushSubscriptionStatsByTargets(roleNames, us
 			COUNT(DISTINCT ps.user_id) AS subscribed_user_count,
 			COUNT(DISTINCT ps.endpoint) AS subscription_endpoint_count
 		FROM users u
-		LEFT JOIN user_roles ur ON u.id = ur.user_id
+		LEFT JOIN user_roles ur ON u.id = ur.user_id AND ` + currentRoleAssignmentCondition + `
 		LEFT JOIN roles r ON ur.role_id = r.id
 		LEFT JOIN push_subscriptions ps ON u.id = ps.user_id
 	`
