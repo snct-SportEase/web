@@ -216,9 +216,9 @@ describe('Archive Event Detail Page', () => {
     await expect.element(page.getByText('学年対抗リレー Aブロック')).toBeInTheDocument();
     await expect.element(page.getByText('借り物競走')).toBeInTheDocument();
     await expect.element(page.getByText('ステータス: 終了').first()).toBeInTheDocument();
-    await expect.element(page.getByText('1位 1A')).toBeInTheDocument();
+    await expect.element(page.getByText('1位 1A', { exact: true }).first()).toBeInTheDocument();
     await expect.element(page.getByText('10 点')).toBeInTheDocument();
-    await expect.element(page.getByText('2位 1B')).toBeInTheDocument();
+    await expect.element(page.getByText('2位 1B', { exact: true }).first()).toBeInTheDocument();
   });
 
   it('スコアカードから得点内訳を表示できること', async () => {
