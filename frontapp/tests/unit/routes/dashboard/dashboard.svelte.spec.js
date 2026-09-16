@@ -18,6 +18,13 @@ const rootUser = {
 	roles: [{ name: 'root' }]
 };
 
+const studentUser = {
+	...rootUser,
+	id: 'student-user-1',
+	email: 'student@example.com',
+	roles: [{ name: 'student' }]
+};
+
 function renderDashboard(user = rootUser) {
 	return render(Page, {
 		props: {
@@ -100,5 +107,33 @@ describe('Dashboard shortcuts', () => {
 		expect(
 			JSON.parse(window.localStorage.getItem('sportease.dashboard.hiddenShortcuts.root-user-1'))
 		).toEqual([]);
+	});
+
+	it('昼競技情報にリレー以外の公開昼競技も表示する', async () => {
+		fetchMock.mockImplementation((url) => {
+			if (url === '/api/events/active') {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ event_id: 1, event_name: '2026春季スポーツ大会' })
+				});
+			}
+			if (url === '/api/student/events/1/noon-game/sessions') {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [{ id: 10 }] }) });
+			}
+			if (url === '/api/student/events/1/noon-game/sessions/10') {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({
+						matches: [{ id: 101, title: '借り物競走', status: 'scheduled', entries: [] }]
+					})
+				});
+			}
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({ count: 0, endpoints: [] }) });
+		});
+
+		renderDashboard(studentUser);
+
+		await expect.element(page.getByRole('heading', { name: '昼競技情報' })).toBeInTheDocument();
+		await expect.element(page.getByText('借り物競走')).toBeInTheDocument();
 	});
 });

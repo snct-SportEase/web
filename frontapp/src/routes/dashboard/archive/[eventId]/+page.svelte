@@ -9,8 +9,8 @@
     let eventData = $state(null);
     let scores = $state([]);
     let tournaments = $state([]);
-    let relayMatches = $state([]);
-    let relayError = $state('');
+    let noonGameMatches = $state([]);
+    let noonGameError = $state('');
     let loading = $state(true);
     let error = $state(null);
 
@@ -55,11 +55,6 @@
     function getWinnerName(tournament, match) {
         const winnerSide = match?.sides?.find((side) => side?.isWinner);
         return winnerSide ? getSideName(tournament, winnerSide) : '引き分け';
-    }
-
-    function isRelayMatch(match) {
-        const title = match?.title || '';
-        return title.includes('リレー');
     }
 
     function formatDateTime(value) {
@@ -125,8 +120,8 @@
                     : [];
             }
 
-            const relaySessions = await fetchPublishedNoonGameSessions(eventId);
-            relayMatches = flattenNoonGameMatches(relaySessions).filter(isRelayMatch);
+            const noonGameSessions = await fetchPublishedNoonGameSessions(eventId);
+            noonGameMatches = flattenNoonGameMatches(noonGameSessions);
         } catch (err) {
             error = err.message;
         } finally {
@@ -227,10 +222,10 @@
                     試合結果
                 </button>
                 <button
-                    onclick={() => activeTab = 'relays'}
-                    class="{activeTab === 'relays' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+                    onclick={() => activeTab = 'noon-games'}
+                    class="{activeTab === 'noon-games' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
                 >
-                    リレー結果
+                    昼競技結果
                 </button>
             </nav>
         </div>
@@ -343,22 +338,22 @@
                     {/each}
                 </div>
             {/if}
-        {:else if activeTab === 'relays'}
-            {#if relayError}
+        {:else if activeTab === 'noon-games'}
+            {#if noonGameError}
                 <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {relayError}
+                    {noonGameError}
                 </p>
-            {:else if relayMatches.length === 0}
+            {:else if noonGameMatches.length === 0}
                 <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                    リレー結果データが見つかりませんでした。
+                    昼競技結果データが見つかりませんでした。
                 </p>
             {:else}
                 <div class="grid gap-4 lg:grid-cols-2">
-                    {#each relayMatches as match (match.id)}
+                    {#each noonGameMatches as match (match.id)}
                         <article class="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-gray-900">{match.title || 'リレー'}</h3>
+                                    <h3 class="text-lg font-semibold text-gray-900">{match.title || '昼競技'}</h3>
                                     <p class="mt-1 text-sm text-gray-600">ステータス: {formatStatus(match.status)}</p>
                                 </div>
                                 <span class="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">

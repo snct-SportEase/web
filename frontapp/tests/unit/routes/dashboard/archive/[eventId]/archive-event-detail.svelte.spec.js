@@ -74,6 +74,21 @@ describe('Archive Event Detail Page', () => {
             { id: 12, entry_id: 2, entry_resolved_name: '1B', rank: 2, points: 8 }
           ]
         }
+      },
+      {
+        id: 202,
+        title: '借り物競走',
+        status: 'finished',
+        entries: [
+          { id: 3, resolved_name: '1A' },
+          { id: 4, resolved_name: '1B' }
+        ],
+        result: {
+          details: [
+            { id: 13, entry_id: 3, entry_resolved_name: '1A', rank: 1, points: 5 },
+            { id: 14, entry_id: 4, entry_resolved_name: '1B', rank: 2, points: 3 }
+          ]
+        }
       }
     ];
 
@@ -192,13 +207,14 @@ describe('Archive Event Detail Page', () => {
     await expect.element(page.getByText('試合結果データが見つかりませんでした。')).toBeInTheDocument();
   });
 
-  it('リレー結果タブでリレーの順位結果を表示できること', async () => {
+  it('昼競技結果タブで昼競技の順位結果を表示できること', async () => {
     render(Page);
 
-    const relayTab = page.getByRole('button', { name: 'リレー結果' });
-    await relayTab.click();
+    const noonGameTab = page.getByRole('button', { name: '昼競技結果' });
+    await noonGameTab.click();
 
     await expect.element(page.getByText('学年対抗リレー Aブロック')).toBeInTheDocument();
+    await expect.element(page.getByText('借り物競走')).toBeInTheDocument();
     await expect.element(page.getByText('ステータス: 終了')).toBeInTheDocument();
     await expect.element(page.getByText('1位 1A')).toBeInTheDocument();
     await expect.element(page.getByText('10 点')).toBeInTheDocument();

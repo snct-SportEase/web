@@ -21,9 +21,9 @@
   let hiddenShortcutHrefs = new SvelteSet();
   let activeEvent = $state(null);
   let competitionGuidelinesUrl = $state(null);
-  let relayMatches = $state([]);
-  let relayInfoLoading = $state(false);
-  let relayInfoError = $state('');
+  let noonGameMatches = $state([]);
+  let noonGameInfoLoading = $state(false);
+  let noonGameInfoError = $state('');
 
   onMount(async () => {
     loadShortcutPreferences();
@@ -43,7 +43,7 @@
             competitionGuidelinesUrl = data.competition_guidelines_pdf_url;
           }
           if (isStudent) {
-            await fetchRelayInfo(data.event_id);
+            await fetchNoonGameInfo(data.event_id);
           }
         }
       }
@@ -133,24 +133,19 @@
       .join(' / ');
   }
 
-  async function fetchRelayInfo(eventId) {
-    relayInfoLoading = true;
-    relayInfoError = '';
+  async function fetchNoonGameInfo(eventId) {
+    noonGameInfoLoading = true;
+    noonGameInfoError = '';
     try {
       const sessions = await fetchPublishedNoonGameSessions(eventId);
-      relayMatches = flattenNoonGameMatches(sessions).filter(isRelayMatch);
+      noonGameMatches = flattenNoonGameMatches(sessions);
     } catch (error) {
-      console.error('Failed to fetch relay info:', error);
-      relayInfoError = error.message || 'リレー情報を取得できませんでした。';
-      relayMatches = [];
+      console.error('Failed to fetch noon game info:', error);
+      noonGameInfoError = error.message || '昼競技情報を取得できませんでした。';
+      noonGameMatches = [];
     } finally {
-      relayInfoLoading = false;
+      noonGameInfoLoading = false;
     }
-  }
-
-  function isRelayMatch(match) {
-    const title = match?.title || '';
-    return title.includes('リレー');
   }
 
   function formatDateTime(value) {
@@ -394,31 +389,31 @@
   {#if isStudent}
     <section class="space-y-6">
       <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-semibold text-gray-900">リレー情報</h2>
+        <h2 class="text-2xl font-semibold text-gray-900">昼競技情報</h2>
         <a href="/dashboard/student/noon-game" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">
           昼競技結果へ →
         </a>
       </div>
 
-      {#if relayInfoLoading}
+      {#if noonGameInfoLoading}
         <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-          リレー情報を読み込み中です。
+          昼競技情報を読み込み中です。
         </p>
-      {:else if relayInfoError}
+      {:else if noonGameInfoError}
         <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {relayInfoError}
+          {noonGameInfoError}
         </p>
-      {:else if relayMatches.length === 0}
+      {:else if noonGameMatches.length === 0}
         <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-          現在表示できるリレー情報はありません。
+          現在表示できる昼競技情報はありません。
         </p>
       {:else}
         <div class="grid gap-4 lg:grid-cols-2">
-          {#each relayMatches as match (match.id)}
+          {#each noonGameMatches as match (match.id)}
             <article class="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 class="text-lg font-semibold text-gray-900">{match.title || 'リレー'}</h3>
+                  <h3 class="text-lg font-semibold text-gray-900">{match.title || '昼競技'}</h3>
                   <p class="mt-1 text-sm text-gray-600">ステータス: {formatStatus(match.status)}</p>
                 </div>
                 <span class="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
