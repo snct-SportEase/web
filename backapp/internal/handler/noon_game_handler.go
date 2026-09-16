@@ -1276,6 +1276,7 @@ func (h *NoonGameHandler) GetSessionByID(c *gin.Context) {
 	}
 	session, err := h.noonRepo.GetSessionByID(sessionID)
 	if err != nil {
+		log.Printf("ERROR: GetSessionByID failed to retrieve session: session_id=%d, error=%s", sessionID, safelog.Value(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve noon game session"})
 		return
 	}
@@ -1289,6 +1290,7 @@ func (h *NoonGameHandler) GetSessionByID(c *gin.Context) {
 	}
 	payload, err := h.buildSessionPayload(session)
 	if err != nil {
+		log.Printf("ERROR: GetSessionByID failed to build payload: session_id=%d, event_id=%d, error=%s", session.ID, session.EventID, safelog.Value(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build session payload"})
 		return
 	}

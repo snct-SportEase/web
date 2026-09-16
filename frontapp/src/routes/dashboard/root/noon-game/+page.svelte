@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import { browser } from '$app/environment';
   import { activeEvent } from '$lib/stores/eventStore.js';
@@ -115,13 +115,14 @@
     isInteractive = true;
   });
 
+  let currentEventId = $derived($activeEvent?.id ?? null);
+
   $effect(() => {
     if (!browser) return;
-    const current = $activeEvent;
-    console.log('[NoonGame] activeEvent changed (reactive):', current);
-    if (current && current.id) {
-      console.log('[NoonGame] fetching session for event:', current.id);
-      fetchSessions(current.id);
+    const eventId = currentEventId;
+    if (eventId) {
+      // セッション選択の変更を大会変更として追跡しない。
+      untrack(() => fetchSessions(eventId, null));
     }
   });
 

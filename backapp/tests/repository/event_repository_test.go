@@ -51,7 +51,7 @@ func expectUserTransition(mock sqlmock.Sqlmock, eventID any) {
 	mock.ExpectExec(`(?s)DELETE u\s+FROM users u.*current_class\.name IN \('IS5', 'IE5', 'IT5'\)`).
 		WithArgs(eventID).
 		WillReturnResult(sqlmock.NewResult(0, 3))
-	mock.ExpectExec(`(?s)UPDATE users u.*previous_event\.year = next_event\.year.*WHERE ae\.event_id <> next_event\.id`).
+	mock.ExpectExec(`(?s)UPDATE users u.*previous_event\.year = next_event\.year.*WHERE previous_event\.id <> next_event\.id`).
 		WithArgs(eventID).
 		WillReturnResult(sqlmock.NewResult(0, 10))
 }

@@ -469,7 +469,7 @@ func (r *classRepository) GetClassMembers(classID int) ([]*models.User, error) {
 	}
 	defer rows.Close()
 
-	var users []*models.User
+	users := make([]*models.User, 0)
 	for rows.Next() {
 		user := &models.User{}
 		var tempClassID sql.NullInt32
@@ -491,7 +491,7 @@ func (r *classRepository) GetClassMembers(classID int) ([]*models.User, error) {
 		users = append(users, user)
 	}
 
-	return users, nil
+	return users, rows.Err()
 }
 
 func (r *classRepository) SetNoonGamePoints(eventID int, points map[int]int) error {
