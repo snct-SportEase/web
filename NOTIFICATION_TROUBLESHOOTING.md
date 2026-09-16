@@ -89,6 +89,8 @@ docker logs --follow --since 5m --timestamps sportease-backend
 
 `reason`にはAppleの`reason`またはFCMの`error.status`から既知のコードだけを記録します。購読URL全体、認証鍵、エラー本文そのものは出力しません。Apple向けの結果が一件もない場合は、iPadの購読登録と通知の宛先を確認してください。
 
+VAPIDの連絡先（JWTの`sub`）は、既定で公開サイトの`https://nitsche-gyouji.com`です。`push.Config.Subscriber`にメールアドレスを指定する場合は、既存の`mailto:`を正規化してからwebpush-goへ渡します。ライブラリが`mailto:`を付与するため、接頭辞の二重付与を防ぎます。この修正にVAPID鍵の再生成や既存購読の削除は不要です。
+
 アンケート公開通知は `event_handler.go` から送信されるため、同じ内容が `[event-notification]` prefix で出力されます。
 
 **よくある問題**：

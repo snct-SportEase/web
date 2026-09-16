@@ -108,8 +108,13 @@ func newSender(cfg Config, allowedHosts hostPolicy, client webpush.HTTPClient) S
 		allowedHosts = newHostPolicy(cfg.AllowedHosts)
 	}
 	subscriber := strings.TrimSpace(cfg.Subscriber)
+	// webpush-go はHTTPS URL以外にmailto:を付けるため、既存の接頭辞を除去する。
+	for strings.HasPrefix(strings.ToLower(subscriber), "mailto:") {
+		subscriber = strings.TrimSpace(subscriber[len("mailto:"):])
+	}
 	if subscriber == "" {
-		subscriber = "mailto:notifications@sportease.local"
+		// 実在する公開サイトを連絡先にして、ローカル専用のメールアドレスを避ける。
+		subscriber = "https://nitsche-gyouji.com"
 	}
 	maxConcurrency := cfg.MaxConcurrency
 	if maxConcurrency <= 0 || maxConcurrency > defaultMaxConcurrency {
