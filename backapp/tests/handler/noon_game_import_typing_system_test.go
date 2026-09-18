@@ -401,4 +401,54 @@ func TestNoonGameHandler_ImportTypingSystemResults(t *testing.T) {
 		mockNoonRepo.AssertExpectations(t)
 		mockClassRepo.AssertExpectations(t)
 	})
+
+	t.Run("Success - accepts KeySprint tie-break ranks with an equal total score", func(t *testing.T) {
+		// KeySprint orders these two teams by raw score after their integer totals tie.
+		// This is the same shape produced by its result export, not a tied rank.
+		payload := buildTypingSystemImportPayload("4ef87d60-2e74-477a-9c16-a93423d04c21")
+		payload.Teams = []typingSystemTeam{
+			{TeamName: "2年生", Match1Score: 100, Match2Score: 100, Match3Score: 100, TotalScore: 300, Rank: 1},
+			{TeamName: "1年生", Match1Score: 100, Match2Score: 100, Match3Score: 100, TotalScore: 300, Rank: 2},
+			{TeamName: "3年生", Match1Score: 90, Match2Score: 90, Match3Score: 90, TotalScore: 270, Rank: 3},
+			{TeamName: "4年生", Match1Score: 80, Match2Score: 80, Match3Score: 80, TotalScore: 240, Rank: 4},
+			{TeamName: "5年生", Match1Score: 70, Match2Score: 70, Match3Score: 70, TotalScore: 210, Rank: 5},
+			{TeamName: "専攻科・教員", Match1Score: 60, Match2Score: 60, Match3Score: 60, TotalScore: 180, Rank: 6},
+		}
+
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		mockNoonRepo.On("GetSessionByID", sessionID).Return(&models.NoonGameSession{ID: sessionID, EventID: eventID, TemplateKey: "typing"}, nil).Once()
+		mockNoonRepo.On("GetGroupsWithMembers", sessionID).Return([]*models.NoonGameGroupWithMembers{
+			{NoonGameGroup: &models.NoonGameGroup{Name: "1年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 3}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "2年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 4}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "3年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 7}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "4年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 10}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "5年生"}, Members: []*models.NoonGameGroupMember{{ClassID: 13}}},
+			{NoonGameGroup: &models.NoonGameGroup{Name: "専攻科・教員"}, Members: []*models.NoonGameGroupMember{{ClassID: 16}}},
+		}, nil).Once()
+		mockNoonRepo.On("ListTemplateRunsBySession", sessionID).Return([]*models.NoonGameTemplateRun{{TemplateKey: "typing", PointsByRank: map[string]interface{}{"1": float64(40), "2": float64(30), "3": float64(25)}}}, nil).Once()
+		mockNoonRepo.On("GetTypingSystemImportsBySessionAndExportID", sessionID, payload.ExportID).Return([]*models.NoonGameTypingSystemImportRecord{}, nil).Once()
+		mockNoonRepo.On("GetActiveTypingSystemImport", sessionID).Return(nil, nil).Once()
+		mockClassRepo.On("GetAllClasses", eventID).Return(buildTypingSystemImportClasses(eventID), nil).Once()
+		mockNoonRepo.On("ApplyTypingSystemResultImport", sessionID, mock.MatchedBy(func(points []*models.NoonGamePoint) bool {
+			return len(points) == 6 && points[0].Points == 40 && points[1].Points == 30
+		}), false, mock.AnythingOfType("*models.NoonGameTypingSystemImportRecord")).Return(nil).Once()
+		mockNoonRepo.On("SumConfirmedPointsByEvent", eventID).Return(map[int]int{}, nil).Once()
+		mockClassRepo.On("SetNoonGamePoints", eventID, map[int]int{}).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "session_id", Value: "10"}}
+		c.Set("user", &models.User{ID: userID})
+		c.Request = buildTypingSystemImportRequest(t, payload)
+
+		h.ImportTypingSystemResults(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockNoonRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
 }

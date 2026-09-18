@@ -2601,10 +2601,9 @@ func (h *NoonGameHandler) ImportTypingSystemResults(c *gin.Context) {
 					return
 				}
 			} else {
-				if prev.TotalScore == team.TotalScore {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "Equal total_score must not have different rank"})
-					return
-				}
+				// KeySprint resolves equal total scores with its published tie breakers
+				// (raw score, accuracy, then incorrect types).  Its export therefore can
+				// legitimately contain adjacent, different ranks with the same total.
 			}
 		}
 
