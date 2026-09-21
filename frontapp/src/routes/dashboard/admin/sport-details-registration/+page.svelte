@@ -56,7 +56,18 @@
     const res = await fetch(`/api/events/${selectedEventId}/sports`);
     if (res.ok) {
       const assignedSports = await res.json();
-      sports = assignedSports.map((sport) => ({ id: sport.sport_id, name: sport.sport_name }));
+      const uniqueSports = [];
+      for (const sport of assignedSports) {
+        const name = sport.sport_name?.trim();
+        if (!name) continue;
+        const existingIndex = uniqueSports.findIndex((item) => item.name === name);
+        if (existingIndex === -1) {
+          uniqueSports.push({ id: sport.sport_id, name });
+        } else if (sport.template_key === 'board_game_tournament') {
+          uniqueSports[existingIndex] = { id: sport.sport_id, name };
+        }
+      }
+      sports = uniqueSports;
     }
   }
 
@@ -141,13 +152,23 @@
         }
         return { ...t, data };
       });
-      selectedTournamentId = null;
-      selectedTournament = null;
+      const currentTournament = tournaments.find((tournament) =>
+        tournament.id == selectedTournamentId && tournament.sport_id == selectedSportId
+      );
+      selectedTournamentId = currentTournament?.id ?? null;
+      selectedTournament = currentTournament ?? null;
       // スポーツが選択されている場合は、全ての試合を更新
       if (selectedSportId) {
         updateAllMatchesForSport();
       }
     }
+  }
+
+  function getSelectedSportTournaments() {
+    if (!selectedSportId) return [];
+    return tournaments.filter((tournament) =>
+      tournament.sport_id == selectedSportId && (isRainyMode || !tournament.name.includes('敗者戦'))
+    );
   }
 
   async function updateSelectedTournament() {
@@ -213,8 +234,6 @@
     selectedSportId = e.target.value;
     if (selectedSportId) {
       await fetchSportDetails(selectedEventId, selectedSportId);
-      const selectedSport = sports.find(s => s.id == selectedSportId);
-      const sportName = selectedSport ? selectedSport.name : '';
 
       if (classes.length === 0 && selectedEventId) {
         await fetchClasses();
@@ -226,17 +245,11 @@
       // トーナメントデータを再取得（雨天時モードが有効になった場合、敗者戦トーナメントの対戦相手が反映される）
       await fetchTournaments(selectedEventId);
       
-      // 本戦トーナメントを探す（" Tournament"が含まれ、敗者戦ではないもの）
-      const mainTournament = tournaments.find(t => 
-        t.sport_id == selectedSportId && 
-        t.name.includes(' Tournament') && 
-        !t.name.includes('敗者戦')
-      );
+      // 命名規則に依存せず、選択した競技の本戦を選ぶ。
+      const sportTournaments = getSelectedSportTournaments();
+      const mainTournament = sportTournaments.find((tournament) => !tournament.name.includes('敗者戦')) ?? sportTournaments[0];
       selectedTournamentId = mainTournament ? mainTournament.id : null;
-      if (mainTournament) {
-        mainTournament.display_name = `${sportName} Tournament`;
-      }
-      updateSelectedTournament();
+      await updateSelectedTournament();
     } else {
       selectedTournamentId = null;
       selectedTournament = null;
@@ -1049,6 +1062,21 @@
 
       <div class="mb-4">
         <h2 class="text-xl font-semibold mb-2">トーナメント情報</h2>
+        {#if getSelectedSportTournaments().length > 0}
+          <div class="mb-4 max-w-md">
+            <label for="tournament-select" class="block text-sm font-medium text-gray-700">トーナメント選択</label>
+            <select
+              id="tournament-select"
+              class="mt-1 block w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+              bind:value={selectedTournamentId}
+              onchange={updateSelectedTournament}
+            >
+              {#each getSelectedSportTournaments() as tournament (tournament.id)}
+                <option value={tournament.id}>{tournament.name}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
         <div id="bracket-container">
           {#if !selectedSportId}
             <p>競技を選択してください。</p>

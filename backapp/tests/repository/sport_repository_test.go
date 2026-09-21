@@ -193,6 +193,27 @@ func TestSportRepository_GetSportsByEventID(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("盤上競技の重複はテンプレート側を返す", func(t *testing.T) {
+		repo, mock, close := setupSport(t)
+		defer close()
+
+		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(1).
+			WillReturnRows(sqlmock.NewRows(eventSportCols).
+				AddRow(1, 3, "将棋", nil, nil, "other", nil, 1, 3).
+				AddRow(1, 9, "将棋", "盤上競技", nil, "other", "board_game_tournament", 1, 3).
+				AddRow(1, 10, "オセロ", nil, nil, "other", "board_game_tournament", 3, 3).
+				AddRow(1, 11, "オセロ", nil, nil, "other", nil, 3, 3))
+
+		sports, err := repo.GetSportsByEventID(1)
+		require.NoError(t, err)
+		require.Len(t, sports, 2)
+		assert.Equal(t, 9, sports[0].SportID)
+		assert.Equal(t, "将棋", sports[0].SportName)
+		assert.Equal(t, 10, sports[1].SportID)
+		assert.Equal(t, "オセロ", sports[1].SportName)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("empty result", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()

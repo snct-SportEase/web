@@ -72,6 +72,7 @@ type BoardGameRanking struct {
 type BoardGameRunCreate struct {
 	EventID             int
 	GameType            string
+	SportName           string
 	Name                string
 	Description         *string
 	Location            string
