@@ -21,7 +21,6 @@
     let boardGameRuns = $state([]);
     let boardGameType = $state('shogi');
     let selectedBoardClassIDs = $state([]);
-    let boardRosters = $state({});
     let boardSeedOrders = $state({ A: [], B: [], MAIN: [] });
     let boardGameForm = $state({ name: '将棋', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 5, rank1: 40, rank2: 30, rank3: 20, rank4: 10, regularMinutes: 15, finalMinutes: 30, rulesPdfUrl: '' });
     let boardGamePdfFile = $state(null);
@@ -70,9 +69,12 @@
         const run = boardGameRuns.find((item) => item.game_type === type);
         if (!run) {
             boardGameForm = defaultBoardGameForm(type);
-            selectedBoardClassIDs = [];
-            boardRosters = {};
-            boardSeedOrders = { A: [], B: [], MAIN: [] };
+            selectedBoardClassIDs = boardGameClasses.map((item) => item.id);
+            boardSeedOrders = {
+                A: [...selectedBoardClassIDs],
+                B: [...selectedBoardClassIDs],
+                MAIN: [...selectedBoardClassIDs],
+            };
             return;
         }
         boardGameForm = {
@@ -89,49 +91,13 @@
             finalMinutes: run.final_minutes,
             rulesPdfUrl: run.rules_pdf_url || '',
         };
-        const firstTournament = run.tournaments?.[0];
-        selectedBoardClassIDs = (firstTournament?.entries || []).map((entry) => entry.class_id);
-        const nextRosters = {};
+        selectedBoardClassIDs = boardGameClasses.map((item) => item.id);
         for (const tournament of run.tournaments || []) {
             const sortedEntries = [...(tournament.entries || [])].sort((a, b) => a.seed_number - b.seed_number);
-            boardSeedOrders[tournament.slot_key] = sortedEntries.map((entry) => entry.class_id);
-            for (const entry of sortedEntries) {
-                nextRosters[entry.class_id] ||= { players: [], substitutes: [] };
-                const players = entry.members.filter((member) => !member.is_substitute).map((member) => member.user_id);
-                const substitutes = entry.members.filter((member) => member.is_substitute).map((member) => member.user_id);
-                if (type === 'shogi') {
-                    const playerIndex = tournament.slot_key === 'B' ? 1 : 0;
-                    nextRosters[entry.class_id].players[playerIndex] = players[0] || '';
-                    nextRosters[entry.class_id].substitutes = substitutes;
-                } else {
-                    nextRosters[entry.class_id].players = players;
-                }
-            }
-        }
-        boardRosters = nextRosters;
-        boardSeedOrders = { ...boardSeedOrders };
-    }
-
-    function toggleBoardClass(classID, checked) {
-        if (checked) {
-            selectedBoardClassIDs = [...selectedBoardClassIDs, classID];
-            boardRosters = { ...boardRosters, [classID]: { players: [], substitutes: [] } };
-            for (const slot of ['A', 'B', 'MAIN']) boardSeedOrders[slot] = [...boardSeedOrders[slot], classID];
-        } else {
-            selectedBoardClassIDs = selectedBoardClassIDs.filter((id) => id !== classID);
-            const nextRosters = { ...boardRosters };
-            delete nextRosters[classID];
-            boardRosters = nextRosters;
-            for (const slot of ['A', 'B', 'MAIN']) boardSeedOrders[slot] = boardSeedOrders[slot].filter((id) => id !== classID);
+            const savedOrder = sortedEntries.map((entry) => entry.class_id).filter((classID) => selectedBoardClassIDs.includes(classID));
+            boardSeedOrders[tournament.slot_key] = [...savedOrder, ...selectedBoardClassIDs.filter((classID) => !savedOrder.includes(classID))];
         }
         boardSeedOrders = { ...boardSeedOrders };
-    }
-
-    function updateRoster(classID, kind, index, value) {
-        const roster = boardRosters[classID] || { players: [], substitutes: [] };
-        const values = [...(roster[kind] || [])];
-        values[index] = value;
-        boardRosters = { ...boardRosters, [classID]: { ...roster, [kind]: values } };
     }
 
     function moveBoardSeed(slot, index, direction) {
@@ -144,10 +110,6 @@
 
     function boardClassName(classID) {
         return boardGameClasses.find((item) => item.id === classID)?.name || String(classID);
-    }
-
-    function boardMemberLabel(member) {
-        return member.display_name || member.email;
     }
 
     async function uploadBoardGamePdf() {
@@ -163,21 +125,13 @@
     async function saveBoardGameRun() {
         const currentEvent = get(activeEvent);
         if (!currentEvent) return;
-        if (selectedBoardClassIDs.length < 2 || (selectedBoardClassIDs.length & (selectedBoardClassIDs.length - 1)) !== 0) {
-            alert('参加クラス数は2、4、8、16…のいずれかにしてください。');
+        if (boardGameClasses.length !== 16) {
+            alert(`盤上競技は全16クラスが必要です（現在${boardGameClasses.length}クラス）。`);
             return;
         }
         isSavingBoardGame = true;
         try {
             const rulesPdfUrl = await uploadBoardGamePdf();
-            const participants = selectedBoardClassIDs.map((classID) => {
-                const roster = boardRosters[classID] || { players: [], substitutes: [] };
-                return {
-                    class_id: classID,
-                    player_ids: (roster.players || []).filter(Boolean),
-                    substitute_ids: boardGameType === 'shogi' ? (roster.substitutes || []).filter(Boolean) : [],
-                };
-            });
             const slots = boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN'];
             const seedOrders = Object.fromEntries(slots.map((slot) => [slot, boardSeedOrders[slot]]));
             const response = await fetch(`/api/root/events/${currentEvent.id}/tournament-templates/board-game/run`, {
@@ -195,7 +149,6 @@
                     regular_minutes: Number(boardGameForm.regularMinutes),
                     final_minutes: Number(boardGameForm.finalMinutes),
                     status: 'published',
-                    participants,
                     seed_orders: seedOrders,
                 }),
             });
@@ -524,7 +477,7 @@
 <section class="mb-12 rounded-lg border border-amber-200 bg-amber-50 p-5">
     <div class="mb-4">
         <h2 class="text-xl font-semibold">盤上競技トーナメント</h2>
-        <p class="mt-1 text-sm text-gray-600">将棋・オセロ専用の設定から、通常のトーナメントと試合を作成します。試合結果の登録後は組み合わせを変更できません。</p>
+        <p class="mt-1 text-sm text-gray-600">将棋・オセロは全16クラス参加で作成します。代表選手・補欠は各クラスの行事委員が「クラス競技割り当て・管理」で設定します。</p>
     </div>
 
     <div class="grid gap-4 md:grid-cols-2">
@@ -568,50 +521,18 @@
     </div>
 
     <fieldset class="mt-6">
-        <legend class="font-semibold">参加クラス（2、4、8、16…クラス）</legend>
+        <legend class="font-semibold">参加クラス（全16クラス固定）</legend>
         <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {#each boardGameClasses as classItem (classItem.id)}
-                <label class="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
-                    <input type="checkbox" checked={selectedBoardClassIDs.includes(classItem.id)} onchange={(event) => toggleBoardClass(classItem.id, event.currentTarget.checked)} />
-                    {classItem.name}
-                </label>
+                <span class="rounded border bg-white px-3 py-2 text-sm">{classItem.name}</span>
             {/each}
         </div>
+        {#if boardGameClasses.length !== 16}
+            <p class="mt-2 text-sm text-red-700">現在は{boardGameClasses.length}クラスです。16クラス登録後に作成してください。</p>
+        {/if}
     </fieldset>
 
     {#if selectedBoardClassIDs.length > 0}
-        <div class="mt-6 space-y-3">
-            <h3 class="font-semibold">代表選手・補欠</h3>
-            {#each selectedBoardClassIDs as classID (classID)}
-                {@const classItem = boardGameClasses.find((item) => item.id === classID)}
-                <div class="rounded border bg-white p-3">
-                    <p class="mb-2 font-medium">{classItem?.name}</p>
-                    <div class="grid gap-2 md:grid-cols-3">
-                        {#each Array.from({ length: boardGameType === 'shogi' ? 2 : 3 }, (_, index) => index) as playerIndex (playerIndex)}
-                            <label class="text-sm">代表{playerIndex + 1}{boardGameType === 'othello' && playerIndex > 0 ? '（任意）' : ''}
-                                <select class="mt-1 w-full rounded-md border-gray-300" value={boardRosters[classID]?.players?.[playerIndex] || ''} onchange={(event) => updateRoster(classID, 'players', playerIndex, event.currentTarget.value)}>
-                                    <option value="">選択してください</option>
-                                    {#each classItem?.members || [] as member (member.id)}
-                                        <option value={member.id}>{boardMemberLabel(member)}</option>
-                                    {/each}
-                                </select>
-                            </label>
-                        {/each}
-                        {#if boardGameType === 'shogi'}
-                            <label class="text-sm">補欠（任意・1名）
-                                <select class="mt-1 w-full rounded-md border-gray-300" value={boardRosters[classID]?.substitutes?.[0] || ''} onchange={(event) => updateRoster(classID, 'substitutes', 0, event.currentTarget.value)}>
-                                    <option value="">選択しない</option>
-                                    {#each classItem?.members || [] as member (member.id)}
-                                        <option value={member.id}>{boardMemberLabel(member)}</option>
-                                    {/each}
-                                </select>
-                            </label>
-                        {/if}
-                    </div>
-                </div>
-            {/each}
-        </div>
-
         <div class="mt-6 grid gap-4 md:grid-cols-2">
             {#each (boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN']) as slot (slot)}
                 <div class="rounded border bg-white p-3">
@@ -635,7 +556,7 @@
     <div class="mt-6 rounded bg-white p-3 text-sm text-gray-600">
         既定時刻: 一次予選① 09:45／一次予選② 10:45／二次予選 13:00／準決勝 14:00／決勝・3位決定戦 15:00
     </div>
-    <button class="mt-4 w-full rounded-md bg-amber-700 px-4 py-2 font-medium text-white hover:bg-amber-800 disabled:opacity-50" disabled={isSavingBoardGame || selectedBoardClassIDs.length === 0} onclick={saveBoardGameRun}>
+    <button class="mt-4 w-full rounded-md bg-amber-700 px-4 py-2 font-medium text-white hover:bg-amber-800 disabled:opacity-50" disabled={isSavingBoardGame || boardGameClasses.length !== 16} onclick={saveBoardGameRun}>
         {isSavingBoardGame ? '保存中...' : boardGameRuns.some((run) => run.game_type === boardGameType) ? '盤上競技トーナメントを再作成' : '盤上競技トーナメントを作成'}
     </button>
 </section>

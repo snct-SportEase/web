@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -246,42 +247,28 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Sport not found"})
 		return
 	}
-	// Get or create team
 	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, req.SportID, activeEventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
 		return
 	}
-
 	var eventSport *models.EventSport
+	isBoardGame := false
 	if team == nil {
 		eventSport, err = h.sportRepo.GetSportDetails(activeEventID, req.SportID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sport details"})
 			return
 		}
-		if eventSport != nil && eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "盤上競技の選手はトーナメント設定画面から管理してください"})
-			return
-		}
-		// Create team if it doesn't exist
-		newTeam := &models.Team{
-			Name:    managedClass.Name,
-			ClassID: managedClass.ID,
-			SportID: req.SportID,
-			EventID: activeEventID,
-		}
-		teamID, err := h.teamRepo.CreateTeam(newTeam)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create team"})
-			return
-		}
-		team = &models.Team{
-			ID:      int(teamID),
-			Name:    newTeam.Name,
-			ClassID: newTeam.ClassID,
-			SportID: newTeam.SportID,
-			EventID: newTeam.EventID,
+		isBoardGame = eventSport != nil && eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament"
+		if !isBoardGame {
+			newTeam := &models.Team{Name: managedClass.Name, ClassID: managedClass.ID, SportID: req.SportID, EventID: activeEventID}
+			teamID, err := h.teamRepo.CreateTeam(newTeam)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create team"})
+				return
+			}
+			team = &models.Team{ID: int(teamID), Name: newTeam.Name, ClassID: newTeam.ClassID, SportID: newTeam.SportID, EventID: newTeam.EventID}
 		}
 	}
 
@@ -289,21 +276,30 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 	var maxCapacity *int
 
 	// 1. Check team specific capacity
-	if team.MaxCapacity != nil {
+	if !isBoardGame && team.MaxCapacity != nil {
 		maxCapacity = team.MaxCapacity
 	} else {
-		// 2. Check event sport default capacity
 		if eventSport == nil {
 			eventSport, err = h.sportRepo.GetSportDetails(activeEventID, req.SportID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sport details"})
+				return
+			}
+			isBoardGame = eventSport != nil && eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament"
 		}
-		if err == nil && eventSport != nil {
+		if eventSport != nil {
 			maxCapacity = eventSport.MaxCapacity
 		}
 	}
 
 	if maxCapacity != nil {
 		// Get current members
-		currentMembers, err := h.teamRepo.GetTeamMembers(team.ID)
+		var currentMembers []*models.User
+		if isBoardGame {
+			currentMembers, err = h.teamRepo.GetBoardGameTeamMembers(activeEventID, req.SportID, managedClass.ID)
+		} else {
+			currentMembers, err = h.teamRepo.GetTeamMembers(team.ID)
+		}
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current team members for capacity check"})
 			return
@@ -371,14 +367,28 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 		validUsers = append(validUsers, user)
 	}
 
-	// Assign team members and roles
+	// Assign team members and roles. For board games, selection order is the roster order:
+	// shogi = A representative, B representative, substitute; othello = representatives 1-3.
 	assignedCount := 0
+	if isBoardGame {
+		validUserIDs := make([]string, 0, len(validUsers))
+		for _, user := range validUsers {
+			validUserIDs = append(validUserIDs, user.ID)
+		}
+		if err := h.teamRepo.AddBoardGameTeamMembers(activeEventID, req.SportID, managedClass.ID, validUserIDs); err != nil {
+			if errors.Is(err, repository.ErrBoardGameRosterFull) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "盤上競技は1クラス3名までです"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign board-game members"})
+			return
+		}
+	}
 	for _, user := range validUsers {
 		userID := user.ID
-		// Add to team_members (ignore duplicate errors)
-		err = h.teamRepo.AddTeamMember(team.ID, userID)
-		if err != nil {
-			// Continue if user is already a member, but still assign role if needed
+		if !isBoardGame {
+			// Add to team_members (ignore duplicate errors)
+			err = h.teamRepo.AddTeamMember(team.ID, userID)
 		}
 
 		// Assign role
@@ -438,20 +448,29 @@ func (h *ClassTeamHandler) RemoveTeamMemberHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Sport not found"})
 		return
 	}
-	// Get team
 	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, req.SportID, activeEventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
 		return
 	}
-
+	isBoardGame := false
 	if team == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
-		return
+		eventSport, detailsErr := h.sportRepo.GetSportDetails(activeEventID, req.SportID)
+		if detailsErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sport details"})
+			return
+		}
+		isBoardGame = eventSport != nil && eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament"
+		if !isBoardGame {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+			return
+		}
 	}
-
-	// Remove from team_members
-	err = h.teamRepo.RemoveTeamMember(team.ID, req.UserID)
+	if isBoardGame {
+		err = h.teamRepo.RemoveBoardGameTeamMember(activeEventID, req.SportID, managedClass.ID, req.UserID)
+	} else {
+		err = h.teamRepo.RemoveTeamMember(team.ID, req.UserID)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove team member"})
 		return
@@ -508,15 +527,32 @@ func (h *ClassTeamHandler) GetTeamMembersHandler(c *gin.Context) {
 		c.JSON(statusCode, gin.H{"error": errMsg})
 		return
 	}
-	// Get team
 	team, err := h.teamRepo.GetTeamByClassAndSport(managedClass.ID, sportID, activeEventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team"})
 		return
 	}
-
 	if team == nil {
-		c.JSON(http.StatusOK, []*models.User{}) // Empty team
+		eventSport, detailsErr := h.sportRepo.GetSportDetails(activeEventID, sportID)
+		if detailsErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sport details"})
+			return
+		}
+		isBoardGame := eventSport != nil && eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament"
+		if !isBoardGame {
+			c.JSON(http.StatusOK, []*models.User{})
+			return
+		}
+		members, err := h.teamRepo.GetBoardGameTeamMembers(activeEventID, sportID, managedClass.ID)
+		if errors.Is(err, repository.ErrBoardGameRosterNotFound) {
+			c.JSON(http.StatusOK, []*models.User{})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get board-game members"})
+			return
+		}
+		c.JSON(http.StatusOK, members)
 		return
 	}
 

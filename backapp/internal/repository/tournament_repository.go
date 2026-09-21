@@ -1372,7 +1372,10 @@ func (r *tournamentRepository) DeleteTournamentsByEventID(eventID int) error {
 		return err
 	}
 
-	rows, err := tx.Query("SELECT id FROM tournaments WHERE event_id = ?", eventID)
+	// 一括生成では専用画面で管理する盤上競技トーナメントを保持する。
+	rows, err := tx.Query(`SELECT t.id FROM tournaments t
+		WHERE t.event_id = ?
+		  AND NOT EXISTS (SELECT 1 FROM board_game_entries e WHERE e.tournament_id = t.id)`, eventID)
 	if err != nil {
 		tx.Rollback()
 		return err

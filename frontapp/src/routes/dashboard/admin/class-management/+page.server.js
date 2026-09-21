@@ -80,18 +80,26 @@ export async function load({ fetch, locals, request }) {
 		}
 
 		if (activeEventId) {
-			const sportRes = await fetch(`${BACKEND_URL}/api/events/${activeEventId}/sports`, {
-				headers
-			});
+			const [sportRes, boardGameRunsRes] = await Promise.all([
+				fetch(`${BACKEND_URL}/api/events/${activeEventId}/sports`, { headers }),
+				fetch(`${BACKEND_URL}/api/admin/events/${activeEventId}/board-game-runs`, { headers })
+			]);
+			const boardGameTypeBySportId = new Map();
+			if (boardGameRunsRes.ok) {
+				const boardGameRuns = await boardGameRunsRes.json();
+				for (const run of Array.isArray(boardGameRuns) ? boardGameRuns : []) {
+					boardGameTypeBySportId.set(Number(run.sport_id), run.game_type);
+				}
+			}
 			if (sportRes.ok) {
 				const sportPayload = await sportRes.json();
 				eventSports = Array.isArray(sportPayload) ? sportPayload : [];
-					allSports = eventSports
-						.filter((eventSport) => eventSport.template_key !== 'board_game_tournament')
-						.map((eventSport) => ({
-						id: eventSport.sport_id,
-						name: eventSport.sport_name
-					}));
+				allSports = eventSports.map((eventSport) => ({
+					id: eventSport.sport_id,
+					name: eventSport.sport_name,
+					templateKey: eventSport.template_key ?? null,
+					gameType: boardGameTypeBySportId.get(Number(eventSport.sport_id)) ?? null
+				}));
 			}
 
 			const noonSessionRes = await fetch(

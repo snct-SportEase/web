@@ -64,23 +64,8 @@ func TestBuildBoardGameBracketCreatesProgressionAndBronzeMatch(t *testing.T) {
 	}
 }
 
-func TestValidateBoardGameRoster(t *testing.T) {
-	if err := validateBoardGameRoster("shogi", boardGameParticipantRequest{PlayerIDs: []string{"a", "b"}, SubstituteIDs: []string{"c"}}); err != nil {
-		t.Fatalf("valid shogi roster was rejected: %v", err)
-	}
-	if err := validateBoardGameRoster("shogi", boardGameParticipantRequest{PlayerIDs: []string{"a"}}); err == nil {
-		t.Fatal("invalid shogi roster was accepted")
-	}
-	if err := validateBoardGameRoster("othello", boardGameParticipantRequest{PlayerIDs: []string{"a", "b", "c"}}); err != nil {
-		t.Fatalf("valid othello roster was rejected: %v", err)
-	}
-	if err := validateBoardGameRoster("othello", boardGameParticipantRequest{PlayerIDs: []string{"a", "a"}}); err == nil {
-		t.Fatal("duplicate player was accepted")
-	}
-}
-
 func TestBoardGameSeedOrderValidatesPermutation(t *testing.T) {
-	participants := []boardGameParticipantRequest{{ClassID: 1}, {ClassID: 2}, {ClassID: 3}, {ClassID: 4}}
+	participants := []boardGameParticipant{{ClassID: 1}, {ClassID: 2}, {ClassID: 3}, {ClassID: 4}}
 	order, err := boardGameSeedOrder("A", participants, map[string][]int{"A": {4, 2, 1, 3}})
 	if err != nil {
 		t.Fatalf("valid order was rejected: %v", err)
@@ -90,5 +75,22 @@ func TestBoardGameSeedOrderValidatesPermutation(t *testing.T) {
 	}
 	if _, err := boardGameSeedOrder("A", participants, map[string][]int{"A": {1, 1, 3, 4}}); err == nil {
 		t.Fatal("duplicate seed was accepted")
+	}
+}
+
+func TestFixedBoardGameParticipantsRequiresAll16Classes(t *testing.T) {
+	classes := make([]*models.Class, 16)
+	for index := range classes {
+		classes[index] = &models.Class{ID: index + 1}
+	}
+	participants, err := fixedBoardGameParticipants(classes)
+	if err != nil {
+		t.Fatalf("16 classes were rejected: %v", err)
+	}
+	if len(participants) != 16 || participants[0].ClassID != 1 || participants[15].ClassID != 16 {
+		t.Fatalf("unexpected fixed participants: %+v", participants)
+	}
+	if _, err := fixedBoardGameParticipants(classes[:15]); err == nil {
+		t.Fatal("15 classes were accepted")
 	}
 }

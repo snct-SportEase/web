@@ -32,6 +32,7 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 	defer tx.Rollback()
 
 	var existingRunID, sportID int
+	preservedRosters := make(map[int]boardGamePreservedRoster)
 	err = tx.QueryRow("SELECT id, sport_id FROM board_game_runs WHERE event_id = ? AND game_type = ?", input.EventID, input.GameType).Scan(&existingRunID, &sportID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -43,6 +44,10 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 		}
 		if finished > 0 {
 			return nil, ErrBoardGameRunHasResults
+		}
+		preservedRosters, err = loadBoardGameRostersForRun(tx, existingRunID, input.GameType)
+		if err != nil {
+			return nil, err
 		}
 		if err := deleteBoardGameRunData(tx, existingRunID, input.EventID, sportID); err != nil {
 			return nil, err
@@ -102,6 +107,18 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 		tournamentID := int(tournamentID64)
 		teamIDs := make([]int, 0, len(tournament.Entries))
 		for _, entry := range tournament.Entries {
+			if roster, ok := preservedRosters[entry.ClassID]; ok && len(entry.MemberIDs) == 0 && len(entry.SubstituteIDs) == 0 {
+				if input.GameType == "shogi" {
+					if playerID := roster.playersBySlot[tournament.SlotKey]; playerID != "" {
+						entry.MemberIDs = []string{playerID}
+					}
+					if roster.substituteID != "" {
+						entry.SubstituteIDs = []string{roster.substituteID}
+					}
+				} else {
+					entry.MemberIDs = append([]string(nil), roster.mainPlayers...)
+				}
+			}
 			result, err := tx.Exec("INSERT INTO teams (name,class_id,sport_id,entry_key,min_capacity,max_capacity) VALUES (?,?,?,?,?,?)", entry.TeamName, entry.ClassID, sportID, entry.EntryKey, entry.MinCapacity, entry.MaxCapacity)
 			if err != nil {
 				return nil, err
@@ -143,6 +160,46 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 		return nil, err
 	}
 	return r.GetRunByID(runID)
+}
+
+type boardGamePreservedRoster struct {
+	playersBySlot map[string]string
+	mainPlayers   []string
+	substituteID  string
+}
+
+func loadBoardGameRostersForRun(tx *sql.Tx, runID int, gameType string) (map[int]boardGamePreservedRoster, error) {
+	rows, err := tx.Query(`SELECT e.class_id,e.slot_key,m.user_id,m.member_order,m.is_substitute
+		FROM board_game_entries e JOIN board_game_entry_members m ON m.entry_id=e.id
+		WHERE e.run_id=? ORDER BY e.class_id,e.slot_key,m.member_order`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	rosters := make(map[int]boardGamePreservedRoster)
+	for rows.Next() {
+		var classID, memberOrder int
+		var slotKey, userID string
+		var isSubstitute bool
+		if err := rows.Scan(&classID, &slotKey, &userID, &memberOrder, &isSubstitute); err != nil {
+			return nil, err
+		}
+		roster := rosters[classID]
+		if roster.playersBySlot == nil {
+			roster.playersBySlot = make(map[string]string)
+		}
+		if isSubstitute {
+			if roster.substituteID == "" {
+				roster.substituteID = userID
+			}
+		} else if gameType == "shogi" {
+			roster.playersBySlot[slotKey] = userID
+		} else {
+			roster.mainPlayers = append(roster.mainPlayers, userID)
+		}
+		rosters[classID] = roster
+	}
+	return rosters, rows.Err()
 }
 
 func deleteBoardGameRunData(tx *sql.Tx, runID, eventID, sportID int) error {

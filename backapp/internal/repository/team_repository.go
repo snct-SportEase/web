@@ -4,12 +4,16 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/go-sql-driver/mysql"
 )
 
 var ErrRoundAlreadyCheckedIn = errors.New("round already checked in")
+var ErrBoardGameRosterNotFound = errors.New("board game roster not found")
+var ErrBoardGameRosterFull = errors.New("board game roster is full")
 
 type TeamRepository interface {
 	CreateTeam(team *models.Team) (int64, error)
@@ -20,6 +24,9 @@ type TeamRepository interface {
 	GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error)
 	AddTeamMember(teamID int, userID string) error
 	GetTeamMembers(teamID int) ([]*models.User, error)
+	GetBoardGameTeamMembers(eventID int, sportID int, classID int) ([]*models.User, error)
+	AddBoardGameTeamMembers(eventID int, sportID int, classID int, userIDs []string) error
+	RemoveBoardGameTeamMember(eventID int, sportID int, classID int, userID string) error
 	GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*models.User, error)
 	RemoveTeamMember(teamID int, userID string) error
 	UpdateTeamCapacity(eventID int, sportID int, classID int, minCapacity *int, maxCapacity *int) error
@@ -212,6 +219,216 @@ func (r *teamRepository) GetTeamMembers(teamID int) ([]*models.User, error) {
 	}
 
 	return users, rows.Err()
+}
+
+type boardGameEntryTeam struct {
+	entryID int
+	teamID  int
+	slotKey string
+}
+
+type boardGameRosterMember struct {
+	userID       string
+	memberOrder  int
+	isSubstitute bool
+	slotKey      string
+}
+
+func loadBoardGameRoster(tx *sql.Tx, eventID, sportID, classID int) (string, []boardGameEntryTeam, []string, error) {
+	rows, err := tx.Query(`SELECT r.game_type,e.id,e.team_id,e.slot_key
+		FROM board_game_runs r JOIN board_game_entries e ON e.run_id=r.id
+		WHERE r.event_id=? AND r.sport_id=? AND e.class_id=?`, eventID, sportID, classID)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	gameType := ""
+	entries := make([]boardGameEntryTeam, 0, 2)
+	for rows.Next() {
+		var entry boardGameEntryTeam
+		if err := rows.Scan(&gameType, &entry.entryID, &entry.teamID, &entry.slotKey); err != nil {
+			rows.Close()
+			return "", nil, nil, err
+		}
+		entries = append(entries, entry)
+	}
+	if err := rows.Close(); err != nil {
+		return "", nil, nil, err
+	}
+	if len(entries) == 0 {
+		return "", nil, nil, ErrBoardGameRosterNotFound
+	}
+
+	memberRows, err := tx.Query(`SELECT e.slot_key,m.user_id,m.member_order,m.is_substitute
+		FROM board_game_entries e JOIN board_game_entry_members m ON m.entry_id=e.id
+		JOIN board_game_runs r ON r.id=e.run_id
+		WHERE r.event_id=? AND r.sport_id=? AND e.class_id=?`, eventID, sportID, classID)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	members := make([]boardGameRosterMember, 0, 4)
+	for memberRows.Next() {
+		var member boardGameRosterMember
+		if err := memberRows.Scan(&member.slotKey, &member.userID, &member.memberOrder, &member.isSubstitute); err != nil {
+			memberRows.Close()
+			return "", nil, nil, err
+		}
+		members = append(members, member)
+	}
+	if err := memberRows.Close(); err != nil {
+		return "", nil, nil, err
+	}
+
+	sort.SliceStable(members, func(i, j int) bool {
+		priority := func(member boardGameRosterMember) int {
+			if member.isSubstitute {
+				return 2
+			}
+			if member.slotKey == "B" {
+				return 1
+			}
+			return member.memberOrder
+		}
+		return priority(members[i]) < priority(members[j])
+	})
+	userIDs := make([]string, 0, 3)
+	seen := make(map[string]bool, len(members))
+	for _, member := range members {
+		if !seen[member.userID] {
+			seen[member.userID] = true
+			userIDs = append(userIDs, member.userID)
+		}
+	}
+	return gameType, entries, userIDs, nil
+}
+
+func rewriteBoardGameRoster(tx *sql.Tx, gameType string, entries []boardGameEntryTeam, userIDs []string) error {
+	if len(userIDs) > 3 {
+		return ErrBoardGameRosterFull
+	}
+	for _, entry := range entries {
+		if _, err := tx.Exec("DELETE FROM board_game_entry_members WHERE entry_id=?", entry.entryID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM team_members WHERE team_id=?", entry.teamID); err != nil {
+			return err
+		}
+
+		type assignment struct {
+			userID       string
+			isSubstitute bool
+		}
+		assignments := make([]assignment, 0, 3)
+		if gameType == "shogi" {
+			playerIndex := 0
+			if entry.slotKey == "B" {
+				playerIndex = 1
+			}
+			if playerIndex < len(userIDs) {
+				assignments = append(assignments, assignment{userID: userIDs[playerIndex]})
+			}
+			if len(userIDs) == 3 {
+				assignments = append(assignments, assignment{userID: userIDs[2], isSubstitute: true})
+			}
+		} else {
+			for _, userID := range userIDs {
+				assignments = append(assignments, assignment{userID: userID})
+			}
+		}
+		for order, assignment := range assignments {
+			if _, err := tx.Exec("INSERT INTO board_game_entry_members (entry_id,user_id,member_order,is_substitute) VALUES (?,?,?,?)", entry.entryID, assignment.userID, order, assignment.isSubstitute); err != nil {
+				return err
+			}
+			if _, err := tx.Exec("INSERT INTO team_members (team_id,user_id,is_confirmed) VALUES (?,?,TRUE)", entry.teamID, assignment.userID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *teamRepository) GetBoardGameTeamMembers(eventID int, sportID int, classID int) ([]*models.User, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	_, _, userIDs, err := loadBoardGameRoster(tx, eventID, sportID, classID)
+	if err != nil {
+		return nil, err
+	}
+	users := make([]*models.User, 0, len(userIDs))
+	for _, userID := range userIDs {
+		user := &models.User{}
+		var classIDValue sql.NullInt32
+		var displayName sql.NullString
+		err := tx.QueryRow(`SELECT id,email,display_name,class_id,is_profile_complete,created_at,updated_at FROM users WHERE id=?`, userID).
+			Scan(&user.ID, &user.Email, &displayName, &classIDValue, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		if displayName.Valid {
+			user.DisplayName = &displayName.String
+		}
+		if classIDValue.Valid {
+			value := int(classIDValue.Int32)
+			user.ClassID = &value
+		}
+		users = append(users, user)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (r *teamRepository) AddBoardGameTeamMembers(eventID int, sportID int, classID int, userIDs []string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	gameType, entries, currentIDs, err := loadBoardGameRoster(tx, eventID, sportID, classID)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]bool, len(currentIDs)+len(userIDs))
+	merged := make([]string, 0, len(currentIDs)+len(userIDs))
+	for _, userID := range append(currentIDs, userIDs...) {
+		if strings.TrimSpace(userID) == "" || seen[userID] {
+			continue
+		}
+		seen[userID] = true
+		merged = append(merged, userID)
+	}
+	if len(merged) > 3 {
+		return fmt.Errorf("%w: maximum is 3", ErrBoardGameRosterFull)
+	}
+	if err := rewriteBoardGameRoster(tx, gameType, entries, merged); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *teamRepository) RemoveBoardGameTeamMember(eventID int, sportID int, classID int, userID string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	gameType, entries, currentIDs, err := loadBoardGameRoster(tx, eventID, sportID, classID)
+	if err != nil {
+		return err
+	}
+	remaining := make([]string, 0, len(currentIDs))
+	for _, currentID := range currentIDs {
+		if currentID != userID {
+			remaining = append(remaining, currentID)
+		}
+	}
+	if err := rewriteBoardGameRoster(tx, gameType, entries, remaining); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *teamRepository) GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*models.User, error) {
