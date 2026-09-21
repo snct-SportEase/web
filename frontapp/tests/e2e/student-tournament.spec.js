@@ -65,29 +65,12 @@ test.describe('トーナメント閲覧 (student)', () => {
         ])
       });
     });
-    await page.route('**/api/student/events/1/board-game-runs', async (route) => {
-      await route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify([{
-          game_type: 'shogi',
-          location: 'ICTメディア室',
-          regular_minutes: 15,
-          final_minutes: 30,
-          win_points: 5,
-          tournaments: [{
-            id: 27,
-            entries: [{ id: 1, team_name: '1-1 A', members: [{ display_name: '参加者A', is_substitute: false }] }],
-            rankings: []
-          }]
-        }])
-      });
-    });
-
     await page.reload();
 
     await expect(page.locator('#bracket-36 .bracket-root')).toBeVisible();
     await expect(page.locator('#bracket-36')).toContainText('通常 1');
-    await expect(page.getByText('参加者A')).toBeVisible();
+    await expect(page.getByText('会場:')).toHaveCount(0);
+    await expect(page.getByText('出場者')).toHaveCount(0);
     await expect(page.locator('#bracket-27 .bracket-root')).toBeVisible();
     await expect(page.locator('#bracket-27')).toContainText('将棋 1');
   });

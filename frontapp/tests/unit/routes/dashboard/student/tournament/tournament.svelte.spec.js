@@ -67,22 +67,6 @@ describe('Student Tournament Page', () => {
         });
       }
 
-      if (url === '/api/student/events/1/board-game-runs') {
-        return Promise.resolve({
-          ok: true,
-          json: () => new Promise((resolve) => setTimeout(() => resolve([
-            {
-              game_type: 'shogi',
-              location: 'ICTメディア室',
-              regular_minutes: 15,
-              final_minutes: 30,
-              win_points: 5,
-              tournaments: [{ id: 2, entries: [], rankings: [] }]
-            }
-          ]), 20))
-        });
-      }
-
       return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
     }));
   });
@@ -93,7 +77,8 @@ describe('Student Tournament Page', () => {
     await expect.element(page.getByRole('heading', { name: 'バスケットボール Tournament' })).toBeInTheDocument();
     await expect.element(page.getByText('表示済み: 1A')).toBeInTheDocument();
     await expect.element(page.getByRole('heading', { name: '将棋 Aブロック' })).toBeInTheDocument();
-    await expect.element(page.getByText('会場: ICTメディア室')).toBeInTheDocument();
+    await expect.element(page.getByText('会場:')).not.toBeInTheDocument();
+    await expect.element(page.getByText('出場者')).not.toBeInTheDocument();
     await expect.element(page.getByText('表示済み: IE2 A')).toBeInTheDocument();
     expect(mocks.createBracket).toHaveBeenCalledTimes(2);
   });
