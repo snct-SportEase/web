@@ -222,7 +222,7 @@ describe('Tournament Management Page', () => {
 
     render(Page);
 
-    await expect.element(page.getByText('参加クラス（全16クラス固定）')).toBeInTheDocument();
+    await expect.element(page.getByText('参加クラス（全16クラス固定）')).not.toBeInTheDocument();
     await expect.element(page.getByText('代表選手・補欠', { exact: true })).not.toBeInTheDocument();
     await page.getByRole('button', { name: '盤上競技トーナメントを作成' }).click();
 

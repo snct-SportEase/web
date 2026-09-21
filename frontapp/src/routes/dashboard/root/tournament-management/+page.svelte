@@ -520,18 +520,6 @@
         </label>
     </div>
 
-    <fieldset class="mt-6">
-        <legend class="font-semibold">参加クラス（全16クラス固定）</legend>
-        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-            {#each boardGameClasses as classItem (classItem.id)}
-                <span class="rounded border bg-white px-3 py-2 text-sm">{classItem.name}</span>
-            {/each}
-        </div>
-        {#if boardGameClasses.length !== 16}
-            <p class="mt-2 text-sm text-red-700">現在は{boardGameClasses.length}クラスです。16クラス登録後に作成してください。</p>
-        {/if}
-    </fieldset>
-
     {#if selectedBoardClassIDs.length > 0}
         <div class="mt-6 grid gap-4 md:grid-cols-2">
             {#each (boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN']) as slot (slot)}
