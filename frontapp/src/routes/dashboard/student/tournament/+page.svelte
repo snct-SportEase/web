@@ -1,5 +1,5 @@
 <script>
-    import { onMount, tick } from 'svelte';
+    import { onMount } from 'svelte';
     import { browser } from '$app/environment';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
@@ -91,30 +91,46 @@
             isLoading = false;
         }
 
-        await renderAllBrackets();
     }
 
-    async function renderAllBrackets() {
-        if (!browser) return;
-        await tick();
-        for (const tournament of allTournaments) {
-            await renderBracket(tournament);
-        }
-    }
+    function bracket(node, initialData) {
+        let bracketInstance = null;
+        let renderVersion = 0;
 
-    async function renderBracket(tournament) {
-        if (!browser) return;
-        const wrapper = document.getElementById(`bracket-${tournament.id}`);
-        if (wrapper && tournament.data) {
-            wrapper.innerHTML = '';
+        async function render(data) {
+            const currentVersion = ++renderVersion;
+            bracketInstance?.uninstall?.();
+            bracketInstance = null;
+            node.replaceChildren();
+
+            if (!data) {
+                node.textContent = 'このトーナメント情報はありません。';
+                return;
+            }
+
             try {
                 const { createBracket } = await import('bracketry');
-                createBracket(tournament.data, wrapper);
+                if (currentVersion !== renderVersion) return;
+                bracketInstance = createBracket(data, node);
             } catch (error) {
                 console.error('Failed to load createBracket:', error);
-                wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';
+                if (currentVersion === renderVersion) {
+                    node.textContent = 'ブラケットの読み込みに失敗しました。';
+                }
             }
         }
+
+        void render(initialData);
+
+        return {
+            update(data) {
+                void render(data);
+            },
+            destroy() {
+                renderVersion += 1;
+                bracketInstance?.uninstall?.();
+            },
+        };
     }
 
     function boardGameForTournament(tournamentID) {
@@ -212,7 +228,7 @@
                                 {/if}
                             </section>
                         {/if}
-                        <div id="bracket-{tournament.id}"></div>
+                        <div id="bracket-{tournament.id}" use:bracket={tournament.data}></div>
                     </div>
                 {/if}
             {/each}

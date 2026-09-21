@@ -49,6 +49,19 @@ describe('Student Tournament Page', () => {
                   c1: { players: [{ title: '1B' }] }
                 }
               }
+            },
+            {
+              id: 2,
+              name: '将棋 Aブロック',
+              sport_id: 10,
+              data: {
+                rounds: [{ name: '決勝' }],
+                matches: [{ roundIndex: 0, order: 0, sides: [{ contestantId: 'c0' }, { contestantId: 'c1' }] }],
+                contestants: {
+                  c0: { players: [{ title: 'IE2 A' }] },
+                  c1: { players: [{ title: 'IS2 A' }] }
+                }
+              }
             }
           ])
         });
@@ -57,7 +70,16 @@ describe('Student Tournament Page', () => {
       if (url === '/api/student/events/1/board-game-runs') {
         return Promise.resolve({
           ok: true,
-          json: () => new Promise((resolve) => setTimeout(() => resolve([]), 20))
+          json: () => new Promise((resolve) => setTimeout(() => resolve([
+            {
+              game_type: 'shogi',
+              location: 'ICTメディア室',
+              regular_minutes: 15,
+              final_minutes: 30,
+              win_points: 5,
+              tournaments: [{ id: 2, entries: [], rankings: [] }]
+            }
+          ]), 20))
         });
       }
 
@@ -65,11 +87,14 @@ describe('Student Tournament Page', () => {
     }));
   });
 
-  it('すべてのAPI取得とDOM更新が完了してから通常トーナメントを描画する', async () => {
+  it('通常競技と盤上競技の表示領域がマウントされた後に各トーナメントを描画する', async () => {
     render(Page);
 
     await expect.element(page.getByRole('heading', { name: 'バスケットボール Tournament' })).toBeInTheDocument();
     await expect.element(page.getByText('表示済み: 1A')).toBeInTheDocument();
-    expect(mocks.createBracket).toHaveBeenCalledOnce();
+    await expect.element(page.getByRole('heading', { name: '将棋 Aブロック' })).toBeInTheDocument();
+    await expect.element(page.getByText('会場: ICTメディア室')).toBeInTheDocument();
+    await expect.element(page.getByText('表示済み: IE2 A')).toBeInTheDocument();
+    expect(mocks.createBracket).toHaveBeenCalledTimes(2);
   });
 });
