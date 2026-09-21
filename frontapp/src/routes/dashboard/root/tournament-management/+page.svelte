@@ -44,6 +44,10 @@
             : { name: 'オセロ', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 10, rank1: 50, rank2: 40, rank3: 30, rank4: 20, regularMinutes: 10, finalMinutes: 20, rulesPdfUrl: '' };
     }
 
+    function makeBoardSeedItems(slot, classIDs) {
+        return classIDs.map((classID) => ({ id: `${slot}-${classID}`, classID }));
+    }
+
     async function fetchBoardGameSetup() {
         const currentEvent = get(activeEvent);
         if (!currentEvent) return;
@@ -71,9 +75,9 @@
             boardGameForm = defaultBoardGameForm(type);
             selectedBoardClassIDs = boardGameClasses.map((item) => item.id);
             boardSeedOrders = {
-                A: [...selectedBoardClassIDs],
-                B: [...selectedBoardClassIDs],
-                MAIN: [...selectedBoardClassIDs],
+                A: makeBoardSeedItems('A', selectedBoardClassIDs),
+                B: makeBoardSeedItems('B', selectedBoardClassIDs),
+                MAIN: makeBoardSeedItems('MAIN', selectedBoardClassIDs),
             };
             return;
         }
@@ -92,20 +96,23 @@
             rulesPdfUrl: run.rules_pdf_url || '',
         };
         selectedBoardClassIDs = boardGameClasses.map((item) => item.id);
+        const nextSeedOrders = {
+            A: makeBoardSeedItems('A', selectedBoardClassIDs),
+            B: makeBoardSeedItems('B', selectedBoardClassIDs),
+            MAIN: makeBoardSeedItems('MAIN', selectedBoardClassIDs),
+        };
         for (const tournament of run.tournaments || []) {
             const sortedEntries = [...(tournament.entries || [])].sort((a, b) => a.seed_number - b.seed_number);
             const savedOrder = sortedEntries.map((entry) => entry.class_id).filter((classID) => selectedBoardClassIDs.includes(classID));
-            boardSeedOrders[tournament.slot_key] = [...savedOrder, ...selectedBoardClassIDs.filter((classID) => !savedOrder.includes(classID))];
+            const classIDs = [...savedOrder, ...selectedBoardClassIDs.filter((classID) => !savedOrder.includes(classID))];
+            nextSeedOrders[tournament.slot_key] = makeBoardSeedItems(tournament.slot_key, classIDs);
         }
-        boardSeedOrders = { ...boardSeedOrders };
+        boardSeedOrders = nextSeedOrders;
     }
 
-    function moveBoardSeed(slot, index, direction) {
-        const target = index + direction;
-        const order = [...boardSeedOrders[slot]];
-        if (target < 0 || target >= order.length) return;
-        [order[index], order[target]] = [order[target], order[index]];
-        boardSeedOrders = { ...boardSeedOrders, [slot]: order };
+    function handleBoardSeedDnd(slot, event) {
+        if (!Array.isArray(event.detail?.items)) return;
+        boardSeedOrders = { ...boardSeedOrders, [slot]: event.detail.items };
     }
 
     function boardClassName(classID) {
@@ -133,7 +140,7 @@
         try {
             const rulesPdfUrl = await uploadBoardGamePdf();
             const slots = boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN'];
-            const seedOrders = Object.fromEntries(slots.map((slot) => [slot, boardSeedOrders[slot]]));
+            const seedOrders = Object.fromEntries(slots.map((slot) => [slot, boardSeedOrders[slot].map((item) => item.classID)]));
             const response = await fetch(`/api/root/events/${currentEvent.id}/tournament-templates/board-game/run`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -521,18 +528,22 @@
     </div>
 
     {#if selectedBoardClassIDs.length > 0}
+        <p class="mt-6 text-sm text-gray-600">クラスをドラッグ＆ドロップしてシード順を変更できます。</p>
         <div class="mt-6 grid gap-4 md:grid-cols-2">
             {#each (boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN']) as slot (slot)}
                 <div class="rounded border bg-white p-3">
                     <h3 class="mb-2 font-semibold">{slot === 'MAIN' ? '本戦' : `${slot}ブロック`} シード順</h3>
-                    <ol class="space-y-1">
-                        {#each boardSeedOrders[slot] as classID, index (classID)}
-                            <li class="flex items-center justify-between rounded bg-gray-50 px-3 py-2 text-sm">
-                                <span>{index + 1}. {boardClassName(classID)}</span>
-                                <span class="flex gap-1">
-                                    <button type="button" class="rounded border px-2 py-1 disabled:opacity-40" disabled={index === 0} onclick={() => moveBoardSeed(slot, index, -1)} aria-label="上へ移動">↑</button>
-                                    <button type="button" class="rounded border px-2 py-1 disabled:opacity-40" disabled={index === boardSeedOrders[slot].length - 1} onclick={() => moveBoardSeed(slot, index, 1)} aria-label="下へ移動">↓</button>
-                                </span>
+                    <ol
+                        class="draggable-list space-y-1"
+                        aria-label={`${slot === 'MAIN' ? '本戦' : `${slot}ブロック`}のシード順`}
+                        use:dndzone={{ items: boardSeedOrders[slot], flipDurationMs, type: `board-seed-${slot}` }}
+                        onconsider={(event) => handleBoardSeedDnd(slot, event)}
+                        onfinalize={(event) => handleBoardSeedDnd(slot, event)}
+                    >
+                        {#each boardSeedOrders[slot] as item, index (item.id)}
+                            <li class="flex items-center gap-3 rounded bg-gray-50 px-3 py-2 text-sm">
+                                <span aria-hidden="true" class="select-none text-gray-400">⠿</span>
+                                <span>{index + 1}. {boardClassName(item.classID)}</span>
                             </li>
                         {/each}
                     </ol>
