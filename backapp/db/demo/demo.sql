@@ -287,30 +287,40 @@ SET @volley_final = (SELECT id FROM matches WHERE tournament_id = @volleyball_to
 UPDATE matches SET next_match_id = @volley_final WHERE id IN (@volley_sf1, @volley_sf2);
 
 -- 昼競技。再投入時はデモ大会のセッション一式を作り直す。
-SET @old_noon_session_id = (
-    SELECT id FROM noon_game_sessions WHERE event_id = @demo_event_id
-);
 DELETE rd FROM noon_game_result_details rd
 JOIN noon_game_results nr ON nr.id = rd.result_id
 JOIN noon_game_matches nm ON nm.id = nr.match_id
-WHERE nm.session_id = @old_noon_session_id;
+JOIN noon_game_sessions ns ON ns.id = nm.session_id
+WHERE ns.event_id = @demo_event_id;
 DELETE trm FROM noon_game_template_run_matches trm
 JOIN noon_game_template_runs tr ON tr.id = trm.run_id
-WHERE tr.session_id = @old_noon_session_id;
-DELETE FROM noon_game_points WHERE session_id = @old_noon_session_id;
+JOIN noon_game_sessions ns ON ns.id = tr.session_id
+WHERE ns.event_id = @demo_event_id;
+DELETE ngp FROM noon_game_points ngp
+JOIN noon_game_sessions ns ON ns.id = ngp.session_id
+WHERE ns.event_id = @demo_event_id;
 DELETE nr FROM noon_game_results nr
 JOIN noon_game_matches nm ON nm.id = nr.match_id
-WHERE nm.session_id = @old_noon_session_id;
+JOIN noon_game_sessions ns ON ns.id = nm.session_id
+WHERE ns.event_id = @demo_event_id;
 DELETE nme FROM noon_game_match_entries nme
 JOIN noon_game_matches nm ON nm.id = nme.match_id
-WHERE nm.session_id = @old_noon_session_id;
-DELETE FROM noon_game_template_runs WHERE session_id = @old_noon_session_id;
-DELETE FROM noon_game_matches WHERE session_id = @old_noon_session_id;
+JOIN noon_game_sessions ns ON ns.id = nm.session_id
+WHERE ns.event_id = @demo_event_id;
+DELETE tr FROM noon_game_template_runs tr
+JOIN noon_game_sessions ns ON ns.id = tr.session_id
+WHERE ns.event_id = @demo_event_id;
+DELETE nm FROM noon_game_matches nm
+JOIN noon_game_sessions ns ON ns.id = nm.session_id
+WHERE ns.event_id = @demo_event_id;
 DELETE ngm FROM noon_game_group_members ngm
 JOIN noon_game_groups ng ON ng.id = ngm.group_id
-WHERE ng.session_id = @old_noon_session_id;
-DELETE FROM noon_game_groups WHERE session_id = @old_noon_session_id;
-DELETE FROM noon_game_sessions WHERE id = @old_noon_session_id;
+JOIN noon_game_sessions ns ON ns.id = ng.session_id
+WHERE ns.event_id = @demo_event_id;
+DELETE ng FROM noon_game_groups ng
+JOIN noon_game_sessions ns ON ns.id = ng.session_id
+WHERE ns.event_id = @demo_event_id;
+DELETE FROM noon_game_sessions WHERE event_id = @demo_event_id;
 
 INSERT INTO noon_game_sessions (
     event_id, name, description, mode,
