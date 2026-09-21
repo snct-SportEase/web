@@ -23,5 +23,6 @@ test.describe('トーナメント閲覧 (student)', () => {
     await expect(page.getByRole('heading', { name: 'トーナメント一覧' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'バスケットボール', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'バスケットボール 敗者復活' })).toBeVisible();
+    await expect(page.locator('#bracket-1 .bracket-root')).toBeVisible();
   });
 });
