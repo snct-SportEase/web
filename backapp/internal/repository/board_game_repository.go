@@ -57,21 +57,15 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 			return nil, err
 		}
 		if sportUsageCount == 1 {
-			if _, err := tx.Exec("UPDATE sports SET name=? WHERE id=?", input.Name, sportID); err != nil {
+			if _, err := tx.Exec("UPDATE sports SET name=? WHERE id=?", input.SportName, sportID); err != nil {
 				return nil, err
 			}
 		}
 	} else {
-		// 盤上競技は大会ごとに設定と名称を持つため、共有の競技マスタを再利用しない。
-		result, insertErr := tx.Exec("INSERT INTO sports (name) VALUES (?)", input.Name)
-		if insertErr != nil {
-			return nil, insertErr
+		sportID, err = findOrCreateBoardGameSport(tx, input.EventID, input.SportName)
+		if err != nil {
+			return nil, err
 		}
-		id, idErr := result.LastInsertId()
-		if idErr != nil {
-			return nil, idErr
-		}
-		sportID = int(id)
 	}
 
 	templateKey := "board_game_tournament"
@@ -160,6 +154,32 @@ func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*mode
 		return nil, err
 	}
 	return r.GetRunByID(runID)
+}
+
+func findOrCreateBoardGameSport(tx *sql.Tx, eventID int, sportName string) (int, error) {
+	var sportID int
+	err := tx.QueryRow(`SELECT es.sport_id
+		FROM event_sports es
+		JOIN sports s ON s.id=es.sport_id
+		WHERE es.event_id=? AND TRIM(s.name)=?
+		ORDER BY CASE WHEN es.template_key='board_game_tournament' THEN 0 ELSE 1 END, es.sport_id
+		LIMIT 1`, eventID, sportName).Scan(&sportID)
+	if err == nil {
+		return sportID, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	result, err := tx.Exec("INSERT INTO sports (name) VALUES (?)", sportName)
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return int(id), nil
 }
 
 type boardGamePreservedRoster struct {

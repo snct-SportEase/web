@@ -278,7 +278,7 @@ func (h *BoardGameHandler) buildRunCreate(eventID int, createdBy string, req *bo
 		tournaments = append(tournaments, models.BoardGameTournamentCreate{Name: tournamentName, SlotKey: slot, Entries: entries, Data: data})
 	}
 
-	return &models.BoardGameRunCreate{EventID: eventID, GameType: req.GameType, Name: name, Description: req.Description, Location: location, RulesPDFURL: req.RulesPDFURL, ScheduledDate: req.ScheduledDate, WinPoints: winPoints, RankPoints: rankPoints, RegularMinutes: regularMinutes, FinalMinutes: finalMinutes, PlayersPerClass: preset.PlayersPerClass, SubstitutesPerClass: preset.SubstitutesPerClass, Status: req.Status, CreatedBy: createdBy, Tournaments: tournaments}, nil
+	return &models.BoardGameRunCreate{EventID: eventID, GameType: req.GameType, SportName: preset.Name, Name: name, Description: req.Description, Location: location, RulesPDFURL: req.RulesPDFURL, ScheduledDate: req.ScheduledDate, WinPoints: winPoints, RankPoints: rankPoints, RegularMinutes: regularMinutes, FinalMinutes: finalMinutes, PlayersPerClass: preset.PlayersPerClass, SubstitutesPerClass: preset.SubstitutesPerClass, Status: req.Status, CreatedBy: createdBy, Tournaments: tournaments}, nil
 }
 
 func fixedBoardGameParticipants(classes []*models.Class) ([]boardGameParticipant, error) {

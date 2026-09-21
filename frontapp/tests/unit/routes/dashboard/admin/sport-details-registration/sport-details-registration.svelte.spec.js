@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from '$src/routes/dashboard/admin/sport-details-registration/+page.svelte';
 
+vi.mock('bracketry', () => ({
+  createBracket: vi.fn()
+}));
+
 const classes = [
   { id: 1, name: '1A' },
   { id: 2, name: '1B' }
@@ -181,5 +185,46 @@ describe('Sport Details Registration Page', () => {
       { sport_id: '1', class_id: '2', min_capacity: 5, max_capacity: 7 }
     ]);
     expect(alertMock).toHaveBeenCalledWith('すべてのクラスの雨天時定員設定を更新しました。');
+  });
+
+  it('重複した盤上競技を1件にまとめ、名前に依存せずトーナメントを参照できる', async () => {
+    fetchMock = vi.fn((url) => {
+      if (url === '/api/events/active') {
+        return jsonResponse({ event_id: 1, event_name: '2025春季スポーツ大会', is_rainy_mode: false });
+      }
+      if (url === '/api/events/1/sports') {
+        return jsonResponse([
+          { sport_id: 3, sport_name: '将棋', template_key: null },
+          { sport_id: 9, sport_name: '将棋', template_key: 'board_game_tournament' },
+          { sport_id: 10, sport_name: 'オセロ', template_key: 'board_game_tournament' },
+          { sport_id: 11, sport_name: 'オセロ', template_key: null }
+        ]);
+      }
+      if (url === '/api/admin/events/1/tournaments') {
+        return jsonResponse([
+          { id: 101, name: '将棋 Aブロック', sport_id: 9, data: { rounds: [], matches: [], contestants: {} } },
+          { id: 102, name: '将棋 Bブロック', sport_id: 9, data: { rounds: [], matches: [], contestants: {} } }
+        ]);
+      }
+      if (url === '/api/admin/class-team/managed-class') return jsonResponse([]);
+      if (url === '/api/admin/events/1/sports/9/details') return jsonResponse({});
+      if (url === '/api/admin/events/1/sports/9/teams') return jsonResponse([]);
+      if (url === '/api/admin/events/1/rainy-mode/settings') return jsonResponse([]);
+      return jsonResponse({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(Page);
+
+    await expect.element(page.getByRole('option', { name: '将棋' })).toBeInTheDocument();
+    expect(document.querySelectorAll('#sport-select option[value="9"]')).toHaveLength(1);
+    expect(document.querySelectorAll('#sport-select option').length).toBe(3);
+
+    await page.getByLabelText('競技選択').selectOptions('9');
+
+    await expect.element(page.getByLabelText('トーナメント選択')).toBeInTheDocument();
+    await expect.element(page.getByRole('option', { name: '将棋 Aブロック' })).toBeInTheDocument();
+    await expect.element(page.getByRole('option', { name: '将棋 Bブロック' })).toBeInTheDocument();
+    expect(document.querySelector('#tournament-select')?.value).toBe('101');
   });
 });

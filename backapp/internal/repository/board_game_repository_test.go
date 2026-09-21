@@ -111,3 +111,37 @@ func TestDeleteBoardGameRunDataDeletesOnlyOwnedTournaments(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestFindOrCreateBoardGameSportReusesAssignedSport(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT es.sport_id
+		FROM event_sports es
+		JOIN sports s ON s.id=es.sport_id
+		WHERE es.event_id=? AND TRIM(s.name)=?
+		ORDER BY CASE WHEN es.template_key='board_game_tournament' THEN 0 ELSE 1 END, es.sport_id
+		LIMIT 1`)).
+		WithArgs(7, "将棋").
+		WillReturnRows(sqlmock.NewRows([]string{"sport_id"}).AddRow(9))
+
+	sportID, err := findOrCreateBoardGameSport(tx, 7, "将棋")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sportID != 9 {
+		t.Fatalf("unexpected sport ID: %d", sportID)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

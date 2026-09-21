@@ -112,14 +112,30 @@ func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport,
 	defer rows.Close()
 
 	var eventSports []*models.EventSport
+	boardGameIndexes := make(map[string]int)
 	for rows.Next() {
 		eventSport := &models.EventSport{}
 		if err := rows.Scan(&eventSport.EventID, &eventSport.SportID, &eventSport.SportName, &eventSport.Description, &eventSport.RulesPdfURL, &eventSport.Location, &eventSport.TemplateKey, &eventSport.MinCapacity, &eventSport.MaxCapacity); err != nil {
 			return nil, err
 		}
+		name := strings.TrimSpace(eventSport.SportName)
+		if name == "将棋" || name == "オセロ" {
+			if index, exists := boardGameIndexes[name]; exists {
+				existing := eventSports[index]
+				if isBoardGameTemplate(eventSport.TemplateKey) && !isBoardGameTemplate(existing.TemplateKey) {
+					eventSports[index] = eventSport
+				}
+				continue
+			}
+			boardGameIndexes[name] = len(eventSports)
+		}
 		eventSports = append(eventSports, eventSport)
 	}
 	return eventSports, nil
+}
+
+func isBoardGameTemplate(templateKey *string) bool {
+	return templateKey != nil && *templateKey == "board_game_tournament"
 }
 
 // AssignSportToEvent assigns a sport to an event in the database.
