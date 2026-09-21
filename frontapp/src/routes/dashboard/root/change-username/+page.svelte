@@ -10,6 +10,7 @@ import { onMount } from 'svelte';
   let searchQuery = $state('');
   let searchType = $state('email'); // 'email' or 'display_name'
   let selectedClassFilter = $state('');
+  let selectedRoleFilter = $state('');
   let sortKey = $state('');
   let sortDirection = $state('asc');
   let selectedUser = $state(null);
@@ -265,6 +266,21 @@ import { onMount } from 'svelte';
     return String(user?.class_id) === selectedClassFilter;
   }
 
+  function getAvailableRoles() {
+    const roleNames = users.flatMap((user) => (user.roles ?? []).map((role) => role.name));
+    return [...new Set(roleNames)].sort((left, right) => left.localeCompare(right, 'ja', {
+      numeric: true,
+      sensitivity: 'base'
+    }));
+  }
+
+  function matchesRoleFilter(user) {
+    const roles = user?.roles ?? [];
+    if (selectedRoleFilter === '') return true;
+    if (selectedRoleFilter === '__none__') return roles.length === 0;
+    return roles.some((role) => role.name === selectedRoleFilter);
+  }
+
   function sortBy(key) {
     if (sortKey === key) {
       sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -281,7 +297,7 @@ import { onMount } from 'svelte';
   }
 
   function getFilteredUsers() {
-    return users.filter((user) => matchesClassFilter(user));
+    return users.filter((user) => matchesClassFilter(user) && matchesRoleFilter(user));
   }
 
   function getVisibleUserCount() {
@@ -372,7 +388,7 @@ import { onMount } from 'svelte';
   <!-- ユーザー検索カード -->
   <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
     <h2 class="text-lg font-semibold text-gray-800 mb-4">ユーザー検索</h2>
-    <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
+    <div class="flex flex-col md:flex-row md:flex-wrap items-start md:items-center gap-4">
       <!-- 検索タイプ選択 -->
       <div class="flex items-center gap-2">
         <label class="flex items-center gap-2 cursor-pointer">
@@ -428,6 +444,22 @@ import { onMount } from 'svelte';
           <option value="__none__">クラス未設定</option>
         </select>
       </div>
+
+      <div class="w-full md:w-48">
+        <label for="roleFilter" class="sr-only">ロールで絞り込み</label>
+        <select
+          id="roleFilter"
+          class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          bind:value={selectedRoleFilter}
+          aria-label="ロールで絞り込み"
+        >
+          <option value="">すべてのロール</option>
+          {#each getAvailableRoles() as role (role)}
+            <option value={role}>{role}</option>
+          {/each}
+          <option value="__none__">ロールなし</option>
+        </select>
+      </div>
       
       <!-- 検索ボタン -->
       <button 
@@ -441,7 +473,7 @@ import { onMount } from 'svelte';
       <!-- すべて表示ボタン -->
       <button 
         class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed" 
-        onclick={() => { searchQuery = ''; selectedClassFilter = ''; fetchUsers('', ''); }}
+        onclick={() => { searchQuery = ''; selectedClassFilter = ''; selectedRoleFilter = ''; fetchUsers('', ''); }}
         disabled={isLoading}
       >
         すべて表示

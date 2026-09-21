@@ -163,6 +163,24 @@ describe('Change Username Page', () => {
     expect(document.querySelector('[aria-label="表示中ユーザー数"]')?.textContent?.trim()).toBe('表示中 2 / 全 2 件');
   });
 
+  it('ロールでユーザー一覧を絞り込みできる', async () => {
+    render(Page);
+
+    await expect.element(page.getByText('student1@sendai-nct.jp')).toBeInTheDocument();
+    await expect.element(page.getByText('admin1@sendai-nct.jp')).toBeInTheDocument();
+
+    await page.getByLabelText('ロールで絞り込み').selectOptions('judge');
+
+    await expect.element(page.getByText('student1@sendai-nct.jp')).toBeInTheDocument();
+    await expect.element(page.getByText('admin1@sendai-nct.jp')).not.toBeInTheDocument();
+    expect(document.querySelector('[aria-label="表示中ユーザー数"]')?.textContent?.trim()).toBe('表示中 1 / 全 2 件');
+
+    await page.getByRole('button', { name: 'すべて表示' }).click();
+
+    await expect.element(page.getByText('student1@sendai-nct.jp')).toBeInTheDocument();
+    await expect.element(page.getByText('admin1@sendai-nct.jp')).toBeInTheDocument();
+  });
+
   it('表示名を更新できる', async () => {
     render(Page);
 

@@ -43,6 +43,16 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.getByLabel('表示中ユーザー数')).toHaveText('表示中 1 / 全 2 件');
   });
 
+  test('ロールで絞り込むと表示件数も更新される', async ({ page }) => {
+    await expect(page.getByLabel('表示中ユーザー数')).toHaveText('表示中 2 / 全 2 件');
+
+    await page.getByLabel('ロールで絞り込み').selectOption('student');
+
+    await expect(page.getByText('student1@sendai-nct.jp')).toBeVisible();
+    await expect(page.getByText('admin1@sendai-nct.jp')).toHaveCount(0);
+    await expect(page.getByLabel('表示中ユーザー数')).toHaveText('表示中 1 / 全 2 件');
+  });
+
   test('表示名を更新できる', async ({ page }) => {
     await page.locator('tbody button').first().click({ force: true });
     await expect(page.locator('#displayNameInput')).toBeVisible();
