@@ -4,6 +4,7 @@ import (
 	"backapp/internal/handler"
 	"backapp/internal/models"
 	"backapp/internal/websocket"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -296,6 +297,44 @@ func TestGenerateAllTournamentsPreview_ParallelProcessingContracts(t *testing.T)
 		mockSportRepo.AssertExpectations(t)
 	})
 
+	t.Run("将棋・オセロはtemplate_key未設定の既存データでも除外する", func(t *testing.T) {
+		mockTournRepo := new(MockTournamentRepository)
+		mockSportRepo := new(MockSportRepository)
+		mockTeamRepo := new(MockTeamRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		hubManager := websocket.NewHubManager()
+
+		h := handler.NewTournamentHandler(mockTournRepo, mockSportRepo, mockTeamRepo, mockClassRepo, mockEventRepo, hubManager)
+
+		const eventID = 1
+		boardGameTemplate := "board_game_tournament"
+		mockSportRepo.On("GetSportsByEventID", eventID).Return([]*models.EventSport{
+			// 既存の将棋データには template_key がない場合がある。
+			{EventID: eventID, SportID: 1, Location: "other"},
+			{EventID: eventID, SportID: 2, Location: "other", TemplateKey: &boardGameTemplate},
+			{EventID: eventID, SportID: 3, Location: "gym1"},
+		}, nil).Once()
+		mockSportRepo.On("GetSportByID", 1).Return(&models.Sport{ID: 1, Name: "将棋"}, nil).Once()
+		mockSportRepo.On("GetSportByID", 3).Return(&models.Sport{ID: 3, Name: "バレーボール"}, nil).Once()
+		mockSportRepo.On("GetTeamsBySportID", 3).Return(makeTournamentPreviewTeams(eventID, 3, 30), nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+
+		h.GenerateAllTournamentsPreviewHandler(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var tournaments []models.GeneratedTournament
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &tournaments))
+		assert.Len(t, tournaments, 1)
+		assert.Equal(t, "バレーボール", tournaments[0].SportName)
+		mockSportRepo.AssertNotCalled(t, "GetTeamsBySportID", 1)
+		mockSportRepo.AssertNotCalled(t, "GetSportByID", 2)
+		mockSportRepo.AssertExpectations(t)
+	})
+
 	t.Run("一部競技の取得に失敗しても他競技のプレビュー生成を継続する", func(t *testing.T) {
 		mockTournRepo := new(MockTournamentRepository)
 		mockSportRepo := new(MockSportRepository)
@@ -432,4 +471,34 @@ func TestGenerateAllTournamentsPreview_LoserBracketFirstRoundMatchMapping(t *tes
 		// - Loser bracket A and B tournaments are created separately
 		// The actual loser assignment happens when match results are recorded.
 	})
+}
+
+func TestBulkCreateTournamentsRejectsBoardGameSports(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockTournRepo := new(MockTournamentRepository)
+	mockSportRepo := new(MockSportRepository)
+	mockTeamRepo := new(MockTeamRepository)
+	mockClassRepo := new(MockClassRepository)
+	mockEventRepo := new(MockEventRepository)
+	h := handler.NewTournamentHandler(mockTournRepo, mockSportRepo, mockTeamRepo, mockClassRepo, mockEventRepo, websocket.NewHubManager())
+
+	const eventID = 1
+	mockSportRepo.On("GetSportsByEventID", eventID).Return([]*models.EventSport{
+		// template_key が未設定の旧データも名称で保護する。
+		{EventID: eventID, SportID: 1, SportName: "オセロ", Location: "other"},
+	}, nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+	c.Request = httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`[{"event_id":1,"sport_id":1,"sport_name":"オセロ"}]`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	h.BulkCreateTournamentsHandler(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	mockTournRepo.AssertNotCalled(t, "DeleteTournamentsByEventID", eventID)
+	mockTournRepo.AssertNotCalled(t, "SaveTournament")
+	mockSportRepo.AssertExpectations(t)
 }

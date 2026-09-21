@@ -194,7 +194,9 @@ func TestTournamentRepository_DeleteTournamentsClosesRowsBeforeDelete(t *testing
 
 	r := repository.NewTournamentRepository(db)
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM tournaments WHERE event_id = ?")).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT t.id FROM tournaments t
+		WHERE t.event_id = ?
+		  AND NOT EXISTS (SELECT 1 FROM board_game_entries e WHERE e.tournament_id = t.id)`)).
 		WithArgs(7).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10).AddRow(11)).
 		RowsWillBeClosed()

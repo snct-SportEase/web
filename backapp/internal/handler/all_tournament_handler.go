@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
@@ -114,6 +115,11 @@ func (h *TournamentHandler) generateTournamentsPreviewForSport(eventID int, even
 	if err != nil {
 		return generatedTournaments
 	}
+	// 盤上競技テンプレート導入前に登録された将棋・オセロには template_key が
+	// 設定されていないことがある。その場合も専用画面で管理するため除外する。
+	if isBoardGameTournamentSportName(sport.Name) {
+		return generatedTournaments
+	}
 
 	teams, err := h.sportRepo.GetTeamsBySportID(sport.ID)
 	if err != nil {
@@ -202,17 +208,26 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sports for the event"})
 		return
 	}
-	locationBySportID := make(map[int]string, len(eventSports))
+	eventSportBySportID := make(map[int]*models.EventSport, len(eventSports))
 	for _, es := range eventSports {
-		locationBySportID[es.SportID] = es.Location
+		eventSportBySportID[es.SportID] = es
 	}
 	for _, t := range tournamentsToCreate {
 		if t.EventID != 0 && t.EventID != eventID {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "EventID mismatch"})
 			return
 		}
-		if locationBySportID[t.SportID] == "noon_game" {
+		eventSport, exists := eventSportBySportID[t.SportID]
+		if !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Sport does not belong to the event"})
+			return
+		}
+		if eventSport.Location == "noon_game" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "昼競技(noon_game)はトーナメント生成の対象外です"})
+			return
+		}
+		if (eventSport.TemplateKey != nil && *eventSport.TemplateKey == "board_game_tournament") || isBoardGameTournamentSportName(eventSport.SportName) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "将棋・オセロは一括トーナメント生成の対象外です"})
 			return
 		}
 	}
@@ -242,6 +257,15 @@ func (h *TournamentHandler) BulkCreateTournamentsHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Tournaments created successfully."})
+}
+
+func isBoardGameTournamentSportName(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "将棋", "オセロ":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *TournamentHandler) GenerateAllTournamentsHandler(c *gin.Context) {

@@ -39,6 +39,10 @@
 	let selectedClass = $derived(
 		selectedClassId !== null ? classes.find((c) => c.id === selectedClassId) : null
 	);
+	let selectedSport = $derived(
+		selectedSportId !== null ? availableSports.find((sport) => sport.id === selectedSportId) : null
+	);
+	let isBoardGameSelected = $derived(selectedSport?.templateKey === 'board_game_tournament');
 	function toNumber(value) {
 		if (value === '' || value === null || value === undefined) {
 			return null;
@@ -145,8 +149,25 @@
 		if (selectedMembers.find((m) => m.id === user.id)) {
 			selectedMembers = selectedMembers.filter((m) => m.id !== user.id);
 		} else {
+			if (isBoardGameSelected && selectedMembers.length >= 3) {
+				error = '盤上競技は1クラス3名までです';
+				return;
+			}
 			selectedMembers = [...selectedMembers, user];
 		}
+	}
+
+	function boardGameRole(index) {
+		if (selectedSport?.gameType === 'shogi') {
+			return ['代表A', '代表B', '補欠'][index] || '';
+		}
+		return `代表${index + 1}`;
+	}
+
+	function selectedBoardGameRole(userId) {
+		if (!isBoardGameSelected) return '';
+		const index = selectedMembers.findIndex((member) => member.id === userId);
+		return index >= 0 ? boardGameRole(index) : '';
 	}
 
 	async function assignMembers() {
@@ -313,6 +334,9 @@
 												onchange={() => toggleMemberSelection(member)}
 												class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 											/>
+											{#if selectedBoardGameRole(member.id)}
+												<span class="ml-2 text-xs font-medium text-blue-700">{selectedBoardGameRole(member.id)}</span>
+											{/if}
 										</td>
 										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 											{member.display_name || '未設定'}
@@ -342,6 +366,13 @@
 						</option>
 					{/each}
 				</select>
+				{#if isBoardGameSelected}
+					<p class="mt-2 text-sm text-blue-700">
+						{selectedSport?.gameType === 'shogi'
+							? '選択順に「代表A・代表B・補欠」として登録します（3名まで）。'
+							: '選択順に代表1〜3として登録します（3名まで）。'}
+					</p>
+				{/if}
 				{#if noonSessionName && !noonSessionSportMatched}
 					<p class="mt-2 text-sm text-amber-700">
 						昼競技セッション「{noonSessionName}」は競技マスタに同名の競技がないため、割り当て候補に表示できません。
@@ -357,7 +388,7 @@
 						disabled={assignLoading}
 						class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
 					>
-						{assignLoading ? '割り当て中...' : `選択した${selectedMembers.length}名を割り当てる`}
+						{assignLoading ? '割り当て中...' : `選択した${selectedMembers.length}名を${isBoardGameSelected ? '選択順で' : ''}割り当てる`}
 					</button>
 				</div>
 			{/if}
@@ -377,14 +408,16 @@
 							<table class="min-w-full divide-y divide-gray-200">
 								<thead class="bg-gray-50">
 									<tr>
+										{#if isBoardGameSelected}<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">区分</th>{/if}
 										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">表示名</th>
 										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">メールアドレス</th>
 										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
 									</tr>
 								</thead>
 								<tbody class="bg-white divide-y divide-gray-200">
-									{#each assignedMembers as member (member.id)}
+									{#each assignedMembers as member, index (member.id)}
 										<tr class="hover:bg-gray-50">
+											{#if isBoardGameSelected}<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-700">{boardGameRole(index)}</td>{/if}
 											<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 												{member.display_name || '未設定'}
 											</td>

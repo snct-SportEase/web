@@ -256,6 +256,24 @@ func (m *MockTeamRepository) GetTeamMembers(teamID int) ([]*models.User, error) 
 	return args.Get(0).([]*models.User), args.Error(1)
 }
 
+func (m *MockTeamRepository) GetBoardGameTeamMembers(eventID int, sportID int, classID int) ([]*models.User, error) {
+	args := m.Called(eventID, sportID, classID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.User), args.Error(1)
+}
+
+func (m *MockTeamRepository) AddBoardGameTeamMembers(eventID int, sportID int, classID int, userIDs []string) error {
+	args := m.Called(eventID, sportID, classID, userIDs)
+	return args.Error(0)
+}
+
+func (m *MockTeamRepository) RemoveBoardGameTeamMember(eventID int, sportID int, classID int, userID string) error {
+	args := m.Called(eventID, sportID, classID, userID)
+	return args.Error(0)
+}
+
 func (m *MockTeamRepository) GetTeamMembersByTeamIDs(teamIDs []int) (map[int][]*models.User, error) {
 	args := m.Called(teamIDs)
 	if args.Get(0) == nil {

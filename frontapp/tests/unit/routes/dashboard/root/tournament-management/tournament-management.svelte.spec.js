@@ -200,4 +200,76 @@ describe('Tournament Management Page', () => {
     const saveCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/root/events/1/tournaments/bulk-create' && options?.method === 'POST');
     expect(saveCall).toBeTruthy();
   });
+
+  it('盤上競技は全16クラス固定で、選手をrootから送信しない', async () => {
+    const classes = Array.from({ length: 16 }, (_, index) => ({ id: index + 1, name: `C${index + 1}` }));
+    fetchMock = vi.fn((url, options = {}) => {
+      if (url === '/api/root/events/1/tournament-templates/board-game/classes') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(classes) });
+      }
+      if (url === '/api/admin/events/1/board-game-runs') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url === '/api/root/events/1/tournaments') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url === '/api/root/events/1/tournament-templates/board-game/run' && options.method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: '将棋' }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(Page);
+
+    await expect.element(page.getByText('参加クラス（全16クラス固定）')).not.toBeInTheDocument();
+    await expect.element(page.getByText('代表選手・補欠', { exact: true })).not.toBeInTheDocument();
+    await page.getByRole('button', { name: '盤上競技トーナメントを作成' }).click();
+
+    const createCall = fetchMock.mock.calls.find(([url, options]) =>
+      url === '/api/root/events/1/tournament-templates/board-game/run' && options?.method === 'POST'
+    );
+    expect(createCall).toBeTruthy();
+    const body = JSON.parse(createCall[1].body);
+    expect(body).not.toHaveProperty('participants');
+    expect(body.seed_orders.A).toHaveLength(16);
+    expect(body.seed_orders.B).toHaveLength(16);
+  });
+
+  it('ドラッグ＆ドロップで変更したシード順を送信する', async () => {
+    const classes = Array.from({ length: 16 }, (_, index) => ({ id: index + 1, name: `C${index + 1}` }));
+    fetchMock = vi.fn((url, options = {}) => {
+      if (url === '/api/root/events/1/tournament-templates/board-game/classes') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(classes) });
+      }
+      if (url === '/api/admin/events/1/board-game-runs') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url === '/api/root/events/1/tournaments') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url === '/api/root/events/1/tournament-templates/board-game/run' && options.method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: '将棋' }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(Page);
+
+    await expect.element(page.getByText('クラスをドラッグ＆ドロップしてシード順を変更できます。')).toBeInTheDocument();
+    const seedList = document.querySelector('ol[aria-label="Aブロックのシード順"]');
+    const reorderedItems = [2, 1, ...Array.from({ length: 14 }, (_, index) => index + 3)]
+      .map((classID) => ({ id: `A-${classID}`, classID }));
+    seedList.dispatchEvent(new CustomEvent('finalize', { detail: { items: reorderedItems } }));
+
+    await page.getByRole('button', { name: '盤上競技トーナメントを作成' }).click();
+
+    const createCall = fetchMock.mock.calls.find(([url, options]) =>
+      url === '/api/root/events/1/tournament-templates/board-game/run' && options?.method === 'POST'
+    );
+    const body = JSON.parse(createCall[1].body);
+    expect(body.seed_orders.A).toEqual([2, 1, ...Array.from({ length: 14 }, (_, index) => index + 3)]);
+    expect(body.seed_orders.B).toEqual(Array.from({ length: 16 }, (_, index) => index + 1));
+  });
 });

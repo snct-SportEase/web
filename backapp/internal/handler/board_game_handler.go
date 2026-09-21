@@ -24,26 +24,23 @@ func NewBoardGameHandler(boardGameRepo repository.BoardGameRepository, classRepo
 	return &BoardGameHandler{boardGameRepo: boardGameRepo, classRepo: classRepo}
 }
 
-type boardGameParticipantRequest struct {
-	ClassID       int      `json:"class_id" binding:"required"`
-	PlayerIDs     []string `json:"player_ids"`
-	SubstituteIDs []string `json:"substitute_ids"`
+type boardGameParticipant struct {
+	ClassID int
 }
 
 type boardGameRunRequest struct {
-	GameType       string                        `json:"game_type" binding:"required"`
-	Name           string                        `json:"name"`
-	Description    *string                       `json:"description"`
-	Location       string                        `json:"location"`
-	RulesPDFURL    *string                       `json:"rules_pdf_url"`
-	ScheduledDate  *string                       `json:"scheduled_date"`
-	WinPoints      *int                          `json:"win_points"`
-	RankPoints     map[string]int                `json:"rank_points"`
-	RegularMinutes *int                          `json:"regular_minutes"`
-	FinalMinutes   *int                          `json:"final_minutes"`
-	Status         string                        `json:"status"`
-	Participants   []boardGameParticipantRequest `json:"participants" binding:"required"`
-	SeedOrders     map[string][]int              `json:"seed_orders"`
+	GameType       string           `json:"game_type" binding:"required"`
+	Name           string           `json:"name"`
+	Description    *string          `json:"description"`
+	Location       string           `json:"location"`
+	RulesPDFURL    *string          `json:"rules_pdf_url"`
+	ScheduledDate  *string          `json:"scheduled_date"`
+	WinPoints      *int             `json:"win_points"`
+	RankPoints     map[string]int   `json:"rank_points"`
+	RegularMinutes *int             `json:"regular_minutes"`
+	FinalMinutes   *int             `json:"final_minutes"`
+	Status         string           `json:"status"`
+	SeedOrders     map[string][]int `json:"seed_orders"`
 }
 
 type boardGamePreset struct {
@@ -132,19 +129,13 @@ func (h *BoardGameHandler) ListEligibleClasses(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event classes"})
 		return
 	}
-	type classWithMembers struct {
-		ID      int            `json:"id"`
-		Name    string         `json:"name"`
-		Members []*models.User `json:"members"`
+	type eligibleClass struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
 	}
-	result := make([]classWithMembers, 0, len(classes))
+	result := make([]eligibleClass, 0, len(classes))
 	for _, class := range classes {
-		members, err := h.classRepo.GetClassMembers(class.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class members"})
-			return
-		}
-		result = append(result, classWithMembers{ID: class.ID, Name: class.Name, Members: members})
+		result = append(result, eligibleClass{ID: class.ID, Name: class.Name})
 	}
 	c.JSON(http.StatusOK, result)
 }
@@ -205,9 +196,6 @@ func (h *BoardGameHandler) buildRunCreate(eventID int, createdBy string, req *bo
 	if !ok {
 		return nil, fmt.Errorf("game_type must be shogi or othello")
 	}
-	if len(req.Participants) < 2 || len(req.Participants)&(len(req.Participants)-1) != 0 {
-		return nil, fmt.Errorf("参加クラス数は2以上の2の累乗にしてください")
-	}
 	if req.Status == "" {
 		req.Status = "published"
 	}
@@ -223,23 +211,13 @@ func (h *BoardGameHandler) buildRunCreate(eventID int, createdBy string, req *bo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get event classes: %w", err)
 	}
+	participants, err := fixedBoardGameParticipants(classes)
+	if err != nil {
+		return nil, err
+	}
 	classByID := make(map[int]*models.Class, len(classes))
 	for _, class := range classes {
 		classByID[class.ID] = class
-	}
-	participantByClass := make(map[int]boardGameParticipantRequest, len(req.Participants))
-	for _, participant := range req.Participants {
-		class := classByID[participant.ClassID]
-		if class == nil {
-			return nil, fmt.Errorf("class_id %d does not belong to the event", participant.ClassID)
-		}
-		if _, exists := participantByClass[participant.ClassID]; exists {
-			return nil, fmt.Errorf("class_id %d is duplicated", participant.ClassID)
-		}
-		if err := validateBoardGameRoster(req.GameType, participant); err != nil {
-			return nil, fmt.Errorf("%s: %w", class.Name, err)
-		}
-		participantByClass[participant.ClassID] = participant
 	}
 
 	name := strings.TrimSpace(req.Name)
@@ -277,27 +255,20 @@ func (h *BoardGameHandler) buildRunCreate(eventID int, createdBy string, req *bo
 
 	tournaments := make([]models.BoardGameTournamentCreate, 0, len(preset.Slots))
 	for _, slot := range preset.Slots {
-		order, err := boardGameSeedOrder(slot, req.Participants, req.SeedOrders)
+		order, err := boardGameSeedOrder(slot, participants, req.SeedOrders)
 		if err != nil {
 			return nil, err
 		}
 		entries := make([]models.BoardGameEntryCreate, 0, len(order))
 		for index, classID := range order {
-			participant := participantByClass[classID]
 			class := classByID[classID]
-			memberIDs := participant.PlayerIDs
 			minCapacity, maxCapacity := 1, preset.PlayersPerClass
 			teamName := class.Name
 			if req.GameType == "shogi" {
-				playerIndex := 0
-				if slot == "B" {
-					playerIndex = 1
-				}
-				memberIDs = []string{participant.PlayerIDs[playerIndex]}
 				minCapacity, maxCapacity = 1, 1+preset.SubstitutesPerClass
 				teamName += " " + slot
 			}
-			entries = append(entries, models.BoardGameEntryCreate{ClassID: classID, ClassName: class.Name, TeamName: teamName, EntryKey: strings.ToLower(req.GameType + "_" + slot), SeedNumber: index + 1, MinCapacity: minCapacity, MaxCapacity: maxCapacity, MemberIDs: memberIDs, SubstituteIDs: participant.SubstituteIDs})
+			entries = append(entries, models.BoardGameEntryCreate{ClassID: classID, ClassName: class.Name, TeamName: teamName, EntryKey: strings.ToLower(req.GameType + "_" + slot), SeedNumber: index + 1, MinCapacity: minCapacity, MaxCapacity: maxCapacity})
 		}
 		data := buildBoardGameBracket(entries, req.ScheduledDate)
 		tournamentName := name
@@ -310,27 +281,18 @@ func (h *BoardGameHandler) buildRunCreate(eventID int, createdBy string, req *bo
 	return &models.BoardGameRunCreate{EventID: eventID, GameType: req.GameType, Name: name, Description: req.Description, Location: location, RulesPDFURL: req.RulesPDFURL, ScheduledDate: req.ScheduledDate, WinPoints: winPoints, RankPoints: rankPoints, RegularMinutes: regularMinutes, FinalMinutes: finalMinutes, PlayersPerClass: preset.PlayersPerClass, SubstitutesPerClass: preset.SubstitutesPerClass, Status: req.Status, CreatedBy: createdBy, Tournaments: tournaments}, nil
 }
 
-func validateBoardGameRoster(gameType string, participant boardGameParticipantRequest) error {
-	seen := make(map[string]bool)
-	for _, id := range append(append([]string{}, participant.PlayerIDs...), participant.SubstituteIDs...) {
-		if strings.TrimSpace(id) == "" || seen[id] {
-			return fmt.Errorf("選手・補欠に空欄または重複があります")
-		}
-		seen[id] = true
+func fixedBoardGameParticipants(classes []*models.Class) ([]boardGameParticipant, error) {
+	if len(classes) != 16 {
+		return nil, fmt.Errorf("盤上競技は全16クラスが必要です（現在%dクラス）", len(classes))
 	}
-	if gameType == "shogi" {
-		if len(participant.PlayerIDs) != 2 || len(participant.SubstituteIDs) > 1 {
-			return fmt.Errorf("将棋は代表2名、補欠1名以内です")
-		}
-		return nil
+	participants := make([]boardGameParticipant, 0, len(classes))
+	for _, class := range classes {
+		participants = append(participants, boardGameParticipant{ClassID: class.ID})
 	}
-	if len(participant.PlayerIDs) < 1 || len(participant.PlayerIDs) > 3 || len(participant.SubstituteIDs) != 0 {
-		return fmt.Errorf("オセロは代表1〜3名、補欠なしです")
-	}
-	return nil
+	return participants, nil
 }
 
-func boardGameSeedOrder(slot string, participants []boardGameParticipantRequest, configured map[string][]int) ([]int, error) {
+func boardGameSeedOrder(slot string, participants []boardGameParticipant, configured map[string][]int) ([]int, error) {
 	order := make([]int, 0, len(participants))
 	if configured != nil && len(configured[slot]) > 0 {
 		order = append(order, configured[slot]...)
