@@ -394,7 +394,14 @@ createServer(async (req, res) => {
     events = events.map((event) => ({
       ...event,
       status: event.id === eventId ? 'active' : event.status === 'active' ? 'upcoming' : event.status,
-      hide_scores: event.id === eventId ? Boolean(body.hide_scores) : event.hide_scores
+      hide_scores: event.id === eventId ? Boolean(body.hide_scores) : event.hide_scores,
+      competition_guidelines_pdf_url: event.id === eventId
+        ? body.competition_guidelines_pdf_url ?? event.competition_guidelines_pdf_url
+        : event.competition_guidelines_pdf_url,
+      survey_url: event.id === eventId ? body.survey_url ?? event.survey_url : event.survey_url,
+      is_survey_published: event.id === eventId
+        ? Boolean(body.is_survey_published ?? event.is_survey_published)
+        : event.is_survey_published
     }));
     sendJson(res, 200, { event: events.find((event) => event.id === eventId) ?? null });
     return;
@@ -625,7 +632,10 @@ createServer(async (req, res) => {
             name: activeEvent.name,
             hide_scores: activeEvent.hide_scores,
             status: activeEvent.status,
-            is_rainy_mode: Boolean(activeEvent.is_rainy_mode)
+            is_rainy_mode: Boolean(activeEvent.is_rainy_mode),
+            competition_guidelines_pdf_url: activeEvent.competition_guidelines_pdf_url ?? null,
+            survey_url: activeEvent.survey_url ?? null,
+            is_survey_published: Boolean(activeEvent.is_survey_published)
           }
         : null
     );

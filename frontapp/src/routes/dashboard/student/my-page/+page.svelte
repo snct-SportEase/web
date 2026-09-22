@@ -16,6 +16,13 @@
 	let categoryBreakdown = $derived(data.categoryBreakdown || []);
 	let pointHighlights = $derived(data.pointHighlights || []);
 	let sportSections = $derived(data.sportSections || []);
+	let matchResults = $derived(data.matchResults || []);
+	let classInfo = $derived(data.classInfo);
+	let classProgress = $derived(data.classProgress || []);
+	let notifications = $derived(data.notifications || []);
+	let sportGuidelines = $derived(data.sportGuidelines || []);
+	let competitionGuidelinesUrl = $derived(data.competitionGuidelinesUrl);
+	let surveyUrl = $derived(data.surveyUrl);
 	let hasScore = $derived(Boolean(myClassScore));
 	let primaryRankLabel = $derived(myClassScore
 		? myClassScore.season === 'spring'
@@ -156,7 +163,7 @@
 <div class="container mx-auto space-y-8 p-4 md:p-6 lg:p-8 max-w-7xl">
 	<div class="space-y-2 text-center mb-8">
 		<h1 class="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">マイページ</h1>
-		<p class="text-base text-gray-600">クラスの現状とポイント内訳をまとめて確認できます</p>
+		<p class="text-base text-gray-600">参加試合や結果、クラスの状況、大会資料をまとめて確認できます</p>
 	</div>
 
 	{#if scoresHidden}
@@ -362,13 +369,13 @@
 				</section>
 			{/if}
 
-			<!-- 今後の試合予定 -->
+			<!-- 参加試合 -->
 			<section class="bg-white rounded-xl border border-gray-200 shadow-lg p-6">
 				<h2 class="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
 					</svg>
-					今後の試合予定
+					参加試合
 				</h2>
 				{#if assignedSports.length > 0}
 					<div class="mb-4">
@@ -425,6 +432,130 @@
 		<div class="flex flex-col items-center justify-center gap-4 py-20">
 			<div class="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-indigo-600"></div>
 			<p class="text-gray-600 font-medium">マイページ情報を読み込んでいます...</p>
+		</div>
+	{/if}
+
+	{#if user}
+		<div class="space-y-8">
+			{#if !hasScore}
+				<section class="rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+					<h2 class="mb-4 text-lg font-semibold text-gray-900">参加試合</h2>
+					{#if assignedSports.length > 0}
+						<div class="mb-4 flex flex-wrap gap-2">
+							{#each assignedSports as sport, index (`summary-${sport.sport_id}-${index}`)}
+								<span class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">{sport.sport_name}</span>
+							{/each}
+						</div>
+					{/if}
+					{#if upcomingMatches.length > 0}
+						<div class="grid gap-3 md:grid-cols-2">
+							{#each upcomingMatches as match (match.id)}
+								<article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+									<div class="flex items-start justify-between gap-3">
+										<h3 class="font-semibold text-gray-900">{match.sport_name}</h3>
+										<span class="text-sm font-medium text-indigo-700">{formatJapanDateTime(match.start_time)}</span>
+									</div>
+									<p class="mt-2 text-sm text-gray-700">対 {match.opponent_name || '未定'}</p>
+									<p class="mt-1 text-xs text-gray-500">{match.location}</p>
+								</article>
+							{/each}
+						</div>
+					{:else}
+						<p class="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">参加予定の試合はありません。</p>
+					{/if}
+				</section>
+			{/if}
+
+			<section class="rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+				<h2 class="mb-4 text-lg font-semibold text-gray-900">試合結果</h2>
+				{#if matchResults.length > 0}
+					<div class="grid gap-3 md:grid-cols-2">
+						{#each matchResults as match (match.id)}
+							<article class="rounded-lg border border-gray-200 p-4">
+								<div class="flex items-center justify-between gap-3">
+									<div>
+										<h3 class="font-semibold text-gray-900">{match.sport_name}</h3>
+										<p class="mt-1 text-xs text-gray-500">{match.round_label}</p>
+									</div>
+									<span class="rounded-full px-3 py-1 text-sm font-semibold {match.result === '勝利' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}">{match.result}</span>
+								</div>
+								<div class="mt-3 flex items-center justify-between text-sm">
+									<span class="text-gray-600">対 {match.opponent_name || '未定'}</span>
+									{#if match.score}<strong class="text-indigo-700">{match.score}</strong>{/if}
+								</div>
+							</article>
+						{/each}
+					</div>
+				{:else}
+					<p class="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">表示できる試合結果はありません。</p>
+				{/if}
+			</section>
+
+			<section class="rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+				<h2 class="mb-4 text-lg font-semibold text-gray-900">クラス状況</h2>
+				{#if classInfo}
+					<div class="mb-5 grid gap-3 sm:grid-cols-3">
+						<div class="rounded-lg bg-indigo-50 p-4"><p class="text-xs text-indigo-600">クラス</p><p class="mt-1 text-xl font-bold text-gray-900">{classInfo.name}</p></div>
+						<div class="rounded-lg bg-gray-50 p-4"><p class="text-xs text-gray-500">出席</p><p class="mt-1 text-xl font-bold text-gray-900">{classInfo.attend_count ?? 0} / {classInfo.student_count ?? 0}名</p></div>
+						<div class="rounded-lg bg-gray-50 p-4"><p class="text-xs text-gray-500">参加競技</p><p class="mt-1 text-xl font-bold text-gray-900">{classProgress.length}競技</p></div>
+					</div>
+				{/if}
+				{#if classProgress.length > 0}
+					<div class="grid gap-3 md:grid-cols-2">
+						{#each classProgress as progress (`${progress.sport_name}-${progress.team_name}`)}
+							<article class="rounded-lg border border-gray-200 p-4">
+								<div class="flex items-center justify-between gap-3">
+									<h3 class="font-semibold text-gray-900">{progress.sport_name}</h3>
+									<span class="text-sm font-semibold text-indigo-700">{progress.status}</span>
+								</div>
+								<p class="mt-1 text-sm text-gray-600">{progress.team_name}・{progress.current_round}</p>
+								{#if progress.last_match}<p class="mt-2 text-xs text-gray-500">直近: {progress.last_match.result}{progress.last_match.score ? `（${progress.last_match.score}）` : ''}</p>{/if}
+							</article>
+						{/each}
+					</div>
+				{:else if !classInfo}
+					<p class="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">クラス情報がありません。</p>
+				{/if}
+			</section>
+
+			<section class="grid gap-6 lg:grid-cols-2">
+				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+					<h2 class="mb-4 text-lg font-semibold text-gray-900">最新のお知らせ</h2>
+					{#if notifications.length > 0}
+						<ul class="divide-y divide-gray-100">
+							{#each notifications as notification (notification.id)}
+								<li class="py-3 first:pt-0 last:pb-0">
+									<div class="flex items-start justify-between gap-3">
+										<h3 class="font-medium text-gray-900">{notification.title}</h3>
+										<time class="shrink-0 text-xs text-gray-400">{formatJapanDateTime(notification.created_at)}</time>
+									</div>
+									<p class="mt-1 line-clamp-2 text-sm text-gray-600">{notification.body}</p>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">新しいお知らせはありません。</p>
+					{/if}
+				</div>
+
+				<div class="rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+					<h2 class="mb-4 text-lg font-semibold text-gray-900">大会資料・リンク</h2>
+					<div class="space-y-3">
+						{#if competitionGuidelinesUrl}
+							<a class="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 font-medium text-indigo-700 hover:bg-indigo-100" href={competitionGuidelinesUrl} target="_blank" rel="noopener noreferrer"><span>大会要項PDF</span><span aria-hidden="true">↗</span></a>
+						{/if}
+						{#each sportGuidelines as guideline (guideline.id)}
+							<a class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 font-medium text-gray-800 hover:bg-gray-50" href={guideline.url} target="_blank" rel="noopener noreferrer"><span>{guideline.name} 競技要項PDF</span><span aria-hidden="true">↗</span></a>
+						{/each}
+						{#if surveyUrl}
+							<a class="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 font-medium text-emerald-700 hover:bg-emerald-100" href={surveyUrl} target="_blank" rel="noopener noreferrer"><span>アンケートに回答する</span><span aria-hidden="true">↗</span></a>
+						{/if}
+						{#if !competitionGuidelinesUrl && sportGuidelines.length === 0 && !surveyUrl}
+							<p class="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">公開中の資料・アンケートはありません。</p>
+						{/if}
+					</div>
+				</div>
+			</section>
 		</div>
 	{/if}
 </div>
