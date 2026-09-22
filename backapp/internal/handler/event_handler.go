@@ -731,9 +731,10 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Survey scores imported successfully", "imported_classes_count": len(surveyPointsData)})
 }
 
-// ResyncInitialPoints copies the same-year spring score into an archived autumn
-// event as initial points. This is intentionally an explicit operation: it
-// replaces all existing initial points for the autumn event.
+// ResyncInitialPoints copies an archived same-year spring score into a preparing
+// or archived autumn event as initial points. The selected event may be either
+// the source spring event or the target autumn event. This is intentionally an
+// explicit operation: it replaces all existing initial points for the autumn event.
 func (h *EventHandler) ResyncInitialPoints(c *gin.Context) {
 	eventID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -741,29 +742,44 @@ func (h *EventHandler) ResyncInitialPoints(c *gin.Context) {
 		return
 	}
 
-	autumnEvent, err := h.eventRepo.GetEventByID(eventID)
+	selectedEvent, err := h.eventRepo.GetEventByID(eventID)
 	if err != nil {
 		log.Printf("error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch event"})
 		return
 	}
-	if autumnEvent == nil {
+	if selectedEvent == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
 		return
 	}
-	if autumnEvent.Season != "autumn" || autumnEvent.Status != models.EventStatusArchived {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Initial point synchronization is only allowed for archived autumn events"})
+
+	var springEvent, autumnEvent *models.Event
+	switch selectedEvent.Season {
+	case "spring":
+		springEvent = selectedEvent
+		autumnEvent, err = h.eventRepo.GetEventByYearAndSeason(selectedEvent.Year, "autumn")
+	case "autumn":
+		autumnEvent = selectedEvent
+		springEvent, err = h.eventRepo.GetEventByYearAndSeason(selectedEvent.Year, "spring")
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Initial point synchronization requires a spring or autumn event"})
 		return
 	}
-
-	springEvent, err := h.eventRepo.GetEventByYearAndSeason(autumnEvent.Year, "spring")
 	if err != nil {
 		log.Printf("error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch the spring event"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch the paired event"})
 		return
 	}
-	if springEvent == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No spring event exists for this year"})
+	if springEvent == nil || autumnEvent == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A same-year spring and autumn event are required"})
+		return
+	}
+	if springEvent.Status != models.EventStatusArchived {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "The spring event must be archived before synchronizing initial points"})
+		return
+	}
+	if autumnEvent.Status != models.EventStatusPreparing && autumnEvent.Status != models.EventStatusArchived {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Initial point synchronization is only allowed for preparing or archived autumn events"})
 		return
 	}
 

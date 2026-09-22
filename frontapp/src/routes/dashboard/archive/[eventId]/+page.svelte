@@ -18,6 +18,9 @@
     let syncInitialPointsError = $state('');
 
     let isRoot = $derived($page.data?.user?.roles?.some((role) => role?.name === 'root') ?? false);
+    let canSyncInitialPoints = $derived(
+        isRoot && eventData?.status === 'archived' && (eventData?.season === 'spring' || eventData?.season === 'autumn')
+    );
 
     function getSportName(location) {
         const firstScore = scores?.[0];
@@ -102,8 +105,11 @@
     }
 
     async function syncInitialPoints() {
-        if (!eventData || eventData.season !== 'autumn' || isSyncingInitialPoints) return;
-        if (!confirm('同年度の春大会の得点で、この秋大会の初期点を再同期します。現在の初期点は置き換えられます。続行しますか？')) return;
+        if (!eventData || !canSyncInitialPoints || isSyncingInitialPoints) return;
+        const confirmation = eventData.season === 'spring'
+            ? '同年度の準備中またはアーカイブ済みの秋大会の初期点を、この春大会の得点で置き換えます。続行しますか？'
+            : '同年度の春大会の得点で、この秋大会の初期点を再同期します。現在の初期点は置き換えられます。続行しますか？';
+        if (!confirm(confirmation)) return;
 
         isSyncingInitialPoints = true;
         syncInitialPointsMessage = '';
@@ -113,9 +119,11 @@
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.error || '初期点の再同期に失敗しました。');
 
-            const scoreResponse = await fetch(`/api/scores/class?event_id=${eventId}`);
-            if (!scoreResponse.ok) throw new Error('再同期後の得点を取得できませんでした。');
-            scores = await scoreResponse.json();
+            if (eventData.season === 'autumn') {
+                const scoreResponse = await fetch(`/api/scores/class?event_id=${eventId}`);
+                if (!scoreResponse.ok) throw new Error('再同期後の得点を取得できませんでした。');
+                scores = await scoreResponse.json();
+            }
             syncInitialPointsMessage = '初期点を同年度の春大会の得点で再同期しました。';
         } catch (err) {
             syncInitialPointsError = err.message;
@@ -253,14 +261,18 @@
                 {eventData ? eventData.name : '読み込み中...'}
             </h1>
         </div>
-        {#if isRoot && eventData?.season === 'autumn' && eventData?.status === 'archived'}
+        {#if canSyncInitialPoints}
             <button
                 type="button"
                 class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 onclick={syncInitialPoints}
                 disabled={isSyncingInitialPoints}
             >
-                {isSyncingInitialPoints ? '初期点を再同期中…' : '春大会の得点を初期点へ再同期'}
+                {isSyncingInitialPoints
+                    ? '初期点を再同期中…'
+                    : eventData.season === 'spring'
+                        ? '秋大会の初期点へ同期'
+                        : '春大会の得点を初期点へ再同期'}
             </button>
         {/if}
     </div>

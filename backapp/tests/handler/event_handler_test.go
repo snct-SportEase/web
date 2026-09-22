@@ -819,7 +819,7 @@ func TestEventHandler_ResyncInitialPoints(t *testing.T) {
 		repo := new(MockEventRepository)
 		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
 		autumn := &models.Event{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusArchived}
-		spring := &models.Event{ID: 1, Year: 2026, Season: "spring"}
+		spring := &models.Event{ID: 1, Year: 2026, Season: "spring", Status: models.EventStatusArchived}
 		repo.On("GetEventByID", 2).Return(autumn, nil).Once()
 		repo.On("GetEventByYearAndSeason", 2026, "spring").Return(spring, nil).Once()
 		repo.On("CopyClassScores", 1, 2).Return(nil).Once()
@@ -835,24 +835,48 @@ func TestEventHandler_ResyncInitialPoints(t *testing.T) {
 		repo.AssertExpectations(t)
 	})
 
-	t.Run("rejects non-archived or non-autumn events", func(t *testing.T) {
-		cases := []*models.Event{
-			{ID: 2, Year: 2026, Season: "spring", Status: models.EventStatusArchived},
-			{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusActive},
-		}
-		for _, event := range cases {
-			repo := new(MockEventRepository)
-			h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
-			repo.On("GetEventByID", 2).Return(event, nil).Once()
+	t.Run("syncs a preparing autumn event when invoked from the archived spring event", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		spring := &models.Event{ID: 1, Year: 2026, Season: "spring", Status: models.EventStatusArchived}
+		autumn := &models.Event{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusPreparing}
+		repo.On("GetEventByID", 1).Return(spring, nil).Once()
+		repo.On("GetEventByYearAndSeason", 2026, "autumn").Return(autumn, nil).Once()
+		repo.On("CopyClassScores", 1, 2).Return(nil).Once()
 
-			w, c := newContext("2")
-			h.ResyncInitialPoints(c)
+		w, c := newContext("1")
+		h.ResyncInitialPoints(c)
 
-			assert.Equal(t, http.StatusBadRequest, w.Code)
-			repo.AssertNotCalled(t, "GetEventByYearAndSeason", mock.Anything, mock.Anything)
-			repo.AssertNotCalled(t, "CopyClassScores", mock.Anything, mock.Anything)
-			repo.AssertExpectations(t)
-		}
+		assert.Equal(t, http.StatusOK, w.Code)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("rejects autumn events that are neither preparing nor archived", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		repo.On("GetEventByID", 2).Return(&models.Event{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusActive}, nil).Once()
+		repo.On("GetEventByYearAndSeason", 2026, "spring").Return(&models.Event{ID: 1, Year: 2026, Season: "spring", Status: models.EventStatusArchived}, nil).Once()
+
+		w, c := newContext("2")
+		h.ResyncInitialPoints(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		repo.AssertNotCalled(t, "CopyClassScores", mock.Anything, mock.Anything)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("requires the source spring event to be archived", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		repo.On("GetEventByID", 1).Return(&models.Event{ID: 1, Year: 2026, Season: "spring", Status: models.EventStatusActive}, nil).Once()
+		repo.On("GetEventByYearAndSeason", 2026, "autumn").Return(&models.Event{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusPreparing}, nil).Once()
+
+		w, c := newContext("1")
+		h.ResyncInitialPoints(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		repo.AssertNotCalled(t, "CopyClassScores", mock.Anything, mock.Anything)
+		repo.AssertExpectations(t)
 	})
 
 	t.Run("requires a same-year spring event", func(t *testing.T) {
