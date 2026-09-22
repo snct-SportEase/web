@@ -180,6 +180,7 @@ APIの入口は `backapp/internal/router/router.go` です。保守時は次の�
 | `backapp/db/migrations/0019_repair_same_year_class_memberships.*.sql` | 同年度の春季・秋季間でクラス所属を補修 |
 | `backapp/db/migrations/0020_scope_user_roles_by_event.*.sql` | 競技参加ロールを大会単位に分離 |
 | `backapp/db/migrations/0021_carry_over_spring_class_counts_to_autumn.*.sql` | 同年度の春大会から秋大会へクラス在籍人数を補完 |
+| `backapp/db/migrations/0022_exclude_special_class_from_student_counts_and_survey.*.sql` | 専教の在籍人数とアンケート得点を対象外へ補正 |
 | `backapp/db/cleanup_score_logs_reason.sql` | スコアログ理由の整理用SQL |
 | `backapp/db/ER図.pdf` | ER図 |
 

@@ -929,6 +929,45 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		mockClassRepo.AssertExpectations(t)
 	})
 
+	t.Run("Success - Special Class Is Excluded From Survey Scores", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockUserRepo := new(MockUserRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, mockClassRepo, nil, mockUserRepo, "", "")
+
+		eventID := 1
+		event := &models.Event{ID: eventID, Season: "autumn"}
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+		mockClassRepo.On("GetAllClasses", eventID).Return([]*models.Class{
+			{ID: 101, Name: "1-1", StudentCount: 10},
+			{ID: 116, Name: models.SpecialClassName, StudentCount: 0},
+		}, nil).Once()
+		mockClassRepo.On("SetSurveyPoints", eventID, map[int]int{101: 10}).Return(nil).Once()
+
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", "survey-counts.csv")
+		assert.NoError(t, err)
+		_, err = part.Write([]byte("クラス名,人数\n1-1,9\n専教,100\n"))
+		assert.NoError(t, err)
+		assert.NoError(t, writer.Close())
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events/1/import-survey-scores", body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+		h.ImportSurveyScores(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, float64(1), response["imported_classes_count"])
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
 	t.Run("Error - Aggregated Survey Count Is Invalid", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockUserRepo := new(MockUserRepository)

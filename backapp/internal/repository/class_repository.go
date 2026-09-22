@@ -195,7 +195,7 @@ func (r *classRepository) UpdateStudentCounts(eventID int, counts map[int]int) e
 	}
 	defer tx.Rollback() // Rollback on error
 
-	stmt, err := tx.Prepare("UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ?")
+	stmt, err := tx.Prepare("UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ? AND name <> '専教'")
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}

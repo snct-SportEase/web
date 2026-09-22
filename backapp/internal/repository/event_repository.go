@@ -66,6 +66,7 @@ const carryOverSpringStudentCountsQuery = `
 		AND source_class.name = target_class.name
 	SET target_class.student_count = source_class.student_count
 	WHERE target_class.event_id = ?
+		AND target_class.name <> '専教'
 		AND target_class.student_count = 0
 		AND source_class.student_count > 0`
 

@@ -9,7 +9,8 @@ describe('Class Student Count Page', () => {
   beforeEach(() => {
     const classes = [
       { id: 1, name: '1A', student_count: 40 },
-      { id: 2, name: '1B', student_count: 38 }
+      { id: 2, name: '1B', student_count: 38 },
+      { id: 16, name: '専教', student_count: 0 }
     ];
 
     fetchMock = vi.fn((url, options = {}) => {
@@ -34,7 +35,8 @@ describe('Class Student Count Page', () => {
         data: {
           classes: [
             { id: 1, name: '1A', student_count: 40 },
-            { id: 2, name: '1B', student_count: 38 }
+            { id: 2, name: '1B', student_count: 38 },
+            { id: 16, name: '専教', student_count: 0 }
           ]
         }
       }
@@ -43,6 +45,8 @@ describe('Class Student Count Page', () => {
     await expect.element(page.getByRole('heading', { name: '各クラス人数設定' })).toBeInTheDocument();
     await expect.element(page.getByText('1A')).toBeInTheDocument();
     await expect.element(page.getByText('1B')).toBeInTheDocument();
+    await expect.element(page.getByText('専教', { exact: true })).not.toBeInTheDocument();
+    await expect.element(page.getByText('専教は在籍人数による判定の対象外のため、設定一覧には表示されません。')).toBeInTheDocument();
   });
 
   it('手動更新で生徒数を保存できる', async () => {
