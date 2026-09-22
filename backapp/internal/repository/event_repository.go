@@ -59,6 +59,32 @@ const deleteGraduatingUsersForEventTransitionQuery = `
 		AND previous_event.year <> next_event.year
 		AND current_class.name IN ('IS5', 'IE5', 'IT5')`
 
+const carryOverSpringStudentCountsQuery = `
+	UPDATE classes target_class
+	JOIN classes source_class
+		ON source_class.event_id = ?
+		AND source_class.name = target_class.name
+	SET target_class.student_count = source_class.student_count
+	WHERE target_class.event_id = ?
+		AND target_class.student_count = 0
+		AND source_class.student_count > 0`
+
+const latestSpringEventIDQuery = "SELECT id FROM events WHERE `year` = ? AND season = 'spring' ORDER BY id DESC LIMIT 1"
+
+func carryOverSpringStudentCounts(tx *sql.Tx, year int, autumnEventID any) (int, error) {
+	var springEventID int
+	if err := tx.QueryRow(latestSpringEventIDQuery, year).Scan(&springEventID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	if _, err := tx.Exec(carryOverSpringStudentCountsQuery, springEventID, autumnEventID); err != nil {
+		return 0, err
+	}
+	return springEventID, nil
+}
+
 func migrateUserProfilesForEventTransition(tx *sql.Tx, nextEventID any) error {
 	// 春大会を終了して active_event が空でも、所属クラスの年度から引き継ぐ。
 	// 同じ大会の再選択でも、別の季節に残った所属を修復する。
@@ -193,12 +219,11 @@ func (r *eventRepository) CreateEventWithClasses(event *models.Event, classNames
 	}
 
 	if event.Season == "autumn" {
-		var springEventID int
-		err := tx.QueryRow("SELECT id FROM events WHERE `year` = ? AND season = 'spring' ORDER BY id DESC LIMIT 1", event.Year).Scan(&springEventID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		springEventID, err := carryOverSpringStudentCounts(tx, event.Year, eventID)
+		if err != nil {
 			return 0, err
 		}
-		if err == nil {
+		if springEventID != 0 {
 			if _, err := tx.Exec("DELETE FROM score_logs WHERE event_id = ? AND reason = 'initial_points'", eventID); err != nil {
 				return 0, err
 			}
@@ -259,6 +284,12 @@ func (r *eventRepository) UpdateEvent(event *models.Event) error {
 	if err != nil {
 		tx.Rollback()
 		return err
+	}
+	if event.Season == "autumn" {
+		if _, err := carryOverSpringStudentCounts(tx, event.Year, event.ID); err != nil {
+			tx.Rollback()
+			return err
+		}
 	}
 
 	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
