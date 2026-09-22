@@ -46,4 +46,33 @@ test.describe('マイページ 得点非表示 (student)', () => {
     await expect(page.getByText('2位')).toHaveCount(2);
     await expect(page.getByText('獲得 50 点')).toBeVisible();
   });
+
+  test('参加試合・結果・クラス状況・通知・大会資料をまとめて確認できる', async ({ page, request }) => {
+    await request.post(`${mockBackendUrl}/__set-user`, { data: { user: 'student' } });
+    await request.post(`${mockBackendUrl}/__set-active-event`, {
+      data: {
+        event_id: 1,
+        competition_guidelines_pdf_url: 'https://example.com/event-guidelines.pdf',
+        survey_url: 'https://example.com/survey',
+        is_survey_published: true
+      }
+    });
+    await request.post(`${mockBackendUrl}/api/admin/events/1/sports`, {
+      data: { sport_id: 1, description: '', location: 'gym1' }
+    });
+    await request.put(`${mockBackendUrl}/api/admin/events/1/sports/1/details`, {
+      data: { description: '', rules_pdf_url: 'https://example.com/basketball-rules.pdf' }
+    });
+
+    await page.goto('/dashboard/student/my-page');
+
+    await expect(page.getByRole('heading', { name: '参加試合' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '試合結果' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'クラス状況' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '最新のお知らせ' })).toBeVisible();
+    await expect(page.getByText('大会開催のお知らせ')).toBeVisible();
+    await expect(page.getByRole('link', { name: /大会要項PDF/ })).toHaveAttribute('href', 'https://example.com/event-guidelines.pdf');
+    await expect(page.getByRole('link', { name: /バスケットボール 競技要項PDF/ })).toHaveAttribute('href', 'https://example.com/basketball-rules.pdf');
+    await expect(page.getByRole('link', { name: /アンケートに回答する/ })).toHaveAttribute('href', 'https://example.com/survey');
+  });
 });

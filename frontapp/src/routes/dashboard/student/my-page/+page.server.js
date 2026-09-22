@@ -121,6 +121,95 @@ const buildAssignedSports = (teams) => {
 	});
 };
 
+const buildTournamentMatchResults = (tournaments, teams) => {
+	if (!Array.isArray(tournaments) || !Array.isArray(teams) || teams.length === 0) return [];
+
+	const teamByID = new Map(teams.map((team) => [Number(team.id), team]));
+	const results = [];
+
+	for (const tournament of tournaments) {
+		let tournamentData = tournament?.data;
+		if (typeof tournamentData === 'string') {
+			try {
+				tournamentData = JSON.parse(tournamentData);
+			} catch {
+				continue;
+			}
+		}
+
+		for (const match of tournamentData?.matches || []) {
+			const sides = Array.isArray(match?.sides) ? match.sides : [];
+			const mySide = sides.find((side) => teamByID.has(Number(side?.teamId)));
+			if (!mySide) continue;
+
+			const myScore = mySide?.scores?.[0]?.mainScore;
+			const opponentSide = sides.find((side) => Number(side?.teamId) !== Number(mySide.teamId));
+			const opponentScore = opponentSide?.scores?.[0]?.mainScore;
+			const status = normalizeMatchStatus(match?.matchStatus);
+			const isFinished = status === 'completed' || status === 'finished' || myScore !== undefined;
+			if (!isFinished) continue;
+
+			const result = mySide.isWinner === true
+				? '勝利'
+				: mySide.isWinner === false || (myScore !== undefined && opponentScore !== undefined && Number(myScore) < Number(opponentScore))
+					? '敗戦'
+					: Number(myScore) === Number(opponentScore)
+						? '引き分け'
+						: '終了';
+			const playedAt = match?.startTime || match?.rainyModeStartTime || null;
+
+			results.push({
+				id: `tournament-result-${tournament.id}-${match.id}`,
+				sport_name: teamByID.get(Number(mySide.teamId))?.sport_name || tournament?.name || '競技',
+				opponent_name: getContestantName(tournamentData, opponentSide),
+				round_label: getRoundLabel(tournamentData, match),
+				result,
+				score: myScore !== undefined && opponentScore !== undefined ? `${myScore} - ${opponentScore}` : '',
+				played_at: playedAt,
+				sort_value: playedAt ? toDateValue(playedAt) : Number.NEGATIVE_INFINITY
+			});
+		}
+	}
+
+	return results.sort((left, right) => right.sort_value - left.sort_value);
+};
+
+const buildNoonMatchResults = (sessionPayload, classId) => {
+	if (!classId || !Array.isArray(sessionPayload?.matches)) return [];
+
+	return sessionPayload.matches
+		.filter((match) => getParticipantEntries(match, classId).length > 0)
+		.filter((match) => match?.result || ['completed', 'finished'].includes(normalizeMatchStatus(match?.status)))
+		.map((match) => {
+			const participantEntries = getParticipantEntries(match, classId);
+			const participantIDs = new Set(participantEntries.map((entry) => String(entry.id)));
+			const detail = (match?.result?.details || []).find((item) => participantIDs.has(String(item.entry_id)));
+			const opponent = (match?.entries || []).find((entry) => !participantIDs.has(String(entry.id)));
+			const result = detail?.rank ? `${detail.rank}位` : match?.result?.winner_display || '終了';
+
+			return {
+				id: `noon-result-${match.id}`,
+				sport_name: match?.title || sessionPayload?.session?.name || '昼競技',
+				opponent_name: opponent?.resolved_name || opponent?.display_name || '',
+				round_label: '昼競技',
+				result,
+				score: detail?.competition_score !== undefined ? `${detail.competition_score}点` : '',
+				played_at: match?.scheduled_at || null,
+				sort_value: toDateValue(match?.scheduled_at)
+			};
+		})
+		.sort((left, right) => right.sort_value - left.sort_value);
+};
+
+const readJson = async (response, fallback) => {
+	if (!response?.ok) return fallback;
+	try {
+		return await response.json();
+	} catch {
+		return fallback;
+	}
+};
+
 const buildScoreBreakdown = (classScore) => {
 	if (!classScore) {
 		return {
@@ -232,16 +321,34 @@ const buildScoreBreakdown = (classScore) => {
 
 export const load = async ({ fetch, locals, request }) => {
 	const user = locals.user;
+	const emptyData = {
+		myClassScore: null,
+		scoreItems: [],
+		categoryBreakdown: [],
+		pointHighlights: [],
+		sportSections: [],
+		assignedSports: [],
+		upcomingMatches: [],
+		matchResults: [],
+		classInfo: null,
+		classProgress: [],
+		notifications: [],
+		sportGuidelines: [],
+		competitionGuidelinesUrl: null,
+		surveyUrl: null,
+		scoreHistory: []
+	};
+
 	if (!user) {
 		return {
-			myClassScore: null,
+			...emptyData,
 			user: null,
 			error: 'ユーザー情報が見つかりません。'
 		};
 	}
 	if (!user.class_id) {
 		return {
-			myClassScore: null,
+			...emptyData,
 			user,
 			error: 'クラスに所属していません。'
 		};
@@ -256,94 +363,75 @@ export const load = async ({ fetch, locals, request }) => {
 			headers.Authorization = authHeader;
 		}
 
-		let activeEventId = null;
+		let activeEvent = null;
 		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
 		if (activeEventResponse.ok) {
-			const activeEventPayload = await activeEventResponse.json();
-			activeEventId = activeEventPayload?.event_id;
-
-			if (activeEventPayload?.hide_scores && !canViewHiddenScores(user)) {
-				return {
-					user,
-					myClassScore: null,
-					scoresHidden: true,
-					scoreItems: [],
-					categoryBreakdown: [],
-					pointHighlights: [],
-					sportSections: [],
-					assignedSports: [],
-					upcomingMatches: [],
-					scoreHistory: []
-				};
-			}
+			activeEvent = await activeEventResponse.json();
 		}
+		const activeEventId = activeEvent?.event_id ?? activeEvent?.id ?? null;
+		let scoresHidden = Boolean(activeEvent?.hide_scores && !canViewHiddenScores(user));
+		let scoreResponse = null;
+		let classProgressResponse = null;
+		let teamsResponse = null;
+		let tournamentsResponse = null;
+		let noonResponse = null;
+		let notificationsResponse = null;
+		let sportsResponse = null;
 
-		const scoreResponse = await fetch(`${BACKEND_URL}/api/scores/class`, {
-			headers
-		});
-		if (!scoreResponse.ok) {
-			if (scoreResponse.status === 403) {
-				return {
-					user,
-					myClassScore: null,
-					scoresHidden: true,
-					scoreItems: [],
-					categoryBreakdown: [],
-					pointHighlights: [],
-					sportSections: [],
-					assignedSports: [],
-					upcomingMatches: [],
-					scoreHistory: []
-				};
-			}
-			throw new Error('クラスの得点一覧の取得に失敗しました。');
-		}
-		const classScores = await scoreResponse.json();
-		const myClassScore = classScores.find((score) => score.class_id === user.class_id);
-
-		if (!myClassScore) {
-			return {
-				myClassScore: null,
-				user,
-				error: 'あなたのクラスの得点情報が見つかりませんでした。'
-			};
-		}
-
-		const season = myClassScore.season;
-		const primaryRankRaw = season === 'spring' ? myClassScore.rank_current_event : myClassScore.rank_overall;
-		const primaryRank = (primaryRankRaw === 0 || primaryRankRaw === null || primaryRankRaw === undefined) ? null : primaryRankRaw;
-		const primaryPoints =
-			season === 'spring' ? myClassScore.total_points_current_event : myClassScore.total_points_overall;
-		const secondaryRankRaw = season === 'spring' ? myClassScore.rank_overall : myClassScore.rank_current_event;
-		const secondaryRank = (secondaryRankRaw === 0 || secondaryRankRaw === null || secondaryRankRaw === undefined) ? null : secondaryRankRaw;
-		const secondaryPoints =
-			season === 'spring' ? myClassScore.total_points_overall : myClassScore.total_points_current_event;
-
-		const breakdown = buildScoreBreakdown(myClassScore);
-
-		let upcomingMatches = [];
-		let assignedSports = [];
 		if (activeEventId) {
-			const [teamsResponse, tournamentsResponse, noonResponse] = await Promise.all([
+			[
+				scoreResponse,
+				classProgressResponse,
+				teamsResponse,
+				tournamentsResponse,
+				noonResponse,
+				notificationsResponse,
+				sportsResponse
+			] = await Promise.all([
+				scoresHidden ? Promise.resolve(null) : fetch(`${BACKEND_URL}/api/scores/class`, { headers }),
+				fetch(`${BACKEND_URL}/api/student/class-progress`, { headers }),
 				fetch(`${BACKEND_URL}/api/barcode/teams`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
-				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers })
+				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers }),
+				fetch(`${BACKEND_URL}/api/notifications?limit=3`, { headers }),
+				fetch(`${BACKEND_URL}/api/events/${activeEventId}/sports`, { headers })
 			]);
+		}
 
-			const teams = teamsResponse.ok ? await teamsResponse.json() : [];
-			const currentEventTeams = Array.isArray(teams)
-				? teams.filter((team) => Number(team?.event_id) === Number(activeEventId))
-				: [];
-			assignedSports = buildAssignedSports(currentEventTeams);
+		if (scoreResponse?.status === 403) scoresHidden = true;
+		const classScores = scoresHidden ? [] : await readJson(scoreResponse, []);
+		const rawClassScore = Array.isArray(classScores)
+			? classScores.find((score) => Number(score.class_id) === Number(user.class_id))
+			: null;
+		let myClassScore = null;
+		let breakdown = buildScoreBreakdown(null);
+		if (rawClassScore) {
+			const season = rawClassScore.season;
+			const primaryRankRaw = season === 'spring' ? rawClassScore.rank_current_event : rawClassScore.rank_overall;
+			const secondaryRankRaw = season === 'spring' ? rawClassScore.rank_overall : rawClassScore.rank_current_event;
+			myClassScore = {
+				...rawClassScore,
+				primaryRank: [0, null, undefined].includes(primaryRankRaw) ? null : primaryRankRaw,
+				primaryPoints: season === 'spring' ? rawClassScore.total_points_current_event : rawClassScore.total_points_overall,
+				secondaryRank: [0, null, undefined].includes(secondaryRankRaw) ? null : secondaryRankRaw,
+				secondaryPoints: season === 'spring' ? rawClassScore.total_points_overall : rawClassScore.total_points_current_event
+			};
+			breakdown = buildScoreBreakdown(rawClassScore);
+		}
 
-			const tournamentMatches = tournamentsResponse.ok
-				? buildTournamentUpcomingMatches(await tournamentsResponse.json(), currentEventTeams)
-				: [];
-
-			const noonMatches = noonResponse.ok
-				? buildNoonUpcomingMatches(await noonResponse.json(), user.class_id)
-				: [];
-
+		const classPayload = await readJson(classProgressResponse, {});
+		const teamsPayload = await readJson(teamsResponse, []);
+		const tournamentsPayload = await readJson(tournamentsResponse, []);
+		const noonPayload = await readJson(noonResponse, {});
+		const notificationPayload = await readJson(notificationsResponse, {});
+		const sportsPayload = await readJson(sportsResponse, []);
+		const currentEventTeams = Array.isArray(teamsPayload)
+			? teamsPayload.filter((team) => Number(team?.event_id) === Number(activeEventId))
+			: [];
+		let upcomingMatches = [];
+		if (activeEventId) {
+			const tournamentMatches = buildTournamentUpcomingMatches(tournamentsPayload, currentEventTeams);
+			const noonMatches = buildNoonUpcomingMatches(noonPayload, user.class_id);
 			upcomingMatches = [...tournamentMatches, ...noonMatches]
 				.filter((match) => match.start_time || match.opponent_name || match.location)
 				.sort((left, right) => left.sort_value - right.sort_value)
@@ -355,30 +443,44 @@ export const load = async ({ fetch, locals, request }) => {
 					location: match.location
 				}));
 		}
+		const matchResults = [
+			...buildTournamentMatchResults(tournamentsPayload, currentEventTeams),
+			...buildNoonMatchResults(noonPayload, user.class_id)
+		].sort((left, right) => right.sort_value - left.sort_value).slice(0, 5);
+		const sportGuidelines = (Array.isArray(sportsPayload) ? sportsPayload : [])
+			.filter((sport) => sport?.rules_pdf_url)
+			.map((sport) => ({
+				id: sport.sport_id ?? sport.id,
+				name: sport.sport_name || sport.name || '競技要項',
+				url: sport.rules_pdf_url
+			}));
 
 		return {
 			user,
-			myClassScore: {
-				...myClassScore,
-				primaryRank,
-				primaryPoints,
-				secondaryRank,
-				secondaryPoints
-			},
+			myClassScore,
+			scoresHidden: scoresHidden || undefined,
+			error: !scoresHidden && !myClassScore ? 'あなたのクラスの得点情報が見つかりませんでした。' : undefined,
 			scoreItems: breakdown.scoreItems,
 			categoryBreakdown: breakdown.categoryBreakdown,
 			pointHighlights: breakdown.pointHighlights,
 			sportSections: breakdown.sportSections,
-			assignedSports,
+			assignedSports: buildAssignedSports(currentEventTeams),
 			upcomingMatches,
+			matchResults,
+			classInfo: classPayload?.class_info ?? null,
+			classProgress: Array.isArray(classPayload?.progress) ? classPayload.progress : [],
+			notifications: Array.isArray(notificationPayload?.notifications) ? notificationPayload.notifications.slice(0, 3) : [],
+			sportGuidelines,
+			competitionGuidelinesUrl: activeEvent?.competition_guidelines_pdf_url ?? null,
+			surveyUrl: activeEvent?.is_survey_published && activeEvent?.survey_url ? activeEvent.survey_url : null,
 			scoreHistory: []
 		};
 	} catch (error) {
 		console.error(error);
 		return {
-			myClassScore: null,
+			...emptyData,
 			user,
-			error: 'クラスの得点の読み込みに失敗しました。'
+			error: 'マイページ情報の読み込みに失敗しました。'
 		};
 	}
 };
