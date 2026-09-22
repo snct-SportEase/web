@@ -161,7 +161,7 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 重複登録のクラス人数上限 | 大会ごとの2競技登録許可人数の設定 | ☓ | ☓ | バックエンドは `event_handler_test.go` と `class_team_handler_test.go` で境界値・登録制限を確認済み。フロントの自動テストは未整備 |
 | スコア非表示設定 | 学生へのスコア公開・非公開設定 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | アンケート通知配信 | アンケートURLの全体通知送信 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で通知送信フローを確認済み |
-| 得点CSVインポート | 外部集計データのインポート（春季） | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
+| 得点CSVインポート | 1回答1行またはクラス別人数データのインポート（秋季） | ○ | ○ | `event_handler_test.go` / `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | 結果のCSV/PDF出力 | クラス別スコア集計の出力 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | DBダンプ出力 | データベース全体のエクスポート | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | アップロードファイル出力 | 登録済み画像・PDFのZIPエクスポート | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
