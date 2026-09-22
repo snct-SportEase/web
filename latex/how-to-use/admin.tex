@@ -25,13 +25,6 @@
 \usepackage{enumitem}
 \usepackage{fontspec}
 
-\usepackage[
-  colorlinks=true,
-  linkcolor=blue,
-  urlcolor=cyan,
-  citecolor=green
-]{hyperref}
-
 \usepackage{listing}
 \usepackage{xcolor}
 \newcommand{\code}[1]{\colorbox{gray!20}{\texttt{#1}}}
@@ -54,6 +47,13 @@
 
 % 画像
 \usepackage{float}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=cyan,
+  citecolor=green
+]{hyperref}
 
 \begin{document}
 
@@ -86,6 +86,12 @@ root専用の「権限管理」画面で行う。
 
 adminダッシュボードは \code{/dashboard/admin/} 以下の各ページから操作する。
 admin権限を持たないアカウントでアクセスしようとした場合は、自動的に \code{/dashboard} へリダイレクトされる。
+
+\subsection*{共通ダッシュボードと報告リンク}
+
+\code{/dashboard} の「表示設定」では、利用可能なショートカットの表示・非表示を端末ごとに保存できる。
+ヘッダーからバグ報告、新機能提案、非公開の脆弱性報告を開ける。
+個人情報・認証情報・未修正の脆弱性は公開Issueへ記載せず、脆弱性報告を使用する。
 
 \subsection{admin作業時の基本方針}
 
@@ -139,7 +145,7 @@ adminは大会当日の進行に関わる操作を担当する。
 \node[main, below of=s4] (s5) {⑤ 昼競技結果入力　→ 第\ref{sec:noon}章};
 \node[main, below of=s5] (s6) {⑥ MIC投票　→ 第\ref{sec:mic}章};
 
-\node[opt, right=1.5cm of s3] (myid) {MyID読み取り（任意）→ 第\ref{sec:myid}章};
+\node[opt, right=0.5cm of s3] (myid) {MyID読み取り（任意）→ 第\ref{sec:myid}章};
 
 \draw[arr] (s1) -- (s2);
 \draw[arr] (s2) -- (s3);
@@ -238,6 +244,12 @@ adminは大会当日の進行に関わる操作を担当する。
 登録時に上限を超える学生が含まれている場合は、割り当て全体が拒否されるため、既存の参加競技を確認してから登録する。
 重複登録が許可される場合も、当日の時間割と重複していないか確認する。
 
+\subsection{盤上競技の代表者登録}
+
+将棋では各クラスの代表A・代表B・補欠を、オセロでは代表者を登録する。
+盤上競技の参加クラスは16クラス固定であり、rootのトーナメント生成画面では参加クラスを選択しない。
+そのため、トーナメント生成前にこの画面で各クラスの代表者が揃っていることを確認する。
+
 \subsection{チームメンバーの削除}
 
 割り当て済みのメンバーをチームから外すことができる。
@@ -269,6 +281,7 @@ MyIDバーコード読み取りによって参加本登録されたメンバー�
 この画面では \code{root} / \code{admin} / \code{student} の基本権限は操作できない。
 審判、受付、競技担当など、一時的に必要な任意ロールを付与する。
 ロール名は運用上の意味が分かる名前にし、同じ用途で複数の表記を作らないようにする。
+競技参加用ロールは大会単位で保持される。現在の大会で付与したロールは、別大会の通知対象や競技割り当てには使用されない。
 
 \subsection{ロールの削除}
 
@@ -485,10 +498,18 @@ rootが生成した競技テンプレートに対して、以下の各種結果�
   \item \textbf{年リレー} ── ブロックごとの結果と総合ボーナス
   \item \textbf{コースリレー} ── コース別の結果
   \item \textbf{綱引き} ── 各試合の勝敗
+  \item \textbf{借り物競争} ── 順位と競技内スコア
 \end{itemize}
 
 テンプレートランはrootが事前に生成した対戦カードに対して結果を入力する。
 ドラッグ操作で順位を並べる形式の入力がある場合は、保存前に順位順が正しいか確認する。
+
+\subsection{競技タイピング結果のインポート}
+
+競技タイピングでは、独自タイピングシステムが出力した \code{typing-results-v1} 形式のJSONを選択し、
+「結果をインポート」で順位と大会得点を確定する。
+同一結果を再度選んだ場合は取込済みとして扱われる。訂正済みファイルへ差し替える場合だけ
+「置換インポート」を使用し、確定後に順位点と学生画面の表示を確認する。
 
 \newpage
 
@@ -537,9 +558,9 @@ MIC（Most Impressive Class：最も印象を残したクラス）の投票を�
 \endhead
 管理者ダッシュボード閲覧 & 出席率・参加率・スコア推移・イベント進捗をリアルタイムで確認 \\
 \midrule
-チームメンバー割り当て & 競技ごとに参加メンバーをクラスから選択して登録・削除 \\
+チームメンバー割り当て & 通常競技の参加者と、将棋・オセロの代表者を登録・削除 \\
 \midrule
-ロール付与・削除 & 審判ロールなど任意のロールを学生に付与または削除 \\
+ロール付与・削除 & 大会単位の審判・競技担当など任意ロールを付与または削除 \\
 \midrule
 MyIDバーコード読み取り & 学生のMyIDバーコードを読み取り、参加本登録とラウンドチェックインを実施 \\
 \midrule
@@ -553,7 +574,7 @@ MyIDバーコード読み取り & 学生のMyIDバーコードを読み取り、
 \midrule
 試合結果の入力 & トーナメント試合のスコアおよび勝敗を入力 \\
 \midrule
-昼競技結果の入力 & 昼競技（年リレー・コースリレー・綱引き等）の結果を登録 \\
+昼競技結果の入力 & 各テンプレートの結果を登録し、競技タイピングのJSONを取り込む \\
 \midrule
 MIC投票 & Most Impressive Classの候補クラスに投票 \\
 \bottomrule

@@ -7,10 +7,10 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{tabularx}
-\usepackage{hyperref}
 \usepackage{tikz}
 \usepackage{float}
 \usetikzlibrary{shapes.geometric, arrows, positioning, fit, backgrounds}
+\usepackage{hyperref}
 
 \title{SportEase の情報の取り扱い}
 \author{佐藤佑作} % 必要に応じて記入してください
@@ -164,6 +164,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
 
 所属クラスはプロフィール完了後、一般ユーザーが変更できない。\\
 補助ロールはクラス管理、競技参加管理、通知のロールフィルタリング等に利用する。
+競技参加ロールはイベントIDを持ち、大会ごとに独立して付与・解除する。基本ロールと大会共通の任意ロールはイベントIDを持たない。
 
 \subsection{機能要件}
 各ロールにおける利用可能な機能の詳細は以下の通りである。
@@ -183,7 +184,8 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \item マイページでのクラス出席状況、競技進捗、最新通知の集約表示
         \item 大会要項PDF、競技要項PDF、公開中アンケートへのアクセス
         \item 各競技のトーナメント表・対戦組み合わせの閲覧
-        \item 試合結果および勝敗のリアルタイム確認
+        \item 通常競技・盤上競技の試合結果および勝敗の確認
+        \item 結果一覧で完了した通常試合と公開済み昼競技結果を横断表示
         \item クラス別の総合得点・進捗状況・順位の閲覧
         \item 昼企画（リレー・綱引き等）の結果閲覧
     \end{itemize}
@@ -192,6 +194,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \item 試合開始・結果等のWeb Push通知の受信
         \item Rootへの通知申請および申請メッセージの送受信
         \item MyIDによる参加確認
+        \item ヘッダーからのバグ報告・非公開脆弱性報告・新機能提案
     \end{itemize}
 \end{itemize}
 
@@ -203,12 +206,15 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \item 試合開始時間の変更・調整
         \item 試合結果（スコア・勝者）の入力・確定
         \item 試合ステータスの更新（試合中、終了など）
-        \item 昼企画（リレー・綱引き等）の予選・決勝結果の入力
+        \item 昼企画（リレー・綱引き・借り物競争等）の予選・決勝結果の入力
+        \item 競技タイピング結果JSONの検証・取込・置換
+        \item 盤上競技の順位・得点入力
     \end{itemize}
     \item \textbf{運営管理}:
     \begin{itemize}
         \item 前日・当日の出欠確認・登録
         \item クラス・チーム編成の管理
+        \item 将棋A・B・補欠およびオセロ代表者の登録
         \item 各競技の参加定員数の調整・変更
         \item ユーザーの表示名修正（不適切な名前の修正等）
         \item 運営用画像・PDF資料（要項・ルールブック等）のアップロード
@@ -230,12 +236,15 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
     \begin{itemize}
         \item 競技種目の新規作成・削除
         \item クラス情報の管理および在籍学生数の登録（CSVインポート対応）
-        \item 昼企画のグループ分け・テンプレート管理
-        \item 全競技のトーナメント表の一括自動生成・プレビュー
+        \item 複数昼企画セッションのグループ分け・テンプレート管理
+        \item 盤上競技を除く通常競技トーナメントの一括自動生成・プレビュー
+        \item 固定16クラスの将棋A・B、オセロのシード順指定・専用生成
+        \item 保存済みトーナメントのExcel出力、クラス別結果のCSV・PDF出力
+        \item データベースおよびアップロード済みファイルのバックアップ出力
     \end{itemize}
     \item \textbf{全体通知・申請管理}:
     \begin{itemize}
-        \item 全ユーザーまたは特定のロールに向けた任意のお知らせ通知の配信
+        \item 全ユーザー、特定ロールまたは個人ユーザーに向けた任意のお知らせ通知の配信
         \item 学生からの通知申請の承認・却下
         \item 大会要項PDFの管理
     \end{itemize}
@@ -246,12 +255,12 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
 
 \begin{itemize}
     \item \textbf{ログイン画面}: Googleアカウントによる認証エントリポイント。
-    \item \textbf{ダッシュボード (ホーム)}: ログイン後の初期画面。ユーザーロールに応じたメニューを表示。
+    \item \textbf{ダッシュボード (ホーム)}: ログイン後の初期画面。ユーザーロールに応じたメニューを表示し、端末のローカルストレージにショートカット表示設定を保存。
     \item \textbf{学生向けメニュー (Student)}:
     \begin{itemize}
         \item \textbf{マイページ}: プロフィール、クラス成績、参加試合・結果、クラス状況、最新通知、大会資料・アンケートの確認
         \item \textbf{クラス情報}: プロフィールで設定した自クラスの人数・出席状況・勝ち進み状況の確認
-        \item \textbf{競技・イベント情報}: 競技詳細、タイムテーブル、トーナメント、点数一覧の閲覧
+        \item \textbf{競技・イベント情報}: 競技詳細、タイムテーブル、通常・盤上トーナメント、結果一覧、点数一覧の閲覧
         \item \textbf{昼企画}: 昼競技結果の確認
         \item \textbf{その他}: MyID参加確認、通知確認、通知申請
     \end{itemize}
@@ -284,7 +293,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
     \item \textbf{SQLインジェクション対策}: すべてのデータベース操作において、Go言語のプレースホルダ機能（Prepared Statements）を使用し、SQLインジェクションを無効化している。
     \item \textbf{CSRF対策}: セッションベースの認証（SameSite=Lax Cookie）およびCORSによるOrigin検証により、不正なクロスサイトリクエストを防止している。
     \item \textbf{XSS対策}: SvelteKitのオートエスケープ機能により、ユーザー入力のスクリプト実行を防止している。
-    \item \textbf{API認可}: 各エンドポイントにおいてミドルウェア（Middleware）による認証・認可チェックを行い、権限のないリソースへのアクセスを遮断している。一部の公開エンドポイント（クラス一覧取得、WebSocket接続）は認証不要でアクセス可能。
+    \item \textbf{API認可}: 各エンドポイントにおいてミドルウェア（Middleware）による認証・認可チェックを行い、権限のないリソースへのアクセスを遮断している。ヘルスチェックとOAuth開始・コールバックを除き、クラス一覧やWebSocket接続を含む大会データAPIは認証を要求する。
     \item \textbf{ファイルアップロード}: 画像およびPDFファイルのアップロード時は、拡張子だけでなくMIMEタイプの検証（\texttt{http.DetectContentType}）を行い、実行可能ファイルの混入を防ぐ。
 \end{itemize}
 
@@ -329,8 +338,8 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \toprule
         カテゴリ & 技術 \\
         \midrule
-        フロントエンド & SvelteKit, TailwindCSS, TypeScript \\
-        バックエンド & Go 1.24, Gin, Gorilla WebSocket \\
+        フロントエンド & SvelteKit, TailwindCSS, JavaScript \\
+        バックエンド & Go 1.26, Gin, Gorilla WebSocket \\
         データベース & MySQL 8.0 \\
         インフラ & Docker, Docker Compose, Traefik v2 \\
         認証 & Google OAuth2 (OpenID Connect) \\
@@ -342,17 +351,18 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
 主なエンティティとその役割は以下の通りである。
 
 \begin{itemize}
-    \item \textbf{Users / Roles}: ユーザーID、メールアドレス、表示名、およびベースロール・動的ロールの割り当てを管理。
-    \item \textbf{Events}: 球技大会等のイベント単位。アクティブなイベントは別テーブル（active\_event）で管理。
+    \item \textbf{Users / Roles}: ユーザーID、メールアドレス、表示名、およびベースロール・大会単位の競技ロールを管理。
+    \item \textbf{Events}: 球技大会等のイベント単位。アクティブなイベントは別テーブル（active\_event）で管理。同年度の切り替えでは同名クラスへプロフィールを引き継ぎ、年度変更時は卒業処理とプロフィール再設定を行う。
     \item \textbf{Sports / Classes}: 競技種目および参加クラスのマスターデータ。
     \item \textbf{Teams / Entries}: クラス・競技ごとのチーム編成およびエントリー情報。
     \item \textbf{Tournaments / Matches}: トーナメント構造および個々の試合データ（開始時刻、スコア、勝者）。
+    \item \textbf{Board Games}: 固定16クラスによる将棋A・B、オセロのシード、出場者、順位、得点を管理。
     \item \textbf{Noon Games}: 昼企画のセッション、試合、結果、ポイント、テンプレート実行を管理。
-    \item \textbf{Notifications}: Web Push通知の購読情報、通知履歴、および通知リクエストのワークフローを管理。
+    \item \textbf{Notifications}: Web Push通知の購読情報、ロール/個人宛て通知履歴、および通知リクエストのワークフローを管理。
 \end{itemize}
 
 \subsection{データベース設計}
-詳細なデータベース設計は以下の通りである。データベースは全34テーブルおよび1ビューで構成される。
+詳細なデータベース設計は以下の通りである。マイグレーション0020適用時点で、データベースは全40テーブルおよび1ビューで構成される。
 ここでは主要なテーブルを記載する。
 
 \subsubsection{Core Tables}
@@ -397,9 +407,11 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \toprule
         Column & Type & Description \\
         \midrule
+        id & BIGINT UNSIGNED & Primary Key \\
         user\_id & CHAR(36) & ユーザーID (FK) \\
         role\_id & INT & ロールID (FK) \\
-        event\_id & INT & イベントID (FK, NULLable) \\
+        event\_id & INT & 大会単位ロールのイベントID (FK, NULLなら大会共通) \\
+        event\_scope\_id & INT & NULLを0として一意性判定する仮想列 \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -421,8 +433,10 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         competition\_guidelines\_pdf\_url & VARCHAR(500) & 競技要項PDF URL \\
         survey\_url & VARCHAR(500) & アンケートURL (NULLable) \\
         is\_survey\_published & BOOLEAN & アンケート通知済みフラグ \\
-        status & ENUM & イベント状態 (upcoming, active, archived) \\
+        status & ENUM & イベント状態 (preparing, upcoming, active, archived) \\
         hide\_scores & BOOLEAN & 得点非表示フラグ \\
+        duplicate\_registration\_threshold & INT & 2競技登録を許可するクラス人数上限 \\
+        is\_mic\_voting\_enabled & BOOLEAN & MIC投票有効フラグ \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -480,7 +494,8 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         sport\_id & INT & 競技ID (FK) \\
         description & TEXT & 説明 \\
         rules\_pdf\_url & VARCHAR(255) & ルールPDF URL \\
-        location & ENUM & 場所 (gym1, gym2, ground, noon\_game, other) \\
+        location & VARCHAR(255) & 任意の開催場所 \\
+        template\_key & VARCHAR(64) & 盤上/昼競技テンプレート識別子 \\
         min\_capacity & INT & 最少人数 \\
         max\_capacity & INT & 最大人数 \\
         \bottomrule
@@ -501,6 +516,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         name & VARCHAR(255) & チーム名 \\
         class\_id & INT & クラスID (FK) \\
         sport\_id & INT & 競技ID (FK) \\
+        entry\_key & VARCHAR(64) & 同一競技内の代表枠識別子（例: A, B, SUBSTITUTE） \\
         min\_capacity & INT & チーム最少人数 \\
         max\_capacity & INT & チーム最大人数 \\
         \bottomrule
@@ -551,6 +567,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         team2\_id & INT & チーム2 ID (FK) \\
         team1\_score & INT & チーム1 スコア \\
         team2\_score & INT & チーム2 スコア \\
+        winner\_team\_id & INT & 確定した勝者チームID (FK) \\
         next\_match\_id & INT & 次戦ID (FK) \\
         status & VARCHAR(50) & 試合状態 (scheduled, in\_progress, completed) \\
         match\_start\_time & TIMESTAMP & 開始予定日時 \\
@@ -608,6 +625,9 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         points & INT & 加算/減算ポイント \\
         reason & VARCHAR(64) & 理由（制約付きの定数値） \\
         source\_match\_id & INT & 対象試合ID (FK) \\
+        noon\_game\_session\_id & INT & 対象昼競技セッションID (FK) \\
+        noon\_game\_match\_id & INT & 対象昼競技試合ID (FK) \\
+        board\_game\_run\_id & INT & 対象盤上競技実行ID (FK) \\
         created\_at & TIMESTAMP & 作成日時 \\
         \bottomrule
     \end{tabularx}
@@ -665,6 +685,60 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
     \end{tabularx}
 \end{table}
 
+\subsubsection{Board Game Tables}
+将棋・オセロの専用トーナメントに関わるテーブル群。通常競技の一括生成とは分離して管理する。
+
+\begin{table}[H]
+    \centering
+    \caption{board\_game\_runs (盤上競技実行)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id / sport\_id & INT & イベント・競技ID (FK) \\
+        game\_type & ENUM & 競技種別 (shogi, othello) \\
+        name / description / location & VARCHAR/TEXT & 名称・説明・会場 \\
+        rules\_pdf\_url / scheduled\_date & VARCHAR/DATE & 要項PDF・実施日 \\
+        win\_points / rank\_points & INT/JSON & 1勝点・順位点 \\
+        regular\_minutes / final\_minutes & INT & 通常戦・決勝の試合時間 \\
+        players\_per\_class / substitutes\_per\_class & INT & クラスごとの選手・補欠人数 \\
+        status & ENUM & 状態 (draft, published, completed) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{board\_game\_entries / board\_game\_entry\_members}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        run\_id / tournament\_id / team\_id / class\_id & INT & 実行・ブラケット・チーム・クラスID (FK) \\
+        slot\_key & VARCHAR(64) & ブラケット枠 (A, B, MAIN) \\
+        seed\_number & INT & ドラッグ＆ドロップで決めたシード順 \\
+        entry\_id / user\_id & INT/CHAR(36) & エントリーと選手ID (FK) \\
+        member\_order / is\_substitute & INT/BOOLEAN & 選手順・補欠フラグ \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{board\_game\_rankings (盤上競技順位)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        run\_id / tournament\_id / entry\_id & INT & 実行・ブラケット・エントリーID (FK) \\
+        rank\_number / win\_count & INT & 順位・勝数 \\
+        win\_points / rank\_points / total\_points & INT & 勝数点・順位点・合計点 \\
+        recorded\_by / recorded\_at & CHAR(36)/TIMESTAMP & 記録者・記録日時 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
 \subsubsection{Noon Game Tables}
 昼企画（リレー、綱引き等）に関わるテーブル群。
 
@@ -677,14 +751,18 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \midrule
         id & INT & Primary Key \\
         event\_id & INT & イベントID (FK) \\
+        template\_key & VARCHAR(64) & 競技テンプレート識別子 \\
         name & VARCHAR(255) & 企画名 \\
         description & TEXT & 説明 \\
+        scheduled\_at & DATETIME & 実施日時 \\
+        location & VARCHAR(255) & 開催場所 \\
         mode & ENUM & 対戦モード (class, group, mixed) \\
         win\_points & INT & 勝利ポイント \\
         loss\_points & INT & 敗北ポイント \\
         draw\_points & INT & 引分ポイント \\
         participation\_points & INT & 参加ポイント \\
         allow\_manual\_points & BOOLEAN & 手動ポイント許可フラグ \\
+        status & ENUM & 状態 (draft, finalized, published) \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -805,7 +883,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         class\_id & INT & クラスID (FK) \\
         points & INT & ポイント数 \\
         reason & VARCHAR(255) & 理由 \\
-        source & ENUM & 付与元 (result, manual) \\
+        source & ENUM & 付与元 (result, manual, typing\_system) \\
         created\_by & CHAR(36) & 作成者ID (FK) \\
         created\_at & TIMESTAMP & 作成日時 \\
         \bottomrule
@@ -841,6 +919,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         result\_id & INT & 結果ID (FK) \\
         entry\_id & INT & エントリーID (FK) \\
         placement\_rank & INT & 順位 (NULLable) \\
+        competition\_score & INT & 競技内スコア (NULLable) \\
         points & INT & 付与ポイント \\
         note & VARCHAR(255) & メモ \\
         entry\_resolved\_name & VARCHAR(255) & エントリー解決済み名前 \\
@@ -860,6 +939,25 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         group\_index & INT & グループ順序 \\
         group\_name & VARCHAR(255) & グループ名 \\
         class\_names & JSON & クラス名リスト \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{noon\_game\_typing\_system\_imports (タイピング結果取込履歴)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id / session\_id & INT & 取込ID・昼競技セッションID (FK) \\
+        export\_id / sha256 & CHAR(36/64) & 外部出力ID・ファイルハッシュ \\
+        status / action & ENUM & 成否と操作種別 (import, replace) \\
+        replaced\_export\_id & CHAR(36) & 置換対象の外部出力ID \\
+        requested\_by / requested\_at & CHAR(36)/TIMESTAMP & 実行者・実行日時 \\
+        filename / payload\_size & VARCHAR/INT & ファイル名・サイズ \\
+        results & JSON & 検証済み取込結果 \\
+        is\_active & BOOLEAN & 現在有効な取込フラグ \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -995,10 +1093,10 @@ RESTful APIのエンドポイント一覧（主要なもの）。ここでは代
         \midrule
         GET & /api/events/active & 現在アクティブなイベント取得 \\
         GET & /api/events/:id/sports & イベント採用競技一覧取得 \\
-        GET & /api/classes & クラス一覧取得（認証不要） \\
+        GET & /api/classes & クラス一覧取得（student/admin/root） \\
         GET & /api/scores/class & クラス得点情報取得 \\
         GET & /api/barcode/teams & 自分の所属チーム一覧取得 \\
-        POST & /api/barcode/check-in & MyIDバーコード読み取りによる参加本登録・ラウンドチェックイン \\
+        POST & /api/barcode/check-in & MyIDバーコード読み取りによる参加本登録・ラウンドチェックイン（admin/root） \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -1012,7 +1110,9 @@ RESTful APIのエンドポイント一覧（主要なもの）。ここでは代
         \midrule
         GET & .../class-progress & クラス進捗状況取得 \\
         GET & .../events/:id/tournaments & トーナメント表取得 \\
-        GET & .../events/:id/noon-game/session & 昼企画セッション情報取得 \\
+        GET & .../events/:id/board-game-runs & 盤上競技ブラケット・出場者・順位取得 \\
+        GET & .../events/:id/noon-game/sessions & 公開済み昼企画セッション一覧取得 \\
+        GET & .../events/:id/noon-game/sessions/:id & 昼企画セッション詳細取得 \\
         GET & .../notification-requests & 通知リクエスト一覧 \\
         POST & .../notification-requests & 通知リクエスト作成 \\
         GET & .../notification-requests/:id & 通知リクエスト詳細 \\
@@ -1043,7 +1143,7 @@ RESTful APIのエンドポイント一覧（主要なもの）。ここでは代
         \toprule
         Method & Path & Description \\
         \midrule
-        GET & /api/ws/tournaments/:id & トーナメントリアルタイム更新（認証不要） \\
+        GET & /api/ws/tournaments/:id & トーナメントリアルタイム更新（認証必須） \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -1063,8 +1163,9 @@ RESTful APIのエンドポイント一覧（主要なもの）。ここでは代
         DELETE & .../events/:id/sports/:id & イベントから競技を削除 \\
         GET/PUT & .../events/.../details & 競技詳細設定 \\
         PUT & .../matches/:id/result & 試合結果更新 \\
-        PUT & .../matches/:id/status & 試合ステータス更新 \\
         PUT & .../matches/:id/start-time & 試合開始時刻更新 \\
+        PUT & .../board-game-runs/:id/tournaments/:id/rankings & 盤上競技順位・得点確定 \\
+        POST & .../noon-game/sessions/:id/typing-system/import & タイピング結果JSON取込 \\
         POST & .../attendance/register & 出席登録 \\
         POST & .../images, /pdfs & 画像・PDFアップロード \\
         GET & .../users & ユーザー一覧検索 \\
@@ -1112,7 +1213,7 @@ RESTful APIのエンドポイント一覧（主要なもの）。ここでは代
 \begin{table}[H]
     \centering
     \caption{Root API (/api/root)}
-    \begin{tabularx}{\textwidth}{|l|l|X|}
+    \begin{tabularx}{\textwidth}{|p{3.1cm}|X|p{4.3cm}|}
         \toprule
         Method & Path & Description \\
         \midrule
@@ -1120,8 +1221,28 @@ RESTful APIのエンドポイント一覧（主要なもの）。ここでは代
         PUT & .../events/active & アクティブイベント切り替え \\
         PUT & .../events/:id/rainy-mode & 雨天モード切り替え \\
         GET/POST/PUT & .../events/:id/rainy-mode/settings & 雨天モード詳細設定 \\
-        POST & .../events/:id/tournaments/generate-all & 全トーナメント一括生成 \\
+        POST & .../events/:id/tournaments/generate-all & 通常競技トーナメント一括生成（盤上競技を除く） \\
         POST & .../events/:id/tournaments/generate-preview & 一括生成プレビュー \\
+        GET & .../events/:id/tournament-templates/board-game/classes & 盤上競技対象16クラス取得 \\
+        POST & .../events/:id/tournament-templates/board-game/run & 盤上競技・シード順生成 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{Root API (/api/root、続き)}
+    \begin{tabularx}{\textwidth}{|p{3.1cm}|X|p{4.3cm}|}
+        \toprule
+        Method & Path & Description \\
+        \midrule
+        GET/POST & .../events/:id/noon-game/sessions & 昼競技セッション一覧・作成 \\
+        PUT/DELETE & .../events/:id/noon-game/sessions/:id & 昼競技セッション更新・削除 \\
+        POST & .../events/:id/noon-game/templates/.../run & 各昼競技テンプレート実行 \\
+        POST & .../noon-game/sessions/:id/typing-system/import & タイピング結果JSON取込 \\
+        GET & .../events/:id/tournaments/export/excel & 保存済みトーナメントExcel出力 \\
+        GET & .../db/export & データベースSQLダンプ出力 \\
+        GET & .../uploads/export & アップロードファイルZIP出力 \\
         PUT & .../classes/student-counts & クラス人数設定 \\
         POST & .../classes/student-counts/csv & クラス人数CSV登録 \\
         POST & .../sports & 競技マスタ作成 \\

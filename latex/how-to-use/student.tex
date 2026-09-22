@@ -25,13 +25,6 @@
 \usepackage{enumitem}
 \usepackage{fontspec}
 
-\usepackage[
-  colorlinks=true,
-  linkcolor=blue,
-  urlcolor=cyan,
-  citecolor=green
-]{hyperref}
-
 \usepackage{listing}
 \usepackage{xcolor}
 \newcommand{\code}[1]{\colorbox{gray!20}{\texttt{#1}}}
@@ -54,6 +47,13 @@
 
 % 画像
 \usepackage{float}
+
+\usepackage[
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=cyan,
+  citecolor=green
+]{hyperref}
 
 \begin{document}
 
@@ -86,6 +86,12 @@
 クラス情報やクラス単位の操作は、この所属クラスを対象として行われる。プロフィール完了後は一般ユーザーによる所属クラス変更はできない。
 
 学生ダッシュボードは \code{/dashboard/student/} 以下の各ページから操作する。
+
+\subsection*{共通ダッシュボードと報告リンク}
+
+\code{/dashboard} の「表示設定」では、利用可能なショートカットの表示・非表示を端末ごとに保存できる。
+ヘッダーからバグ報告、新機能提案、非公開の脆弱性報告を開ける。
+個人情報・認証情報・未修正の脆弱性は公開Issueへ記載せず、脆弱性報告を使用する。
 
 \subsection{学生利用時の基本方針}
 
@@ -131,11 +137,11 @@
 ]
 \node[main] (s1) {① ガイド確認・PWAインストール（事前準備）→ 第\ref{sec:guide}章};
 \node[main, below of=s1] (s2) {② タイムテーブルで日程確認　→ 第\ref{sec:timetable}章};
-\node[main, below of=s2] (s3) {③ トーナメント・昼競技・スコア閲覧　→ 第\ref{sec:tournament}章};
+\node[main, below of=s2] (s3) {③ トーナメント・結果一覧・スコア閲覧　→ 第\ref{sec:tournament}章};
 \node[main, below of=s3] (s4) {④ 通知受信・管理　→ 第\ref{sec:notification}章};
 
-\node[opt, right=1.5cm of s2] (myid) {MyID提示（必要時）→ 第\ref{sec:myid}章};
-\node[opt, right=1.5cm of s4] (req) {通知申請（任意）→ 第\ref{sec:notificationreq}章};
+\node[opt, right=0.5cm of s2] (myid) {MyID提示（必要時）→ 第\ref{sec:myid}章};
+\node[opt, right=0.5cm of s4] (req) {通知申請（任意）→ 第\ref{sec:notificationreq}章};
 
 \draw[arr] (s1) -- (s2);
 \draw[arr] (s2) -- (s3);
@@ -222,12 +228,6 @@ rootの設定により一般学生へのスコア公開が停止されている�
 大会終了後などにrootがアンケートを公開した場合は、「アンケートに回答する」リンクも表示される。
 未登録のPDFや未公開のアンケートは表示されない。
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.95\textwidth]{./images/student-mypage-overview.png}
-  \caption{試合結果・クラス状況・最新のお知らせ・大会資料}
-\end{figure}
-
 \newpage
 
 % =====================================================================
@@ -236,7 +236,7 @@ rootの設定により一般学生へのスコア公開が停止されている�
 
 \textbf{ページ}: \code{/dashboard/student/tournament}
 
-大会の全競技にわたるトーナメントブラケットを確認するページである。
+大会の通常競技と盤上競技（将棋・オセロ）のトーナメントブラケットを確認するページである。
 
 \begin{figure}[H]
   \centering
@@ -250,12 +250,34 @@ rootの設定により一般学生へのスコア公開が停止されている�
 各試合の対戦クラス・日時・結果を確認できる。
 自クラスの試合だけでなく、次に対戦する可能性があるクラスも確認できる。
 試合結果が入力されると、勝ち上がり先の表示も更新される。
+将棋は代表A・代表Bの2ブラケット、オセロはクラス対抗のブラケットとして表示される。
+出場者名だけの一覧ではなく、対戦枠と勝ち上がりをブラケット上で確認する。
 
 \subsection{雨天時のブラケット}
 
 雨天時モードが有効な場合、雨天時に対応したブラケット（敗者復活戦追加後）も表示される。
 雨天時モードでは、グラウンド競技や昼競技の扱いが変更される場合がある。
 当日の案内と画面表示を合わせて確認する。
+
+\newpage
+
+% =====================================================================
+\section{結果一覧}\label{sec:results}
+% =====================================================================
+
+\textbf{ページ}: \code{/dashboard/student/results}
+
+開催中大会の確定済み結果を、競技を横断して確認するページである。
+
+\subsection{通常競技の結果}
+
+完了した試合について、競技名、ラウンド（3位決定戦を含む）、対戦チーム、
+スコア、勝者を表示する。結果が確定していない試合は一覧に含まれない。
+
+\subsection{昼競技の結果}
+
+公開済みの各昼競技セッションについて、順位と獲得点、または勝者を表示する。
+競技タイピングなど順位形式の競技も、運営が結果を確定した後に表示される。
 
 \newpage
 
@@ -592,6 +614,8 @@ rootがアップロードした競技要項PDFをここから参照できる。
 マイページの閲覧 & クラス成績、参加試合、直近の結果、クラス状況、お知らせ、大会資料・アンケートを確認 \\
 \midrule
 トーナメントの閲覧 & 競技ごとのトーナメントブラケットと試合結果を確認 \\
+\midrule
+結果一覧の閲覧 & 完了した通常試合と公開済み昼競技結果を競技横断で確認 \\
 \midrule
 タイムテーブルの閲覧 & 全競技の試合日時・場所・対戦クラスを一覧で確認 \\
 \midrule

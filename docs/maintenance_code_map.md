@@ -52,9 +52,9 @@
 
 | 画面の種類 | 場所 | 主な内容 |
 | --- | --- | --- |
-| root向け | `frontapp/src/routes/dashboard/root/` | 大会、競技、通知、通知申請、雨天モード、トーナメント、ユーザー昇格、MIC(行事委員会賞)、資料アップロード |
+| root向け | `frontapp/src/routes/dashboard/root/` | 大会、競技、通知、通知申請、雨天モード、通常・盤上トーナメント、昼競技・タイピング結果取込、ユーザー管理、MIC(行事委員会賞)、資料アップロード |
 | admin向け | `frontapp/src/routes/dashboard/admin/` | 出席、バーコード読み取り、クラス管理、参加者確定、試合結果入力、競技詳細、MIC(行事委員会賞)投票 |
-| student向け | `frontapp/src/routes/dashboard/student/` | マイページ、クラス情報、通知、通知申請、昼競技、スコア、競技情報、時間割、トーナメント |
+| student向け | `frontapp/src/routes/dashboard/student/` | マイページ、結果一覧、クラス情報、通知、通知申請、昼競技、スコア、競技情報、時間割、通常・盤上トーナメント |
 | 共通/補助 | `frontapp/src/routes/dashboard/archive/` | 過去イベントの閲覧 |
 | 共通/補助 | `frontapp/src/routes/dashboard/guide/` | 競技ガイド資料の閲覧 |
 | 共通/補助 | `frontapp/src/routes/dashboard/privacy-policy/` | プライバシーポリシー |
@@ -125,9 +125,10 @@ APIの入口は `backapp/internal/router/router.go` です。保守時は次の�
 | 学生マイページ（参加試合・結果・クラス状況・通知・資料） | `frontapp/src/routes/dashboard/student/my-page/+page.svelte`, `+page.server.js` | `event_handler.go`, `class_handler.go`, `barcode_handler.go`, `tournament_handler.go`, `noon_game_handler.go`, `notification_handler.go`, `sport_handler.go` | `event_repository.go`, `class_repository.go`, `team_repository.go`, `tournament_repository.go`, `noon_game_repository.go`, `notification_repository.go`, `sport_repository.go` | `frontapp/tests/unit/routes/dashboard/student/my-page/my-page.server.spec.js`, `frontapp/tests/e2e/student-my-page-hidden-scores.spec.js` |
 | イベント管理（準備中ステータス・重複登録のクラス人数上限を含む） | `frontapp/src/routes/dashboard/root/event-management/` | `event_handler.go` | `event_repository.go`, `event.go`, `db/migrations/000005_add_duplicate_registration_threshold.*.sql`, `db/migrations/000006_add_preparing_event_status.*.sql` | `backapp/tests/handler/event_handler_test.go`, `backapp/tests/repository/event_repository_test.go`, `backapp/tests/middleware/event_status_test.go`, `frontapp/tests/e2e/root-event-management.spec.js` |
 | 競技管理（競技ルールはPDFのみ） | `frontapp/src/routes/dashboard/root/sport-management/`, `frontapp/src/routes/dashboard/admin/sport-details-registration/`, `frontapp/src/routes/dashboard/student/sport-info/` | `sport_handler.go`, `pdf_handler.go` | `sport_repository.go`, `sport.go` | `backapp/tests/handler/sport_handler_test.go`, `backapp/tests/repository/sport_repository_test.go`, `frontapp/tests/e2e/root-sport-management.spec.js` |
-| トーナメント管理 | `frontapp/src/routes/dashboard/root/tournament-management/`, `frontapp/src/routes/dashboard/student/tournament/` | `tournament_handler.go`, `tournament_export_handler.go`, `all_tournament_handler.go` | `tournament_repository.go`, `team_repository.go`, `tournament.go`, `team.go` | `backapp/tests/handler/all_tournament_handler_test.go`, `backapp/tests/repository/tournament_repository_test.go`, `frontapp/tests/e2e/root-tournament-management.spec.js` |
+| トーナメント管理（通常・盤上競技） | `frontapp/src/routes/dashboard/root/tournament-management/`, `frontapp/src/routes/dashboard/student/tournament/` | `tournament_handler.go`, `tournament_export_handler.go`, `all_tournament_handler.go`, `board_game_handler.go` | `tournament_repository.go`, `board_game_repository.go`, `team_repository.go`, `tournament.go`, `board_game.go` | `backapp/tests/handler/all_tournament_handler_test.go`, `backapp/internal/handler/board_game_handler_test.go`, `backapp/internal/repository/board_game_repository_test.go`, `backapp/tests/repository/tournament_repository_test.go`, `frontapp/tests/unit/routes/dashboard/root/tournament-management/tournament-management.svelte.spec.js`, `frontapp/tests/e2e/root-tournament-management.spec.js`, `frontapp/tests/e2e/student-tournament.spec.js` |
+| 学生向け結果一覧 | `frontapp/src/routes/dashboard/student/results/` | `tournament_handler.go`, `noon_game_handler.go` | `tournament_repository.go`, `noon_game_repository.go` | 専用フロントテスト未整備（通常試合・昼競技APIはバックエンドテストで確認） |
 | 試合結果入力 | `frontapp/src/routes/dashboard/admin/insert-matche-result/`, `frontapp/src/lib/components/InsertMatchResultModal.svelte`, `frontapp/src/lib/components/ConfirmMatchResultModal.svelte` | `tournament_handler.go` | `tournament_repository.go`, `class_score_repository.go` | `backapp/tests/handler/tournament_export_handler_test.go` など |
-| 昼競技 | `frontapp/src/routes/dashboard/root/noon-game/`, `frontapp/src/routes/dashboard/admin/noon-game-results/`, `frontapp/src/routes/dashboard/student/noon-game/` | `noon_game_handler.go` | `noon_game_repository.go`, `noon_game.go` | `backapp/tests/handler/noon_game_*.go`, `frontapp/tests/e2e/root-noon-game.spec.js` |
+| 昼競技・タイピング結果取込 | `frontapp/src/routes/dashboard/root/noon-game/`, `frontapp/src/routes/dashboard/admin/noon-game-results/`, `frontapp/src/routes/dashboard/student/noon-game/` | `noon_game_handler.go` | `noon_game_repository.go`, `noon_game.go` | `backapp/tests/handler/noon_game_*.go`, `frontapp/tests/e2e/root-noon-game.spec.js`, `frontapp/tests/e2e/admin-noon-game-results.spec.js`, `frontapp/tests/e2e/root-typing-results-import.spec.js` |
 | 雨天モード | `frontapp/src/routes/dashboard/root/rainy-mode/` | `rainy_mode_handler.go`, `event_handler.go` | `rainy_mode_repository.go`, `rainy_mode_setting.go` | `backapp/tests/handler/rainy_mode_handler_test.go`, `backapp/tests/repository/rainy_mode_repository_test.go`, `frontapp/tests/e2e/root-rainy-mode.spec.js` |
 | クラス・チーム管理（重複登録判定を含む） | `frontapp/src/routes/dashboard/admin/class-management/`, `frontapp/src/routes/dashboard/student/class-info/` | `class_handler.go`, `class_team_handler.go` | `class_repository.go`, `team_repository.go`, `class.go`, `team.go`, `event.go` | `backapp/tests/handler/class_handler_test.go`, `backapp/tests/handler/class_team_handler_test.go`, `backapp/tests/repository/class_repository_test.go`, `backapp/tests/repository/team_repository_test.go` |
 | クラス在籍人数 | `frontapp/src/routes/dashboard/root/class-student-count/` | `class_handler.go` | `class_repository.go` | `backapp/tests/handler/class_handler_export_test.go`, `frontapp/tests/e2e/root-class-student-count.spec.js` |
@@ -139,7 +140,7 @@ APIの入口は `backapp/internal/router/router.go` です。保守時は次の�
 | MIC(行事委員会賞) | `frontapp/src/routes/dashboard/root/identify-mic/`, `frontapp/src/routes/dashboard/admin/vorting-mic/` | `mic_handler.go` | `mic_repository.go`, `mic.go` | `backapp/tests/handler/mic_handler_test.go`, `backapp/tests/repository/mic_repository_test.go`, `frontapp/tests/e2e/root-identify-mic.spec.js` |
 | 競技ガイド資料 | `frontapp/src/routes/dashboard/root/competition-guidelines-upload/`, `frontapp/src/routes/dashboard/guide/` | `guide_document_handler.go`, `event_handler.go` | `guide_document_repository.go`, `guide_document.go` | `backapp/tests/handler/guide_document_handler_test.go`, `frontapp/tests/e2e/root-competition-guidelines-upload.spec.js` |
 | 統計 | `frontapp/src/routes/dashboard/admin/manage-dashboard/` | `statistics_handler.go` | `class_repository.go`, `sport_repository.go`, `tournament_repository.go` | `backapp/tests/handler/statistics_handler_test.go` |
-| システムバックアップ | 画面なし、root API | `system_handler.go` | DB dump、uploads dump | `backapp/tests/handler/system_handler_test.go`, `backapp/internal/handler/system_handler_dump_test.go` |
+| システムバックアップ | `frontapp/src/routes/dashboard/root/event-management/` | `system_handler.go` | DB dump、uploads dump | `backapp/tests/handler/system_handler_test.go`, `backapp/internal/handler/system_handler_dump_test.go`, `frontapp/tests/unit/routes/dashboard/root/event-management/event-management.svelte.spec.js`, `frontapp/tests/e2e/root-event-management.spec.js` |
 | WebSocket | トーナメント/進行状況表示画面 | `websocket_handler.go` | `backapp/internal/websocket/` | `backapp/tests/handler/websocket_handler_test.go`, `backapp/internal/websocket/*_test.go` |
 
 ### 性能・並行処理まわり
@@ -161,8 +162,23 @@ APIの入口は `backapp/internal/router/router.go` です。保守時は次の�
 | `backapp/db/migrations/000001_initial_schema.down.sql` | 初期スキーマの取り消し |
 | `backapp/db/migrations/000002_add_guide_documents.*.sql` | ガイド資料関連 |
 | `backapp/db/migrations/000003_add_round_check_ins.*.sql` | ラウンドチェックイン関連 |
+| `backapp/db/migrations/000004_remove_markdown_rules.*.sql` | 競技ルール本文を廃止し、PDF資料へ統一 |
 | `backapp/db/migrations/000005_add_duplicate_registration_threshold.*.sql` | 大会ごとの重複登録を許可するクラス人数上限 |
 | `backapp/db/migrations/000006_add_preparing_event_status.*.sql` | 大会ステータスに準備中（`preparing`）を追加 |
+| `backapp/db/migrations/000007_remove_class_rep_roles.*.sql` | 廃止したクラス代表ロールを削除 |
+| `backapp/db/migrations/000008_multi_noon_game_sessions.*.sql` | 複数の昼競技セッションとテンプレート識別子を追加 |
+| `backapp/db/migrations/000009_add_mic_voting_enabled.*.sql` | 大会ごとのMIC投票有効/無効設定を追加 |
+| `backapp/db/migrations/0010_add_typing_system_noon_game_imports.*.sql` | 競技タイピング結果JSONの取込履歴を追加 |
+| `backapp/db/migrations/0011_add_typing_system_import_results.*.sql` | タイピング取込結果・スコアログとの関連を追加 |
+| `backapp/db/migrations/0012_backfill_missing_event_classes.*.sql` | 不足している大会クラスを補完 |
+| `backapp/db/migrations/0013_add_noon_game_competition_score.*.sql` | 昼競技結果へ競技内スコアを追加 |
+| `backapp/db/migrations/0014_add_board_game_tournament_template.*.sql` | 将棋・オセロの盤上競技トーナメントを追加 |
+| `backapp/db/migrations/0015_persist_match_winner.*.sql` | 通常試合の勝者を永続化 |
+| `backapp/db/migrations/0016_allow_graduating_user_cleanup.*.sql` | 卒業ユーザー整理のための参照制約を変更 |
+| `backapp/db/migrations/0017_allow_custom_sport_locations.*.sql` | 競技会場を任意文字列で登録可能に変更 |
+| `backapp/db/migrations/0018_enable_individual_notification_recipients.*.sql` | 通知の個人宛先を追加 |
+| `backapp/db/migrations/0019_repair_same_year_class_memberships.*.sql` | 同年度の春季・秋季間でクラス所属を補修 |
+| `backapp/db/migrations/0020_scope_user_roles_by_event.*.sql` | 競技参加ロールを大会単位に分離 |
 | `backapp/db/cleanup_score_logs_reason.sql` | スコアログ理由の整理用SQL |
 | `backapp/db/ER図.pdf` | ER図 |
 
