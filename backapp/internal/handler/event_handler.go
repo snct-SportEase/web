@@ -731,6 +731,55 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Survey scores imported successfully", "imported_classes_count": len(surveyPointsData)})
 }
 
+// ResyncInitialPoints copies the same-year spring score into an archived autumn
+// event as initial points. This is intentionally an explicit operation: it
+// replaces all existing initial points for the autumn event.
+func (h *EventHandler) ResyncInitialPoints(c *gin.Context) {
+	eventID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+
+	autumnEvent, err := h.eventRepo.GetEventByID(eventID)
+	if err != nil {
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch event"})
+		return
+	}
+	if autumnEvent == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+	if autumnEvent.Season != "autumn" || autumnEvent.Status != models.EventStatusArchived {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Initial point synchronization is only allowed for archived autumn events"})
+		return
+	}
+
+	springEvent, err := h.eventRepo.GetEventByYearAndSeason(autumnEvent.Year, "spring")
+	if err != nil {
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch the spring event"})
+		return
+	}
+	if springEvent == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No spring event exists for this year"})
+		return
+	}
+
+	if err := h.eventRepo.CopyClassScores(springEvent.ID, autumnEvent.ID); err != nil {
+		log.Printf("error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to synchronize initial points"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "Initial points synchronized successfully",
+		"spring_event_id": springEvent.ID,
+		"autumn_event_id": autumnEvent.ID,
+	})
+}
+
 func (h *EventHandler) filterUsersByNotificationType(userIDs []string, notificationType string) ([]string, error) {
 	if notificationType == "general" {
 		// General notifications are sent to all users

@@ -804,6 +804,72 @@ func TestEventHandler_NotifySurvey(t *testing.T) {
 	})
 }
 
+func TestEventHandler_ResyncInitialPoints(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	newContext := func(eventID string) (*httptest.ResponseRecorder, *gin.Context) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: eventID}}
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events/"+eventID+"/sync-initial-points", nil)
+		return w, c
+	}
+
+	t.Run("successfully replaces archived autumn initial points from the same-year spring event", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		autumn := &models.Event{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusArchived}
+		spring := &models.Event{ID: 1, Year: 2026, Season: "spring"}
+		repo.On("GetEventByID", 2).Return(autumn, nil).Once()
+		repo.On("GetEventByYearAndSeason", 2026, "spring").Return(spring, nil).Once()
+		repo.On("CopyClassScores", 1, 2).Return(nil).Once()
+
+		w, c := newContext("2")
+		h.ResyncInitialPoints(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, float64(1), response["spring_event_id"])
+		assert.Equal(t, float64(2), response["autumn_event_id"])
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("rejects non-archived or non-autumn events", func(t *testing.T) {
+		cases := []*models.Event{
+			{ID: 2, Year: 2026, Season: "spring", Status: models.EventStatusArchived},
+			{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusActive},
+		}
+		for _, event := range cases {
+			repo := new(MockEventRepository)
+			h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+			repo.On("GetEventByID", 2).Return(event, nil).Once()
+
+			w, c := newContext("2")
+			h.ResyncInitialPoints(c)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			repo.AssertNotCalled(t, "GetEventByYearAndSeason", mock.Anything, mock.Anything)
+			repo.AssertNotCalled(t, "CopyClassScores", mock.Anything, mock.Anything)
+			repo.AssertExpectations(t)
+		}
+	})
+
+	t.Run("requires a same-year spring event", func(t *testing.T) {
+		repo := new(MockEventRepository)
+		h := handler.NewEventHandler(repo, nil, nil, nil, nil, "", "")
+		repo.On("GetEventByID", 2).Return(&models.Event{ID: 2, Year: 2026, Season: "autumn", Status: models.EventStatusArchived}, nil).Once()
+		repo.On("GetEventByYearAndSeason", 2026, "spring").Return((*models.Event)(nil), nil).Once()
+
+		w, c := newContext("2")
+		h.ResyncInitialPoints(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		repo.AssertNotCalled(t, "CopyClassScores", mock.Anything, mock.Anything)
+		repo.AssertExpectations(t)
+	})
+}
+
 func TestEventHandler_ImportSurveyScores(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

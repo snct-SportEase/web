@@ -10,6 +10,11 @@ vi.mock('$app/stores', async () => {
     page: readable({
       params: {
         eventId: '1'
+      },
+      data: {
+        user: {
+          roles: [{ name: 'root' }]
+        }
       }
     })
   };
@@ -286,6 +291,7 @@ describe('Archive Event Detail Page', () => {
 
     await expect.element(page.getByRole('heading', { name: '秋スポーツ大会順位' })).toBeInTheDocument();
     await expect.element(page.getByRole('heading', { name: '春＋秋 総合順位' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: '春大会の得点を初期点へ再同期' })).toBeInTheDocument();
 
     const autumnRanking = page.getByRole('region', { name: '秋スポーツ大会順位' });
     const overallRanking = page.getByRole('region', { name: '春＋秋 総合順位' });

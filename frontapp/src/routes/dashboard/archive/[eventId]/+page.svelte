@@ -13,6 +13,11 @@
     let noonGameError = $state('');
     let loading = $state(true);
     let error = $state(null);
+    let isSyncingInitialPoints = $state(false);
+    let syncInitialPointsMessage = $state('');
+    let syncInitialPointsError = $state('');
+
+    let isRoot = $derived($page.data?.user?.roles?.some((role) => role?.name === 'root') ?? false);
 
     function getSportName(location) {
         const firstScore = scores?.[0];
@@ -94,6 +99,29 @@
         if (detail?.entry_resolved_name) return detail.entry_resolved_name;
         const entry = match?.entries?.find((item) => String(item.id) === String(detail?.entry_id));
         return entryName(entry);
+    }
+
+    async function syncInitialPoints() {
+        if (!eventData || eventData.season !== 'autumn' || isSyncingInitialPoints) return;
+        if (!confirm('同年度の春大会の得点で、この秋大会の初期点を再同期します。現在の初期点は置き換えられます。続行しますか？')) return;
+
+        isSyncingInitialPoints = true;
+        syncInitialPointsMessage = '';
+        syncInitialPointsError = '';
+        try {
+            const response = await fetch(`/api/root/events/${eventId}/sync-initial-points`, { method: 'POST' });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.error || '初期点の再同期に失敗しました。');
+
+            const scoreResponse = await fetch(`/api/scores/class?event_id=${eventId}`);
+            if (!scoreResponse.ok) throw new Error('再同期後の得点を取得できませんでした。');
+            scores = await scoreResponse.json();
+            syncInitialPointsMessage = '初期点を同年度の春大会の得点で再同期しました。';
+        } catch (err) {
+            syncInitialPointsError = err.message;
+        } finally {
+            isSyncingInitialPoints = false;
+        }
     }
 
     onMount(async () => {
@@ -225,6 +253,16 @@
                 {eventData ? eventData.name : '読み込み中...'}
             </h1>
         </div>
+        {#if isRoot && eventData?.season === 'autumn' && eventData?.status === 'archived'}
+            <button
+                type="button"
+                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onclick={syncInitialPoints}
+                disabled={isSyncingInitialPoints}
+            >
+                {isSyncingInitialPoints ? '初期点を再同期中…' : '春大会の得点を初期点へ再同期'}
+            </button>
+        {/if}
     </div>
 
     {#if loading}
@@ -236,6 +274,16 @@
             <span class="block sm:inline">{error}</span>
         </div>
     {:else}
+        {#if syncInitialPointsMessage}
+            <div class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800" role="status">
+                {syncInitialPointsMessage}
+            </div>
+        {/if}
+        {#if syncInitialPointsError}
+            <div class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+                {syncInitialPointsError}
+            </div>
+        {/if}
         <!-- Tabs -->
         <div class="border-b border-gray-200 mb-6">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
