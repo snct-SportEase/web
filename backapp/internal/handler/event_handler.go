@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -648,6 +649,39 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 	classes, err := h.classRepo.GetAllClasses(eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch class info"})
+		return
+	}
+
+	if len(submissionCounts) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "CSVに有効なクラスデータがありません"})
+		return
+	}
+
+	classesByName := make(map[string]*models.Class, len(classes))
+	for _, class := range classes {
+		classesByName[class.Name] = class
+	}
+
+	unknownClasses := make([]string, 0)
+	unsetStudentCountClasses := make([]string, 0)
+	for className := range submissionCounts {
+		class, ok := classesByName[className]
+		if !ok {
+			unknownClasses = append(unknownClasses, className)
+			continue
+		}
+		if class.StudentCount <= 0 {
+			unsetStudentCountClasses = append(unsetStudentCountClasses, className)
+		}
+	}
+	if len(unknownClasses) > 0 {
+		sort.Strings(unknownClasses)
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSVに大会へ登録されていないクラスが含まれています: %s", strings.Join(unknownClasses, ", "))})
+		return
+	}
+	if len(unsetStudentCountClasses) > 0 {
+		sort.Strings(unsetStudentCountClasses)
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("クラス在籍人数が未設定です。「各クラス人数設定」で登録してください: %s", strings.Join(unsetStudentCountClasses, ", "))})
 		return
 	}
 
