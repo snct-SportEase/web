@@ -961,6 +961,44 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		mockEventRepo.AssertExpectations(t)
 	})
 
+	t.Run("Error - Class Student Count Is Not Configured", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockUserRepo := new(MockUserRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, mockClassRepo, nil, mockUserRepo, "", "")
+
+		eventID := 1
+		event := &models.Event{ID: eventID, Season: "autumn"}
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+		mockClassRepo.On("GetAllClasses", eventID).Return([]*models.Class{
+			{ID: 101, Name: "1-1", StudentCount: 0},
+		}, nil).Once()
+
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", "survey-counts.csv")
+		assert.NoError(t, err)
+		_, err = part.Write([]byte("クラス名,人数\n1-1,13\n"))
+		assert.NoError(t, err)
+		assert.NoError(t, writer.Close())
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events/1/import-survey-scores", body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+		h.ImportSurveyScores(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var response map[string]interface{}
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, "クラス在籍人数が未設定です。「各クラス人数設定」で登録してください: 1-1", response["error"])
+		mockClassRepo.AssertNotCalled(t, "SetSurveyPoints")
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
 	t.Run("Error - Missing File", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockUserRepo := new(MockUserRepository)

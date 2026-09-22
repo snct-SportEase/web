@@ -352,6 +352,7 @@
                       <input type="file" accept=".csv" class="text-xs mt-1 block" onchange={(e) => handleCsvUpload(event.id, e)} />
                     </label>
                     <span class="text-[11px] text-gray-500">1回答1行、または「クラス名,人数」形式</span>
+                    <span class="text-[11px] text-amber-700">同年度の春大会から在籍人数を引き継ぎます。未設定の場合は「各クラス人数設定」で登録してください</span>
                   </div>
                 {/if}
               </div>

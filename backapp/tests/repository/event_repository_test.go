@@ -400,6 +400,44 @@ func TestEventRepository_CreateEventWithClassesMigratesUsersWhenEventBecomesCurr
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestEventRepository_CreateAutumnEventWithClassesCarriesSpringStudentCounts(t *testing.T) {
+	const insertEvent = "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	repo, mock, close := setupEvent(t)
+	defer close()
+
+	event := newEvent()
+	event.Name = "Autumn 2024"
+	event.Season = "autumn"
+	event.Status = models.EventStatusUpcoming
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(insertEvent)).
+		WithArgs(event.Name, event.Year, event.Season, event.Start_date, event.End_date, event.IsRainyMode, nil, nil, event.IsSurveyPublished, event.Status, event.HideScores, event.DuplicateRegistrationThreshold).
+		WillReturnResult(sqlmock.NewResult(10, 1))
+	classes := mock.ExpectPrepare(regexp.QuoteMeta("INSERT INTO classes (event_id, name) VALUES (?, ?)"))
+	classes.ExpectExec().WithArgs(int64(10), "1-1").WillReturnResult(sqlmock.NewResult(1, 1))
+	classes.ExpectExec().WithArgs(int64(10), "IS2").WillReturnResult(sqlmock.NewResult(2, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE `year` = ? AND season = 'spring' ORDER BY id DESC LIMIT 1")).
+		WithArgs(event.Year).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(5))
+	mock.ExpectExec(`(?s)UPDATE classes target_class.*source_class\.student_count > 0`).
+		WithArgs(5, int64(10)).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM score_logs WHERE event_id = ? AND reason = 'initial_points'")).
+		WithArgs(int64(10)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`(?s)INSERT INTO score_logs.*WHERE scores\.event_id = \? AND scores\.total_points_current_event > 0`).
+		WithArgs(int64(10), int64(10), 5).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectCommit()
+
+	id, err := repo.CreateEventWithClasses(event, []string{"1-1", "IS2"})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), id)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ─── UpdateEvent ───────────────────────────────────────────────────────────
 
 func TestEventRepository_UpdateEvent(t *testing.T) {
@@ -462,6 +500,33 @@ func TestEventRepository_UpdateEvent(t *testing.T) {
 		mock.ExpectExec(regexp.QuoteMeta(updateQ)).
 			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold, e.ID).
 			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(regexp.QuoteMeta(clearQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectCommit()
+
+		err := repo.UpdateEvent(e)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("success - autumn event carries spring student counts", func(t *testing.T) {
+		repo, mock, close := setupEvent(t)
+		defer close()
+
+		e := newEvent()
+		e.Name = "Autumn 2024"
+		e.Season = "autumn"
+		e.Status = "upcoming"
+
+		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta(updateQ)).
+			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold, e.ID).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE `year` = ? AND season = 'spring' ORDER BY id DESC LIMIT 1")).
+			WithArgs(e.Year).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(5))
+		mock.ExpectExec(`(?s)UPDATE classes target_class.*source_class\.student_count > 0`).
+			WithArgs(5, e.ID).
+			WillReturnResult(sqlmock.NewResult(0, 2))
 		mock.ExpectExec(regexp.QuoteMeta(clearQ)).WithArgs(e.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 

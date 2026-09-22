@@ -378,6 +378,7 @@ describe('Event Management Page', () => {
     await page.getByText('2025秋季スポーツ大会').click();
     await expect.element(page.getByText('点数インポート(CSV)')).toBeInTheDocument();
     await expect.element(page.getByText('1回答1行、または「クラス名,人数」形式')).toBeInTheDocument();
+    await expect.element(page.getByText('同年度の春大会から在籍人数を引き継ぎます。未設定の場合は「各クラス人数設定」で登録してください')).toBeInTheDocument();
 
     const fileInput = view.container.querySelector('input[type="file"]');
     expect(fileInput).toBeTruthy();
