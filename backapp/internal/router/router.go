@@ -308,6 +308,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.PUT("/:id/competition-guidelines", eventHandler.UpdateCompetitionGuidelines)
 				rootEvents.POST("/:id/notify-survey", eventHandler.NotifySurvey)
 				rootEvents.POST("/:id/import-survey-scores", eventHandler.ImportSurveyScores)
+				rootEvents.POST("/:id/sync-initial-points", eventHandler.ResyncInitialPoints)
 
 				// Export endpoints
 				rootEvents.GET("/:id/export/csv", classHandler.ExportClassScoresCSVHandler)

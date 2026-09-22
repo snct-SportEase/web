@@ -13,6 +13,11 @@
     let noonGameError = $state('');
     let loading = $state(true);
     let error = $state(null);
+    let isSyncingInitialPoints = $state(false);
+    let syncInitialPointsMessage = $state('');
+    let syncInitialPointsError = $state('');
+
+    let isRoot = $derived($page.data?.user?.roles?.some((role) => role?.name === 'root') ?? false);
 
     function getSportName(location) {
         const firstScore = scores?.[0];
@@ -96,6 +101,29 @@
         return entryName(entry);
     }
 
+    async function syncInitialPoints() {
+        if (!eventData || eventData.season !== 'autumn' || isSyncingInitialPoints) return;
+        if (!confirm('同年度の春大会の得点で、この秋大会の初期点を再同期します。現在の初期点は置き換えられます。続行しますか？')) return;
+
+        isSyncingInitialPoints = true;
+        syncInitialPointsMessage = '';
+        syncInitialPointsError = '';
+        try {
+            const response = await fetch(`/api/root/events/${eventId}/sync-initial-points`, { method: 'POST' });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.error || '初期点の再同期に失敗しました。');
+
+            const scoreResponse = await fetch(`/api/scores/class?event_id=${eventId}`);
+            if (!scoreResponse.ok) throw new Error('再同期後の得点を取得できませんでした。');
+            scores = await scoreResponse.json();
+            syncInitialPointsMessage = '初期点を同年度の春大会の得点で再同期しました。';
+        } catch (err) {
+            syncInitialPointsError = err.message;
+        } finally {
+            isSyncingInitialPoints = false;
+        }
+    }
+
     onMount(async () => {
         try {
             // Fetch event info
@@ -153,21 +181,51 @@
         { key: 'total_points_overall', label: '総合点' },
         { key: 'rank_overall', label: '総合順位' }
     ]);
-    let filteredScoreItems = $derived(scoreItemDefinitions.filter((item) => {
-        if (season === 'spring') {
-            return item.key !== 'initial_points' && item.key !== 'survey_points' && item.key !== 'total_points_overall' && item.key !== 'rank_overall';
-        }
-        return true;
-    }));
+    const rankingLists = $derived(season === 'autumn'
+        ? [
+            {
+                id: 'autumn',
+                title: '秋スポーツ大会順位',
+                description: '秋スポーツ大会で獲得した点数のみで集計した順位です。',
+                rankKey: 'rank_current_event',
+                totalKey: 'total_points_current_event',
+                totalLabel: '秋スポ合計点',
+                includeInitialPoints: false
+            },
+            {
+                id: 'overall',
+                title: '春＋秋 総合順位',
+                description: '春スポーツ大会の得点と秋スポーツ大会の得点を合計した順位です。',
+                rankKey: 'rank_overall',
+                totalKey: 'total_points_overall',
+                totalLabel: '春＋秋 合計点',
+                includeInitialPoints: true
+            }
+        ]
+        : [{
+            id: 'spring',
+            title: '春スポーツ大会順位',
+            description: '',
+            rankKey: 'rank_current_event',
+            totalKey: 'total_points_current_event',
+            totalLabel: '合計点',
+            includeInitialPoints: false
+        }]);
 
-    // Simplistic rank sorting
-    let sortedScores = $derived([...scores].sort((a, b) => {
-        const rankA = season === 'spring' ? a.rank_current_event : a.rank_overall;
-        const rankB = season === 'spring' ? b.rank_current_event : b.rank_overall;
-        const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
-        const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
-        return normalizedRankA - normalizedRankB;
-    }));
+    const detailScoreItems = $derived(scoreItemDefinitions.filter((item) =>
+        item.key !== 'rank_current_event' && item.key !== 'rank_overall' &&
+        item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'
+    ));
+
+    function sortedScoresByRank(rankKey) {
+        return [...scores].sort((a, b) => {
+            const rankA = a[rankKey];
+            const rankB = b[rankKey];
+            const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
+            const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
+            return normalizedRankA - normalizedRankB;
+        });
+    }
 
     function getRankBadge(rank) {
         if (rank === 0 || rank === null || rank === undefined) return '未開始';
@@ -195,6 +253,16 @@
                 {eventData ? eventData.name : '読み込み中...'}
             </h1>
         </div>
+        {#if isRoot && eventData?.season === 'autumn' && eventData?.status === 'archived'}
+            <button
+                type="button"
+                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onclick={syncInitialPoints}
+                disabled={isSyncingInitialPoints}
+            >
+                {isSyncingInitialPoints ? '初期点を再同期中…' : '春大会の得点を初期点へ再同期'}
+            </button>
+        {/if}
     </div>
 
     {#if loading}
@@ -206,6 +274,16 @@
             <span class="block sm:inline">{error}</span>
         </div>
     {:else}
+        {#if syncInitialPointsMessage}
+            <div class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800" role="status">
+                {syncInitialPointsMessage}
+            </div>
+        {/if}
+        {#if syncInitialPointsError}
+            <div class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+                {syncInitialPointsError}
+            </div>
+        {/if}
         <!-- Tabs -->
         <div class="border-b border-gray-200 mb-6">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
@@ -237,36 +315,46 @@
                     スコアデータが見つかりませんでした。
                 </div>
             {:else}
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {#each sortedScores as score (score.id || score.class_id)}
-                        {@const rank = season === 'spring' ? score.rank_current_event : score.rank_overall}
-                        {@const totalPoints = season === 'spring' ? score.total_points_current_event : score.total_points_overall}
-                        <div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex flex-col hover:shadow-md transition-shadow">
-                            <div class="text-2xl font-bold text-center mb-2">{getRankBadge(rank)}</div>
-                            <div class="text-xl font-semibold text-center text-gray-800 mb-4">{score.class_name}</div>
-                            
-                            <div class="mt-auto pt-4 border-t border-gray-100 flex justify-between items-center">
-                                <span class="text-gray-500 text-sm">合計スコア</span>
-                                <span class="text-2xl font-bold text-indigo-600">{totalPoints}</span>
-                            </div>
+                <div class="space-y-10">
+                    {#each rankingLists as rankingList (rankingList.id)}
+                        <section aria-labelledby={`${rankingList.id}-ranking-heading`}>
+                            <h2 id={`${rankingList.id}-ranking-heading`} class="text-xl font-bold text-gray-800">{rankingList.title}</h2>
+                            {#if rankingList.description}
+                                <p class="mt-1 text-sm text-gray-600">{rankingList.description}</p>
+                            {/if}
+                            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {#each sortedScoresByRank(rankingList.rankKey) as score (score.id || score.class_id)}
+                                    {@const rank = score[rankingList.rankKey]}
+                                    {@const totalPoints = score[rankingList.totalKey]}
+                                    <div class="bg-white rounded-lg shadow border border-gray-200 p-6 flex flex-col hover:shadow-md transition-shadow">
+                                        <div class="text-2xl font-bold text-center mb-2">{getRankBadge(rank)}</div>
+                                        <div class="text-xl font-semibold text-center text-gray-800 mb-4">{score.class_name}</div>
 
-                            <details class="mt-4 rounded-lg border border-gray-200 bg-gray-50/70">
-                                <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-700 flex items-center justify-between">
-                                    <span>得点内訳を表示</span>
-                                    <span class="text-sm text-gray-500">▼</span>
-                                </summary>
-                                <div class="space-y-1 px-4 pb-4">
-                                    {#each filteredScoreItems as item (item.key || item.label)}
-                                        {#if item.key !== 'rank_current_event' && item.key !== 'rank_overall' && item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'}
-                                            <div class="flex justify-between py-2 border-b border-gray-200 last:border-b-0">
-                                                <span class="text-gray-500">{item.label}</span>
-                                                <span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
+                                        <div class="mt-auto pt-4 border-t border-gray-100 flex justify-between items-center">
+                                            <span class="text-gray-500 text-sm">{rankingList.totalLabel}</span>
+                                            <span class="text-2xl font-bold text-indigo-600">{totalPoints}</span>
+                                        </div>
+
+                                        <details class="mt-4 rounded-lg border border-gray-200 bg-gray-50/70">
+                                            <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-700 flex items-center justify-between">
+                                                <span>得点内訳を表示</span>
+                                                <span class="text-sm text-gray-500">▼</span>
+                                            </summary>
+                                            <div class="space-y-1 px-4 pb-4">
+                                                {#each detailScoreItems as item (item.key || item.label)}
+                                                    {#if rankingList.includeInitialPoints || item.key !== 'initial_points'}
+                                                        <div class="flex justify-between py-2 border-b border-gray-200 last:border-b-0">
+                                                            <span class="text-gray-500">{item.label}</span>
+                                                            <span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
+                                                        </div>
+                                                    {/if}
+                                                {/each}
                                             </div>
-                                        {/if}
-                                    {/each}
-                                </div>
-                            </details>
-                        </div>
+                                        </details>
+                                    </div>
+                                {/each}
+                            </div>
+                        </section>
                     {/each}
                 </div>
             {/if}

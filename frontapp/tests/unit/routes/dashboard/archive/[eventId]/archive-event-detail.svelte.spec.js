@@ -10,6 +10,11 @@ vi.mock('$app/stores', async () => {
     page: readable({
       params: {
         eventId: '1'
+      },
+      data: {
+        user: {
+          roles: [{ name: 'root' }]
+        }
       }
     })
   };
@@ -232,5 +237,67 @@ describe('Archive Event Detail Page', () => {
     await expect.element(page.getByText('出席点')).toBeInTheDocument();
     await expect.element(page.getByText('昼競技', { exact: true })).toBeInTheDocument();
     await expect.element(page.getByText('バスケットボール1勝点')).toBeInTheDocument();
+  });
+
+  it('秋大会では秋単独順位と春＋秋の総合順位を分けて表示すること', async () => {
+    fetchMock.mockImplementation((url) => {
+      if (url === '/api/events') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([{ id: 1, name: '2025秋季スポーツ大会', season: 'autumn', status: 'archived' }])
+        });
+      }
+      if (url === '/api/scores/class?event_id=1') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            {
+              id: 1,
+              class_id: 1,
+              class_name: '1A',
+              season: 'autumn',
+              initial_points: 50,
+              attendance_points: 10,
+              total_points_current_event: 10,
+              rank_current_event: 2,
+              total_points_overall: 60,
+              rank_overall: 1
+            },
+            {
+              id: 2,
+              class_id: 2,
+              class_name: '1B',
+              season: 'autumn',
+              initial_points: 20,
+              attendance_points: 15,
+              total_points_current_event: 15,
+              rank_current_event: 1,
+              total_points_overall: 35,
+              rank_overall: 2
+            }
+          ])
+        });
+      }
+      if (url === '/api/student/events/1/tournaments') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url === '/api/student/events/1/noon-game/sessions') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [] }) });
+      }
+      return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    });
+
+    render(Page);
+
+    await expect.element(page.getByRole('heading', { name: '秋スポーツ大会順位' })).toBeInTheDocument();
+    await expect.element(page.getByRole('heading', { name: '春＋秋 総合順位' })).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: '春大会の得点を初期点へ再同期' })).toBeInTheDocument();
+
+    const autumnRanking = page.getByRole('region', { name: '秋スポーツ大会順位' });
+    const overallRanking = page.getByRole('region', { name: '春＋秋 総合順位' });
+    await expect.element(autumnRanking.getByText('1B', { exact: true })).toBeInTheDocument();
+    await expect.element(overallRanking.getByText('1A', { exact: true })).toBeInTheDocument();
+    await expect.element(autumnRanking.getByText('秋スポ合計点').first()).toBeInTheDocument();
+    await expect.element(overallRanking.getByText('春＋秋 合計点').first()).toBeInTheDocument();
   });
 });

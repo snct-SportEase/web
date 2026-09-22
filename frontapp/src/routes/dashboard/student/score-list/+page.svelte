@@ -37,24 +37,53 @@
 		{ key: 'rank_overall', label: '総合順位' }
 	]);
 
-	// Filter score items based on season
-	let filteredScoreItems = $derived(scoreItemDefinitions.filter(item => {
-		if (season === 'spring') {
-			return item.key !== 'initial_points' && item.key !== 'survey_points' && item.key !== 'total_points_overall' && item.key !== 'rank_overall';
-		}
-		return true; // For autumn, include all
-	}));
+	const rankingLists = $derived(season === 'autumn'
+		? [
+			{
+				id: 'autumn',
+				title: '秋スポーツ大会順位',
+				description: '秋スポーツ大会で獲得した点数のみで集計した順位です。',
+				rankKey: 'rank_current_event',
+				totalKey: 'total_points_current_event',
+				totalLabel: '秋スポ合計点',
+				includeInitialPoints: false
+			},
+			{
+				id: 'overall',
+				title: '春＋秋 総合順位',
+				description: '春スポーツ大会の得点と秋スポーツ大会の得点を合計した順位です。',
+				rankKey: 'rank_overall',
+				totalKey: 'total_points_overall',
+				totalLabel: '春＋秋 合計点',
+				includeInitialPoints: true
+			}
+		]
+		: [{
+			id: 'spring',
+			title: '春スポーツ大会順位',
+			description: '',
+			rankKey: 'rank_current_event',
+			totalKey: 'total_points_current_event',
+			totalLabel: '合計点',
+			includeInitialPoints: false
+		}]);
 
-	// Sort scores by rank (1st, 2nd, 3rd, etc.)
-	// Rank 0 (未開始) should be sorted last
-	let sortedScores = $derived([...scores].sort((a, b) => {
-		const rankA = season === 'spring' ? a.rank_current_event : a.rank_overall;
-		const rankB = season === 'spring' ? b.rank_current_event : b.rank_overall;
-		// If rank is 0, null, or undefined, treat it as Infinity for sorting (put it last)
-		const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
-		const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
-		return normalizedRankA - normalizedRankB;
-	}));
+	const detailScoreItems = $derived(scoreItemDefinitions.filter(item =>
+		item.key !== 'rank_current_event' && item.key !== 'rank_overall' &&
+		item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'
+	));
+
+	// Rank 0 (未開始) should be sorted last.
+	function sortedScoresByRank(rankKey) {
+		return [...scores].sort((a, b) => {
+			const rankA = a[rankKey];
+			const rankB = b[rankKey];
+			// If rank is 0, null, or undefined, treat it as Infinity for sorting (put it last)
+			const normalizedRankA = (rankA === 0 || rankA === null || rankA === undefined) ? Infinity : rankA;
+			const normalizedRankB = (rankB === 0 || rankB === null || rankB === undefined) ? Infinity : rankB;
+			return normalizedRankA - normalizedRankB;
+		});
+	}
 
 	// Helper function to get rank style classes
 	function getRankStyle(rank) {
@@ -169,44 +198,54 @@
 		{errorMessage}
 	</div>
 {:else if scores.length > 0}
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 py-4">
-		{#each sortedScores as score (score.id || score.class_id)}
-			{@const rank = season === 'spring' ? score.rank_current_event : score.rank_overall}
-			{@const totalPoints = season === 'spring' ? score.total_points_current_event : score.total_points_overall}
-			{@const isNotStarted = rank === 0 || rank === null || rank === undefined}
-			<div class="transition-all duration-300 rounded-xl p-6 hover:-translate-y-1 hover:shadow-xl {getRankStyle(rank)}">
-				{#if rank === 1}
-					<span class="absolute top-2.5 right-2.5 text-2xl pointer-events-none animate-pulse">✨</span>
+	<div class="space-y-12 py-4">
+		{#each rankingLists as rankingList (rankingList.id)}
+			<section aria-labelledby={`${rankingList.id}-ranking-heading`}>
+				<h2 id={`${rankingList.id}-ranking-heading`} class="text-xl font-bold text-gray-800">{rankingList.title}</h2>
+				{#if rankingList.description}
+					<p class="mt-1 text-sm text-gray-600">{rankingList.description}</p>
 				{/if}
-				<div class="text-3xl font-bold text-center mb-4 drop-shadow-md">{getRankBadge(rank)}</div>
-				<div class="text-2xl font-bold text-center mb-4 {rank === 1 ? 'text-amber-900 text-[1.75rem] drop-shadow-[2px_2px_4px_rgba(0,0,0,0.3),0_0_10px_rgba(255,255,255,0.5)]' : rank === 2 ? 'text-gray-700 drop-shadow-sm' : rank === 3 ? 'text-amber-900 drop-shadow-sm' : isNotStarted ? 'text-gray-600 drop-shadow-sm' : 'text-gray-800 drop-shadow-sm'}">
-					{score.class_name}
-				</div>
-
-				<div class="flex justify-between py-3 mt-2 border-t-2 border-black/20 font-bold {rank === 1 ? 'text-[1.75rem]' : 'text-xl'}">
-					<span class="text-gray-500">合計点:</span>
-					<span class="font-bold {rank === 1 ? 'text-amber-900 drop-shadow-[1px_1px_2px_rgba(0,0,0,0.2)]' : 'text-gray-800'}">
-						{totalPoints}
-					</span>
-				</div>
-
-				<details class="mt-4 rounded-lg border border-black/10 bg-white/40">
-					<summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-700 flex items-center justify-between">
-						<span>点数項目を表示</span>
-						<span class="text-sm text-gray-500">▼</span>
-					</summary>
-					<div class="space-y-1 px-4 pb-4">
-						{#each filteredScoreItems as item (item.key || item.label)}
-							{#if item.key !== 'rank_current_event' && item.key !== 'rank_overall' && item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'}
-								<div class="flex justify-between py-2 border-b border-black/10 last:border-b-0">
-									<span class="text-gray-500">{item.label}:</span>
-									<span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
-								</div>
+				<div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+					{#each sortedScoresByRank(rankingList.rankKey) as score (score.id || score.class_id)}
+						{@const rank = score[rankingList.rankKey]}
+						{@const totalPoints = score[rankingList.totalKey]}
+						{@const isNotStarted = rank === 0 || rank === null || rank === undefined}
+						<div class="transition-all duration-300 rounded-xl p-6 hover:-translate-y-1 hover:shadow-xl {getRankStyle(rank)}">
+							{#if rank === 1}
+								<span class="absolute top-2.5 right-2.5 text-2xl pointer-events-none animate-pulse">✨</span>
 							{/if}
-						{/each}
-					</div>
-				</details>
-			</div>
+							<div class="text-3xl font-bold text-center mb-4 drop-shadow-md">{getRankBadge(rank)}</div>
+							<div class="text-2xl font-bold text-center mb-4 {rank === 1 ? 'text-amber-900 text-[1.75rem] drop-shadow-[2px_2px_4px_rgba(0,0,0,0.3),0_0_10px_rgba(255,255,255,0.5)]' : rank === 2 ? 'text-gray-700 drop-shadow-sm' : rank === 3 ? 'text-amber-900 drop-shadow-sm' : isNotStarted ? 'text-gray-600 drop-shadow-sm' : 'text-gray-800 drop-shadow-sm'}">
+								{score.class_name}
+							</div>
+
+							<div class="flex justify-between py-3 mt-2 border-t-2 border-black/20 font-bold {rank === 1 ? 'text-[1.75rem]' : 'text-xl'}">
+								<span class="text-gray-500">{rankingList.totalLabel}:</span>
+								<span class="font-bold {rank === 1 ? 'text-amber-900 drop-shadow-[1px_1px_2px_rgba(0,0,0,0.2)]' : 'text-gray-800'}">
+									{totalPoints}
+								</span>
+							</div>
+
+							<details class="mt-4 rounded-lg border border-black/10 bg-white/40">
+								<summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-700 flex items-center justify-between">
+									<span>点数項目を表示</span>
+									<span class="text-sm text-gray-500">▼</span>
+								</summary>
+								<div class="space-y-1 px-4 pb-4">
+									{#each detailScoreItems as item (item.key || item.label)}
+										{#if rankingList.includeInitialPoints || item.key !== 'initial_points'}
+											<div class="flex justify-between py-2 border-b border-black/10 last:border-b-0">
+												<span class="text-gray-500">{item.label}:</span>
+												<span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
+											</div>
+										{/if}
+									{/each}
+								</div>
+							</details>
+						</div>
+					{/each}
+				</div>
+			</section>
 		{/each}
 	</div>
 {:else}
