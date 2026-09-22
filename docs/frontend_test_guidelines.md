@@ -49,7 +49,7 @@ Svelteコンポーネントのテストには `vitest-browser-svelte` を使用�
 ### 基本的な書き方
 
 ```javascript
-import { page } from '@vitest/browser/context';
+import { page } from 'vitest/browser';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import MyComponent from './MyComponent.svelte';
@@ -73,6 +73,8 @@ describe('MyComponent', () => {
   });
 });
 ```
+
+`@vitest/browser/context` はVitest 4.1で非推奨警告の対象です。新規・更新するテストでは `vitest/browser` からインポートし、既存テストも順次置き換えてください。
 
 ## Playwright (E2Eテスト)
 
@@ -152,7 +154,7 @@ test('ユーザーがログインしてトップページを表示できる', as
 
 ### root（最上位管理者）機能
 
-| 機能 | 概要 | コンポーネント | E2E | 備考 |
+| 機能 | 概要 | ユニット/コンポーネント | E2E | 備考 |
 | :--- | :--- | :---: | :---: | :--- |
 | 大会の作成・編集 | 年度・シーズン・期間等の設定 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | 大会ステータス変更 | preparing / upcoming / active / archived の切り替え | ○ | ○ | 準備中の表示・保存と編集時の `status` 更新を確認済み |
@@ -162,14 +164,17 @@ test('ユーザーがログインしてトップページを表示できる', as
 | 得点CSVインポート | 外部集計データのインポート（春季） | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | 結果のCSV/PDF出力 | クラス別スコア集計の出力 | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | DBダンプ出力 | データベース全体のエクスポート | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
+| アップロードファイル出力 | 登録済み画像・PDFのZIPエクスポート | ○ | ○ | `event-management.svelte.spec.js` / `root-event-management.spec.js` で確認済み |
 | 雨天時モード切替 | 競技中止・敗者復活戦追加の一括制御 | ○ | ○ | `rainy-mode.svelte.spec.js` / `root-rainy-mode.spec.js` で確認済み |
 | 雨天時定員設定 | 競技・クラスごとの雨天時定員設定 | ○ | ○ | `sport-details-registration.svelte.spec.js` / `root-rainy-capacity-settings.spec.js` で確認済み |
 | 競技マスタ登録 | システム共通の競技種目登録 | ○ | ○ | `sport-management.svelte.spec.js` / `root-sport-management.spec.js` で確認済み |
 | 大会への競技割り当て | 競技の大会紐付け・ルール設定 | ○ | ○ | `sport-management.svelte.spec.js` / `root-sport-management.spec.js` で確認済み |
-| 通知作成・配信 | プッシュ通知の作成と送信 | ○ | ○ | `notification.svelte.spec.js` / `root-notification.spec.js` で確認済み |
+| 通知作成・配信 | ロールまたは個人宛て通知の作成と送信 | ○ | ○ | `notification.svelte.spec.js` / `root-notification.spec.js` で確認済み |
 | 通知申請の承認・否認 | 学生からの通知申請の審査 | ○ | ○ | `notification-requests.svelte.spec.js` / `root-notification-requests.spec.js` で確認済み |
-| 権限管理 | `admin` / `root` 権限の付与・剥奪 | ☓ | ☓ | `user-promotion` 画面の自動テストは未整備 |
+| 権限管理 | `admin` / `root` 権限の付与・剥奪 | ☓ | ○ | `root-user-promotion.spec.js` で確認済み |
 | トーナメント自動生成 | ブラケットの自動生成と確定 | ○ | ○ | `tournament-management.svelte.spec.js` / `root-tournament-management.spec.js` で確認済み |
+| 盤上競技トーナメント | 将棋・オセロの固定16クラス、シード並べ替え、専用生成 | ○ | ○ | 同上。通常競技の一括生成から除外されることも確認済み |
+| トーナメントExcel出力 | 保存済みの全ブラケットをExcel出力 | ○ | ○ | `tournament-management.svelte.spec.js` / `root-tournament-management.spec.js` で確認済み |
 | 昼競技セッション管理 | 昼競技の開催枠・ポイント設定 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | 昼競技テンプレート実行 | リレー等の対戦カード自動生成 | ○ | ○ | `noon-game.svelte.spec.js` / `root-noon-game.spec.js` で確認済み |
 | ユーザー表示名変更 | ユーザーの表示名更新 | ○ | ○ | `change-username.svelte.spec.js` / `root-change-username.spec.js` で確認済み |
@@ -180,35 +185,37 @@ test('ユーザーがログインしてトップページを表示できる', as
 
 ### admin（運営スタッフ）機能
 
-| 機能 | 概要 | コンポーネント | E2E | 備考 |
+| 機能 | 概要 | ユニット/コンポーネント | E2E | 備考 |
 | :--- | :--- | :---: | :---: | :--- |
-| 管理者ダッシュボード閲覧 | 統計情報のリアルタイム確認 | ☓ | ☓ | |
-| チームメンバー割り当て | 競技参加メンバーの登録・削除 | ☓ | ☓ | |
-| ロール付与・削除 | 審判ロール等の付与 | ☓ | ☓ | |
+| 管理者ダッシュボード閲覧 | 統計情報のリアルタイム確認 | ☓ | ○ | `admin-statistics-dashboard.spec.js` で確認済み |
+| チームメンバー割り当て | 通常競技・盤上競技の参加者登録 | ○ | ○ | `class-management.svelte.spec.js` / `admin-class-team-management.spec.js` で確認済み |
+| ロール付与・削除 | 審判ロール等の付与 | ☓ | ○ | `admin-role-management.spec.js` で確認済み |
 | バーコード読み取り | MyIDバーコードの読み取り・参加本登録・ラウンドチェックイン | ○ | ○ | `barcode-reader.svelte.spec.js` / `admin-barcode-check-in.spec.js` で確認済み |
-| 参加確認済み一覧 | スキャン済み学生の確認 | ☓ | ☓ | |
-| 出席者数の登録 | クラスごとの出席数入力 | ☓ | ☓ | |
-| 競技詳細の登録・更新 | ルール・定員・開始時間の設定 | ☓ | ☓ | |
-| 試合ステータスの更新 | 試合の進行状況変更 | ☓ | ☓ | |
-| 試合結果の入力 | トーナメントスコア・勝敗入力 | ☓ | ☓ | |
-| 昼競技結果の入力 | 昼競技の結果登録 | ☓ | ☓ | |
-| MIC投票 | MIC候補への投票 | ☓ | ☓ | |
+| 参加確認済み一覧 | スキャン済み学生の確認 | ○ | ○ | `confirmed-participants.svelte.spec.js` / `admin-confirmed-participants.spec.js` で確認済み |
+| 出席者数の登録 | クラスごとの出席数入力 | ☓ | ○ | `admin-attendance-management.spec.js` で確認済み |
+| 競技詳細の登録・更新 | ルール・定員・開始時間の設定 | ○ | ○ | `sport-details-registration.svelte.spec.js` / `admin-sport-details.spec.js` で確認済み |
+| 試合ステータスの更新 | 試合の進行状況変更 | ☓ | ○ | `admin-match-result.spec.js` で確認済み |
+| 試合結果の入力 | トーナメントスコア・勝敗入力 | ☓ | ○ | `admin-match-result.spec.js` で確認済み |
+| 昼競技結果の入力 | 昼競技の結果登録・タイピングJSON取込 | ☓ | ○ | `admin-noon-game-results.spec.js` / `root-typing-results-import.spec.js` で確認済み |
+| MIC投票 | MIC候補への投票 | ☓ | ○ | `admin-mic-voting.spec.js` で確認済み |
 
 ### student（学生）機能
 
-| 機能 | 概要 | コンポーネント | E2E | 備考 |
+| 機能 | 概要 | ユニット/コンポーネント | E2E | 備考 |
 | :--- | :--- | :---: | :---: | :--- |
-| マイページの閲覧 | 自クラスのスコア・日程確認 | ☓ | ☓ | |
-| トーナメントの閲覧 | ブラケットと結果の確認 | ☓ | ☓ | |
-| タイムテーブルの閲覧 | 試合スケジュールの確認 | ☓ | ☓ | |
-| 昼競技情報の閲覧 | 昼競技の結果・ポイント確認 | ☓ | ☓ | |
-| 競技情報の閲覧 | ルール・開催場所の確認 | ☓ | ☓ | |
-| スコア一覧の閲覧 | 全クラスのランキング確認 | ☓ | ☓ | |
+| マイページの閲覧 | スコア、参加試合、結果、クラス状況、通知、資料リンクの確認 | ○ | ○ | `my-page.server.spec.js` / `student-my-page-hidden-scores.spec.js` で、得点の公開制御と集約情報の表示を確認済み |
+| ダッシュボード・ショートカット設定 | 権限別リンクの表示/非表示と端末保存 | ○ | ☓ | `dashboard.svelte.spec.js` で確認済み。E2Eは未整備 |
+| 結果一覧の閲覧 | 完了試合と公開済み昼競技結果の横断表示 | ☓ | ☓ | 専用の自動テストは未整備 |
+| トーナメントの閲覧 | 通常競技・盤上競技のブラケットと結果確認 | ○ | ○ | `tournament.svelte.spec.js` / `student-tournament.spec.js` で確認済み |
+| タイムテーブルの閲覧 | 試合スケジュールの確認 | ☓ | ○ | `student-timetable.spec.js` で確認済み |
+| 昼競技情報の閲覧 | 昼競技の結果・ポイント確認 | ☓ | ○ | `root-typing-results-import.spec.js` でタイピング結果の学生表示を確認済み |
+| 競技情報の閲覧 | ルール・開催場所の確認 | ○ | ○ | `sport-info.svelte.spec.js` / `student-sport-info.spec.js` で確認済み |
+| スコア一覧の閲覧 | 全クラスのランキング確認 | ☓ | ○ | `student-score-list.spec.js` で確認済み |
 | MyIDバーコード提示 | 大会当日に学生証等のMyIDバーコードを運営へ提示 | - | - | 学生側で発行する画面はなし |
-| 通知の受信・フィルタ設定 | プッシュ通知の受信と表示管理 | ☓ | ☓ | |
-| プッシュ通知の設定 | ブラウザ通知の有効化・解除 | ☓ | ☓ | |
-| 通知申請の提出 | 運営への通知配信申請 | ☓ | ☓ | |
-| 申請状況の確認 | 提出済み申請のステータス確認 | ☓ | ☓ | |
-| 過去大会の閲覧 | アーカイブデータの参照 | ☓ | ☓ | |
+| 通知の受信・フィルタ設定 | プッシュ通知の受信と表示管理 | ○ | ○ | `NotificationSettings.spec.js` / `student-notifications.spec.js` で確認済み |
+| プッシュ通知の設定 | ブラウザ通知の有効化・解除 | ○ | ○ | 同上 |
+| 通知申請の提出 | 運営への通知配信申請 | ☓ | ○ | `student-notification-request.spec.js` で確認済み |
+| 申請状況の確認 | 提出済み申請のステータス確認 | ☓ | ○ | 同上 |
+| 過去大会の閲覧 | アーカイブデータの参照 | ○ | ○ | `archive-event-detail.svelte.spec.js` / `archive-event.spec.js` で確認済み |
 | ガイドの閲覧 | PWAインストール・要項確認 | ☓ | ☓ | |
-| クラス情報の閲覧 | 出席状況・メンバー一覧の確認 | ☓ | ☓ | |
+| クラス情報の閲覧 | 出席状況・メンバー一覧の確認 | ☓ | ○ | `student-class-progress.spec.js` で確認済み |
