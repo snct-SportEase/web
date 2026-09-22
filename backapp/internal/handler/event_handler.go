@@ -628,6 +628,9 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 		if len(row) > classNameColIdx {
 			className := strings.TrimSpace(row[classNameColIdx])
 			if className != "" {
+				if className == models.SpecialClassName {
+					continue
+				}
 				if countColIdx == -1 {
 					submissionCounts[className]++
 					continue
@@ -659,6 +662,9 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 
 	classesByName := make(map[string]*models.Class, len(classes))
 	for _, class := range classes {
+		if class.Name == models.SpecialClassName {
+			continue
+		}
 		classesByName[class.Name] = class
 	}
 
@@ -687,6 +693,9 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 
 	surveyPointsData := make(map[int]int)
 	for _, class := range classes {
+		if class.Name == models.SpecialClassName {
+			continue
+		}
 		if class.StudentCount > 0 {
 			submissions := submissionCounts[class.Name]
 			rate := float64(submissions) / float64(class.StudentCount)

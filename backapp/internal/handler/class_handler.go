@@ -135,6 +135,9 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 	}
 	classNameToID := make(map[string]int)
 	for _, class := range allClasses {
+		if class.Name == models.SpecialClassName {
+			continue
+		}
 		classNameToID[class.Name] = class.ID
 	}
 
@@ -170,6 +173,10 @@ func (h *ClassHandler) UpdateStudentCountsFromCSVHandler(c *gin.Context) {
 
 		className := strings.TrimSpace(record[0])
 		studentCountStr := strings.TrimSpace(record[1])
+		if className == models.SpecialClassName {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d contains a class excluded from student count settings: %s", rowNumber, className)})
+			return
+		}
 
 		classID, ok := classNameToID[className]
 		if !ok {

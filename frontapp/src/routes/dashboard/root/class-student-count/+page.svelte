@@ -12,11 +12,16 @@
   let isUploading = $state(false);
   let csvFile = $state(null);
 
+  function setEditableClasses(items) {
+    const editableClasses = (items || []).filter((classItem) => classItem.name !== '専教');
+    classes = JSON.parse(JSON.stringify(editableClasses));
+    originalClasses = JSON.parse(JSON.stringify(editableClasses));
+  }
+
   onMount(() => {
     if (data.classes) {
       // データをディープコピーして編集用と保存前用に保持
-      classes = JSON.parse(JSON.stringify(data.classes));
-      originalClasses = JSON.parse(JSON.stringify(data.classes));
+      setEditableClasses(data.classes);
     }
     if (data.error) {
       errorMessage = data.error;
@@ -50,8 +55,7 @@
       successMessage = '生徒数を更新しました。';
       // データを再取得して画面を更新
       const freshData = await fetch(`/api/classes`).then(res => res.json());
-      classes = JSON.parse(JSON.stringify(freshData));
-      originalClasses = JSON.parse(JSON.stringify(freshData));
+      setEditableClasses(freshData);
 
     } catch (error) {
       errorMessage = error.message;
@@ -91,8 +95,7 @@
       successMessage = 'CSVで生徒数を更新しました。';
       // データを再取得して画面を更新
       const freshData = await fetch(`/api/classes`).then(res => res.json());
-      classes = JSON.parse(JSON.stringify(freshData));
-      originalClasses = JSON.parse(JSON.stringify(freshData));
+      setEditableClasses(freshData);
       csvFile = null; // ファイル選択をリセット
 
     } catch (error) {
@@ -132,7 +135,7 @@
           accept=".csv" 
           onchange={handleFileSelect} 
           class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
-        <p class="text-xs text-gray-500 mt-1">フォーマット: 1列目にクラス名, 2列目に生徒数 (ヘッダー行あり)</p>
+        <p class="text-xs text-gray-500 mt-1">フォーマット: 1列目にクラス名, 2列目に生徒数 (ヘッダー行あり・専教は対象外)</p>
       </div>
       <button type="submit" disabled={isUploading || !csvFile} class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
         {#if isUploading}
@@ -146,6 +149,7 @@
   <!-- Manual Update -->
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">手動で更新</h2>
+    <p class="mb-4 text-sm text-gray-600">専教は在籍人数による判定の対象外のため、設定一覧には表示されません。</p>
     <form onsubmit={(e) => { e.preventDefault(); handleSave(e); }}>
       <div class="overflow-x-auto rounded-lg border border-gray-200">
         <table class="min-w-full divide-y divide-gray-200">

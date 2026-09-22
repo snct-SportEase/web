@@ -60,3 +60,35 @@ func TestUpdateStudentCountsCSVRejectsUnknownClassWithoutPartialUpdate(t *testin
 	eventRepo.AssertExpectations(t)
 	classRepo.AssertExpectations(t)
 }
+
+func TestUpdateStudentCountsCSVRejectsSpecialClass(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	eventRepo := new(MockEventRepository)
+	classRepo := new(MockClassRepository)
+	h := handler.NewClassHandler(classRepo, eventRepo, nil, nil)
+	eventRepo.On("GetActiveEvent").Return(7, nil).Once()
+	classRepo.On("GetAllClasses", 7).Return([]*models.Class{
+		{ID: 1, Name: "1-A"},
+		{ID: 16, Name: models.SpecialClassName},
+	}, nil).Once()
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("csv", "counts.csv")
+	assert.NoError(t, err)
+	_, err = part.Write([]byte("class_name,student_count\n専教,20\n"))
+	assert.NoError(t, err)
+	assert.NoError(t, writer.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/classes/student-counts/csv", body)
+	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+	h.UpdateStudentCountsFromCSVHandler(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "excluded from student count settings")
+	classRepo.AssertNotCalled(t, "UpdateStudentCounts", mock.Anything, mock.Anything)
+	eventRepo.AssertExpectations(t)
+	classRepo.AssertExpectations(t)
+}

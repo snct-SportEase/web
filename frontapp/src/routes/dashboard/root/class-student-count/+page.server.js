@@ -11,7 +11,7 @@ export async function load({ fetch, request }) {
     if (!response.ok) {
       throw new Error(`Failed to fetch classes: ${response.statusText}`);
     }
-    const classes = await response.json();
+    const classes = (await response.json()).filter((classItem) => classItem.name !== '専教');
     return {
       classes,
     };

@@ -241,7 +241,7 @@ func TestClassRepository_UpdateStudentCountsRejectsClassFromAnotherEvent(t *test
 	repo := repository.NewClassRepository(db)
 
 	mock.ExpectBegin()
-	mock.ExpectPrepare(regexp.QuoteMeta("UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ?")).
+	mock.ExpectPrepare(regexp.QuoteMeta("UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ? AND name <> '専教'")).
 		ExpectExec().WithArgs(30, 99, 7).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectRollback()
 
@@ -254,7 +254,7 @@ func TestClassRepository_UpdateStudentCountsRejectsClassFromAnotherEvent(t *test
 // ─── UpdateStudentCounts ───────────────────────────────────────────────────
 
 func TestClassRepository_UpdateStudentCounts(t *testing.T) {
-	const updateStmt = "UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ?"
+	const updateStmt = "UPDATE classes SET student_count = ? WHERE id = ? AND event_id = ? AND name <> '専教'"
 
 	setup := func(t *testing.T) (repository.ClassRepository, sqlmock.Sqlmock, func()) {
 		t.Helper()
@@ -289,6 +289,20 @@ func TestClassRepository_UpdateStudentCounts(t *testing.T) {
 
 		err := repo.UpdateStudentCounts(1, map[int]int{})
 		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("rollback - special class is excluded", func(t *testing.T) {
+		repo, mock, close := setup(t)
+		defer close()
+
+		mock.ExpectBegin()
+		mock.ExpectPrepare(regexp.QuoteMeta(updateStmt)).
+			ExpectExec().WithArgs(20, 16, 1).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectRollback()
+
+		err := repo.UpdateStudentCounts(1, map[int]int{16: 20})
+		assert.ErrorIs(t, err, repository.ErrClassNotFound)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
