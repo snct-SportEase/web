@@ -606,10 +606,14 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 
 	headers := records[0]
 	classNameColIdx := -1
+	countColIdx := -1
 	for i, header := range headers {
-		if strings.Contains(strings.ToLower(header), "クラス") || strings.Contains(header, "class") {
+		normalizedHeader := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(header, "\uFEFF")))
+		if classNameColIdx == -1 && (strings.Contains(normalizedHeader, "クラス") || strings.Contains(normalizedHeader, "class")) {
 			classNameColIdx = i
-			break
+		}
+		if countColIdx == -1 && (strings.Contains(normalizedHeader, "人数") || normalizedHeader == "count") {
+			countColIdx = i
 		}
 	}
 
@@ -619,11 +623,24 @@ func (h *EventHandler) ImportSurveyScores(c *gin.Context) {
 	}
 
 	submissionCounts := make(map[string]int)
-	for _, row := range records[1:] {
+	for rowIndex, row := range records[1:] {
 		if len(row) > classNameColIdx {
 			className := strings.TrimSpace(row[classNameColIdx])
 			if className != "" {
-				submissionCounts[className]++
+				if countColIdx == -1 {
+					submissionCounts[className]++
+					continue
+				}
+				if len(row) <= countColIdx {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d does not contain a count value", rowIndex+2)})
+					return
+				}
+				count, err := strconv.Atoi(strings.TrimSpace(row[countColIdx]))
+				if err != nil || count < 0 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("CSV row %d contains an invalid count", rowIndex+2)})
+					return
+				}
+				submissionCounts[className] += count
 			}
 		}
 	}

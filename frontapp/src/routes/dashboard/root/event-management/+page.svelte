@@ -351,6 +351,7 @@
                     <label class="text-xs text-gray-600 mb-1">点数インポート(CSV)
                       <input type="file" accept=".csv" class="text-xs mt-1 block" onchange={(e) => handleCsvUpload(event.id, e)} />
                     </label>
+                    <span class="text-[11px] text-gray-500">1回答1行、または「クラス名,人数」形式</span>
                   </div>
                 {/if}
               </div>

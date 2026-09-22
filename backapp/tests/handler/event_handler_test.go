@@ -888,6 +888,79 @@ func TestEventHandler_ImportSurveyScores(t *testing.T) {
 		mockClassRepo.AssertExpectations(t)
 	})
 
+	t.Run("Success - Import Aggregated Survey Counts", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockUserRepo := new(MockUserRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, mockClassRepo, nil, mockUserRepo, "", "")
+
+		eventID := 1
+		event := &models.Event{ID: eventID, Season: "autumn"}
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+
+		classes := []*models.Class{
+			{ID: 101, Name: "1-1", StudentCount: 40},
+			{ID: 102, Name: "IE2", StudentCount: 40},
+		}
+		mockClassRepo.On("GetAllClasses", eventID).Return(classes, nil).Once()
+		mockClassRepo.On("SetSurveyPoints", eventID, map[int]int{
+			101: 10, // 35 + 1 responses / 40 students = 90%
+			102: 6,  // 20 responses / 40 students = 50%
+		}).Return(nil).Once()
+
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", "survey-counts.csv")
+		assert.NoError(t, err)
+		_, err = part.Write([]byte("クラス名, 人数\n1-1,35\n1-1,1\nIE2,20\n"))
+		assert.NoError(t, err)
+		assert.NoError(t, writer.Close())
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events/1/import-survey-scores", body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+		h.ImportSurveyScores(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("Error - Aggregated Survey Count Is Invalid", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockUserRepo := new(MockUserRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, mockUserRepo, "", "")
+
+		eventID := 1
+		event := &models.Event{ID: eventID, Season: "autumn"}
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", "survey-counts.csv")
+		assert.NoError(t, err)
+		_, err = part.Write([]byte("クラス名,人数\n1-1,-1\n"))
+		assert.NoError(t, err)
+		assert.NoError(t, writer.Close())
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
+		c.Request, _ = http.NewRequest(http.MethodPost, "/api/root/events/1/import-survey-scores", body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+		h.ImportSurveyScores(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var response map[string]interface{}
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Contains(t, response["error"], "invalid count")
+		mockEventRepo.AssertExpectations(t)
+	})
+
 	t.Run("Error - Missing File", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockUserRepo := new(MockUserRepository)
