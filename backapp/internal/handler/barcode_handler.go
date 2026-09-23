@@ -20,6 +20,7 @@ type BarcodeHandler struct {
 	eventRepo repository.EventRepository
 	classRepo repository.ClassRepository
 	tournRepo repository.TournamentRepository
+	noonRepo  repository.NoonGameRepository
 }
 
 const myIDBarcodePrefix = "H10"
@@ -35,6 +36,12 @@ func NewBarcodeHandler(teamRepo repository.TeamRepository, sportRepo repository.
 		classRepo: classRepo,
 		tournRepo: tournRepo,
 	}
+}
+
+// WithNoonGameRepository enables barcode check-in for noon-game matches.
+func (h *BarcodeHandler) WithNoonGameRepository(noonRepo repository.NoonGameRepository) *BarcodeHandler {
+	h.noonRepo = noonRepo
+	return h
 }
 
 // GetUserTeamsHandler returns all teams that the current user is a member of.
@@ -89,6 +96,11 @@ func (h *BarcodeHandler) CheckInRoundHandler(c *gin.Context) {
 	}
 	if user == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "該当する学生が見つかりません"})
+		return
+	}
+
+	if req.NoonGameSessionID > 0 {
+		h.checkInNoonGame(c, req, user)
 		return
 	}
 
@@ -218,6 +230,11 @@ func (h *BarcodeHandler) GetMatchCheckInsHandler(c *gin.Context) {
 	}
 
 	selectedMatchIDs := parseMatchIDsQuery(matchID, c.Query("match_ids"))
+	if noonSessionID, _ := strconv.Atoi(c.Query("noon_game_session_id")); noonSessionID > 0 {
+		h.getNoonGameMatchCheckIns(c, eventID, sportID, noonSessionID, matchID)
+		return
+	}
+
 	members := make([]*models.MatchCheckInMember, 0)
 	matchTeamIDs := make([]int, 0)
 	seenTeamIDs := make(map[int]bool)

@@ -716,6 +716,47 @@ createServer(async (req, res) => {
       return;
     }
 
+    const noonGameSessionId = Number(body.noon_game_session_id);
+    if (noonGameSessionId > 0) {
+      const noonMatch = noonMatches.find((item) => item.id === matchId && item.session_id === noonGameSessionId);
+      if (!noonMatch) {
+        sendJson(res, 400, { error: '選択した試合がこの昼競技に存在しません' });
+        return;
+      }
+      const existingCheckIn = barcodeCheckIns.find((item) =>
+        item.event_id === eventId
+        && item.sport_id === sportId
+        && item.match_id === matchId
+        && item.noon_game_session_id === noonGameSessionId
+        && item.user_id === studentUser.id
+      );
+      if (existingCheckIn) {
+        sendJson(res, 409, { error: 'チェックイン済みです', already_checked_in: true });
+        return;
+      }
+      const checkIn = {
+        user_id: studentUser.id,
+        email: 's2301059@sendai-nct.jp',
+        display_name: studentUser.display_name,
+        class_id: 1,
+        class_name: '1A',
+        team_name: noonSession?.name ?? '昼競技',
+        event_id: eventId,
+        sport_id: sportId,
+        match_id: matchId,
+        noon_game_session_id: noonGameSessionId,
+        round: 1,
+        checked_in_at: new Date().toISOString()
+      };
+      barcodeCheckIns = [checkIn, ...barcodeCheckIns];
+      sendJson(res, 200, {
+        valid: true, checked_in: true, confirmed: true,
+        event_id: eventId, sport_id: sportId, sport_name: noonSession?.name ?? '昼競技',
+        round: 1, match_id: matchId, user_id: studentUser.id,
+        display_name: studentUser.display_name, student_number: barcode.slice(3, 10), barcode_data: barcode
+      });
+      return;
+    }
     const tournament = tournaments.find((item) => item.sport_id === sportId);
     const match = tournament?.data?.matches?.find((item) => item.id === matchId);
     if (!match) {
@@ -777,6 +818,29 @@ createServer(async (req, res) => {
     const matchId = Number(barcodeMatchCheckInsMatch[1]);
     const eventId = Number(url.searchParams.get('event_id'));
     const sportId = Number(url.searchParams.get('sport_id'));
+    const noonGameSessionId = Number(url.searchParams.get('noon_game_session_id'));
+    if (noonGameSessionId > 0) {
+      const noonMatch = noonMatches.find((item) => item.id === matchId && item.session_id === noonGameSessionId);
+      if (!noonMatch) {
+        sendJson(res, 400, { error: '選択した試合がこの昼競技に存在しません' });
+        return;
+      }
+      const members = barcodeCheckIns.filter((item) =>
+        item.event_id === eventId
+        && item.sport_id === sportId
+        && item.match_id === matchId
+        && item.noon_game_session_id === noonGameSessionId
+      );
+      sendJson(res, 200, {
+        members,
+        count: members.length,
+        checked_in_members: members,
+        checked_in_count: members.length,
+        unchecked_members: [],
+        unchecked_count: 0
+      });
+      return;
+    }
     const tournament = tournaments.find((item) => item.sport_id === sportId);
     const selectedMatchIds = (url.searchParams.get('match_ids') ?? `${matchId}`)
       .split(',')

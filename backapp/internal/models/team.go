@@ -25,11 +25,12 @@ type TeamWithSport struct {
 
 // BarcodeCheckInRequest represents a request to check in a student to the selected match round with a MyID barcode.
 type BarcodeCheckInRequest struct {
-	BarcodeData string `json:"barcode_data"`
-	EventID     int    `json:"event_id"`
-	SportID     int    `json:"sport_id"`
-	MatchID     int    `json:"match_id"`
-	MatchIDs    []int  `json:"match_ids"`
+	BarcodeData       string `json:"barcode_data"`
+	EventID           int    `json:"event_id"`
+	SportID           int    `json:"sport_id"`
+	MatchID           int    `json:"match_id"`
+	MatchIDs          []int  `json:"match_ids"`
+	NoonGameSessionID int    `json:"noon_game_session_id,omitempty"`
 }
 
 // MatchCheckInMember represents a student checked in for a selected match.

@@ -77,6 +77,42 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
     await uncheckedDialog.getByRole('button', { name: '閉じる' }).click();
   });
 
+  test('昼競技の試合を選択してチェックインできる', async ({ page, request }) => {
+    await request.post(`${mockBackendUrl}/api/admin/events/1/sports`, {
+      data: { sport_id: 2, location: 'noon_game', description: '昼競技' }
+    });
+    await request.post(`${mockBackendUrl}/api/root/events/1/noon-game/session`, {
+      data: { name: 'バレーボール', mode: 'match', allow_manual_points: false }
+    });
+    await request.post(`${mockBackendUrl}/api/root/noon-game/sessions/1/matches`, {
+      data: {
+        title: '昼競技決勝',
+        home_display_name: '1A',
+        away_display_name: '1B',
+        scheduled_at: '2025-04-01T12:30:00Z',
+        entries: [{ class_id: 1 }, { class_id: 2 }]
+      }
+    });
+
+    await page.reload();
+    await page.getByLabel('競技').selectOption('2');
+    const noonGameOption = page.getByLabel('試合').locator('option').filter({ hasText: '昼競技' });
+    await expect(noonGameOption).toHaveCount(1);
+    const noonGameMatchValue = await noonGameOption.getAttribute('value');
+    await page.getByLabel('試合').selectOption(noonGameMatchValue);
+    await page.getByLabel('バーコード値').fill('H1023010590');
+
+    const checkInRequest = page.waitForRequest((request) => {
+      if (!request.url().endsWith('/api/barcode/check-in') || request.method() !== 'POST') return false;
+      const body = JSON.parse(request.postData() ?? '{}');
+      return body.sport_id === 2 && body.match_id === 1 && body.noon_game_session_id === 1;
+    });
+    await page.getByRole('button', { name: 'チェックインする' }).click();
+
+    await checkInRequest;
+    await expect(page.getByRole('dialog', { name: 'ラウンドチェックインを完了しました' })).toBeVisible();
+  });
+
   test('MyID形式ではないバーコードはrejectされる', async ({ page }) => {
     await page.getByLabel('競技').selectOption('1');
     await page.getByLabel('試合').selectOption({ index: 1 });
