@@ -214,7 +214,11 @@
           html2canvas: { scale: 2 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        const html2pdf = (await import('html2pdf.js')).default;
+        const pdfModule = await import('html2pdf.js');
+        // The UMD package can be wrapped in an extra default export by the bundler.
+        const html2pdf = typeof pdfModule.default === 'function'
+          ? pdfModule.default
+          : pdfModule.default?.default;
         html2pdf().set(opt).from(htmlContent).save();
       } else {
         const resp = await fetch(`/api/root/events/${event.id}/export/${type}`);
