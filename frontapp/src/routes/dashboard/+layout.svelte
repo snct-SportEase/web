@@ -169,8 +169,8 @@
           <details class="relative mr-1 md:hidden">
             <summary
               class="flex cursor-pointer list-none items-center rounded-md p-2 text-gray-600 hover:bg-gray-100 [&::-webkit-details-marker]:hidden"
-              aria-label="報告・提案メニューを開く"
-              title="報告・提案"
+              aria-label="ヘッダメニューを開く"
+              title="メニュー"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.75h.01M12 12h.01M12 17.25h.01" /></svg>
             </summary>
@@ -199,13 +199,33 @@
               >
                 新機能を提案
               </a>
+              {#if shouldShowPWASetupBadge || shouldShowPushSetupBadge}
+                <div class="my-1 border-t border-gray-200"></div>
+              {/if}
+              {#if shouldShowPWASetupBadge}
+                <button
+                  type="button"
+                  onclick={openPWAInstallDialog}
+                  class="block w-full px-4 py-2 text-left text-sm text-sky-800 hover:bg-sky-50"
+                >
+                  PWAを設定
+                </button>
+              {/if}
+              {#if shouldShowPushSetupBadge}
+                <a
+                  href="/dashboard"
+                  class="block px-4 py-2 text-sm text-amber-800 hover:bg-amber-50"
+                >
+                  {$pushSubscriptionStatus.permission === 'denied' ? '通知拒否中' : '通知を設定'}
+                </a>
+              {/if}
             </div>
           </details>
           {#if shouldShowPWASetupBadge}
             <button
               type="button"
               onclick={openPWAInstallDialog}
-              class="mr-3 rounded-md border border-sky-300 bg-sky-100 px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-200"
+              class="mr-3 hidden rounded-md border border-sky-300 bg-sky-100 px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-200 md:inline-flex"
             >
               PWA未設定
             </button>
@@ -213,7 +233,7 @@
           {#if shouldShowPushSetupBadge}
             <a
               href="/dashboard"
-              class="mr-3 rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-200"
+              class="mr-3 hidden rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-200 md:inline-flex"
             >
               {$pushSubscriptionStatus.permission === 'denied' ? '通知拒否中' : '通知未設定'}
             </a>
