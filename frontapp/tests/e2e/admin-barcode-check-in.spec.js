@@ -61,6 +61,10 @@ test.describe('MyIDバーコード読み取り (admin)', () => {
     await successDialog.getByRole('button', { name: '閉じる' }).click();
     await expect(page.getByText('この試合のチェックイン状況')).toBeVisible();
     await expect(page.getByText('s2301059@sendai-nct.jp')).toBeVisible();
+    await expect(page.getByText('クラス別チェックイン状況')).toBeVisible();
+    await expect(page.getByText('チェックイン済み: 1 / 1人')).toBeVisible();
+    await expect(page.getByText('チェックイン済み: 0 / 1人')).toBeVisible();
+    await expect(page.getByText('表示名: 山田太郎')).toBeVisible();
 
     const checkedInButton = page.getByRole('button', { name: 'チェックイン済み（1 / 2人）' });
     await expect(checkedInButton).toBeVisible();

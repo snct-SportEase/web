@@ -734,12 +734,17 @@
 		return `チェックイン済み: ${group.checked.length} / ${totalCount}人`;
 	}
 
+	function getClassCheckInCountLabel(group) {
+		const totalCount = group.checked.length + group.unchecked.length;
+		return `チェックイン済み: ${group.checked.length} / ${totalCount}人`;
+	}
+
 	function getMemberDisplayName(member) {
 		return member?.display_name || member?.email || '未設定';
 	}
 
 	function getMemberGroupKey(member) {
-		return `${member?.class_id ?? 'unknown'}:${member?.team_id ?? 'unknown'}:${getMemberClassName(member)}`;
+		return `${member?.class_id ?? 'unknown'}:${getMemberClassName(member)}`;
 	}
 
 	function getMemberClassName(member) {
@@ -801,6 +806,26 @@
 						</button>
 					</div>
 				</div>
+					{#if !checkInsLoading && !checkInsError && getCheckInStatusClassGroups().length > 0}
+						<div class="mt-4 border-t border-gray-200 pt-3">
+							<p class="mb-2 text-sm font-semibold text-gray-700">クラス別チェックイン状況</p>
+							<div class="grid gap-2 sm:grid-cols-2">
+								{#each getCheckInStatusClassGroups() as group (group.key)}
+									<div class="rounded border border-gray-200 px-3 py-2">
+										<div class="flex items-center justify-between gap-2">
+											<p class="text-sm font-semibold text-gray-900">{group.name}</p>
+											<span class="text-xs font-medium text-blue-700">{getClassCheckInCountLabel(group)}</span>
+										</div>
+										<p class="mt-1 text-xs text-gray-600">
+											表示名: {group.checked.length > 0
+												? group.checked.map(getMemberDisplayName).join('、')
+												: 'チェックイン済みの学生はいません'}
+										</p>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 			</div>
 		{/if}
 
