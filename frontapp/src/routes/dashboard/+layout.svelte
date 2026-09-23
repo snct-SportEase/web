@@ -125,16 +125,16 @@
 
 <div class="min-h-screen bg-gray-50 flex flex-col">
   {#if (!$isSidebarOpen || (browser && !isMobile)) && user?.is_profile_complete}
-    <header class="app-layer-header bg-white shadow-sm p-4 sticky top-0 pointer-events-auto">
+    <header class="app-layer-header sticky top-0 z-30 bg-white p-2 shadow-sm pointer-events-auto md:p-4">
       <div class="flex justify-between items-center pointer-events-auto">
         <div class="flex items-center pointer-events-auto">
-          <button type="button" onclick={openSidebar} class="mr-4 p-2 rounded-md hover:bg-gray-100 pointer-events-auto" aria-label="サイドバーを開く">
+          <button type="button" onclick={openSidebar} class="mr-1 rounded-md p-2 hover:bg-gray-100 pointer-events-auto md:mr-4" aria-label="サイドバーを開く">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>
-          <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-2xl font-bold text-gray-800">Dashboard</h1></a>
+          <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-xl font-bold text-gray-800 md:text-2xl">Dashboard</h1></a>
         </div>
         <div class="flex items-center pointer-events-auto">
-          <div class="mr-3 flex items-center gap-1" aria-label="報告・提案">
+          <div class="mr-3 hidden items-center gap-1 md:flex" aria-label="報告・提案">
             <a
               href="https://github.com/snct-SportEase/web/issues/new?template=bug_report.yml"
               target="_blank"
@@ -166,6 +166,41 @@
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a7 7 0 0 0-4 12.75V18a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.25A7 7 0 0 0 12 3Zm-2 19h4" /></svg>
             </a>
           </div>
+          <details class="relative mr-1 md:hidden">
+            <summary
+              class="flex cursor-pointer list-none items-center rounded-md p-2 text-gray-600 hover:bg-gray-100 [&::-webkit-details-marker]:hidden"
+              aria-label="報告・提案メニューを開く"
+              title="報告・提案"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.75h.01M12 12h.01M12 17.25h.01" /></svg>
+            </summary>
+            <div class="absolute right-0 top-full z-40 mt-2 w-52 rounded-md border border-gray-200 bg-white py-1 shadow-lg" aria-label="報告・提案">
+              <a
+                href="https://github.com/snct-SportEase/web/issues/new?template=bug_report.yml"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700"
+              >
+                バグを報告
+              </a>
+              <a
+                href="https://github.com/snct-SportEase/web/security/advisories/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700"
+              >
+                脆弱性を非公開で報告
+              </a>
+              <a
+                href="https://github.com/snct-SportEase/web/issues/new?template=feature_request.yml"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                新機能を提案
+              </a>
+            </div>
+          </details>
           {#if shouldShowPWASetupBadge}
             <button
               type="button"
@@ -186,7 +221,7 @@
           <button 
             type="button"
             onclick={handleDisplayNameClick}
-            class="mr-4 flex items-center {isMobile ? 'px-2 space-x-0' : 'space-x-2 px-3'} py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pointer-events-auto"
+            class="mr-1 flex items-center {isMobile ? 'px-2 space-x-0' : 'space-x-2 px-3'} py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pointer-events-auto md:mr-4"
             title="表示名をクリックして変更"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -199,7 +234,7 @@
           <button 
             type="button" 
             onclick={handleLogout}
-            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors duration-200 pointer-events-auto"
+            class="rounded-md bg-indigo-600 px-2.5 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 pointer-events-auto md:px-4"
           >
             Logout
           </button>
