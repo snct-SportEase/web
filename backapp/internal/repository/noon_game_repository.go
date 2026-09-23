@@ -46,6 +46,8 @@ type NoonGameRepository interface {
 
 	GetGroupMembers(groupID int) ([]*models.NoonGameGroupMember, error)
 	GetEntryByID(entryID int) (*models.NoonGameMatchEntry, error)
+	CheckInMember(eventID, sessionID, matchID int, userID string) error
+	GetMatchCheckIns(eventID, sessionID, matchID int) ([]*models.NoonGameCheckIn, error)
 
 	// --- Template runs ---
 	CreateTemplateRun(run *models.NoonGameTemplateRun) (*models.NoonGameTemplateRun, error)
@@ -64,6 +66,7 @@ type NoonGameRepository interface {
 }
 
 var ErrNoonGameMatchParticipantsLocked = errors.New("result-recorded match participants cannot be changed")
+var ErrNoonGameAlreadyCheckedIn = errors.New("noon game match already checked in")
 
 type noonGameRepository struct {
 	db *sql.DB
@@ -1021,6 +1024,42 @@ func (r *noonGameRepository) GetMatchesWithResults(sessionID int) ([]*models.Noo
 	}
 
 	return matches, nil
+}
+
+// CheckInMember records a participant's check-in for a noon-game match.
+func (r *noonGameRepository) CheckInMember(eventID, sessionID, matchID int, userID string) error {
+	_, err := r.db.Exec(`
+		INSERT INTO noon_game_check_ins (event_id, session_id, match_id, user_id)
+		VALUES (?, ?, ?, ?)
+	`, eventID, sessionID, matchID, userID)
+	if isMySQLDuplicateEntryError(err) {
+		return ErrNoonGameAlreadyCheckedIn
+	}
+	return err
+}
+
+// GetMatchCheckIns returns noon-game participants who have checked in.
+func (r *noonGameRepository) GetMatchCheckIns(eventID, sessionID, matchID int) ([]*models.NoonGameCheckIn, error) {
+	rows, err := r.db.Query(`
+		SELECT event_id, session_id, match_id, user_id, checked_in_at
+		FROM noon_game_check_ins
+		WHERE event_id = ? AND session_id = ? AND match_id = ?
+		ORDER BY checked_in_at DESC, user_id ASC
+	`, eventID, sessionID, matchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	checkIns := make([]*models.NoonGameCheckIn, 0)
+	for rows.Next() {
+		checkIn := &models.NoonGameCheckIn{}
+		if err := rows.Scan(&checkIn.EventID, &checkIn.SessionID, &checkIn.MatchID, &checkIn.UserID, &checkIn.CheckedInAt); err != nil {
+			return nil, err
+		}
+		checkIns = append(checkIns, checkIn)
+	}
+	return checkIns, rows.Err()
 }
 
 func (r *noonGameRepository) GetMatchByID(matchID int) (*models.NoonGameMatchWithResult, error) {

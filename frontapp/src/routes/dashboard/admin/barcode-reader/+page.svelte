@@ -84,19 +84,22 @@
 				return;
 			}
 
-			const [sportsResponse, tournamentsResponse] = await Promise.all([
+			const [sportsResponse, tournamentsResponse, noonSessionsResponse] = await Promise.all([
 				fetch(`/api/events/${activeEventId}/sports`, { credentials: 'include' }),
-				fetch(`/api/admin/events/${activeEventId}/tournaments`, { credentials: 'include' })
+				fetch(`/api/admin/events/${activeEventId}/tournaments`, { credentials: 'include' }),
+				fetch(`/api/admin/events/${activeEventId}/noon-game/sessions`, { credentials: 'include' })
 			]);
-			if (!sportsResponse.ok) {
-				throw new Error('競技一覧の取得に失敗しました');
-			}
-			if (!tournamentsResponse.ok) {
-				throw new Error('試合一覧の取得に失敗しました');
-			}
+			if (!sportsResponse.ok) throw new Error('競技一覧の取得に失敗しました');
+			if (!tournamentsResponse.ok) throw new Error('試合一覧の取得に失敗しました');
 			sports = dedupeSportsByID(await sportsResponse.json());
-			tournaments = await tournamentsResponse.json();
-		} catch (err) {
+			const regularTournaments = await tournamentsResponse.json();
+			const noonSessions = noonSessionsResponse.ok ? (await noonSessionsResponse.json()).sessions || [] : [];
+			const noonTournaments = await Promise.all(noonSessions.map(async (session) => {
+				const response = await fetch(`/api/admin/events/${activeEventId}/noon-game/sessions/${session.id}`, { credentials: 'include' });
+				return response.ok ? createNoonGameTournament(session, await response.json()) : null;
+			}));
+			tournaments = [...regularTournaments, ...noonTournaments.filter(Boolean)];
+			} catch (err) {
 			errorMessage = err.message || '初期データの取得に失敗しました';
 		} finally {
 			loading = false;
@@ -168,6 +171,20 @@
 		return data.rounds?.[match.roundIndex]?.name || `第${getMatchRound(match)}ラウンド`;
 	}
 
+	function createNoonGameTournament(session, payload) {
+		const sport = sports.find((item) => item.name === session.name);
+		if (!sport) return null;
+		const matches = (payload.matches || []).map((match, index) => ({
+			id: match.id,
+			roundIndex: 0,
+			order: index,
+			startTime: match.scheduled_at,
+			noonGameSessionId: session.id,
+			sides: [{ title: match.home_display_name || '未定' }, { title: match.away_display_name || '未定' }]
+		}));
+		return { id: `noon:${session.id}`, name: session.name, sport_id: sport.id, data: { rounds: [{ name: '昼競技' }], matches } };
+	}
+
 	function buildMatchSelections(tournamentsForSport, nowMs) {
 		const timedGroups = new SvelteMap();
 		const selections = [];
@@ -183,6 +200,7 @@
 						tournament,
 						data,
 						match,
+							noonGameSessionId: match.noonGameSessionId || null,
 						matchupLabel: getMatchupLabel(data, match),
 						sortIndex:
 							tournamentIndex * 100000 +
@@ -242,7 +260,8 @@
 				round: timedGroup.round,
 				isSelectable,
 				opensAtMs,
-				sortIndex
+				sortIndex,
+				noonGameSessionId: firstEntry.noonGameSessionId
 			};
 		}
 
@@ -259,7 +278,8 @@
 			round: getMatchRound(firstEntry.match),
 			isSelectable,
 			opensAtMs,
-			sortIndex
+			sortIndex,
+			noonGameSessionId: firstEntry.noonGameSessionId
 		};
 	}
 
@@ -445,6 +465,9 @@
 				sport_id: String(selectedSportId)
 			});
 			params.set('match_ids', selectedMatch.matchIds.join(','));
+			if (selectedMatch.noonGameSessionId) {
+				params.set('noon_game_session_id', String(selectedMatch.noonGameSessionId));
+			}
 			const response = await fetch(`/api/barcode/matches/${selectedMatch.id}/check-ins?${params}`, {
 				credentials: 'include'
 			});
@@ -503,7 +526,10 @@
 				event_id: Number(activeEventId),
 				sport_id: Number(selectedSportId),
 				match_id: Number(selectedMatch.id),
-				match_ids: selectedMatch.matchIds.map(Number)
+				match_ids: selectedMatch.matchIds.map(Number),
+				...(selectedMatch.noonGameSessionId
+					? { noon_game_session_id: Number(selectedMatch.noonGameSessionId) }
+					: {})
 			};
 
 			const response = await fetch('/api/barcode/check-in', {
@@ -708,12 +734,17 @@
 		return `チェックイン済み: ${group.checked.length} / ${totalCount}人`;
 	}
 
+	function getClassCheckInCountLabel(group) {
+		const totalCount = group.checked.length + group.unchecked.length;
+		return `チェックイン済み: ${group.checked.length} / ${totalCount}人`;
+	}
+
 	function getMemberDisplayName(member) {
 		return member?.display_name || member?.email || '未設定';
 	}
 
 	function getMemberGroupKey(member) {
-		return `${member?.class_id ?? 'unknown'}:${member?.team_id ?? 'unknown'}:${getMemberClassName(member)}`;
+		return `${member?.class_id ?? 'unknown'}:${getMemberClassName(member)}`;
 	}
 
 	function getMemberClassName(member) {
@@ -775,6 +806,26 @@
 						</button>
 					</div>
 				</div>
+					{#if !checkInsLoading && !checkInsError && getCheckInStatusClassGroups().length > 0}
+						<div class="mt-4 border-t border-gray-200 pt-3">
+							<p class="mb-2 text-sm font-semibold text-gray-700">クラス別チェックイン状況</p>
+							<div class="grid gap-2 sm:grid-cols-2">
+								{#each getCheckInStatusClassGroups() as group (group.key)}
+									<div class="rounded border border-gray-200 px-3 py-2">
+										<div class="flex items-center justify-between gap-2">
+											<p class="text-sm font-semibold text-gray-900">{group.name}</p>
+											<span class="text-xs font-medium text-blue-700">{getClassCheckInCountLabel(group)}</span>
+										</div>
+										<p class="mt-1 text-xs text-gray-600">
+											表示名: {group.checked.length > 0
+												? group.checked.map(getMemberDisplayName).join('、')
+												: 'チェックイン済みの学生はいません'}
+										</p>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 			</div>
 		{/if}
 

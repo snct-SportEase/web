@@ -118,6 +118,17 @@ type NoonGameMatchEntry struct {
 	ClassIDs     []int   `json:"class_ids"`
 }
 
+// NoonGameCheckIn represents a barcode check-in for a noon-game match.
+// Noon-game matches do not have regular tournament teams, so their check-ins
+// are stored separately from round_check_ins.
+type NoonGameCheckIn struct {
+	EventID     int       `json:"event_id"`
+	SessionID   int       `json:"session_id"`
+	MatchID     int       `json:"match_id"`
+	UserID      string    `json:"user_id"`
+	CheckedInAt time.Time `json:"checked_in_at"`
+}
+
 type NoonGameResultDetail struct {
 	ID                int     `json:"id"`
 	EntryID           int     `json:"entry_id"`
