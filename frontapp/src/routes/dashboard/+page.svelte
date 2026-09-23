@@ -9,6 +9,8 @@
   import Card from '$lib/components/Card.svelte';
   import DataTable from '$lib/components/DataTable.svelte';
   import { fetchPublishedNoonGameSessions, flattenNoonGameMatches } from '$lib/utils/noonGameSessions.js';
+  import { isPWAInstalled } from '$lib/utils/pwa.js';
+  import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
 
   let { data } = $props();
   let user = $derived(data.user);
@@ -17,6 +19,7 @@
   let form = $derived(data.form);
   
   let showPWAInstallGuide = $state(false);
+  let isPWA = $state(true);
   let shortcutSettingsOpen = $state(false);
   let hiddenShortcutHrefs = new SvelteSet();
   let activeEvent = $state(null);
@@ -26,6 +29,7 @@
   let noonGameInfoError = $state('');
 
   onMount(async () => {
+    isPWA = isPWAInstalled();
     loadShortcutPreferences();
 
     try {
@@ -269,6 +273,34 @@
 
   {#if showEventSetup}
     <EventSetupModal />
+  {/if}
+
+  {#if !isPWA}
+    <section class="space-y-6">
+      <div class="rounded-lg border border-sky-200 bg-sky-50 p-5 shadow-sm">
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-semibold text-sky-900">PWA設定</h3>
+            <p class="mt-1 text-sm text-sky-800">
+              SportEaseをアプリとしてインストールすると、ホーム画面からすばやく開けます。
+            </p>
+          </div>
+          <span class="shrink-0 text-sm font-medium text-sky-700">未設定</span>
+        </div>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm text-sky-800">
+            対応端末では、プッシュ通知を受け取るためにもPWAの設定が必要です。
+          </p>
+          <button
+            type="button"
+            onclick={openPWAInstallDialog}
+            class="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            PWAを設定する
+          </button>
+        </div>
+      </div>
+    </section>
   {/if}
 
   <section class="space-y-6">

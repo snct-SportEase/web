@@ -27,7 +27,7 @@ test.describe('大会得点一覧 (student)', () => {
     await expect(page.getByText('50', { exact: true })).toBeVisible();
 
     await page.getByText('点数項目を表示').first().click();
-    const firstClass = page.locator('details').first();
+    const firstClass = page.locator('details').filter({ hasText: '点数項目を表示' }).first();
     await expect(firstClass.getByText('出席点:')).toBeVisible();
     await expect(firstClass.getByText('昼競技:')).toBeVisible();
     await expect(firstClass.getByText('10', { exact: true })).toBeVisible();
