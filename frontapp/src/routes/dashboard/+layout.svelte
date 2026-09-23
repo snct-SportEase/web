@@ -17,6 +17,7 @@
   let showPWANotification = $state(false);
   let isMobile = $state(false);
   let isPWA = $state(true);
+  let mobileHeaderMenu = $state();
   let canSeeNotifications = $derived(user?.roles?.some(role => ['student', 'admin', 'root'].includes(role.name)));
   let shouldShowPWASetupBadge = $derived(canSeeNotifications && !isPWA);
   let shouldShowPushSetupBadge = $derived(
@@ -43,9 +44,17 @@
       };
       checkMobile();
       window.addEventListener('resize', checkMobile);
+
+      const closeMobileHeaderMenu = (event) => {
+        if (mobileHeaderMenu?.open && !mobileHeaderMenu.contains(event.target)) {
+          mobileHeaderMenu.open = false;
+        }
+      };
+      document.addEventListener('pointerdown', closeMobileHeaderMenu);
       
       return () => {
         window.removeEventListener('resize', checkMobile);
+        document.removeEventListener('pointerdown', closeMobileHeaderMenu);
       };
     }
   });
@@ -166,7 +175,7 @@
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a7 7 0 0 0-4 12.75V18a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.25A7 7 0 0 0 12 3Zm-2 19h4" /></svg>
             </a>
           </div>
-          <details class="relative mr-1 md:hidden">
+          <details bind:this={mobileHeaderMenu} class="relative mr-1 md:hidden">
             <summary
               class="flex cursor-pointer list-none items-center rounded-md p-2 text-gray-600 hover:bg-gray-100 [&::-webkit-details-marker]:hidden"
               aria-label="ヘッダメニューを開く"
