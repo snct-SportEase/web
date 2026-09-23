@@ -164,10 +164,8 @@ describe('Event Management Page', () => {
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('alert', vi.fn());
     vi.stubGlobal('confirm', vi.fn(() => true));
-    vi.stubGlobal('URL', {
-      createObjectURL: createObjectURLMock,
-      revokeObjectURL: revokeObjectURLMock
-    });
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(createObjectURLMock);
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(revokeObjectURLMock);
 
     vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
       const element = originalCreateElement(tagName);
