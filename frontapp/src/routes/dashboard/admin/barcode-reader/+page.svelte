@@ -44,6 +44,7 @@
 			? selectableMatches.find((match) => match.value === selectedMatchId) || null
 			: null
 	);
+	let matchMemberCount = $derived(checkedInMembers.length + uncheckedMembers.length);
 
 	onMount(() => {
 		loadInitialData();
@@ -750,6 +751,10 @@
 					<div>
 						<p class="text-sm text-gray-500">選択中の試合</p>
 						<p class="text-base font-semibold text-gray-900">{selectedMatch.summaryLabel}</p>
+						<p class="mt-1 text-sm text-gray-600">
+							チェックイン状況:
+							<span class="font-semibold text-blue-700">{matchCheckInCount} / {matchMemberCount} 人</span>
+						</p>
 					</div>
 					<div class="grid grid-cols-1 gap-2 sm:grid-cols-2 md:min-w-80">
 						<button
@@ -758,7 +763,7 @@
 							disabled={checkInsLoading}
 							class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-500"
 						>
-							チェックイン済み（{checkedInMembers.length}人）
+							チェックイン済み（{matchCheckInCount} / {matchMemberCount}人）
 						</button>
 						<button
 							type="button"
@@ -766,7 +771,7 @@
 							disabled={checkInsLoading}
 							class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-500"
 						>
-							未チェックイン（{uncheckedMembers.length}人）
+							未チェックイン者（{uncheckedMembers.length}人）
 						</button>
 					</div>
 				</div>
@@ -895,9 +900,9 @@
 				<div class="mt-6 border-t border-gray-200 pt-4">
 					<div class="mb-3 flex items-center justify-between">
 						<h3 class="text-base font-semibold text-gray-900">
-							{selectedMatch?.matchIds?.length > 1 ? 'この時間帯のチェックイン済み' : 'この試合のチェックイン済み'}
+							{selectedMatch?.matchIds?.length > 1 ? 'この時間帯のチェックイン状況' : 'この試合のチェックイン状況'}
 						</h3>
-						<span class="text-sm text-gray-600">{matchCheckInCount} 人</span>
+						<span class="text-sm font-semibold text-blue-700">{matchCheckInCount} / {matchMemberCount} 人</span>
 					</div>
 
 					{#if checkInsError}

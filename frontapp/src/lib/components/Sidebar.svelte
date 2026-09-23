@@ -241,9 +241,6 @@
         <a href="/dashboard/admin/barcode-reader" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           バーコード読み取り
         </a>
-        <a href="/dashboard/admin/confirmed-participants" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
-          参加本登録確認
-        </a>
         <a href="/dashboard/admin/insert-matche-result" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           試合結果入力
         </a>

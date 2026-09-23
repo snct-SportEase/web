@@ -217,7 +217,7 @@ describe('Barcode Reader Page', () => {
 		await page.getByLabelText('競技').selectOptions('7');
 		await page.getByLabelText('試合').selectOptions('time:31-32');
 
-		await page.getByRole('button', { name: 'チェックイン済み（1人）' }).click();
+		await page.getByRole('button', { name: 'チェックイン済み（1 / 2人）' }).click();
 		const checkedDialog = page.getByRole('dialog', { name: 'チェックイン済みの学生' });
 		await expect.element(checkedDialog).toBeInTheDocument();
 		await expect.element(checkedDialog.getByText('1-1')).toBeInTheDocument();
@@ -226,7 +226,7 @@ describe('Barcode Reader Page', () => {
 		await expect.element(checkedDialog.getByText('山田 太郎')).toBeInTheDocument();
 		await page.getByRole('button', { name: '閉じる' }).click();
 
-		await page.getByRole('button', { name: '未チェックイン（1人）' }).click();
+		await page.getByRole('button', { name: '未チェックイン者（1人）' }).click();
 		const uncheckedDialog = page.getByRole('dialog', { name: '未チェックインの学生' });
 		await expect.element(uncheckedDialog).toBeInTheDocument();
 		await expect.element(uncheckedDialog.getByText('1-2')).toBeInTheDocument();

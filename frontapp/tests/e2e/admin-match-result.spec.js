@@ -38,17 +38,23 @@ test.describe('試合結果入力 (admin)', () => {
     await expect(page.getByRole('heading', { name: '試合結果確認' })).toBeVisible();
     await expect(page.getByText('勝者: 1A')).toBeVisible();
 
-    page.once('dialog', async (dialog) => dialog.accept());
-    const resultRequest = page.waitForRequest((request) => {
-      if (!request.url().endsWith('/api/admin/matches/1/result') || request.method() !== 'PUT') {
+    const resultResponse = page.waitForResponse((response) => {
+      if (!response.url().endsWith('/api/admin/matches/1/result') || response.request().method() !== 'PUT') {
         return false;
       }
-      const body = JSON.parse(request.postData() ?? '{}');
-      return body.team1_score === 5 && body.team2_score === 3;
+      const body = JSON.parse(response.request().postData() ?? '{}');
+      return response.ok() && body.team1_score === 5 && body.team2_score === 3;
     });
-    await page.getByRole('button', { name: '登録' }).click();
-    await resultRequest;
+    const dialogPromise = page.waitForEvent('dialog');
+    const registerClick = page.getByRole('button', { name: '登録' }).click();
+    const dialog = await dialogPromise;
+    expect(dialog.message()).toBe('試合結果を更新しました');
+    await dialog.accept();
+    await registerClick;
+    await resultResponse;
 
-    await expect(page.getByText('勝者: 1A')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '試合結果確認' })).toBeHidden();
+    await expect(page.getByText('Score: 5 - 3')).toBeVisible();
+    await expect(page.getByText('Winner: 1A')).toBeVisible();
   });
 });

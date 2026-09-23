@@ -3,8 +3,9 @@ FROM golang:1.26.6-alpine AS builder
 
 WORKDIR /app
 
-# Route public Go module metadata through Takumi Guard during image builds.
-ENV GOPROXY=https://golang.flatt.tech
+# Prefer Takumi Guard for public Go modules, but fall back when it is unavailable.
+# `|` retries on any proxy error (including HTTP 500); `,` retries only on 404/410.
+ENV GOPROXY=https://golang.flatt.tech|https://proxy.golang.org,direct
 
 COPY go.mod go.sum ./
 RUN go mod download
