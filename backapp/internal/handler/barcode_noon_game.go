@@ -38,7 +38,12 @@ func (h *BarcodeHandler) checkInNoonGame(c *gin.Context, req models.BarcodeCheck
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "昼競技の参加クラス確認に失敗しました"})
 		return
 	}
-	if user.ClassID == nil || !containsNoonGameClassID(classIDs, *user.ClassID) {
+	targetMembers, err := h.noonGameMatchMembers(req.EventID, req.SportID, classIDs, match.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "昼競技の参加メンバー確認に失敗しました"})
+		return
+	}
+	if !containsNoonGameMember(targetMembers, user.ID) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "このユーザーはこの昼競技の試合に参加しません"})
 		return
 	}
@@ -93,9 +98,47 @@ func (h *BarcodeHandler) noonGameMatchClassIDs(match *models.NoonGameMatchWithRe
 	return classIDs, nil
 }
 
-func containsNoonGameClassID(classIDs []int, target int) bool {
+func (h *BarcodeHandler) noonGameMatchMembers(eventID, sportID int, classIDs []int, matchID int) ([]*models.MatchCheckInMember, error) {
+	members := make([]*models.MatchCheckInMember, 0)
+	seenUserIDs := make(map[string]bool)
 	for _, classID := range classIDs {
-		if classID == target {
+		team, err := h.teamRepo.GetTeamByClassAndSport(classID, sportID, eventID)
+		if err != nil {
+			return nil, err
+		}
+		if team == nil {
+			continue
+		}
+		class, err := h.classRepo.GetClassByID(classID)
+		if err != nil {
+			return nil, err
+		}
+		teamMembers, err := h.teamRepo.GetTeamMembers(team.ID)
+		if err != nil {
+			return nil, err
+		}
+		className := team.Name
+		if class != nil {
+			className = class.Name
+		}
+		for _, member := range teamMembers {
+			if member == nil || member.ClassID == nil || *member.ClassID != classID || seenUserIDs[member.ID] {
+				continue
+			}
+			seenUserIDs[member.ID] = true
+			members = append(members, &models.MatchCheckInMember{
+				UserID: member.ID, Email: member.Email, DisplayName: member.DisplayName,
+				ClassID: classID, ClassName: className, TeamID: team.ID, TeamName: team.Name,
+				EventID: eventID, SportID: sportID, MatchID: matchID, Round: 1,
+			})
+		}
+	}
+	return members, nil
+}
+
+func containsNoonGameMember(members []*models.MatchCheckInMember, userID string) bool {
+	for _, member := range members {
+		if member != nil && member.UserID == userID {
 			return true
 		}
 	}
@@ -122,6 +165,11 @@ func (h *BarcodeHandler) getNoonGameMatchCheckIns(c *gin.Context, eventID, sport
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "昼競技の参加クラス確認に失敗しました"})
 		return
 	}
+	targetMembers, err := h.noonGameMatchMembers(eventID, sportID, classIDs, matchID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "昼競技の参加メンバー確認に失敗しました"})
+		return
+	}
 	checkIns, err := h.noonRepo.GetMatchCheckIns(eventID, sessionID, matchID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "昼競技のチェックイン一覧取得に失敗しました"})
@@ -135,36 +183,12 @@ func (h *BarcodeHandler) getNoonGameMatchCheckIns(c *gin.Context, eventID, sport
 	}
 	checked := make([]*models.MatchCheckInMember, 0)
 	unchecked := make([]*models.MatchCheckInMember, 0)
-	for _, classID := range classIDs {
-		class, err := h.classRepo.GetClassByID(classID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "クラス情報の取得に失敗しました"})
-			return
-		}
-		members, err := h.classRepo.GetClassMembers(classID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "クラスメンバーの取得に失敗しました"})
-			return
-		}
-		className := ""
-		if class != nil {
-			className = class.Name
-		}
-		for _, member := range members {
-			if member == nil {
-				continue
-			}
-			item := &models.MatchCheckInMember{
-				UserID: member.ID, Email: member.Email, DisplayName: member.DisplayName,
-				ClassID: classID, ClassName: className, TeamName: session.Name,
-				EventID: eventID, SportID: sportID, MatchID: matchID, Round: 1,
-			}
-			if checkedInAt, ok := checkedAt[member.ID]; ok {
-				item.CheckedInAt = checkedInAt
-				checked = append(checked, item)
-			} else {
-				unchecked = append(unchecked, item)
-			}
+	for _, member := range targetMembers {
+		if checkedInAt, ok := checkedAt[member.UserID]; ok {
+			member.CheckedInAt = checkedInAt
+			checked = append(checked, member)
+		} else {
+			unchecked = append(unchecked, member)
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
