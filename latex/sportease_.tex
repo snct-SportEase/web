@@ -218,7 +218,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \item 各競技の参加定員数の調整・変更
         \item ユーザーの表示名修正（不適切な名前の修正等）
         \item 運営用画像・PDF資料（要項・ルールブック等）のアップロード
-        \item MyIDバーコードの読み取りおよび参加本登録の確認
+        \item MyIDバーコードによる通常競技・昼競技の試合チェックインと、クラス別状況の確認
         \item MIC投票および状況確認
         \item ロールの付与・剥奪
     \end{itemize}
@@ -262,12 +262,12 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         \item \textbf{クラス情報}: プロフィールで設定した自クラスの人数・出席状況・勝ち進み状況の確認
         \item \textbf{競技・イベント情報}: 競技詳細、タイムテーブル、通常・盤上トーナメント、結果一覧、点数一覧の閲覧
         \item \textbf{昼企画}: 昼競技結果の確認
-        \item \textbf{その他}: MyID参加確認、通知確認、通知申請
+        \item \textbf{その他}: MyIDチェックイン、通知確認、通知申請
     \end{itemize}
     \item \textbf{運営管理者メニュー (Admin)}:
     \begin{itemize}
         \item \textbf{試合管理}: 試合結果入力、昼競技結果入力
-        \item \textbf{参加管理}: クラス・チーム編成管理、MyIDバーコード読み取り、参加本登録確認、出席登録
+        \item \textbf{参加管理}: クラス・チーム編成管理、MyIDバーコード読み取り、試合別・クラス別チェックイン状況確認、出席登録
         \item \textbf{運営設定}: 統計ダッシュボード、ロール管理、競技詳細設定、MIC投票
     \end{itemize}
     \item \textbf{システム管理者メニュー (Root)}:
@@ -362,7 +362,7 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
 \end{itemize}
 
 \subsection{データベース設計}
-詳細なデータベース設計は以下の通りである。マイグレーション0022適用時点で、データベースは全40テーブルおよび1ビューで構成される。
+詳細なデータベース設計は以下の通りである。マイグレーション0023適用時点で、データベースは全41テーブルおよび1ビューで構成される。
 ここでは主要なテーブルを記載する。
 
 \subsubsection{Core Tables}
@@ -578,6 +578,22 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         is\_loser\_bracket\_match & BOOLEAN & 敗者復活戦フラグ \\
         loser\_bracket\_round & INT & 敗者復活戦ラウンド \\
         loser\_bracket\_block & VARCHAR(1) & 敗者復活戦ブロック \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{round\_check\_ins (通常競技チェックイン)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id / sport\_id / match\_id & INT & イベント・競技・試合ID (FK) \\
+        round & INT & チェックイン対象ラウンド \\
+        user\_id / team\_id & CHAR(36)/INT & チェックインしたユーザー・所属チームID (FK) \\
+        checked\_in\_at & TIMESTAMP & チェックイン日時 \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -817,6 +833,21 @@ SportEase は、学校行事におけるスポーツ大会運営を支援する�
         away\_side\_type & ENUM & アウェイ側種別 (class, group) \\
         away\_class\_id / away\_group\_id & INT & アウェイ側ID \\
         allow\_draw & BOOLEAN & 引分許可 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{noon\_game\_check\_ins (昼競技チェックイン)}
+    \begin{tabularx}{\textwidth}{|l|l|X|}
+        \toprule
+        Column & Type & Description \\
+        \midrule
+        id & INT & Primary Key \\
+        event\_id / session\_id / match\_id & INT & イベント・セッション・試合ID (FK) \\
+        user\_id & CHAR(36) & チェックインしたユーザーID (FK) \\
+        checked\_in\_at & TIMESTAMP & チェックイン日時 \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -1096,7 +1127,8 @@ RESTful APIのエンドポイント一覧（主要なもの）。ここでは代
         GET & /api/classes & クラス一覧取得（student/admin/root） \\
         GET & /api/scores/class & クラス得点情報取得 \\
         GET & /api/barcode/teams & 自分の所属チーム一覧取得 \\
-        POST & /api/barcode/check-in & MyIDバーコード読み取りによる参加本登録・ラウンドチェックイン（admin/root） \\
+        POST & /api/barcode/check-in & MyIDバーコード読み取りによる対象試合チェックイン（通常競技・昼競技、参加本登録を兼ねる、admin/root） \\
+        GET & /api/barcode/matches/:match\_id/check-ins & 選択試合のクラス別チェックイン人数・表示名・未チェックイン者取得（admin/root） \\
         \bottomrule
     \end{tabularx}
 \end{table}
