@@ -94,21 +94,22 @@ func TestTeamRepository_DeleteTeamsByEventAndSportID(t *testing.T) {
 
 func TestTeamRepository_GetTeamsByUserID(t *testing.T) {
 	const q = `
-			SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
+			SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name, es.location
 			FROM teams t
 			INNER JOIN team_members tm ON t.id = tm.team_id
 			INNER JOIN sports s ON t.sport_id = s.id
 			INNER JOIN classes c ON t.class_id = c.id
+			INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
 			WHERE tm.user_id = ?
 		`
-	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name"}
+	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name", "location"}
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs("user-1").
-			WillReturnRows(sqlmock.NewRows(cols).AddRow(10, "IS3-A", 5, 1, 1, "バスケ"))
+			WillReturnRows(sqlmock.NewRows(cols).AddRow(10, "IS3-A", 5, 1, 1, "バスケ", "gym1"))
 
 		teams, err := repo.GetTeamsByUserID("user-1")
 		require.NoError(t, err)
