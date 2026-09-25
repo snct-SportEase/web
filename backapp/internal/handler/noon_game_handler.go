@@ -275,6 +275,9 @@ func (h *NoonGameHandler) CreateYearRelayRun(c *gin.Context) {
 			if req.Session.AllowManualPoints != nil {
 				session.AllowManualPoints = *req.Session.AllowManualPoints
 			}
+			if req.Session.ExcludeRegistrationLimit != nil {
+				session.ExcludeRegistrationLimit = *req.Session.ExcludeRegistrationLimit
+			}
 		}
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
@@ -565,6 +568,9 @@ func (h *NoonGameHandler) CreateCourseRelayRun(c *gin.Context) {
 			if req.Session.AllowManualPoints != nil {
 				session.AllowManualPoints = *req.Session.AllowManualPoints
 			}
+			if req.Session.ExcludeRegistrationLimit != nil {
+				session.ExcludeRegistrationLimit = *req.Session.ExcludeRegistrationLimit
+			}
 		}
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
@@ -854,6 +860,9 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 			if req.Session.AllowManualPoints != nil {
 				session.AllowManualPoints = *req.Session.AllowManualPoints
 			}
+			if req.Session.ExcludeRegistrationLimit != nil {
+				session.ExcludeRegistrationLimit = *req.Session.ExcludeRegistrationLimit
+			}
 		}
 		session, err = h.noonRepo.UpsertSession(session)
 		if err != nil {
@@ -1044,6 +1053,7 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 }
 
 type upsertNoonSessionRequest struct {
+	ExcludeRegistrationLimit *bool `json:"exclude_registration_limit"`
 	TemplateKey         string  `json:"template_key"`
 	Name                string  `json:"name" binding:"required"`
 	Description         *string `json:"description"`
@@ -1161,6 +1171,7 @@ type createCourseRelayRunResponse struct {
 
 type createTemplateRunRequest struct {
 	Session *struct {
+		ExcludeRegistrationLimit *bool `json:"exclude_registration_limit"`
 		Name                string                 `json:"name"`
 		Description         *string                `json:"description"`
 		Mode                string                 `json:"mode"`
@@ -1176,6 +1187,7 @@ type createTemplateRunRequest struct {
 
 type createTypingRunRequest struct {
 	Session struct {
+		ExcludeRegistrationLimit *bool `json:"exclude_registration_limit"`
 		Name         string                 `json:"name"`
 		Description  *string                `json:"description"`
 		ScheduledAt  *string                `json:"scheduled_at"`
@@ -1433,6 +1445,7 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 		}
 		existingSession = existing
 		session.ID = sessionID
+		session.ExcludeRegistrationLimit = existing.ExcludeRegistrationLimit
 	}
 	if session.TemplateKey == "" {
 		session.TemplateKey = "custom"
@@ -1458,6 +1471,9 @@ func (h *NoonGameHandler) UpsertSession(c *gin.Context) {
 	}
 	if req.AllowManualPoints != nil {
 		session.AllowManualPoints = *req.AllowManualPoints
+	}
+	if req.ExcludeRegistrationLimit != nil {
+		session.ExcludeRegistrationLimit = *req.ExcludeRegistrationLimit
 	}
 
 	updated, err := h.noonRepo.UpsertSession(session)
@@ -2810,6 +2826,10 @@ func (h *NoonGameHandler) CreateTypingRun(c *gin.Context) {
 	if existing != nil {
 		session.ID = existing.ID
 		session.Status = existing.Status
+		session.ExcludeRegistrationLimit = existing.ExcludeRegistrationLimit
+	}
+	if req.Session.ExcludeRegistrationLimit != nil {
+		session.ExcludeRegistrationLimit = *req.Session.ExcludeRegistrationLimit
 	}
 	if req.Session.ScheduledAt != nil && strings.TrimSpace(*req.Session.ScheduledAt) != "" {
 		parsed, err := time.Parse(time.RFC3339, *req.Session.ScheduledAt)
