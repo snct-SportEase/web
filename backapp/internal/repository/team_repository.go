@@ -73,11 +73,12 @@ func (r *teamRepository) DeleteTeamsByEventAndSportID(eventID int, sportID int) 
 
 func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error) {
 	query := `
-		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name, es.location
 		FROM teams t
 		INNER JOIN team_members tm ON t.id = tm.team_id
 		INNER JOIN sports s ON t.sport_id = s.id
 		INNER JOIN classes c ON t.class_id = c.id
+		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
 		WHERE tm.user_id = ?
 	`
 	rows, err := r.db.Query(query, userID)
@@ -89,7 +90,7 @@ func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSpor
 	var teams []*models.TeamWithSport
 	for rows.Next() {
 		team := &models.TeamWithSport{}
-		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &team.SportName); err != nil {
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &team.SportName, &team.Location); err != nil {
 			return nil, err
 		}
 		teams = append(teams, team)
