@@ -21,6 +21,8 @@ type TeamWithSport struct {
 	SportID   int    `json:"sport_id"`
 	EventID   int    `json:"event_id"`
 	SportName string `json:"sport_name"`
+	Location  string `json:"location,omitempty"`
+	ExcludeRegistrationLimit bool `json:"exclude_registration_limit,omitempty"`
 }
 
 // BarcodeCheckInRequest represents a request to check in a student to the selected match round with a MyID barcode.

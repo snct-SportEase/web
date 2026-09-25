@@ -35,6 +35,7 @@
     draw_points: 0,
     participation_points: 0,
     allow_manual_points: false,
+    exclude_registration_limit: false,
 		duration_minutes: 15,
 		participant_class_ids: [],
     points_by_rank: {
@@ -59,6 +60,7 @@
   let sessionFormDrawPoints = $state(0);
   let sessionFormParticipationPoints = $state(0);
   let sessionFormAllowManualPoints = $state(true);
+  let sessionFormExcludeRegistrationLimit = $state(false);
 
   let groupForm = $state({
     id: null,
@@ -206,6 +208,7 @@
     sessionFormDrawPoints = s.draw_points ?? 0;
     sessionFormParticipationPoints = s.participation_points ?? 0;
     sessionFormAllowManualPoints = s.allow_manual_points ?? true;
+    sessionFormExcludeRegistrationLimit = s.exclude_registration_limit ?? false;
   }
 
   function resetSessionForm() {
@@ -217,6 +220,7 @@
     sessionFormDrawPoints = 0;
     sessionFormParticipationPoints = 0;
     sessionFormAllowManualPoints = true;
+    sessionFormExcludeRegistrationLimit = false;
   }
 
   function resetGroupForm() {
@@ -327,7 +331,8 @@
       loss_points: Number(sessionFormLossPoints),
       draw_points: Number(sessionFormDrawPoints),
       participation_points: Number(sessionFormParticipationPoints),
-      allow_manual_points: !!sessionFormAllowManualPoints
+      allow_manual_points: !!sessionFormAllowManualPoints,
+      exclude_registration_limit: !!sessionFormExcludeRegistrationLimit
     };
     console.log('[NoonGame] payload to be sent:', payload);
 
@@ -337,10 +342,17 @@
       savingSession = true;
       errorMessage = '';
       try {
-        const res = await fetch(`/api/root/events/${current.id}/noon-game/session`, {
-          method: 'POST',
+				const updatePayload = {
+					...payload,
+					template_key: session.template_key,
+					status: session.status,
+					scheduled_at: session.scheduled_at,
+					location: session.location
+				};
+        const res = await fetch(`/api/root/events/${current.id}/noon-game/sessions/${session.id}`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(updatePayload)
         });
         console.log('[NoonGame] update session response', res.status);
         if (!res.ok) {
@@ -794,6 +806,7 @@
     // 既存のテンプレートランを探す
     const existingRun = templateRuns.find(run => run.template_key === templateKeyMap[templateType]);
     const isEditingSelectedTemplate = session?.template_key === templateKeyMap[templateType];
+		const existingTemplateSession = sessions.find((item) => item.template_key === templateKeyMap[templateType]);
 
     // デフォルトの点数設定
     let pointsByRank = {
@@ -883,6 +896,7 @@
           draw_points: session.draw_points || 0,
           participation_points: session.participation_points || 0,
           allow_manual_points: session.allow_manual_points || false,
+          exclude_registration_limit: session.exclude_registration_limit ?? false,
 				duration_minutes: existingRun?.points_by_rank?.duration_minutes || 15,
 				participant_class_ids: templateType === 'borrowing-race'
 					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter(Boolean)
@@ -905,6 +919,7 @@
           draw_points: 0,
           participation_points: 0,
           allow_manual_points: false,
+				exclude_registration_limit: existingTemplateSession?.exclude_registration_limit ?? false,
 				duration_minutes: 15,
 				participant_class_ids: templateType === 'borrowing-race' ? classes.map((item) => item.id) : [],
           points_by_rank: pointsByRank,
@@ -928,6 +943,7 @@
           draw_points: session.draw_points || 0,
           participation_points: session.participation_points || 0,
           allow_manual_points: session.allow_manual_points || false,
+          exclude_registration_limit: session.exclude_registration_limit ?? false,
 				duration_minutes: existingRun?.points_by_rank?.duration_minutes || 15,
 				participant_class_ids: templateType === 'borrowing-race'
 					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter(Boolean)
@@ -949,6 +965,7 @@
           draw_points: 0,
           participation_points: 0,
           allow_manual_points: false,
+				exclude_registration_limit: existingTemplateSession?.exclude_registration_limit ?? false,
 				duration_minutes: 15,
 				participant_class_ids: templateType === 'borrowing-race' ? classes.map((item) => item.id) : [],
           points_by_rank: pointsByRank,
@@ -1036,7 +1053,8 @@
           loss_points: Number(templateConfigForm.loss_points),
           draw_points: Number(templateConfigForm.draw_points),
           participation_points: Number(templateConfigForm.participation_points),
-          allow_manual_points: templateConfigForm.allow_manual_points
+          allow_manual_points: templateConfigForm.allow_manual_points,
+          exclude_registration_limit: !!templateConfigForm.exclude_registration_limit
         }
       };
 
@@ -1334,6 +1352,10 @@
                 <label class="flex items-center space-x-2 text-sm font-medium text-gray-700">
                   <input type="checkbox" bind:checked={templateConfigForm.allow_manual_points} />
                   <span>手動加点を許可</span>
+                </label>
+                <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 md:col-span-2">
+                  <input type="checkbox" bind:checked={templateConfigForm.exclude_registration_limit} />
+                  <span>この昼競技を重複登録の競技数制限から除外する</span>
                 </label>
                 <label class="flex flex-col text-sm font-medium text-gray-700">
                   勝利ポイント
@@ -1771,6 +1793,10 @@
               <label class="flex items-center space-x-2 text-sm font-medium text-gray-700">
                 <input type="checkbox" bind:checked={sessionFormAllowManualPoints} />
                 <span>手動加点を許可</span>
+              </label>
+              <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 md:col-span-2">
+                <input type="checkbox" bind:checked={sessionFormExcludeRegistrationLimit} />
+                <span>この昼競技を重複登録の競技数制限から除外する</span>
               </label>
             </div>
             <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"

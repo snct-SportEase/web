@@ -19,6 +19,7 @@ type TeamRepository interface {
 	CreateTeam(team *models.Team) (int64, error)
 	DeleteTeamsByEventAndSportID(eventID int, sportID int) error
 	GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error)
+	IsNoonGameRegistrationExempt(eventID int, sportID int) (bool, error)
 	GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
 	GetNoonGameTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
 	GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error)
@@ -73,11 +74,15 @@ func (r *teamRepository) DeleteTeamsByEventAndSportID(eventID int, sportID int) 
 
 func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error) {
 	query := `
-		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
+		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name, es.location,
+		       EXISTS (SELECT 1 FROM noon_game_sessions ng
+		               WHERE ng.event_id = c.event_id AND ng.name = s.name
+		                 AND es.location = 'noon_game' AND ng.exclude_registration_limit = TRUE)
 		FROM teams t
 		INNER JOIN team_members tm ON t.id = tm.team_id
 		INNER JOIN sports s ON t.sport_id = s.id
 		INNER JOIN classes c ON t.class_id = c.id
+		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
 		WHERE tm.user_id = ?
 	`
 	rows, err := r.db.Query(query, userID)
@@ -89,12 +94,24 @@ func (r *teamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWithSpor
 	var teams []*models.TeamWithSport
 	for rows.Next() {
 		team := &models.TeamWithSport{}
-		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &team.SportName); err != nil {
+		if err := rows.Scan(&team.ID, &team.Name, &team.ClassID, &team.SportID, &team.EventID, &team.SportName, &team.Location, &team.ExcludeRegistrationLimit); err != nil {
 			return nil, err
 		}
 		teams = append(teams, team)
 	}
 	return teams, nil
+}
+
+func (r *teamRepository) IsNoonGameRegistrationExempt(eventID int, sportID int) (bool, error) {
+	var exempt bool
+	err := r.db.QueryRow(`
+		SELECT EXISTS (SELECT 1 FROM noon_game_sessions ng
+		               JOIN sports s ON s.name = ng.name
+		               JOIN event_sports es ON es.event_id = ng.event_id AND es.sport_id = s.id
+		               WHERE ng.event_id = ? AND s.id = ? AND es.location = 'noon_game'
+		                 AND ng.exclude_registration_limit = TRUE)
+	`, eventID, sportID).Scan(&exempt)
+	return exempt, err
 }
 
 func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {

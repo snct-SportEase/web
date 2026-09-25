@@ -1,0 +1,1 @@
+ALTER TABLE noon_game_sessions DROP COLUMN exclude_registration_limit;

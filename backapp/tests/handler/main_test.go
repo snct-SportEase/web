@@ -219,6 +219,11 @@ func (m *MockTeamRepository) GetTeamsByUserID(userID string) ([]*models.TeamWith
 	return args.Get(0).([]*models.TeamWithSport), args.Error(1)
 }
 
+func (m *MockTeamRepository) IsNoonGameRegistrationExempt(eventID int, sportID int) (bool, error) {
+	args := m.Called(eventID, sportID)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *MockTeamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
 	args := m.Called(classID, eventID)
 	if args.Get(0) == nil {

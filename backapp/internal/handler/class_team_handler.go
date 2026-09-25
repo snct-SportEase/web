@@ -26,7 +26,7 @@ func teamRegistrationLimit(class *models.Class, smallClassStudentThreshold int) 
 func registeredSportCountForEvent(teams []*models.TeamWithSport, eventID int, newSportID int) int {
 	sportIDs := map[int]struct{}{newSportID: {}}
 	for _, team := range teams {
-		if team.EventID == eventID {
+		if team.EventID == eventID && !team.ExcludeRegistrationLimit {
 			sportIDs[team.SportID] = struct{}{}
 		}
 	}
@@ -337,6 +337,23 @@ func (h *ClassTeamHandler) AssignTeamMembersHandler(c *gin.Context) {
 
 	// Validate the duplicate registration limit before changing any memberships.
 	registrationLimit := teamRegistrationLimit(managedClass, activeEvent.DuplicateRegistrationThreshold)
+	if eventSport == nil {
+		eventSport, err = h.sportRepo.GetSportDetails(activeEventID, req.SportID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sport details"})
+			return
+		}
+	}
+	if eventSport != nil && eventSport.Location == "noon_game" {
+		exempt, err := h.teamRepo.IsNoonGameRegistrationExempt(activeEventID, req.SportID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check noon game registration settings"})
+			return
+		}
+		if exempt {
+			registrationLimit = 0
+		}
+	}
 	validUsers := make([]*models.User, 0, len(req.UserIDs))
 	seenUserIDs := make(map[string]struct{}, len(req.UserIDs))
 	for _, userID := range req.UserIDs {

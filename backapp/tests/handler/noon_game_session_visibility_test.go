@@ -72,7 +72,7 @@ func TestNoonGameHandler_UpsertSession_DefaultsToDraft(t *testing.T) {
 
 	eventRepo.On("GetEventByID", 1).Return(&models.Event{ID: 1}, nil).Once()
 	noonRepo.On("UpsertSession", mock.MatchedBy(func(session *models.NoonGameSession) bool {
-		return session.EventID == 1 && session.Status == "draft" && session.TemplateKey == "custom"
+		return session.EventID == 1 && session.Status == "draft" && session.TemplateKey == "custom" && session.ExcludeRegistrationLimit
 	})).Return(&models.NoonGameSession{ID: 10, EventID: 1, Name: "綱引き", Mode: "mixed", Status: "draft", TemplateKey: "custom"}, nil).Once()
 	classRepo.On("GetAllClasses", 1).Return([]*models.Class{}, nil).Once()
 	noonRepo.On("GetGroupsWithMembers", 10).Return([]*models.NoonGameGroupWithMembers{}, nil).Once()
@@ -80,7 +80,7 @@ func TestNoonGameHandler_UpsertSession_DefaultsToDraft(t *testing.T) {
 	noonRepo.On("SumPointsByClass", 10).Return(map[int]int{}, nil).Once()
 	noonRepo.On("ListTemplateRunsBySession", 10).Return([]*models.NoonGameTemplateRun{}, nil).Once()
 
-	body := []byte(`{"name":"綱引き","mode":"mixed"}`)
+	body := []byte(`{"name":"綱引き","mode":"mixed","exclude_registration_limit":true}`)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Params = gin.Params{{Key: "event_id", Value: "1"}}

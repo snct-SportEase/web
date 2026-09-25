@@ -94,27 +94,32 @@ func TestTeamRepository_DeleteTeamsByEventAndSportID(t *testing.T) {
 
 func TestTeamRepository_GetTeamsByUserID(t *testing.T) {
 	const q = `
-			SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
+			SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name, es.location,
+			       EXISTS (SELECT 1 FROM noon_game_sessions ng
+			               WHERE ng.event_id = c.event_id AND ng.name = s.name
+			                 AND es.location = 'noon_game' AND ng.exclude_registration_limit = TRUE)
 			FROM teams t
 			INNER JOIN team_members tm ON t.id = tm.team_id
 			INNER JOIN sports s ON t.sport_id = s.id
 			INNER JOIN classes c ON t.class_id = c.id
+			INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
 			WHERE tm.user_id = ?
 		`
-	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name"}
+	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name", "location", "exclude_registration_limit"}
 
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupTeam(t)
 		defer close()
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs("user-1").
-			WillReturnRows(sqlmock.NewRows(cols).AddRow(10, "IS3-A", 5, 1, 1, "バスケ"))
+			WillReturnRows(sqlmock.NewRows(cols).AddRow(10, "IS3-A", 5, 1, 1, "借り物競争", "noon_game", true))
 
 		teams, err := repo.GetTeamsByUserID("user-1")
 		require.NoError(t, err)
 		assert.Len(t, teams, 1)
 		assert.Equal(t, 10, teams[0].ID)
-		assert.Equal(t, "バスケ", teams[0].SportName)
+		assert.Equal(t, "借り物競争", teams[0].SportName)
+		assert.True(t, teams[0].ExcludeRegistrationLimit)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -142,6 +147,27 @@ func TestTeamRepository_GetTeamsByUserID(t *testing.T) {
 		assert.Nil(t, teams)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+}
+
+func TestTeamRepository_IsNoonGameRegistrationExempt(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		exempt bool
+	}{
+		{name: "excluded session", exempt: true},
+		{name: "normal session", exempt: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, mock, close := setupTeam(t)
+			defer close()
+			mock.ExpectQuery("SELECT EXISTS").WithArgs(10, 3).
+				WillReturnRows(sqlmock.NewRows([]string{"exempt"}).AddRow(tc.exempt))
+			exempt, err := repo.IsNoonGameRegistrationExempt(10, 3)
+			require.NoError(t, err)
+			assert.Equal(t, tc.exempt, exempt)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }
 
 // ─── GetTeamsByClassID ─────────────────────────────────────────────────────
