@@ -21,15 +21,15 @@ func TestGetSessionByEventPrefersPublishedSession(t *testing.T) {
 	now := time.Now()
 	mock.ExpectQuery(regexp.QuoteMeta(`
 		SELECT id, event_id, template_key, name, description, scheduled_at, location, mode, win_points, loss_points, draw_points,
-		       participation_points, allow_manual_points, status, created_at, updated_at
+		       participation_points, allow_manual_points, exclude_registration_limit, status, created_at, updated_at
 		FROM noon_game_sessions
 		WHERE event_id = ?
 		ORDER BY status = 'published' DESC, scheduled_at IS NULL, scheduled_at, id
 		LIMIT 1
 	`)).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{
 		"id", "event_id", "template_key", "name", "description", "scheduled_at", "location", "mode",
-		"win_points", "loss_points", "draw_points", "participation_points", "allow_manual_points", "status", "created_at", "updated_at",
-	}).AddRow(4, 7, "year_relay", "公開リレー", nil, nil, nil, "mixed", 3, 0, 1, 0, false, "published", now, now))
+		"win_points", "loss_points", "draw_points", "participation_points", "allow_manual_points", "exclude_registration_limit", "status", "created_at", "updated_at",
+	}).AddRow(4, 7, "year_relay", "公開リレー", nil, nil, nil, "mixed", 3, 0, 1, 0, false, false, "published", now, now))
 
 	session, err := repo.GetSessionByEvent(7)
 
