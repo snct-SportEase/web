@@ -16,6 +16,7 @@ type NoonGameSession struct {
 	DrawPoints          int                         `json:"draw_points"`
 	ParticipationPoints int                         `json:"participation_points"`
 	AllowManualPoints   bool                        `json:"allow_manual_points"`
+	ExcludeRegistrationLimit bool                   `json:"exclude_registration_limit"`
 	Status              string                      `json:"status"`
 	CreatedAt           time.Time                   `json:"created_at"`
 	UpdatedAt           time.Time                   `json:"updated_at"`
