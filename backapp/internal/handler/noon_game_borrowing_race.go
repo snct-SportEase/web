@@ -25,6 +25,7 @@ var defaultBorrowingRacePointsByRank = map[string]int{
 
 type borrowingRaceRunRequest struct {
 	Session struct {
+		ExcludeRegistrationLimit *bool `json:"exclude_registration_limit"`
 		Name                string         `json:"name"`
 		Description         *string        `json:"description"`
 		ScheduledAt         *string        `json:"scheduled_at"`
@@ -176,6 +177,9 @@ func (h *NoonGameHandler) CreateBorrowingRaceRun(c *gin.Context) {
 	session.Location = req.Session.Location
 	session.Mode = "class"
 	session.AllowManualPoints = false
+	if req.Session.ExcludeRegistrationLimit != nil {
+		session.ExcludeRegistrationLimit = *req.Session.ExcludeRegistrationLimit
+	}
 	session.ScheduledAt = scheduledAt
 	session, err = h.noonRepo.UpsertSession(session)
 	if err != nil {
