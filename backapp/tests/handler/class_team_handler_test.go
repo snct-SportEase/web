@@ -325,6 +325,7 @@ func TestClassTeamHandler_DuplicateRegistrationRules(t *testing.T) {
 		studentCount  int
 		threshold     int
 		targetLocation string
+		targetExempt bool
 		existingTeams []*models.TeamWithSport
 		wantStatus    int
 		wantLimitText string
@@ -361,17 +362,27 @@ func TestClassTeamHandler_DuplicateRegistrationRules(t *testing.T) {
 		},
 		{
 			name: "noon game can be assigned after regular sport", studentCount: 40, threshold: 20,
+			targetLocation: "noon_game", targetExempt: true, existingTeams: []*models.TeamWithSport{{SportID: 1, EventID: 10}},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "noon game without exemption is limited", studentCount: 40, threshold: 20,
 			targetLocation: "noon_game", existingTeams: []*models.TeamWithSport{{SportID: 1, EventID: 10}},
+			wantStatus: http.StatusBadRequest, wantLimitText: "1競技",
+		},
+		{
+			name: "exempt noon games do not consume regular sport slots", studentCount: 40, threshold: 20,
+			existingTeams: []*models.TeamWithSport{{SportID: 1, EventID: 10, Location: "noon_game", ExcludeRegistrationLimit: true}},
 			wantStatus: http.StatusOK,
 		},
 		{
-			name: "existing noon games do not consume regular sport slots", studentCount: 40, threshold: 20,
+			name: "regular sport rejects after non-exempt noon game", studentCount: 40, threshold: 20,
 			existingTeams: []*models.TeamWithSport{{SportID: 1, EventID: 10, Location: "noon_game"}},
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusBadRequest, wantLimitText: "1競技",
 		},
 		{
-			name: "regular sport still rejects second regular sport after noon game", studentCount: 40, threshold: 20,
-			existingTeams: []*models.TeamWithSport{{SportID: 1, EventID: 10, Location: "noon_game"}, {SportID: 2, EventID: 10}},
+			name: "regular sport still rejects second regular sport after exempt noon game", studentCount: 40, threshold: 20,
+			existingTeams: []*models.TeamWithSport{{SportID: 1, EventID: 10, Location: "noon_game", ExcludeRegistrationLimit: true}, {SportID: 2, EventID: 10}},
 			wantStatus: http.StatusBadRequest, wantLimitText: "1競技",
 		},
 	}
@@ -398,7 +409,10 @@ func TestClassTeamHandler_DuplicateRegistrationRules(t *testing.T) {
 			teamRepo.On("GetTeamByClassAndSport", classID, sportID, eventID).Return(&models.Team{ID: 300}, nil).Once()
 			sportRepo.On("GetSportDetails", eventID, sportID).Return(&models.EventSport{Location: tt.targetLocation}, nil).Once()
 			userRepo.On("GetUserWithRoles", "user1").Return(&models.User{ID: "user1", ClassID: classTeamIntPtr(classID)}, nil).Once()
-			if tt.targetLocation != "noon_game" {
+			if tt.targetLocation == "noon_game" {
+				teamRepo.On("IsNoonGameRegistrationExempt", eventID, sportID).Return(tt.targetExempt, nil).Once()
+			}
+			if !tt.targetExempt {
 				teamRepo.On("GetTeamsByUserID", "user1").Return(tt.existingTeams, nil).Once()
 			}
 
