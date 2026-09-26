@@ -142,7 +142,19 @@
     noonGameInfoError = '';
     try {
       const sessions = await fetchPublishedNoonGameSessions(eventId);
-      noonGameMatches = flattenNoonGameMatches(sessions);
+      const teamsResponse = await fetch('/api/barcode/teams');
+      if (!teamsResponse.ok) throw new Error('競技の割り当てを取得できませんでした。');
+      const teams = await teamsResponse.json();
+      const assignedNames = new Set(
+        (Array.isArray(teams) ? teams : [])
+          .filter((team) => Number(team.event_id) === Number(eventId) && team.location === 'noon_game')
+          .map((team) => team.sport_name)
+      );
+      noonGameMatches = flattenNoonGameMatches(sessions).filter((match) =>
+        assignedNames.has(match.session_name) && match.entries?.some((entry) =>
+          entry.class_ids?.some((id) => Number(id) === Number(user?.class_id))
+        )
+      );
     } catch (error) {
       console.error('Failed to fetch noon game info:', error);
       noonGameInfoError = error.message || '昼競技情報を取得できませんでした。';

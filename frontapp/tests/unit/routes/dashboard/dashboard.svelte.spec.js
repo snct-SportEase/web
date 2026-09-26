@@ -21,6 +21,7 @@ const rootUser = {
 const studentUser = {
 	...rootUser,
 	id: 'student-user-1',
+	class_id: 7,
 	email: 'student@example.com',
 	roles: [{ name: 'student' }]
 };
@@ -124,8 +125,15 @@ describe('Dashboard shortcuts', () => {
 				return Promise.resolve({
 					ok: true,
 					json: () => Promise.resolve({
-						matches: [{ id: 101, title: '借り物競走', status: 'scheduled', entries: [] }]
+						name: '借り物競走',
+						matches: [{ id: 101, title: '借り物競走', status: 'scheduled', entries: [{ id: 1, class_ids: [7] }] }]
 					})
+				});
+			}
+			if (url === '/api/barcode/teams') {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve([{ event_id: 1, location: 'noon_game', sport_name: '借り物競走' }])
 				});
 			}
 			return Promise.resolve({ ok: true, json: () => Promise.resolve({ count: 0, endpoints: [] }) });
@@ -135,5 +143,33 @@ describe('Dashboard shortcuts', () => {
 
 		await expect.element(page.getByRole('heading', { name: '昼競技情報' })).toBeInTheDocument();
 		await expect.element(page.getByText('借り物競走')).toBeInTheDocument();
+	});
+	it('割り当てがない昼競技は表示しない', async () => {
+		fetchMock.mockImplementation((url) => {
+			if (url === '/api/events/active') {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({ event_id: 1 }) });
+			}
+			if (url === '/api/student/events/1/noon-game/sessions') {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [{ id: 10 }] }) });
+			}
+			if (url === '/api/student/events/1/noon-game/sessions/10') {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({
+						name: '借り物競走',
+						matches: [{ id: 101, title: '借り物競走', entries: [{ id: 1, class_ids: [7] }] }]
+					})
+				});
+			}
+			if (url === '/api/barcode/teams') {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+			}
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+		});
+
+		renderDashboard(studentUser);
+
+		await expect.element(page.getByText('現在表示できる昼競技情報はありません。')).toBeInTheDocument();
+		await expect.element(page.getByText('借り物競走')).not.toBeInTheDocument();
 	});
 });
