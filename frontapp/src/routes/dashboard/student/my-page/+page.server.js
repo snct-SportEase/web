@@ -89,8 +89,13 @@ const getOpponentName = (match, classId) => {
 	return opponent?.resolved_name || opponent?.display_name || '未定';
 };
 
-const buildNoonUpcomingMatches = (sessionPayload, classId) => {
-	if (!classId || !sessionPayload?.matches) return [];
+const isAssignedToNoonSession = (teams, session) =>
+	Array.isArray(teams) && teams.some((team) =>
+		team?.location === 'noon_game' && team?.sport_name === session?.name
+	);
+
+const buildNoonUpcomingMatches = (sessionPayload, classId, teams) => {
+	if (!classId || !isAssignedToNoonSession(teams, sessionPayload?.session) || !sessionPayload?.matches) return [];
 
 	return sessionPayload.matches
 		.filter((match) => getParticipantEntries(match, classId).length > 0)
@@ -174,8 +179,8 @@ const buildTournamentMatchResults = (tournaments, teams) => {
 	return results.sort((left, right) => right.sort_value - left.sort_value);
 };
 
-const buildNoonMatchResults = (sessionPayload, classId) => {
-	if (!classId || !Array.isArray(sessionPayload?.matches)) return [];
+const buildNoonMatchResults = (sessionPayload, classId, teams) => {
+	if (!classId || !isAssignedToNoonSession(teams, sessionPayload?.session) || !Array.isArray(sessionPayload?.matches)) return [];
 
 	return sessionPayload.matches
 		.filter((match) => getParticipantEntries(match, classId).length > 0)
@@ -431,7 +436,7 @@ export const load = async ({ fetch, locals, request }) => {
 		let upcomingMatches = [];
 		if (activeEventId) {
 			const tournamentMatches = buildTournamentUpcomingMatches(tournamentsPayload, currentEventTeams);
-			const noonMatches = buildNoonUpcomingMatches(noonPayload, user.class_id);
+			const noonMatches = buildNoonUpcomingMatches(noonPayload, user.class_id, currentEventTeams);
 			upcomingMatches = [...tournamentMatches, ...noonMatches]
 				.filter((match) => match.start_time || match.opponent_name || match.location)
 				.sort((left, right) => left.sort_value - right.sort_value)
@@ -445,7 +450,7 @@ export const load = async ({ fetch, locals, request }) => {
 		}
 		const matchResults = [
 			...buildTournamentMatchResults(tournamentsPayload, currentEventTeams),
-			...buildNoonMatchResults(noonPayload, user.class_id)
+			...buildNoonMatchResults(noonPayload, user.class_id, currentEventTeams)
 		].sort((left, right) => right.sort_value - left.sort_value).slice(0, 5);
 		const sportGuidelines = (Array.isArray(sportsPayload) ? sportsPayload : [])
 			.filter((sport) => sport?.rules_pdf_url)
