@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
@@ -46,11 +47,12 @@ func (h *NotificationHandler) WithPushSender(sender push.Sender) *NotificationHa
 }
 
 type createNotificationRequest struct {
-	Title         string   `json:"title"`
-	Body          string   `json:"body"`
-	Type          string   `json:"type"`
-	TargetRoles   []string `json:"target_roles"`
-	TargetUserIDs []string `json:"target_user_ids"`
+	Title         string     `json:"title"`
+	Body          string     `json:"body"`
+	Type          string     `json:"type"`
+	TargetRoles   []string   `json:"target_roles"`
+	TargetUserIDs []string   `json:"target_user_ids"`
+	ScheduledAt   *time.Time `json:"scheduled_at"`
 }
 
 func (h *NotificationHandler) CreateNotification(c *gin.Context) {
@@ -141,7 +143,38 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 		eventIDPtr = &activeEventID
 	}
 
-	notificationID, err := h.NotificationRepo.CreateNotification(req.Title, req.Body, req.Type, user.ID, eventIDPtr)
+	var notificationID int64
+	if req.ScheduledAt != nil {
+		scheduledAt := req.ScheduledAt.UTC()
+		if !scheduledAt.After(time.Now().UTC()) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "予約日時には現在より後の時刻を指定してください"})
+			return
+		}
+
+		notificationID, err = h.NotificationRepo.CreateScheduledNotification(
+			req.Title,
+			req.Body,
+			req.Type,
+			user.ID,
+			eventIDPtr,
+			scheduledAt,
+			targetRoles,
+			targetUserIDs,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "通知の予約に失敗しました"})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{
+			"message":        "通知を予約しました",
+			"notificationId": notificationID,
+			"scheduledAt":    scheduledAt,
+		})
+		return
+	}
+
+	notificationID, err = h.NotificationRepo.CreateNotification(req.Title, req.Body, req.Type, user.ID, eventIDPtr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "通知の作成に失敗しました"})
 		return
@@ -453,6 +486,51 @@ func (h *NotificationHandler) GetSubscription(c *gin.Context) {
 		"endpoints":  endpoints,
 		"count":      len(subs),
 	})
+}
+
+// StartScheduledNotificationWorker starts a lightweight, database-backed
+// scheduler. Reservations are persisted, so a restart does not lose them.
+func (h *NotificationHandler) StartScheduledNotificationWorker(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 30 * time.Second
+	}
+
+	go func() {
+		h.DispatchDueNotifications()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.DispatchDueNotifications()
+			}
+		}
+	}()
+}
+
+// DispatchDueNotifications claims and dispatches one bounded batch. It is
+// exported to keep the worker behavior directly testable.
+func (h *NotificationHandler) DispatchDueNotifications() {
+	due, err := h.NotificationRepo.ClaimDueNotifications(100)
+	if err != nil {
+		log.Printf("[notification-scheduler] 予約通知の取得に失敗しました: %s\n", safelog.Value(err))
+		return
+	}
+
+	for _, notification := range due {
+		h.dispatchPushNotifications(
+			notification.ID,
+			notification.Title,
+			notification.Body,
+			notification.Type,
+			notification.TargetRoles,
+			notification.TargetUserIDs,
+			notification.EventID,
+		)
+	}
 }
 
 func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles, targetUserIDs []string, eventID *int) {

@@ -7,6 +7,7 @@ import (
 	"backapp/internal/push"
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -65,6 +66,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	roleRepo := repository.NewRoleRepository(db)
 	notificationHandler := handler.NewNotificationHandler(notificationRepo, eventRepo, roleRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).WithPushSender(pushSender)
+	if db != nil {
+		notificationHandler.StartScheduledNotificationWorker(context.Background(), 30*time.Second)
+	}
 	notificationRequestRepo := repository.NewNotificationRequestRepository(db)
 	notificationRequestHandler := handler.NewNotificationRequestHandler(notificationRequestRepo, notificationRepo, roleRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).WithPushSender(pushSender)
 

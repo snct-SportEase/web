@@ -40,7 +40,8 @@ func eventRoleDB(t *testing.T) *sql.DB {
 		);
 		CREATE TABLE notifications (
 			id INT PRIMARY KEY AUTO_INCREMENT, title VARCHAR(100), body TEXT, type VARCHAR(50),
-			created_by VARCHAR(36), event_id INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_by VARCHAR(36), event_id INT NULL, scheduled_at DATETIME(6) NULL,
+			sent_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6), created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE TABLE notification_targets (
 			notification_id INT, role_name VARCHAR(50), PRIMARY KEY (notification_id, role_name)

@@ -3,15 +3,30 @@ package models
 import "time"
 
 type Notification struct {
-	ID              int       `json:"id"`
-	Title           string    `json:"title"`
-	Body            string    `json:"body"`
-	Type            string    `json:"type"`
-	CreatedAt       time.Time `json:"created_at"`
-	CreatedBy       *string   `json:"created_by,omitempty"`
-	EventID         *int      `json:"event_id,omitempty"`
-	TargetRoles     []string  `json:"target_roles"`
-	TargetUserCount int       `json:"target_user_count"`
+	ID              int        `json:"id"`
+	Title           string     `json:"title"`
+	Body            string     `json:"body"`
+	Type            string     `json:"type"`
+	CreatedAt       time.Time  `json:"created_at"`
+	CreatedBy       *string    `json:"created_by,omitempty"`
+	EventID         *int       `json:"event_id,omitempty"`
+	ScheduledAt     *time.Time `json:"scheduled_at,omitempty"`
+	SentAt          *time.Time `json:"sent_at,omitempty"`
+	TargetRoles     []string   `json:"target_roles"`
+	TargetUserCount int        `json:"target_user_count"`
+}
+
+// ScheduledNotification contains the persisted delivery targets needed by the
+// background worker after a scheduled notification becomes due.
+type ScheduledNotification struct {
+	ID            int
+	Title         string
+	Body          string
+	Type          string
+	EventID       *int
+	ScheduledAt   time.Time
+	TargetRoles   []string
+	TargetUserIDs []string
 }
 
 type PushSubscription struct {

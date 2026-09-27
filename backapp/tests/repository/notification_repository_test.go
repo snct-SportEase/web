@@ -71,11 +71,11 @@ func TestGetNotificationsForAccessIncludesIndividualRecipient(t *testing.T) {
 	repo := repository.NewNotificationRepository(db)
 
 	createdAt := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(`(?s)SELECT.*LEFT JOIN notification_recipients nr.*WHERE \(\(nt.role_name IN \(\?\) AND EXISTS.*access_ur.event_id = n.event_id.*OR nr.user_id = \?\).*GROUP BY n.id`).
+	mock.ExpectQuery(`(?s)SELECT.*LEFT JOIN notification_recipients nr.*WHERE .*nt.role_name IN \(\?\).*access_ur.event_id = n.event_id.*OR nr.user_id = \?.*n.sent_at IS NOT NULL.*GROUP BY n.id`).
 		WithArgs("student", "user-1", "user-1", 50).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "title", "body", "type", "created_by", "event_id", "created_at", "target_roles", "target_user_count",
-		}).AddRow(9, "個人連絡", "本文", "general", "root-1", nil, createdAt, nil, 1))
+			"id", "title", "body", "type", "created_by", "event_id", "created_at", "scheduled_at", "sent_at", "target_roles", "target_user_count",
+		}).AddRow(9, "個人連絡", "本文", "general", "root-1", nil, createdAt, nil, createdAt, nil, 1))
 
 	notifications, err := repo.GetNotificationsForAccess([]string{"student"}, "user-1", false, 50)
 	if err != nil {
@@ -83,6 +83,80 @@ func TestGetNotificationsForAccessIncludesIndividualRecipient(t *testing.T) {
 	}
 	if len(notifications) != 1 || notifications[0].TargetUserCount != 1 {
 		t.Fatalf("unexpected notifications: %#v", notifications)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateScheduledNotificationPersistsTargetsInTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer db.Close()
+	repo := repository.NewNotificationRepository(db)
+	scheduledAt := time.Date(2026, 10, 1, 3, 30, 0, 0, time.UTC)
+	eventID := 3
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO notifications (title, body, type, created_by, event_id, scheduled_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, NULL)")).
+		WithArgs("予約", "本文", "general", "root-1", eventID, scheduledAt).
+		WillReturnResult(sqlmock.NewResult(20, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT IGNORE INTO notification_targets (notification_id, role_name) VALUES (?, ?)")).
+		WithArgs(int64(20), "student").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT IGNORE INTO notification_recipients (notification_id, user_id) VALUES (?, ?)")).
+		WithArgs(int64(20), "user-1").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	id, err := repo.CreateScheduledNotification("予約", "本文", "general", "root-1", &eventID, scheduledAt, []string{"student"}, []string{"user-1"})
+	if err != nil {
+		t.Fatalf("create scheduled notification: %v", err)
+	}
+	if id != 20 {
+		t.Fatalf("unexpected id: %d", id)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClaimDueNotificationsReturnsPersistedTargets(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer db.Close()
+	repo := repository.NewNotificationRepository(db)
+	scheduledAt := time.Date(2026, 10, 1, 3, 30, 0, 0, time.UTC)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)SELECT id, title, body, type, event_id, scheduled_at.*FOR UPDATE SKIP LOCKED`).
+		WithArgs(100).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "body", "type", "event_id", "scheduled_at"}).
+			AddRow(20, "予約", "本文", "general", 3, scheduledAt))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT role_name FROM notification_targets WHERE notification_id = ? ORDER BY role_name")).
+		WithArgs(20).
+		WillReturnRows(sqlmock.NewRows([]string{"role_name"}).AddRow("student"))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT user_id FROM notification_recipients WHERE notification_id = ? AND user_id IS NOT NULL ORDER BY user_id")).
+		WithArgs(20).
+		WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow("user-1"))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE notifications SET sent_at = UTC_TIMESTAMP(6) WHERE id = ? AND sent_at IS NULL")).
+		WithArgs(20).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	due, err := repo.ClaimDueNotifications(100)
+	if err != nil {
+		t.Fatalf("claim due notifications: %v", err)
+	}
+	if len(due) != 1 || due[0].ID != 20 {
+		t.Fatalf("unexpected due notifications: %#v", due)
+	}
+	if len(due[0].TargetRoles) != 1 || due[0].TargetRoles[0] != "student" || len(due[0].TargetUserIDs) != 1 || due[0].TargetUserIDs[0] != "user-1" {
+		t.Fatalf("unexpected targets: %#v", due[0])
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

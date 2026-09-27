@@ -153,6 +153,31 @@ describe('Notification Management Page', () => {
     await expect.element(page.getByText('競技開始時間変更')).toBeInTheDocument();
   });
 
+  it('日時を指定して通知を予約できる', async () => {
+    render(Page);
+
+    await page.getByRole('radio', { name: '日時を指定' }).click();
+    await page.getByLabelText('予約日時').fill('2099-10-01T12:30');
+    await page.getByLabelText('タイトル').fill('予約連絡');
+    await page.getByLabelText('本文').fill('指定時刻に配信します。');
+    await page.getByRole('button', { name: '通知を予約' }).click();
+
+    const createCall = fetchMock.mock.calls.find(([url, options]) => {
+      if (url !== '/api/root/notifications' || options?.method !== 'POST') return false;
+      return JSON.parse(options.body).title === '予約連絡';
+    });
+    expect(JSON.parse(createCall[1].body)).toEqual({
+      title: '予約連絡',
+      body: '指定時刻に配信します。',
+      type: 'general',
+      scheduled_at: new Date('2099-10-01T12:30').toISOString(),
+      target_roles: ['student']
+    });
+
+    await expect.element(page.getByText('通知を予約しました。')).toBeInTheDocument();
+    await expect.element(page.getByText('予約済み')).toBeInTheDocument();
+  });
+
   it('検索したユーザーを選択して個人宛て通知を送信できる', async () => {
     render(Page);
 
