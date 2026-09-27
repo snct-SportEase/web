@@ -175,7 +175,11 @@ describe('Notification Management Page', () => {
     });
 
     await expect.element(page.getByText('通知を予約しました。')).toBeInTheDocument();
-    await expect.element(page.getByText('予約済み')).toBeInTheDocument();
+    await expect.element(page.getByRole('heading', { name: '通知予定' })).toBeInTheDocument();
+    await expect.element(page.getByText('予約連絡')).toBeInTheDocument();
+    await expect.element(page.getByLabelText('タイトル')).toHaveValue('');
+    await expect.element(page.getByLabelText('本文')).toHaveValue('');
+    await expect.element(page.getByLabelText('予約日時')).not.toBeInTheDocument();
   });
 
   it('検索したユーザーを選択して個人宛て通知を送信できる', async () => {

@@ -166,6 +166,8 @@ func (h *NotificationHandler) CreateNotification(c *gin.Context) {
 			return
 		}
 
+		log.Printf("[notification-scheduler] 予約通知を登録: notificationID=%d scheduledAt=%s targetRoleCount=%d targetUserCount=%d\n", notificationID, scheduledAt.Format(time.RFC3339), len(targetRoles), len(targetUserIDs))
+
 		c.JSON(http.StatusCreated, gin.H{
 			"message":        "通知を予約しました",
 			"notificationId": notificationID,
@@ -496,7 +498,6 @@ func (h *NotificationHandler) StartScheduledNotificationWorker(ctx context.Conte
 	}
 
 	go func() {
-		h.DispatchDueNotifications()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -519,8 +520,12 @@ func (h *NotificationHandler) DispatchDueNotifications() {
 		log.Printf("[notification-scheduler] 予約通知の取得に失敗しました: %s\n", safelog.Value(err))
 		return
 	}
+	if len(due) > 0 {
+		log.Printf("[notification-scheduler] 配信対象の予約通知を取得: count=%d\n", len(due))
+	}
 
 	for _, notification := range due {
+		log.Printf("[notification-scheduler] 予約通知の配信開始: notificationID=%d scheduledAt=%s\n", notification.ID, notification.ScheduledAt.Format(time.RFC3339))
 		h.dispatchPushNotifications(
 			notification.ID,
 			notification.Title,

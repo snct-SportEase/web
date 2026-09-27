@@ -80,6 +80,35 @@
     selectedRoles = createDefaultSelections(availableRoles);
   }
 
+  function resetForm() {
+    title = '';
+    body = '';
+    selectedType = 'general';
+    deliveryTiming = 'now';
+    scheduledAt = '';
+    deliveryMode = 'role';
+    resetSelectedRoles();
+    selectedUsers = {};
+    userSearchQuery = '';
+    userSearchType = 'email';
+    userSearchResults = [];
+    userSearchError = '';
+  }
+
+  function isScheduledNotification(notification) {
+    return Boolean(notification.scheduled_at && !notification.sent_at);
+  }
+
+  function getScheduledNotifications() {
+    return notifications
+      .filter(isScheduledNotification)
+      .sort((left, right) => new Date(left.scheduled_at).getTime() - new Date(right.scheduled_at).getTime());
+  }
+
+  function getSentNotifications() {
+    return notifications.filter((notification) => !isScheduledNotification(notification));
+  }
+
   function getSelectedRoles() {
     return availableRoles
       .map((role) => role.name)
@@ -238,12 +267,7 @@
       message = deliveryTiming === 'scheduled'
         ? '通知を予約しました。'
         : '通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。';
-      title = '';
-      body = '';
-      resetSelectedRoles();
-      selectedUsers = {};
-      deliveryTiming = 'now';
-      scheduledAt = '';
+      resetForm();
 
       await refreshNotifications();
       await refreshSubscriptionStats();
@@ -567,33 +591,64 @@
 
   <section class="bg-white shadow rounded-lg p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold text-gray-800">通知履歴</h2>
-      <p class="text-sm text-gray-500">最新100件まで表示</p>
+      <h2 class="text-xl font-semibold text-gray-800">通知予定</h2>
+      <p class="text-sm text-gray-500">{getScheduledNotifications().length}件</p>
     </div>
 
-    {#if notifications.length === 0}
-      <p class="text-gray-500">まだ通知はありません。</p>
+    {#if getScheduledNotifications().length === 0}
+      <p class="text-gray-500">予約されている通知はありません。</p>
     {:else}
       <ul class="space-y-4">
-        {#each notifications as notification (notification.id ?? `${notification.title}-${notification.created_at}`)}
-          <li class="border border-gray-200 rounded-lg p-4">
-            <div class="flex items-center justify-between">
+        {#each getScheduledNotifications() as notification (notification.id ?? `${notification.title}-${notification.scheduled_at}`)}
+          <li class="border border-amber-200 bg-amber-50/40 rounded-lg p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <h3 class="text-lg font-semibold text-gray-900">{notification.title}</h3>
               <div class="flex items-center gap-2">
-                {#if notification.scheduled_at && !notification.sent_at}
-                  <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">予約済み</span>
-                {/if}
-                <span class="text-sm text-gray-500">
-                  {notification.scheduled_at && !notification.sent_at ? '配信予定 ' : ''}
-                  {formatDate(notification.scheduled_at && !notification.sent_at ? notification.scheduled_at : (notification.sent_at ?? notification.created_at))}
-                </span>
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">通知予定</span>
+                <span class="text-sm text-gray-600">{formatDate(notification.scheduled_at)}</span>
               </div>
-
             </div>
             <p class="mt-2 text-gray-700 whitespace-pre-wrap">{notification.body}</p>
             {#if notification.target_roles?.length || notification.target_user_count > 0}
               <div class="mt-3 flex flex-wrap gap-2">
-                {#each notification.target_roles as role (role)}
+                {#each notification.target_roles ?? [] as role (role)}
+                  <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                    {roleLabelMap[role] ?? role}
+                  </span>
+                {/each}
+                {#if notification.target_user_count > 0}
+                  <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                    個人 {notification.target_user_count}名
+                  </span>
+                {/if}
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+
+  <section class="bg-white shadow rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold text-gray-800">通知履歴</h2>
+      <p class="text-sm text-gray-500">最新100件まで表示</p>
+    </div>
+
+    {#if getSentNotifications().length === 0}
+      <p class="text-gray-500">送信済みの通知はありません。</p>
+    {:else}
+      <ul class="space-y-4">
+        {#each getSentNotifications() as notification (notification.id ?? `${notification.title}-${notification.created_at}`)}
+          <li class="border border-gray-200 rounded-lg p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold text-gray-900">{notification.title}</h3>
+              <span class="text-sm text-gray-500">{formatDate(notification.sent_at ?? notification.created_at)}</span>
+            </div>
+            <p class="mt-2 text-gray-700 whitespace-pre-wrap">{notification.body}</p>
+            {#if notification.target_roles?.length || notification.target_user_count > 0}
+              <div class="mt-3 flex flex-wrap gap-2">
+                {#each notification.target_roles ?? [] as role (role)}
                   <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
                     {roleLabelMap[role] ?? role}
                   </span>
