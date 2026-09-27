@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 var (
@@ -15,8 +16,10 @@ var (
 
 type NotificationRepository interface {
 	CreateNotification(title, body, notificationType, createdBy string, eventID *int) (int64, error)
+	CreateScheduledNotification(title, body, notificationType, createdBy string, eventID *int, scheduledAt time.Time, targetRoles, targetUserIDs []string) (int64, error)
 	AddNotificationTargets(notificationID int64, roles []string) error
 	AddNotificationRecipients(notificationID int64, userIDs []string) error
+	ClaimDueNotifications(limit int) ([]models.ScheduledNotification, error)
 	GetNotificationsForAccess(roleNames []string, authorID string, includeAuthored bool, limit int) ([]models.Notification, error)
 	GetUserIDsByRoles(roleNames []string, eventID *int) ([]string, error)
 	GetPushSubscriptionsByUserIDs(userIDs []string) ([]models.PushSubscription, error)
@@ -35,7 +38,7 @@ func NewNotificationRepository(db *sql.DB) NotificationRepository {
 }
 
 func (r *notificationRepository) CreateNotification(title, body, notificationType, createdBy string, eventID *int) (int64, error) {
-	query := "INSERT INTO notifications (title, body, type, created_by, event_id) VALUES (?, ?, ?, ?, ?)"
+	query := "INSERT INTO notifications (title, body, type, created_by, event_id, sent_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6))"
 	var result sql.Result
 	var err error
 
@@ -55,6 +58,51 @@ func (r *notificationRepository) CreateNotification(title, body, notificationTyp
 	}
 
 	return result.LastInsertId()
+}
+
+func (r *notificationRepository) CreateScheduledNotification(title, body, notificationType, createdBy string, eventID *int, scheduledAt time.Time, targetRoles, targetUserIDs []string) (int64, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	var createdByParam any
+	if createdBy != "" {
+		createdByParam = createdBy
+	}
+	var eventIDParam any
+	if eventID != nil {
+		eventIDParam = *eventID
+	}
+
+	result, err := tx.Exec(
+		"INSERT INTO notifications (title, body, type, created_by, event_id, scheduled_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, NULL)",
+		title, body, notificationType, createdByParam, eventIDParam, scheduledAt.UTC(),
+	)
+	if err != nil {
+		return 0, err
+	}
+	notificationID, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, role := range targetRoles {
+		if _, err := tx.Exec("INSERT IGNORE INTO notification_targets (notification_id, role_name) VALUES (?, ?)", notificationID, role); err != nil {
+			return 0, err
+		}
+	}
+	for _, userID := range targetUserIDs {
+		if _, err := tx.Exec("INSERT IGNORE INTO notification_recipients (notification_id, user_id) VALUES (?, ?)", notificationID, userID); err != nil {
+			return 0, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return notificationID, nil
 }
 
 func (r *notificationRepository) AddNotificationTargets(notificationID int64, roles []string) error {
@@ -147,6 +195,8 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 			n.created_by,
 			n.event_id,
 			n.created_at,
+			n.scheduled_at,
+			n.sent_at,
 			GROUP_CONCAT(DISTINCT nt.role_name ORDER BY nt.role_name SEPARATOR ',') AS target_roles,
 			COUNT(DISTINCT nr.user_id) AS target_user_count
 		FROM notifications n
@@ -154,11 +204,26 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 		LEFT JOIN notification_recipients nr ON n.id = nr.notification_id
 	`
 
-	if len(filters) > 0 {
-		query += " WHERE (" + strings.Join(filters, " OR ") + ")" // #nosec G202 -- filters are fixed SQL fragments and all values are bound.
-	} else {
+	if len(filters) == 0 {
 		// どのフィルターも無い場合は空を返す
 		return []models.Notification{}, nil
+	}
+
+	// Recipients must not see a reservation before it is sent. Its author can
+	// still see and confirm it when include_authored is requested.
+	accessFilterCount := len(filters)
+	if includeAuthored && authorID != "" {
+		accessFilterCount--
+	}
+	if accessFilterCount > 0 {
+		query += " WHERE ((" + strings.Join(filters[:accessFilterCount], " OR ") + ") AND n.sent_at IS NOT NULL)" // #nosec G202 -- filters are fixed SQL fragments and all values are bound.
+	}
+	if includeAuthored && authorID != "" {
+		if accessFilterCount > 0 {
+			query += " OR n.created_by = ?"
+		} else {
+			query += " WHERE n.created_by = ?"
+		}
 	}
 
 	query += " GROUP BY n.id ORDER BY n.created_at DESC"
@@ -180,6 +245,8 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 		var notif models.Notification
 		var createdBy sql.NullString
 		var eventID sql.NullInt64
+		var scheduledAt sql.NullTime
+		var sentAt sql.NullTime
 		var targetRoles sql.NullString
 
 		if err := rows.Scan(
@@ -190,6 +257,8 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 			&createdBy,
 			&eventID,
 			&notif.CreatedAt,
+			&scheduledAt,
+			&sentAt,
 			&targetRoles,
 			&notif.TargetUserCount,
 		); err != nil {
@@ -204,6 +273,14 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 			value := int(eventID.Int64)
 			notif.EventID = &value
 		}
+		if scheduledAt.Valid {
+			value := scheduledAt.Time
+			notif.ScheduledAt = &value
+		}
+		if sentAt.Valid {
+			value := sentAt.Time
+			notif.SentAt = &value
+		}
 		if targetRoles.Valid && targetRoles.String != "" {
 			notif.TargetRoles = strings.Split(targetRoles.String, ",")
 		} else {
@@ -213,6 +290,98 @@ func (r *notificationRepository) GetNotificationsForAccess(roleNames []string, a
 	}
 
 	return notifications, nil
+}
+
+// ClaimDueNotifications atomically marks due reservations as sent and returns
+// their persisted targets. FOR UPDATE SKIP LOCKED lets multiple application
+// instances poll safely without sending the same reservation twice.
+func (r *notificationRepository) ClaimDueNotifications(limit int) ([]models.ScheduledNotification, error) {
+	if limit <= 0 {
+		return []models.ScheduledNotification{}, nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.Query(`
+		SELECT id, title, body, type, event_id, scheduled_at
+		FROM notifications
+		WHERE scheduled_at IS NOT NULL
+			AND sent_at IS NULL
+			AND scheduled_at <= UTC_TIMESTAMP(6)
+		ORDER BY scheduled_at, id
+		LIMIT ?
+		FOR UPDATE SKIP LOCKED`, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	due := make([]models.ScheduledNotification, 0)
+	for rows.Next() {
+		var notification models.ScheduledNotification
+		var eventID sql.NullInt64
+		if err := rows.Scan(&notification.ID, &notification.Title, &notification.Body, &notification.Type, &eventID, &notification.ScheduledAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if eventID.Valid {
+			value := int(eventID.Int64)
+			notification.EventID = &value
+		}
+		due = append(due, notification)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range due {
+		roleRows, err := tx.Query("SELECT role_name FROM notification_targets WHERE notification_id = ? ORDER BY role_name", due[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		for roleRows.Next() {
+			var role string
+			if err := roleRows.Scan(&role); err != nil {
+				roleRows.Close()
+				return nil, err
+			}
+			due[i].TargetRoles = append(due[i].TargetRoles, role)
+		}
+		if err := roleRows.Close(); err != nil {
+			return nil, err
+		}
+
+		userRows, err := tx.Query("SELECT user_id FROM notification_recipients WHERE notification_id = ? AND user_id IS NOT NULL ORDER BY user_id", due[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		for userRows.Next() {
+			var userID string
+			if err := userRows.Scan(&userID); err != nil {
+				userRows.Close()
+				return nil, err
+			}
+			due[i].TargetUserIDs = append(due[i].TargetUserIDs, userID)
+		}
+		if err := userRows.Close(); err != nil {
+			return nil, err
+		}
+
+		if _, err := tx.Exec("UPDATE notifications SET sent_at = UTC_TIMESTAMP(6) WHERE id = ? AND sent_at IS NULL", due[i].ID); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return due, nil
 }
 
 func (r *notificationRepository) GetUserIDsByRoles(roleNames []string, eventID *int) ([]string, error) {

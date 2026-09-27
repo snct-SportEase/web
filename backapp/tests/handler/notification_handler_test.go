@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -96,6 +97,93 @@ func TestNotificationHandler_CreateNotification_ForIndividualUsers(t *testing.T)
 	mockNotifRepo.AssertExpectations(t)
 	mockEventRepo.AssertExpectations(t)
 	mockUserRepo.AssertExpectations(t)
+}
+
+func TestNotificationHandler_CreateNotification_SchedulesFutureDelivery(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockNotifRepo := new(MockNotificationRepository)
+	mockEventRepo := new(MockEventRepository)
+	mockRoleRepo := new(MockRoleRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, mockRoleRepo, new(MockUserRepository), "", "")
+
+	scheduledAt := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
+	mockRoleRepo.On("GetAllRoles").Return([]models.Role{{ID: 1, Name: "student"}}, nil).Once()
+	mockEventRepo.On("GetActiveEvent").Return(3, nil).Once()
+	mockNotifRepo.On(
+		"CreateScheduledNotification",
+		"予約のお知らせ",
+		"本文です",
+		"general",
+		"root-1",
+		mock.MatchedBy(func(eventID *int) bool { return eventID != nil && *eventID == 3 }),
+		scheduledAt,
+		[]string{"student"},
+		[]string{},
+	).Return(int64(20), nil).Once()
+
+	payload, _ := json.Marshal(map[string]any{
+		"title":        "予約のお知らせ",
+		"body":         "本文です",
+		"target_roles": []string{"student"},
+		"scheduled_at": scheduledAt,
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/notifications", bytes.NewReader(payload))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user", &models.User{ID: "root-1"})
+
+	h.CreateNotification(c)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Contains(t, w.Body.String(), "通知を予約しました")
+	mockNotifRepo.AssertNotCalled(t, "CreateNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockNotifRepo.AssertExpectations(t)
+}
+
+func TestNotificationHandler_CreateNotification_RejectsPastSchedule(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockNotifRepo := new(MockNotificationRepository)
+	mockEventRepo := new(MockEventRepository)
+	mockRoleRepo := new(MockRoleRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, mockRoleRepo, new(MockUserRepository), "", "")
+
+	mockRoleRepo.On("GetAllRoles").Return([]models.Role{{ID: 1, Name: "student"}}, nil).Once()
+	mockEventRepo.On("GetActiveEvent").Return(3, nil).Once()
+	payload, _ := json.Marshal(map[string]any{
+		"title":        "予約のお知らせ",
+		"body":         "本文です",
+		"target_roles": []string{"student"},
+		"scheduled_at": time.Now().UTC().Add(-time.Minute),
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/notifications", bytes.NewReader(payload))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user", &models.User{ID: "root-1"})
+
+	h.CreateNotification(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "現在より後")
+	mockNotifRepo.AssertNotCalled(t, "CreateScheduledNotification", mock.Anything)
+}
+
+func TestNotificationHandler_DispatchDueNotificationsClaimsBatch(t *testing.T) {
+	mockNotifRepo := new(MockNotificationRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, new(MockEventRepository), new(MockRoleRepository), new(MockUserRepository), "", "")
+	mockNotifRepo.On("ClaimDueNotifications", 100).Return([]models.ScheduledNotification{{
+		ID:          20,
+		Title:       "予約のお知らせ",
+		Body:        "本文です",
+		Type:        "general",
+		TargetRoles: []string{"student"},
+	}}, nil).Once()
+
+	h.DispatchDueNotifications()
+
+	mockNotifRepo.AssertExpectations(t)
 }
 
 func TestNotificationHandler_CreateNotification_RejectsMissingTargets(t *testing.T) {

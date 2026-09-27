@@ -5,6 +5,7 @@ import (
 	"backapp/internal/repository"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -635,6 +636,19 @@ type MockNotificationRepository struct {
 func (m *MockNotificationRepository) CreateNotification(title, body, notificationType, createdBy string, eventID *int) (int64, error) {
 	args := m.Called(title, body, notificationType, createdBy, eventID)
 	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockNotificationRepository) CreateScheduledNotification(title, body, notificationType, createdBy string, eventID *int, scheduledAt time.Time, targetRoles, targetUserIDs []string) (int64, error) {
+	args := m.Called(title, body, notificationType, createdBy, eventID, scheduledAt, targetRoles, targetUserIDs)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockNotificationRepository) ClaimDueNotifications(limit int) ([]models.ScheduledNotification, error) {
+	args := m.Called(limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.ScheduledNotification), args.Error(1)
 }
 
 func (m *MockNotificationRepository) AddNotificationTargets(notificationID int64, roles []string) error {

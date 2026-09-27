@@ -50,6 +50,8 @@
   let title = $state('');
   let body = $state('');
   let selectedType = $state('general');
+  let deliveryTiming = $state('now');
+  let scheduledAt = $state('');
   let deliveryMode = $state('role');
   let selectedRoles = $state(createDefaultSelections(availableRoles));
   let selectedUsers = $state({});
@@ -76,6 +78,35 @@
 
   function resetSelectedRoles() {
     selectedRoles = createDefaultSelections(availableRoles);
+  }
+
+  function resetForm() {
+    title = '';
+    body = '';
+    selectedType = 'general';
+    deliveryTiming = 'now';
+    scheduledAt = '';
+    deliveryMode = 'role';
+    resetSelectedRoles();
+    selectedUsers = {};
+    userSearchQuery = '';
+    userSearchType = 'email';
+    userSearchResults = [];
+    userSearchError = '';
+  }
+
+  function isScheduledNotification(notification) {
+    return Boolean(notification.scheduled_at && !notification.sent_at);
+  }
+
+  function getScheduledNotifications() {
+    return notifications
+      .filter(isScheduledNotification)
+      .sort((left, right) => new Date(left.scheduled_at).getTime() - new Date(right.scheduled_at).getTime());
+  }
+
+  function getSentNotifications() {
+    return notifications.filter((notification) => !isScheduledNotification(notification));
   }
 
   function getSelectedRoles() {
@@ -176,6 +207,12 @@
     }
   }
 
+  function getMinimumScheduledAt() {
+    const date = new Date(Date.now() + 60_000);
+    const timezoneOffset = date.getTimezoneOffset() * 60_000;
+    return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+  }
+
   async function handleSubmit() {
     message = '';
     errorMessage = '';
@@ -185,6 +222,14 @@
     if (!title.trim() || !body.trim()) {
       errorMessage = 'タイトルと本文を入力してください。';
       return;
+    }
+
+    if (deliveryTiming === 'scheduled') {
+      const scheduledDate = new Date(scheduledAt);
+      if (!scheduledAt || Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) {
+        errorMessage = '予約日時には現在より後の時刻を指定してください。';
+        return;
+      }
     }
 
     if (targetRoles.length === 0 && targetUserIDs.length === 0) {
@@ -205,6 +250,9 @@
           title,
           body,
           type: selectedType,
+          ...(deliveryTiming === 'scheduled'
+            ? { scheduled_at: new Date(scheduledAt).toISOString() }
+            : {}),
           ...(deliveryMode === 'individual'
             ? { target_user_ids: targetUserIDs }
             : { target_roles: targetRoles })
@@ -216,11 +264,10 @@
         throw new Error(err.error || '通知の作成に失敗しました。');
       }
 
-      message = '通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。';
-      title = '';
-      body = '';
-      resetSelectedRoles();
-      selectedUsers = {};
+      message = deliveryTiming === 'scheduled'
+        ? '通知を予約しました。'
+        : '通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。';
+      resetForm();
 
       await refreshNotifications();
       await refreshSubscriptionStats();
@@ -398,6 +445,44 @@
         ></textarea>
       </FormField>
 
+      <fieldset class="space-y-3">
+        <legend class="block text-sm font-medium text-gray-700">配信タイミング</legend>
+        <div class="flex flex-wrap gap-4">
+          <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="delivery-timing"
+              value="now"
+              checked={deliveryTiming === 'now'}
+              onchange={() => { deliveryTiming = 'now'; }}
+            />
+            今すぐ送信
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="delivery-timing"
+              value="scheduled"
+              checked={deliveryTiming === 'scheduled'}
+              onchange={() => { deliveryTiming = 'scheduled'; }}
+            />
+            日時を指定
+          </label>
+        </div>
+
+        {#if deliveryTiming === 'scheduled'}
+          <FormField label="予約日時" inputId="scheduled-at" labelClass="mb-1 block text-sm font-medium text-gray-700" description="端末のローカル時刻で指定します。">
+            <input
+              id="scheduled-at"
+              type="datetime-local"
+              min={getMinimumScheduledAt()}
+              class="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:max-w-xs"
+              bind:value={scheduledAt}
+            />
+          </FormField>
+        {/if}
+      </fieldset>
+
       {#if deliveryMode === 'role'}
       <div>
         <span class="block text-sm font-medium text-gray-700 mb-2">宛先ロール</span>
@@ -498,32 +583,72 @@
       onclick={(e) => { e.preventDefault(); handleSubmit(e); }}
       disabled={!isInteractive || (deliveryMode === 'role' && availableRoles.length === 0)}
       loading={isSubmitting}
-      loadingLabel="送信中..."
+      loadingLabel={deliveryTiming === 'scheduled' ? '予約中...' : '送信中...'}
     >
-      通知を送信
+      {deliveryTiming === 'scheduled' ? '通知を予約' : '通知を送信'}
     </Button>
   </section>
 
   <section class="bg-white shadow rounded-lg p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold text-gray-800">送信済み通知</h2>
-      <p class="text-sm text-gray-500">最新100件まで表示</p>
+      <h2 class="text-xl font-semibold text-gray-800">通知予定</h2>
+      <p class="text-sm text-gray-500">{getScheduledNotifications().length}件</p>
     </div>
 
-    {#if notifications.length === 0}
-      <p class="text-gray-500">まだ通知はありません。</p>
+    {#if getScheduledNotifications().length === 0}
+      <p class="text-gray-500">予約されている通知はありません。</p>
     {:else}
       <ul class="space-y-4">
-        {#each notifications as notification (notification.id ?? `${notification.title}-${notification.created_at}`)}
-          <li class="border border-gray-200 rounded-lg p-4">
-            <div class="flex items-center justify-between">
+        {#each getScheduledNotifications() as notification (notification.id ?? `${notification.title}-${notification.scheduled_at}`)}
+          <li class="border border-amber-200 bg-amber-50/40 rounded-lg p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <h3 class="text-lg font-semibold text-gray-900">{notification.title}</h3>
-              <span class="text-sm text-gray-500">{formatDate(notification.created_at)}</span>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">通知予定</span>
+                <span class="text-sm text-gray-600">{formatDate(notification.scheduled_at)}</span>
+              </div>
             </div>
             <p class="mt-2 text-gray-700 whitespace-pre-wrap">{notification.body}</p>
             {#if notification.target_roles?.length || notification.target_user_count > 0}
               <div class="mt-3 flex flex-wrap gap-2">
-                {#each notification.target_roles as role (role)}
+                {#each notification.target_roles ?? [] as role (role)}
+                  <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                    {roleLabelMap[role] ?? role}
+                  </span>
+                {/each}
+                {#if notification.target_user_count > 0}
+                  <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                    個人 {notification.target_user_count}名
+                  </span>
+                {/if}
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+
+  <section class="bg-white shadow rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold text-gray-800">通知履歴</h2>
+      <p class="text-sm text-gray-500">最新100件まで表示</p>
+    </div>
+
+    {#if getSentNotifications().length === 0}
+      <p class="text-gray-500">送信済みの通知はありません。</p>
+    {:else}
+      <ul class="space-y-4">
+        {#each getSentNotifications() as notification (notification.id ?? `${notification.title}-${notification.created_at}`)}
+          <li class="border border-gray-200 rounded-lg p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold text-gray-900">{notification.title}</h3>
+              <span class="text-sm text-gray-500">{formatDate(notification.sent_at ?? notification.created_at)}</span>
+            </div>
+            <p class="mt-2 text-gray-700 whitespace-pre-wrap">{notification.body}</p>
+            {#if notification.target_roles?.length || notification.target_user_count > 0}
+              <div class="mt-3 flex flex-wrap gap-2">
+                {#each notification.target_roles ?? [] as role (role)}
                   <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
                     {roleLabelMap[role] ?? role}
                   </span>
