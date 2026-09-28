@@ -496,6 +496,9 @@ import { onMount } from 'svelte';
         表示中 {getVisibleUserCount()} / 全 {users.length} 件
       </p>
     </div>
+    <p class="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
+      通知はプッシュ購読の登録状況です。PWAはアプリとして起動した履歴を示し、端末からの削除は検出できません。
+    </p>
     <div class="overflow-x-auto">
       <table class="w-full">
         <thead>
@@ -514,6 +517,8 @@ import { onMount } from 'svelte';
                 <span class="inline-block w-4 text-xs text-indigo-600" aria-hidden="true">{getSortIndicator('class')}</span>
               </button>
             </th>
+            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">通知</th>
+            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">PWA</th>
             <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">アクション</th>
           </tr>
         </thead>
@@ -542,6 +547,19 @@ import { onMount } from 'svelte';
                 {/if}
               </td>
               <td class="px-4 py-3 text-sm font-medium text-indigo-700">{getClassDisplayName(user)}</td>
+              <td class="px-4 py-3 text-center text-sm">
+                <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {user.has_push_subscription ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}">
+                  {user.has_push_subscription ? '登録済み' : '未登録'}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center text-sm">
+                <span
+                  class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {user.pwa_last_seen_at ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}"
+                  title={user.pwa_last_seen_at ? `最終確認: ${new Date(user.pwa_last_seen_at).toLocaleString('ja-JP')}` : 'PWAとしての起動は確認されていません'}
+                >
+                  {user.pwa_last_seen_at ? '利用確認済み' : '未確認'}
+                </span>
+              </td>
               <td class="px-4 py-3 text-right">
                 <button 
                   class="inline-flex items-center gap-2 rounded-md border border-indigo-600 bg-white px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1" 
@@ -558,14 +576,14 @@ import { onMount } from 'svelte';
           {/each}
           {#if !isLoading && getSortedUsers().length === 0}
             <tr>
-              <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">
+              <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500">
                 ユーザーが見つかりませんでした。
               </td>
             </tr>
           {/if}
           {#if isLoading}
             <tr>
-              <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">
+              <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500">
                 読み込み中...
               </td>
             </tr>

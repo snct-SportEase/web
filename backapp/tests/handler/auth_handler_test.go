@@ -330,7 +330,7 @@ func TestAuthHandler_AdminUserManagement(t *testing.T) {
 		)
 		actor := &models.User{ID: "admin-1"}
 		mockUserRepo.On("GetUserWithRoles", actor.ID).Return(&models.User{
-			ID: actor.ID,
+			ID:    actor.ID,
 			Roles: []models.Role{{Name: "admin"}},
 		}, nil).Once()
 		mockUserRepo.On("UpdateUserDisplayName", "student-1", "大会係").Return(nil).Once()
@@ -430,4 +430,23 @@ func TestAuthHandler_LogoutWithoutSession(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.JSONEq(t, `{"message":"not logged in"}`, w.Body.String())
+}
+
+func TestAuthHandler_RecordPWAVisitUsesAuthenticatedUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockUserRepo := new(MockUserRepository)
+	authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, new(MockEventRepository), new(MockClassRepository))
+	mockUserRepo.On("RecordPWAVisit", "user-1").Return(nil).Once()
+
+	router := gin.New()
+	router.POST("/api/user/pwa-visit", func(c *gin.Context) {
+		c.Set("user", &models.User{ID: "user-1"})
+		authHandler.RecordPWAVisit(c)
+	})
+	w := httptest.NewRecorder()
+	request, _ := http.NewRequest(http.MethodPost, "/api/user/pwa-visit", nil)
+	router.ServeHTTP(w, request)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	mockUserRepo.AssertExpectations(t)
 }

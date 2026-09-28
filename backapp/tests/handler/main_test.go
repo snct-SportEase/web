@@ -565,6 +565,10 @@ type MockUserRepository struct {
 	mock.Mock
 }
 
+func (m *MockUserRepository) RecordPWAVisit(userID string) error {
+	return m.Called(userID).Error(0)
+}
+
 func (m *MockUserRepository) FindUsers(query string, searchType string) ([]*models.User, error) {
 	args := m.Called(query, searchType)
 	if args.Get(0) == nil {

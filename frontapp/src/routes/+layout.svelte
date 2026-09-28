@@ -6,9 +6,30 @@
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { isPWAInstalled } from '$lib/utils/pwa.js';
 
   let { children } = $props();
   let data = $derived($page.data);
+  let lastReportedPWAUserId = null;
+
+  $effect(() => {
+    const userId = data.user?.id;
+    if (!userId) {
+      lastReportedPWAUserId = null;
+      return;
+    }
+    if (!browser || !isPWAInstalled() || lastReportedPWAUserId === userId) return;
+
+    lastReportedPWAUserId = userId;
+    fetch('/api/user/pwa-visit', { method: 'POST', credentials: 'include' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`PWA visit: ${response.status}`);
+      })
+      .catch((error) => {
+        lastReportedPWAUserId = null;
+        console.error('Failed to record PWA visit:', error);
+      });
+  });
 
   onMount(() => {
     if (browser && 'serviceWorker' in navigator) {

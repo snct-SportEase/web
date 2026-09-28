@@ -129,6 +129,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		{
 			user.Use(middleware.AuthMiddleware(userRepo))
 			user.PUT("/profile", authHandler.UpdateProfile)
+			user.POST("/pwa-visit", authHandler.RecordPWAVisit)
 		}
 
 		// Events accessible to any authenticated user
