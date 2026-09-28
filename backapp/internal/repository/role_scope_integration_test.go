@@ -15,6 +15,7 @@ func eventRoleDB(t *testing.T) *sql.DB {
 	db := seasonalMembershipDB(t)
 	_, err := db.Exec(`
 		ALTER TABLE users ADD notification_filters JSON DEFAULT ('["general"]');
+		ALTER TABLE users ADD pwa_last_seen_at TIMESTAMP NULL DEFAULT NULL;
 		CREATE TABLE roles (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(50) NOT NULL UNIQUE);
 		CREATE TABLE user_roles (
 			user_id VARCHAR(36) NOT NULL, role_id INT NOT NULL, event_id INT NULL,

@@ -382,6 +382,21 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "logout successful"})
 }
 
+// RecordPWAVisit records that the authenticated user opened the app in standalone mode.
+func (h *AuthHandler) RecordPWAVisit(c *gin.Context) {
+	userValue, exists := c.Get("user")
+	user, ok := userValue.(*models.User)
+	if !exists || !ok || user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user in context"})
+		return
+	}
+	if err := h.userRepo.RecordPWAVisit(user.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record PWA visit"})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *AuthHandler) FindUsersHandler(c *gin.Context) {
 	query := c.Query("query")
 	searchType := c.Query("searchType")

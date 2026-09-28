@@ -20,6 +20,7 @@ type UserRepository interface {
 	UpdateUserRole(userID string, roleName string, eventID *int) error
 	DeleteUserRole(userID string, roleName string, eventID *int) error
 	UpdateNotificationFilters(userID string, filters []string) error
+	RecordPWAVisit(userID string) error
 }
 
 func (r *userRepository) DeleteUserRole(userID string, roleName string, eventID *int) error {
@@ -148,16 +149,19 @@ func (r *userRepository) ReplaceMasterRole(userID string, roleName string) error
 }
 
 func (r *userRepository) FindUsers(query string, searchType string) ([]*models.User, error) {
-	baseQuery := "SELECT id, email, display_name, class_id, notification_filters, is_profile_complete, created_at, updated_at FROM users"
+	baseQuery := `SELECT u.id, u.email, u.display_name, u.class_id, u.notification_filters,
+		u.is_profile_complete, u.created_at, u.updated_at,
+		EXISTS(SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = u.id), u.pwa_last_seen_at
+		FROM users u`
 	var args []interface{}
 
 	if query != "" {
 		switch searchType {
 		case "email":
-			baseQuery += " WHERE email LIKE ?"
+			baseQuery += " WHERE u.email LIKE ?"
 			args = append(args, "%"+query+"%")
 		case "display_name":
-			baseQuery += " WHERE display_name LIKE ?"
+			baseQuery += " WHERE u.display_name LIKE ?"
 			args = append(args, "%"+query+"%")
 		}
 	}
@@ -175,10 +179,15 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 		var tempClassID sql.NullInt32
 		var tempDisplayName sql.NullString
 		var notificationFiltersStr string
+		var pwaLastSeenAt sql.NullTime
 
-		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &notificationFiltersStr, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt)
+		err := rows.Scan(&user.ID, &user.Email, &tempDisplayName, &tempClassID, &notificationFiltersStr, &user.IsProfileComplete, &user.CreatedAt, &user.UpdatedAt, &user.HasPushSubscription, &pwaLastSeenAt)
 		if err != nil {
 			return nil, err
+		}
+
+		if pwaLastSeenAt.Valid {
+			user.PWALastSeenAt = &pwaLastSeenAt.Time
 		}
 
 		if tempDisplayName.Valid {
@@ -243,6 +252,11 @@ func (r *userRepository) FindUsers(query string, searchType string) ([]*models.U
 	}
 
 	return users, nil
+}
+
+func (r *userRepository) RecordPWAVisit(userID string) error {
+	_, err := r.db.Exec("UPDATE users SET pwa_last_seen_at = CURRENT_TIMESTAMP, updated_at = updated_at WHERE id = ?", userID)
+	return err
 }
 
 func (r *userRepository) GetUserByEmail(email string) (*models.User, error) {
