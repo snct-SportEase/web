@@ -233,7 +233,7 @@ func (m *MockTeamRepository) GetTeamsByClassID(classID int, eventID int) ([]*mod
 	return args.Get(0).([]*models.TeamWithSport), args.Error(1)
 }
 
-func (m *MockTeamRepository) GetNoonGameTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
+func (m *MockTeamRepository) GetAssignmentTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
 	args := m.Called(classID, eventID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -356,6 +356,11 @@ type MockTournamentRepository struct {
 
 func (m *MockTournamentRepository) SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {
 	args := m.Called(eventID, sportID, sportName, tournamentData, teams)
+	return args.Error(0)
+}
+
+func (m *MockTournamentRepository) SaveMissingSportTournaments(eventID int, sportID int, tournaments []models.GeneratedTournament) error {
+	args := m.Called(eventID, sportID, tournaments)
 	return args.Error(0)
 }
 

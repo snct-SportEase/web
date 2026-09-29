@@ -21,7 +21,7 @@ type TeamRepository interface {
 	GetTeamsByUserID(userID string) ([]*models.TeamWithSport, error)
 	IsNoonGameRegistrationExempt(eventID int, sportID int) (bool, error)
 	GetTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
-	GetNoonGameTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
+	GetAssignmentTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error)
 	GetTeamByClassAndSport(classID int, sportID int, eventID int) (*models.Team, error)
 	AddTeamMember(teamID int, userID string) error
 	GetTeamMembers(teamID int) ([]*models.User, error)
@@ -141,14 +141,16 @@ func (r *teamRepository) GetTeamsByClassID(classID int, eventID int) ([]*models.
 	return teams, nil
 }
 
-func (r *teamRepository) GetNoonGameTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
+// GetAssignmentTeamsByClassID includes all sports assigned to a class, including
+// noon games and board game tournament entries.
+func (r *teamRepository) GetAssignmentTeamsByClassID(classID int, eventID int) ([]*models.TeamWithSport, error) {
 	query := `
 		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
 		FROM teams t
 		INNER JOIN sports s ON t.sport_id = s.id
 		INNER JOIN classes c ON t.class_id = c.id
 		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
-		WHERE t.class_id = ? AND c.event_id = ? AND es.location = 'noon_game'
+		WHERE t.class_id = ? AND c.event_id = ?
 	`
 	rows, err := r.db.Query(query, classID, eventID)
 	if err != nil {

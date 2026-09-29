@@ -6,6 +6,7 @@ import (
 	"backapp/internal/safelog"
 	"backapp/internal/websocket"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -56,6 +57,64 @@ func (h *TournamentHandler) GetTournamentsByEventHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, tournaments)
+}
+
+// GenerateMissingSportTournamentsHandler adds brackets for one sport without
+// deleting any existing tournaments in the event.
+func (h *TournamentHandler) GenerateMissingSportTournamentsHandler(c *gin.Context) {
+	eventID, eventErr := strconv.Atoi(c.Param("id"))
+	sportID, sportErr := strconv.Atoi(c.Param("sport_id"))
+	if eventErr != nil || sportErr != nil || eventID <= 0 || sportID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "大会または競技IDが不正です"})
+		return
+	}
+
+	eventSports, err := h.sportRepo.GetSportsByEventID(eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "大会の競技一覧を取得できませんでした"})
+		return
+	}
+	var selected *models.EventSport
+	for _, eventSport := range eventSports {
+		if eventSport.SportID == sportID {
+			selected = eventSport
+			break
+		}
+	}
+	if selected == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "この大会に登録されていない競技です"})
+		return
+	}
+	if selected.Location == "noon_game" || (selected.TemplateKey != nil && *selected.TemplateKey == "board_game_tournament") || isBoardGameTournamentSportName(selected.SportName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "この競技は専用画面で管理してください"})
+		return
+	}
+
+	existing, err := h.tournRepo.GetTournamentsByEventAndSportID(eventID, sportID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "既存のトーナメントを確認できませんでした"})
+		return
+	}
+	if len(existing) > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "この競技のトーナメントは既に作成されています"})
+		return
+	}
+
+	generated := h.generateTournamentsPreviewForSport(eventID, selected)
+	if len(generated) == 0 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "トーナメントを生成できませんでした。競技のチーム数を確認してください"})
+		return
+	}
+	if err := h.tournRepo.SaveMissingSportTournaments(eventID, sportID, generated); err != nil {
+		if errors.Is(err, repository.ErrTournamentAlreadyExists) {
+			c.JSON(http.StatusConflict, gin.H{"error": "この競技のトーナメントは既に作成されています"})
+			return
+		}
+		log.Printf("[GenerateMissingSportTournaments] failed for event %d sport %d: %s", eventID, sportID, safelog.Value(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "トーナメントの追加に失敗しました"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"message": "トーナメントを追加しました", "count": len(generated)})
 }
 
 func (h *TournamentHandler) GenerateAllTournamentsPreviewHandler(c *gin.Context) {
@@ -121,7 +180,7 @@ func (h *TournamentHandler) generateTournamentsPreviewForSport(eventID int, even
 		return generatedTournaments
 	}
 
-	teams, err := h.sportRepo.GetTeamsBySportID(sport.ID)
+	teams, err := h.sportRepo.GetTeamsByEventAndSportID(eventID, sport.ID)
 	if err != nil {
 		return generatedTournaments
 	}
