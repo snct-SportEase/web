@@ -23,6 +23,8 @@ var (
 type TournamentRepository interface {
 	SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error
 	SaveMissingSportTournaments(eventID int, sportID int, tournaments []models.GeneratedTournament) error
+	GetTournamentSeedOrder(eventID, tournamentID int) ([]TournamentSeedTeam, error)
+	UpdateTournamentSeedOrder(eventID, tournamentID int, expectedIDs, teamIDs []int) error
 	DeleteTournamentsByEventID(eventID int) error
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)

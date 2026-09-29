@@ -24,6 +24,9 @@
 
     let editingTournamentId = $state(null);
     let teamsForEditing = $state([]);
+    let originalSeedTeamIDs = $state([]);
+    let isLoadingSeeds = $state(false);
+    let isSavingSeeds = $state(false);
     const flipDurationMs = 300;
 
     let boardGameClasses = $state([]);
@@ -458,13 +461,41 @@
         return newBracketData;
     }
 
-    function toggleEdit(tournament) {
+    function isEditableSavedTournament(tournament) {
+        const sport = eventSports.find((item) => Number(item.sport_id) === Number(tournament.sport_id));
+        return Boolean(sport && sport.location !== 'noon_game' && sport.template_key !== 'board_game_tournament' &&
+            sport.sport_name !== '将棋' && sport.sport_name !== 'オセロ' &&
+            tournament.data?.matches?.some((match) => match.roundIndex === 0 &&
+                match.sides?.some((side) => Number(side.teamId) > 0)));
+    }
+
+    async function toggleEdit(tournament) {
         if (editingTournamentId === tournament.id) {
             editingTournamentId = null;
             teamsForEditing = [];
-        } else {
+            originalSeedTeamIDs = [];
+            return;
+        }
+        if (generatedTournamentsPreview) {
             editingTournamentId = tournament.id;
             teamsForEditing = getTeams(tournament);
+            originalSeedTeamIDs = [];
+            return;
+        }
+        const currentEvent = get(activeEvent);
+        if (!currentEvent) return;
+        isLoadingSeeds = true;
+        try {
+            const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/${tournament.id}/seeds`);
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'シード順を取得できませんでした');
+            originalSeedTeamIDs = result.seeds.map((seed) => seed.team_id);
+            teamsForEditing = result.seeds.map((seed) => ({ id: String(seed.team_id), teamID: seed.team_id, name: seed.team_name }));
+            editingTournamentId = tournament.id;
+        } catch (error) {
+            alert(error.message || 'シード順を取得できませんでした');
+        } finally {
+            isLoadingSeeds = false;
         }
     }
 
@@ -472,8 +503,35 @@
         teamsForEditing = e.detail.items;
     }
 
-    function saveTeamOrder(tournament) {
+    async function saveTeamOrder(tournament) {
         if (!browser) return;
+        if (!generatedTournamentsPreview) {
+            const currentEvent = get(activeEvent);
+            if (!currentEvent || isSavingSeeds) return;
+            isSavingSeeds = true;
+            try {
+                const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/${tournament.id}/seeds`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        expected_team_ids: originalSeedTeamIDs,
+                        team_ids: teamsForEditing.map((team) => team.teamID)
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'シード順を保存できませんでした');
+                editingTournamentId = null;
+                teamsForEditing = [];
+                originalSeedTeamIDs = [];
+                await fetchTournamentsForActiveEvent();
+                alert('シード順を更新しました。');
+            } catch (error) {
+                alert(error.message || 'シード順を保存できませんでした');
+            } finally {
+                isSavingSeeds = false;
+            }
+            return;
+        }
         const newTeamNames = teamsForEditing.map(t => t.name);
         const newBracketData = updateBracketDataWithNewTeams(tournament.data, newTeamNames);
 
@@ -658,9 +716,9 @@
                 <div class="p-4 border rounded-lg mb-8">
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-lg font-bold">{tournament.name}</h3>
-                        {#if generatedTournamentsPreview}
-                        <button onclick={() => toggleEdit(tournament)} class="py-1 px-3 border border-transparent shadow-sm text-sm font-medium rounded-md text-white {editingTournamentId === tournament.id ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}">
-                            {editingTournamentId === tournament.id ? 'キャンセル' : 'シード順を編集'}
+                        {#if generatedTournamentsPreview || isEditableSavedTournament(tournament)}
+                        <button onclick={() => toggleEdit(tournament)} disabled={isLoadingSeeds || isSavingSeeds} class="py-1 px-3 border border-transparent shadow-sm text-sm font-medium rounded-md text-white disabled:opacity-50 {editingTournamentId === tournament.id ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}">
+                            {isLoadingSeeds ? '読み込み中...' : editingTournamentId === tournament.id ? 'キャンセル' : 'シード順を編集'}
                         </button>
                         {/if}
                     </div>
@@ -668,13 +726,14 @@
                     {#if editingTournamentId === tournament.id}
                         <div class="my-4 p-4 border rounded-lg bg-gray-50">
                             <h4 class="font-semibold mb-2">チームの並び替え (ドラッグ＆ドロップで編集)</h4>
+                            {#if !generatedTournamentsPreview}<p class="mb-3 text-sm text-gray-600">試合が始まるとシード順は変更できません。</p>{/if}
                             <ul class="draggable-list" use:dndzone={{ items: teamsForEditing, flipDurationMs }} onconsider={handleDnd} onfinalize={handleDnd}>
                                 {#each teamsForEditing as team (team.id)}
                                     <li class="bg-white">{team.name}</li>
                                 {/each}
                             </ul>
-                            <button onclick={() => saveTeamOrder(tournament)} class="mt-4 w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                この順序でブラケットを更新
+                            <button onclick={() => saveTeamOrder(tournament)} disabled={isSavingSeeds} class="mt-4 w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+                                {isSavingSeeds ? '保存中...' : generatedTournamentsPreview ? 'この順序でブラケットを更新' : 'このシード順を保存'}
                             </button>
                         </div>
                     {/if}
