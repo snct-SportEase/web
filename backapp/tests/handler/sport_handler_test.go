@@ -1199,3 +1199,37 @@ func TestSportHandler_UpdateSportDetailsHandler(t *testing.T) {
 		mockSportRepo.AssertExpectations(t)
 	})
 }
+
+func TestSportHandler_UpdateSportSettingsHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	newContext := func(body string) (*gin.Context, *httptest.ResponseRecorder) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "event_id", Value: "2"}, {Key: "sport_id", Value: "7"}}
+		c.Request = httptest.NewRequest(http.MethodPut, "/api/admin/events/2/sports/7/settings", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		return c, w
+	}
+
+	t.Run("updates the same event sport without deleting assignments", func(t *testing.T) {
+		sportRepo := new(MockSportRepository)
+		h := handler.NewSportHandler(sportRepo, nil, nil, nil, nil)
+		sportRepo.On("UpdateSportLocationAndDescription", 2, 7, "gym2", mock.MatchedBy(func(description *string) bool {
+			return description != nil && *description == "new"
+		})).Return(nil).Once()
+		c, w := newContext(`{"location":"gym2","description":"new"}`)
+		h.UpdateSportSettingsHandler(c)
+		assert.Equal(t, http.StatusOK, w.Code)
+		sportRepo.AssertNotCalled(t, "DeleteSportFromEvent", mock.Anything, mock.Anything)
+		sportRepo.AssertExpectations(t)
+	})
+	t.Run("rejects an occupied location", func(t *testing.T) {
+		sportRepo := new(MockSportRepository)
+		h := handler.NewSportHandler(sportRepo, nil, nil, nil, nil)
+		sportRepo.On("UpdateSportLocationAndDescription", 2, 7, "gym2", mock.Anything).Return(repository.ErrSportLocationInUse).Once()
+		c, w := newContext(`{"location":"gym2"}`)
+		h.UpdateSportSettingsHandler(c)
+		assert.Equal(t, http.StatusConflict, w.Code)
+		sportRepo.AssertExpectations(t)
+	})
+}

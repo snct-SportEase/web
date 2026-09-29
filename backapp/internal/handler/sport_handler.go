@@ -3,6 +3,7 @@ package handler
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -175,6 +176,10 @@ func (h *SportHandler) AssignSportToEventHandler(c *gin.Context) {
 	}
 
 	if err := h.sportRepo.AssignSportToEvent(&eventSport); err != nil {
+		if errors.Is(err, repository.ErrSportLocationInUse) {
+			c.JSON(http.StatusConflict, gin.H{"error": "この場所は、この大会で既に使用されています"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign sport to the event"})
 		return
 	}
@@ -292,6 +297,41 @@ func (h *SportHandler) GetSportDetailsHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, details)
+}
+
+// UpdateSportSettingsHandler changes the location and description in place.
+// Team, member, tournament, and role identities remain unchanged.
+func (h *SportHandler) UpdateSportSettingsHandler(c *gin.Context) {
+	eventID, eventErr := strconv.Atoi(c.Param("event_id"))
+	sportID, sportErr := strconv.Atoi(c.Param("sport_id"))
+	if eventErr != nil || sportErr != nil || eventID <= 0 || sportID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "大会または競技IDが不正です"})
+		return
+	}
+	var req struct {
+		Location    string  `json:"location"`
+		Description *string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "入力内容が不正です"})
+		return
+	}
+	if err := h.sportRepo.UpdateSportLocationAndDescription(eventID, sportID, strings.TrimSpace(req.Location), req.Description); err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows), errors.Is(err, repository.ErrEventSportNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "この大会の競技が見つかりません"})
+		case errors.Is(err, repository.ErrSportLocationInUse):
+			c.JSON(http.StatusConflict, gin.H{"error": "この場所は、この大会で既に使用されています"})
+		case errors.Is(err, repository.ErrInvalidSportLocation):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "場所の指定が不正です"})
+		case errors.Is(err, repository.ErrSportManagedInOtherScreen):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "この競技は専用画面で管理してください"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "競技設定を更新できませんでした"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "競技設定を更新しました"})
 }
 
 func (h *SportHandler) UpdateSportDetailsHandler(c *gin.Context) {

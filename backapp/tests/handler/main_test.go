@@ -574,6 +574,11 @@ func (m *MockSportRepository) GetSportDetails(eventID int, sportID int) (*models
 	return args.Get(0).(*models.EventSport), args.Error(1)
 }
 
+func (m *MockSportRepository) UpdateSportLocationAndDescription(eventID, sportID int, location string, description *string) error {
+	args := m.Called(eventID, sportID, location, description)
+	return args.Error(0)
+}
+
 func (m *MockSportRepository) UpdateSportDetails(eventID int, sportID int, details models.EventSport) error {
 	args := m.Called(eventID, sportID, details)
 	return args.Error(0)
