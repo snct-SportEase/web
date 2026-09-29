@@ -445,6 +445,60 @@ func TestTournamentRepository_SaveTournament_BulkInsertsMatchesAndBulkUpdatesNex
 	})
 }
 
+func TestTournamentRepository_SaveMissingSportTournaments(t *testing.T) {
+	const eventID, sportID = 2, 7
+	items := []models.GeneratedTournament{
+		{EventID: eventID, SportID: sportID, SportName: "バスケットボール"},
+		{EventID: eventID, SportID: sportID, SportName: "バスケットボール Tournament - 敗者戦Aブロック"},
+	}
+	setup := func(t *testing.T) (repository.TournamentRepository, sqlmock.Sqlmock) {
+		t.Helper()
+		db, mock, err := sqlmock.New()
+		require.NoError(t, err)
+		t.Cleanup(func() { db.Close() })
+		return repository.NewTournamentRepository(db), mock
+	}
+	expectLock := func(mock sqlmock.Sqlmock, count int) {
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT sport_id FROM event_sports WHERE event_id = ? AND sport_id = ? FOR UPDATE")).
+			WithArgs(eventID, sportID).
+			WillReturnRows(sqlmock.NewRows([]string{"sport_id"}).AddRow(sportID))
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM tournaments WHERE event_id = ? AND sport_id = ?")).
+			WithArgs(eventID, sportID).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(count))
+	}
+	insert := regexp.QuoteMeta("INSERT INTO tournaments (name, event_id, sport_id) VALUES (?, ?, ?)")
+
+	t.Run("commits every bracket together", func(t *testing.T) {
+		repo, mock := setup(t)
+		expectLock(mock, 0)
+		mock.ExpectExec(insert).WithArgs("バスケットボール Tournament", eventID, sportID).WillReturnResult(sqlmock.NewResult(100, 1))
+		mock.ExpectExec(insert).WithArgs(items[1].SportName, eventID, sportID).WillReturnResult(sqlmock.NewResult(101, 1))
+		mock.ExpectCommit()
+		require.NoError(t, repo.SaveMissingSportTournaments(eventID, sportID, items))
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("rolls back when a later bracket fails", func(t *testing.T) {
+		repo, mock := setup(t)
+		expectLock(mock, 0)
+		mock.ExpectExec(insert).WithArgs("バスケットボール Tournament", eventID, sportID).WillReturnResult(sqlmock.NewResult(100, 1))
+		insertErr := errors.New("insert failed")
+		mock.ExpectExec(insert).WithArgs(items[1].SportName, eventID, sportID).WillReturnError(insertErr)
+		mock.ExpectRollback()
+		assert.ErrorIs(t, repo.SaveMissingSportTournaments(eventID, sportID, items), insertErr)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("refuses an existing tournament", func(t *testing.T) {
+		repo, mock := setup(t)
+		expectLock(mock, 1)
+		mock.ExpectRollback()
+		assert.ErrorIs(t, repo.SaveMissingSportTournaments(eventID, sportID, items), repository.ErrTournamentAlreadyExists)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 	t.Run("Success - Update match and advance winner", func(t *testing.T) {
 		db, mock, err := sqlmock.New()

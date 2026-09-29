@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	ErrTournamentAlreadyExists    = errors.New("tournament already exists for this sport")
 	ErrMatchResultAlreadyEntered  = errors.New("match result already entered")
 	ErrInvalidMatchResult         = errors.New("invalid match result")
 	ErrMatchParticipantsUndecided = errors.New("対戦相手が確定していない試合には結果を登録できません")
@@ -21,6 +22,7 @@ var (
 
 type TournamentRepository interface {
 	SaveTournament(eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error
+	SaveMissingSportTournaments(eventID int, sportID int, tournaments []models.GeneratedTournament) error
 	DeleteTournamentsByEventID(eventID int) error
 	DeleteTournamentsByEventAndSportID(eventID int, sportID int) error
 	GetTournamentsByEventID(eventID int) ([]*models.Tournament, error)
@@ -1192,7 +1194,53 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
+	if err := r.saveTournamentTx(tx, eventID, sportID, sportName, tournamentData, teams); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
 
+// SaveMissingSportTournaments inserts every bracket for one sport atomically.
+// Locking the event_sports row serializes concurrent attempts for the same sport.
+func (r *tournamentRepository) SaveMissingSportTournaments(eventID int, sportID int, tournaments []models.GeneratedTournament) error {
+	if len(tournaments) == 0 {
+		return errors.New("no tournaments to save")
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var lockedSportID int
+	if err := tx.QueryRow("SELECT sport_id FROM event_sports WHERE event_id = ? AND sport_id = ? FOR UPDATE", eventID, sportID).Scan(&lockedSportID); err != nil {
+		return err
+	}
+	var existingCount int
+	if err := tx.QueryRow("SELECT COUNT(*) FROM tournaments WHERE event_id = ? AND sport_id = ?", eventID, sportID).Scan(&existingCount); err != nil {
+		return err
+	}
+	if existingCount > 0 {
+		return ErrTournamentAlreadyExists
+	}
+
+	for _, tournament := range tournaments {
+		if tournament.EventID != eventID || tournament.SportID != sportID {
+			return errors.New("tournament event or sport ID mismatch")
+		}
+		teams := make([]*models.Team, len(tournament.ShuffledTeams))
+		for i := range tournament.ShuffledTeams {
+			teams[i] = &tournament.ShuffledTeams[i]
+		}
+		if err := r.saveTournamentTx(tx, eventID, sportID, tournament.SportName, &tournament.TournamentData, teams); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (r *tournamentRepository) saveTournamentTx(tx *sql.Tx, eventID int, sportID int, sportName string, tournamentData *models.TournamentData, teams []*models.Team) error {
 	// トーナメント名を生成
 	// sportNameが既に完全なトーナメント名の場合はそのまま使用（" Tournament"が含まれている場合）
 	// そうでない場合は "{sportName} Tournament" を生成
@@ -1202,12 +1250,10 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 	}
 	res, err := tx.Exec("INSERT INTO tournaments (name, event_id, sport_id) VALUES (?, ?, ?)", tournamentName, eventID, sportID)
 	if err != nil {
-		tx.Rollback()
 		return fmt.Errorf("failed to insert tournament: %w (tournamentName: %s, eventID: %d, sportID: %d)", err, tournamentName, eventID, sportID)
 	}
 	tournamentID, err := res.LastInsertId()
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
 
@@ -1268,13 +1314,11 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 			matchArgs...,
 		)
 		if err != nil {
-			tx.Rollback()
 			return err
 		}
 
 		firstMatchID, err := res.LastInsertId()
 		if err != nil {
-			tx.Rollback()
 			return err
 		}
 
@@ -1358,12 +1402,11 @@ func (r *tournamentRepository) SaveTournament(eventID int, sportID int, sportNam
 			strings.TrimRight(strings.Repeat("?,", len(whereArgs)), ","),
 		)
 		if _, err := tx.Exec(query, updateArgs...); err != nil {
-			tx.Rollback()
 			return err
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 func (r *tournamentRepository) DeleteTournamentsByEventID(eventID int) error {

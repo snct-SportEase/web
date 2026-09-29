@@ -151,7 +151,7 @@ func TestTeamRepository_GetTeamsByUserID(t *testing.T) {
 
 func TestTeamRepository_IsNoonGameRegistrationExempt(t *testing.T) {
 	for _, tc := range []struct {
-		name string
+		name   string
 		exempt bool
 	}{
 		{name: "excluded session", exempt: true},
@@ -180,6 +180,7 @@ func TestTeamRepository_GetTeamsByClassID(t *testing.T) {
 			INNER JOIN classes c ON t.class_id = c.id
 			INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
 			WHERE t.class_id = ? AND c.event_id = ? AND es.location <> 'noon_game'
+			  AND (es.template_key IS NULL OR es.template_key <> 'board_game_tournament')
 		`
 	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name"}
 
@@ -224,14 +225,14 @@ func TestTeamRepository_GetTeamsByClassID(t *testing.T) {
 	})
 }
 
-func TestTeamRepository_GetNoonGameTeamsByClassID(t *testing.T) {
+func TestTeamRepository_GetAssignmentTeamsByClassID(t *testing.T) {
 	const q = `
 		SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id, s.name as sport_name
 		FROM teams t
 		INNER JOIN sports s ON t.sport_id = s.id
 		INNER JOIN classes c ON t.class_id = c.id
 		INNER JOIN event_sports es ON es.event_id = c.event_id AND es.sport_id = t.sport_id
-		WHERE t.class_id = ? AND c.event_id = ? AND es.location = 'noon_game'
+		WHERE t.class_id = ? AND c.event_id = ?
 	`
 	cols := []string{"id", "name", "class_id", "sport_id", "event_id", "sport_name"}
 
@@ -241,12 +242,18 @@ func TestTeamRepository_GetNoonGameTeamsByClassID(t *testing.T) {
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(5, 1).
 			WillReturnRows(sqlmock.NewRows(cols).
-				AddRow(10, "IS3リレー", 5, 99, 1, "学年対抗リレー"))
+				AddRow(10, "IS3バスケ", 5, 1, 1, "バスケットボール").
+				AddRow(11, "IS3リレー", 5, 99, 1, "学年対抗リレー").
+				AddRow(12, "IS3将棋A", 5, 2, 1, "将棋").
+				AddRow(13, "IS3オセロ", 5, 3, 1, "オセロ"))
 
-		teams, err := repo.GetNoonGameTeamsByClassID(5, 1)
+		teams, err := repo.GetAssignmentTeamsByClassID(5, 1)
 		require.NoError(t, err)
-		assert.Len(t, teams, 1)
-		assert.Equal(t, "学年対抗リレー", teams[0].SportName)
+		assert.Len(t, teams, 4)
+		assert.Equal(t, "バスケットボール", teams[0].SportName)
+		assert.Equal(t, "学年対抗リレー", teams[1].SportName)
+		assert.Equal(t, "将棋", teams[2].SportName)
+		assert.Equal(t, "オセロ", teams[3].SportName)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -257,7 +264,7 @@ func TestTeamRepository_GetNoonGameTeamsByClassID(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs(999, 1).
 			WillReturnRows(sqlmock.NewRows(cols))
 
-		teams, err := repo.GetNoonGameTeamsByClassID(999, 1)
+		teams, err := repo.GetAssignmentTeamsByClassID(999, 1)
 		assert.NoError(t, err)
 		assert.Nil(t, teams)
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -269,7 +276,7 @@ func TestTeamRepository_GetNoonGameTeamsByClassID(t *testing.T) {
 
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WillReturnError(errors.New("db error"))
 
-		teams, err := repo.GetNoonGameTeamsByClassID(5, 1)
+		teams, err := repo.GetAssignmentTeamsByClassID(5, 1)
 		assert.Error(t, err)
 		assert.Nil(t, teams)
 		assert.NoError(t, mock.ExpectationsWereMet())

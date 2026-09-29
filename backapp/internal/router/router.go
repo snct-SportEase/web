@@ -294,6 +294,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.PUT("/:id/mic/settings", eventHandler.SetMICVotingSettings)
 				rootEvents.POST("/:id/tournaments/generate-all", tournHandler.GenerateAllTournamentsHandler)
 				rootEvents.POST("/:id/tournaments/generate-preview", tournHandler.GenerateAllTournamentsPreviewHandler)
+				rootEvents.POST("/:id/tournaments/sports/:sport_id/generate-missing", tournHandler.GenerateMissingSportTournamentsHandler)
 				rootEvents.POST("/:id/tournaments/bulk-create", tournHandler.BulkCreateTournamentsHandler)
 				rootEvents.GET("/:id/tournaments/export/excel", tournHandler.ExportTournamentsExcelHandler)
 				rootEvents.GET("/:id/tournaments", tournHandler.GetTournamentsByEventHandler)

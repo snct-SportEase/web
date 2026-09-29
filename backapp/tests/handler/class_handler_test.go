@@ -284,9 +284,14 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
-		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(map[int][]*models.User{team.ID: members}, nil).Once()
-		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{}).Return(map[int][]*models.User{}, nil).Once()
+		shogiTeam := &models.TeamWithSport{ID: 101, Name: "IS3将棋A", SportID: 2, SportName: "将棋"}
+		othelloTeam := &models.TeamWithSport{ID: 102, Name: "IS3オセロ", SportID: 3, SportName: "オセロ"}
+		mockTeamRepo.On("GetAssignmentTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team, shogiTeam, othelloTeam}, nil).Once()
+		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID, shogiTeam.ID, othelloTeam.ID}).Return(map[int][]*models.User{
+			team.ID:        members,
+			shogiTeam.ID:   {members[0]},
+			othelloTeam.ID: {members[1]},
+		}, nil).Once()
 		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: matchDetails}, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -310,7 +315,13 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		firstMember := memberList[0].(map[string]any)
 		assignments, ok := firstMember["assignments"].([]any)
 		assert.True(t, ok)
-		assert.Len(t, assignments, 1)
+		assert.Len(t, assignments, 2)
+		assert.Equal(t, "バスケットボール", assignments[0].(map[string]any)["sport_name"])
+		assert.Equal(t, "将棋", assignments[1].(map[string]any)["sport_name"])
+		secondMember := memberList[1].(map[string]any)
+		secondAssignments := secondMember["assignments"].([]any)
+		assert.Len(t, secondAssignments, 2)
+		assert.Equal(t, "オセロ", secondAssignments[1].(map[string]any)["sport_name"])
 
 		progressData, ok := response["progress"].([]any)
 		assert.True(t, ok)
@@ -331,9 +342,8 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
-		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{noonGameTeam}, nil).Once()
+		mockTeamRepo.On("GetAssignmentTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{noonGameTeam}, nil).Once()
 		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{}).Return(map[int][]*models.MatchDetail{}, nil).Once()
-		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{}).Return(map[int][]*models.User{}, nil).Once()
 		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{noonGameTeam.ID}).Return(map[int][]*models.User{
 			noonGameTeam.ID: {members[0]},
 		}, nil).Once()
@@ -423,9 +433,8 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
+		mockTeamRepo.On("GetAssignmentTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(map[int][]*models.User{team.ID: members}, nil).Once()
-		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{}).Return(map[int][]*models.User{}, nil).Once()
 		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: losingMatches}, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -555,7 +564,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
 		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return(nil, errors.New("db error")).Once()
-		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
+		mockTeamRepo.On("GetAssignmentTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 
 		w := httptest.NewRecorder()
@@ -578,7 +587,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
 		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
+		mockTeamRepo.On("GetAssignmentTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(nil, errors.New("db error")).Once()
 
 		w := httptest.NewRecorder()
@@ -601,7 +610,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
 		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
+		mockTeamRepo.On("GetAssignmentTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(nil, errors.New("db error")).Once()
 
@@ -626,7 +635,7 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockEventRepo.On("GetActiveEvent").Return(1, nil).Once()
 		mockClassRepo.On("GetClassByID", class.ID).Return(class, nil).Once()
 		mockTeamRepo.On("GetTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
-		mockTeamRepo.On("GetNoonGameTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{}, nil).Once()
+		mockTeamRepo.On("GetAssignmentTeamsByClassID", class.ID, 1).Return([]*models.TeamWithSport{team}, nil).Once()
 		mockClassRepo.On("GetClassMembers", class.ID).Return(members, nil).Once()
 		mockTournamentRepo.On("GetMatchesForTeams", 1, []int{team.ID}).Return(map[int][]*models.MatchDetail{team.ID: matchDetails}, nil).Once()
 		mockTeamRepo.On("GetTeamMembersByTeamIDs", []int{team.ID}).Return(nil, errors.New("db error")).Once()

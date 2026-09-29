@@ -12,6 +12,15 @@
     let isExporting = $state(false);
     let allTournaments = $state([]);
     let generatedTournamentsPreview = $state(null);
+    let eventSports = $state([]);
+    let selectedMissingSportId = $state('');
+    let isCreatingMissingSport = $state(false);
+    let missingSports = $derived(generatedTournamentsPreview ? [] : eventSports.filter((sport) =>
+        sport.location !== 'noon_game' &&
+        sport.template_key !== 'board_game_tournament' &&
+        sport.sport_name !== '将棋' && sport.sport_name !== 'オセロ' &&
+        !allTournaments.some((tournament) => Number(tournament.sport_id) === Number(sport.sport_id))
+    ));
 
     let editingTournamentId = $state(null);
     let teamsForEditing = $state([]);
@@ -34,7 +43,7 @@
         await activeEvent.init();
         const currentEvent = get(activeEvent);
         if (currentEvent) {
-            await Promise.all([fetchTournamentsForActiveEvent(), fetchBoardGameSetup()]);
+            await Promise.all([fetchTournamentsForActiveEvent(), fetchBoardGameSetup(), fetchEventSports()]);
         }
     });
 
@@ -167,6 +176,43 @@
             alert(error.message || '盤上競技トーナメントの保存に失敗しました');
         } finally {
             isSavingBoardGame = false;
+        }
+    }
+
+    async function fetchEventSports() {
+        const currentEvent = get(activeEvent);
+        if (!currentEvent) return;
+        try {
+            const response = await fetch(`/api/events/${currentEvent.id}/sports`);
+            if (!response.ok) throw new Error('競技一覧の取得に失敗しました');
+            const payload = await response.json();
+            eventSports = Array.isArray(payload) ? payload : [];
+        } catch (error) {
+            console.error('Error fetching event sports:', error);
+            eventSports = [];
+        }
+    }
+
+    async function createMissingSportTournament() {
+        const currentEvent = get(activeEvent);
+        const sport = missingSports.find((item) => Number(item.sport_id) === Number(selectedMissingSportId));
+        if (!currentEvent || !sport) return;
+        if (!confirm(`${sport.sport_name}のトーナメントを追加します。よろしいですか？`)) return;
+
+        isCreatingMissingSport = true;
+        try {
+            const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/sports/${sport.sport_id}/generate-missing`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'トーナメントの追加に失敗しました');
+            selectedMissingSportId = '';
+            await fetchTournamentsForActiveEvent();
+            alert(`${sport.sport_name}のトーナメントを追加しました。`);
+        } catch (error) {
+            alert(error.message || 'トーナメントの追加に失敗しました');
+        } finally {
+            isCreatingMissingSport = false;
         }
     }
 
@@ -568,6 +614,23 @@
                 <p class="text-sm text-gray-600">現在アクティブな大会に登録されている全ての競技のトーナメントをプレビューし、保存します。</p>
                 {#if $activeEvent}
                     <p class="text-sm">アクティブな大会: <span class="font-bold">{$activeEvent.name}</span></p>
+                {/if}
+                {#if missingSports.length > 0}
+                    <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                        <h3 class="font-semibold text-indigo-900">未作成の競技を追加</h3>
+                        <p class="mt-1 text-sm text-indigo-800">選んだ競技のトーナメントだけを作成し、既存のトーナメントは保持します。</p>
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                            <select class="flex-1 rounded-md border border-indigo-300 bg-white px-3 py-2" bind:value={selectedMissingSportId} aria-label="追加する競技">
+                                <option value="">競技を選択</option>
+                                {#each missingSports as sport (sport.sport_id)}
+                                    <option value={String(sport.sport_id)}>{sport.sport_name}</option>
+                                {/each}
+                            </select>
+                            <button onclick={createMissingSportTournament} class="rounded-md bg-indigo-700 px-4 py-2 font-medium text-white hover:bg-indigo-800 disabled:opacity-50" disabled={!selectedMissingSportId || isCreatingMissingSport}>
+                                {isCreatingMissingSport ? '追加中...' : '選んだ競技を追加'}
+                            </button>
+                        </div>
+                    </div>
                 {/if}
                 <button onclick={previewAllTournaments} class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled={!$activeEvent || isGenerating}>
                     {isGenerating ? 'プレビュー生成中...' : 'トーナメントプレビューを生成'}

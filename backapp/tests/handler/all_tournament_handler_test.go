@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func makeTournamentPreviewTeams(eventID, sportID, startID int) []*models.Team {
@@ -64,7 +65,7 @@ func TestGenerateAllTournamentsPreview_LoserBracketBlocks(t *testing.T) {
 				EventID: eventID,
 			}
 		}
-		mockSportRepo.On("GetTeamsBySportID", sportID).Return(teams, nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", eventID, sportID).Return(teams, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -218,7 +219,7 @@ func TestGenerateAllTournamentsPreview_LoserBracketBlocks(t *testing.T) {
 				EventID: eventID,
 			}
 		}
-		mockSportRepo.On("GetTeamsBySportID", sportID).Return(teams, nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", eventID, sportID).Return(teams, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -273,9 +274,9 @@ func TestGenerateAllTournamentsPreview_ParallelProcessingContracts(t *testing.T)
 		}, nil).Once()
 
 		mockSportRepo.On("GetSportByID", 1).Return(&models.Sport{ID: 1, Name: "First Sport"}, nil).Once()
-		mockSportRepo.On("GetTeamsBySportID", 1).Return(makeTournamentPreviewTeams(eventID, 1, 10), nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", eventID, 1).Return(makeTournamentPreviewTeams(eventID, 1, 10), nil).Once()
 		mockSportRepo.On("GetSportByID", 3).Return(&models.Sport{ID: 3, Name: "Third Sport"}, nil).Once()
-		mockSportRepo.On("GetTeamsBySportID", 3).Return(makeTournamentPreviewTeams(eventID, 3, 30), nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", eventID, 3).Return(makeTournamentPreviewTeams(eventID, 3, 30), nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -293,7 +294,7 @@ func TestGenerateAllTournamentsPreview_ParallelProcessingContracts(t *testing.T)
 		assert.Equal(t, "Third Sport", tournaments[1].SportName)
 
 		mockSportRepo.AssertNotCalled(t, "GetSportByID", 2)
-		mockSportRepo.AssertNotCalled(t, "GetTeamsBySportID", 2)
+		mockSportRepo.AssertNotCalled(t, "GetTeamsByEventAndSportID", eventID, 2)
 		mockSportRepo.AssertExpectations(t)
 	})
 
@@ -317,7 +318,7 @@ func TestGenerateAllTournamentsPreview_ParallelProcessingContracts(t *testing.T)
 		}, nil).Once()
 		mockSportRepo.On("GetSportByID", 1).Return(&models.Sport{ID: 1, Name: "将棋"}, nil).Once()
 		mockSportRepo.On("GetSportByID", 3).Return(&models.Sport{ID: 3, Name: "バレーボール"}, nil).Once()
-		mockSportRepo.On("GetTeamsBySportID", 3).Return(makeTournamentPreviewTeams(eventID, 3, 30), nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", eventID, 3).Return(makeTournamentPreviewTeams(eventID, 3, 30), nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -330,7 +331,7 @@ func TestGenerateAllTournamentsPreview_ParallelProcessingContracts(t *testing.T)
 		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &tournaments))
 		assert.Len(t, tournaments, 1)
 		assert.Equal(t, "バレーボール", tournaments[0].SportName)
-		mockSportRepo.AssertNotCalled(t, "GetTeamsBySportID", 1)
+		mockSportRepo.AssertNotCalled(t, "GetTeamsByEventAndSportID", eventID, 1)
 		mockSportRepo.AssertNotCalled(t, "GetSportByID", 2)
 		mockSportRepo.AssertExpectations(t)
 	})
@@ -353,7 +354,7 @@ func TestGenerateAllTournamentsPreview_ParallelProcessingContracts(t *testing.T)
 
 		mockSportRepo.On("GetSportByID", 1).Return(nil, errors.New("db error")).Once()
 		mockSportRepo.On("GetSportByID", 2).Return(&models.Sport{ID: 2, Name: "Surviving Sport"}, nil).Once()
-		mockSportRepo.On("GetTeamsBySportID", 2).Return(makeTournamentPreviewTeams(eventID, 2, 20), nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", eventID, 2).Return(makeTournamentPreviewTeams(eventID, 2, 20), nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -369,7 +370,7 @@ func TestGenerateAllTournamentsPreview_ParallelProcessingContracts(t *testing.T)
 		assert.Len(t, tournaments, 1)
 		assert.Equal(t, "Surviving Sport", tournaments[0].SportName)
 
-		mockSportRepo.AssertNotCalled(t, "GetTeamsBySportID", 1)
+		mockSportRepo.AssertNotCalled(t, "GetTeamsByEventAndSportID", eventID, 1)
 		mockSportRepo.AssertExpectations(t)
 	})
 }
@@ -416,7 +417,7 @@ func TestGenerateAllTournamentsPreview_LoserBracketFirstRoundMatchMapping(t *tes
 				EventID: eventID,
 			}
 		}
-		mockSportRepo.On("GetTeamsBySportID", sportID).Return(teams, nil).Once()
+		mockSportRepo.On("GetTeamsByEventAndSportID", eventID, sportID).Return(teams, nil).Once()
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -501,4 +502,66 @@ func TestBulkCreateTournamentsRejectsBoardGameSports(t *testing.T) {
 	mockTournRepo.AssertNotCalled(t, "DeleteTournamentsByEventID", eventID)
 	mockTournRepo.AssertNotCalled(t, "SaveTournament")
 	mockSportRepo.AssertExpectations(t)
+}
+
+func TestGenerateMissingSportTournaments_PreservesExistingSports(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const eventID, sportID = 2, 7
+
+	newHandler := func() (*handler.TournamentHandler, *MockTournamentRepository, *MockSportRepository) {
+		tournRepo := new(MockTournamentRepository)
+		sportRepo := new(MockSportRepository)
+		h := handler.NewTournamentHandler(tournRepo, sportRepo, new(MockTeamRepository), new(MockClassRepository), new(MockEventRepository), websocket.NewHubManager())
+		return h, tournRepo, sportRepo
+	}
+	newContext := func() (*gin.Context, *httptest.ResponseRecorder) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "2"}, {Key: "sport_id", Value: "7"}}
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events/2/tournaments/sports/7/generate-missing", nil)
+		return c, w
+	}
+	eventSport := &models.EventSport{EventID: eventID, SportID: sportID, SportName: "バスケットボール", Location: "gym2"}
+
+	t.Run("creates only the missing gym2 brackets", func(t *testing.T) {
+		h, tournRepo, sportRepo := newHandler()
+		sportRepo.On("GetSportsByEventID", eventID).Return([]*models.EventSport{eventSport}, nil).Once()
+		tournRepo.On("GetTournamentsByEventAndSportID", eventID, sportID).Return([]*models.Tournament{}, nil).Once()
+		sportRepo.On("GetSportByID", sportID).Return(&models.Sport{ID: sportID, Name: "バスケットボール"}, nil).Once()
+		teams := make([]*models.Team, 16)
+		for i := range teams {
+			teams[i] = &models.Team{ID: i + 1, Name: "Team", ClassID: i + 1, SportID: sportID, EventID: eventID}
+		}
+		sportRepo.On("GetTeamsByEventAndSportID", eventID, sportID).Return(teams, nil).Once()
+		tournRepo.On("SaveMissingSportTournaments", eventID, sportID, mock.MatchedBy(func(items []models.GeneratedTournament) bool {
+			return len(items) == 3 && items[0].SportName == "バスケットボール"
+		})).Return(nil).Once()
+
+		c, w := newContext()
+		h.GenerateMissingSportTournamentsHandler(c)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		var response map[string]any
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, float64(3), response["count"])
+		tournRepo.AssertNotCalled(t, "DeleteTournamentsByEventID", mock.Anything)
+		tournRepo.AssertNotCalled(t, "DeleteTournamentsByEventAndSportID", mock.Anything, mock.Anything)
+		tournRepo.AssertExpectations(t)
+		sportRepo.AssertExpectations(t)
+	})
+
+	t.Run("refuses to replace an existing tournament", func(t *testing.T) {
+		h, tournRepo, sportRepo := newHandler()
+		sportRepo.On("GetSportsByEventID", eventID).Return([]*models.EventSport{eventSport}, nil).Once()
+		tournRepo.On("GetTournamentsByEventAndSportID", eventID, sportID).Return([]*models.Tournament{{ID: 42}}, nil).Once()
+
+		c, w := newContext()
+		h.GenerateMissingSportTournamentsHandler(c)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		tournRepo.AssertNotCalled(t, "SaveMissingSportTournaments", mock.Anything, mock.Anything, mock.Anything)
+		tournRepo.AssertNotCalled(t, "DeleteTournamentsByEventID", mock.Anything)
+		tournRepo.AssertExpectations(t)
+		sportRepo.AssertExpectations(t)
+	})
 }
