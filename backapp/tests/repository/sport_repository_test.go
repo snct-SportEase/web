@@ -252,6 +252,9 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE id = ? FOR UPDATE")).WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		mock.ExpectQuery(regexp.QuoteMeta(checkDupSportQ)).WithArgs(1, 3).
 			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
@@ -261,6 +264,7 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 			WithArgs(es.EventID, es.SportID, es.Description, es.RulesPdfURL, es.Location, es.TemplateKey, es.MinCapacity, es.MaxCapacity).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
+		mock.ExpectCommit()
 		assert.NoError(t, repo.AssignSportToEvent(es))
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -268,10 +272,14 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 	t.Run("sport already assigned to event", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE id = ? FOR UPDATE")).WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		mock.ExpectQuery(regexp.QuoteMeta(checkDupSportQ)).WithArgs(1, 3).
 			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
+		mock.ExpectRollback()
 		err := repo.AssignSportToEvent(es)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "すでにこの大会に割り当てられています")
@@ -281,21 +289,28 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 	t.Run("location already used in event", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE id = ? FOR UPDATE")).WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		mock.ExpectQuery(regexp.QuoteMeta(checkDupSportQ)).WithArgs(1, 3).
 			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 		mock.ExpectQuery(regexp.QuoteMeta(checkDupLocQ)).WithArgs(1, "gym1").
 			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
+		mock.ExpectRollback()
 		err := repo.AssignSportToEvent(es)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "この場所は")
+		assert.ErrorIs(t, err, repository.ErrSportLocationInUse)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("location=other allows duplicate location", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE id = ? FOR UPDATE")).WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		esOther := *es
 		esOther.Location = "other"
@@ -307,6 +322,7 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 			WithArgs(esOther.EventID, esOther.SportID, esOther.Description, esOther.RulesPdfURL, esOther.Location, esOther.TemplateKey, esOther.MinCapacity, esOther.MaxCapacity).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
+		mock.ExpectCommit()
 		assert.NoError(t, repo.AssignSportToEvent(&esOther))
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -314,6 +330,9 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 	t.Run("custom other location allows duplicate location", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE id = ? FOR UPDATE")).WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		esOther := *es
 		esOther.Location = "other:中庭ステージ"
@@ -325,6 +344,7 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 			WithArgs(esOther.EventID, esOther.SportID, esOther.Description, esOther.RulesPdfURL, esOther.Location, esOther.TemplateKey, esOther.MinCapacity, esOther.MaxCapacity).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
+		mock.ExpectCommit()
 		assert.NoError(t, repo.AssignSportToEvent(&esOther))
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -332,6 +352,9 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 	t.Run("location=noon_game allows multiple sessions", func(t *testing.T) {
 		repo, mock, close := setupSport(t)
 		defer close()
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM events WHERE id = ? FOR UPDATE")).WithArgs(1).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		esNoonGame := *es
 		esNoonGame.Location = "noon_game"
@@ -342,6 +365,7 @@ func TestSportRepository_AssignSportToEvent(t *testing.T) {
 			WithArgs(esNoonGame.EventID, esNoonGame.SportID, esNoonGame.Description, esNoonGame.RulesPdfURL, esNoonGame.Location, esNoonGame.TemplateKey, esNoonGame.MinCapacity, esNoonGame.MaxCapacity).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
+		mock.ExpectCommit()
 		assert.NoError(t, repo.AssignSportToEvent(&esNoonGame))
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})

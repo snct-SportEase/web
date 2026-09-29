@@ -21,6 +21,7 @@ type SportRepository interface {
 	GetTeamsByEventAndSportID(eventID int, sportID int) ([]*models.Team, error)
 	GetSportDetails(eventID int, sportID int) (*models.EventSport, error)
 	UpdateSportDetails(eventID int, sportID int, details models.EventSport) error
+	UpdateSportLocationAndDescription(eventID, sportID int, location string, description *string) error
 }
 
 var ErrEventSportNotFound = errors.New("sport is not assigned to event")
@@ -140,36 +141,45 @@ func isBoardGameTemplate(templateKey *string) bool {
 
 // AssignSportToEvent assigns a sport to an event in the database.
 func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) error {
-	// Check if the sport is already assigned to the event
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Use the same event lock as location editing to prevent both requests from
+	// assigning the same exclusive physical location concurrently.
+	var lockedEventID int
+	if err := tx.QueryRow("SELECT id FROM events WHERE id = ? FOR UPDATE", eventSport.EventID).Scan(&lockedEventID); err != nil {
+		return err
+	}
+
 	var count int
 	query := "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND sport_id = ?"
-	err := r.db.QueryRow(query, eventSport.EventID, eventSport.SportID).Scan(&count)
-	if err != nil {
+	if err := tx.QueryRow(query, eventSport.EventID, eventSport.SportID).Scan(&count); err != nil {
 		return err
 	}
 	if count > 0 {
 		return errors.New("この競技はすでにこの大会に割り当てられています。")
 	}
 
-	// Multiple noon-game sessions may coexist. Like "other", noon_game is a
-	// shared logical location rather than an exclusive physical court.
+	// Noon games and custom other locations are shared logical locations.
 	if !isOtherLocation(eventSport.Location) && eventSport.Location != "noon_game" {
-		query := "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND location = ?"
-		err := r.db.QueryRow(query, eventSport.EventID, eventSport.Location).Scan(&count)
-		if err != nil {
+		query = "SELECT COUNT(*) FROM event_sports WHERE event_id = ? AND location = ?"
+		if err := tx.QueryRow(query, eventSport.EventID, eventSport.Location).Scan(&count); err != nil {
 			return err
 		}
 		if count > 0 {
-			return errors.New("この場所は、この大会で既に使用されています。")
+			return ErrSportLocationInUse
 		}
 	}
 
 	query = "INSERT INTO event_sports (event_id, sport_id, description, rules_pdf_url, location, template_key, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-	_, err = r.db.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.RulesPdfURL, eventSport.Location, eventSport.TemplateKey, eventSport.MinCapacity, eventSport.MaxCapacity)
-	if err != nil {
+	if _, err := tx.Exec(query, eventSport.EventID, eventSport.SportID, eventSport.Description, eventSport.RulesPdfURL, eventSport.Location, eventSport.TemplateKey, eventSport.MinCapacity, eventSport.MaxCapacity); err != nil {
 		log.Printf("Error inserting EventSport: %v", err)
+		return err
 	}
-	return err
+	return tx.Commit()
 }
 
 func isOtherLocation(location string) bool {

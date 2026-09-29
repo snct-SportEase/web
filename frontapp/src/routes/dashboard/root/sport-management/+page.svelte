@@ -16,6 +16,11 @@
 
     let currentActiveEvent = $state(null);
     let editingCapacity = $state(null); // { event_id, sport_id } or null
+    let editingSportId = $state(null);
+    let editingLocation = $state('');
+    let editingOtherLocation = $state('');
+    let editingDescription = $state('');
+    let isSavingSettings = $state(false);
     let editingMinCapacity = $state(null);
     let editingMaxCapacity = $state(null);
     let isAssigning = $state(false); // 割り当て処理中のフラグ
@@ -51,6 +56,7 @@
         }
 
         unsubscribe = activeEvent.subscribe(value => {
+            if (currentActiveEvent?.id !== value?.id) cancelEditSportSettings();
             currentActiveEvent = value;
             if (value) {
                 // アクティブイベントが変わったら、割り当て済み競技を再取得
@@ -197,7 +203,7 @@
         }
 
         const sportName = getSportName(sportId);
-        if (!confirm(`本当に「${sportName}」の割り当てを解除しますか？この操作は元に戻せません。`)) {
+        if (!confirm(`本当に「${sportName}」の割り当てを解除しますか？チーム・メンバー割当とトーナメントも削除されます。場所変更は「場所・概要を編集」を使用してください。`)) {
             return;
         }
 
@@ -257,6 +263,57 @@
             other: 'その他'
         };
         return labels[location] || location;
+    }
+
+    function canEditSportSettings(eventSport) {
+        const name = eventSport.sport_name || getSportName(eventSport.sport_id);
+        return eventSport.template_key !== 'board_game_tournament' &&
+            name !== '将棋' && name !== 'オセロ';
+    }
+
+    function startEditSportSettings(eventSport) {
+        editingSportId = eventSport.sport_id;
+        editingLocation = isOtherLocation(eventSport.location) ? 'other' : eventSport.location;
+        editingOtherLocation = isOtherLocation(eventSport.location)
+            ? eventSport.location.slice('other:'.length) : '';
+        editingDescription = eventSport.description || '';
+    }
+
+    function cancelEditSportSettings() {
+        editingSportId = null;
+        editingLocation = '';
+        editingOtherLocation = '';
+        editingDescription = '';
+    }
+
+    async function saveSportSettings(eventSport) {
+        if (!currentActiveEvent || isSavingSettings) return;
+        let location = editingLocation;
+        if (location === 'other') {
+            const customLocation = editingOtherLocation.trim();
+            if (!customLocation && eventSport.location !== 'other') {
+                alert('具体的な場所を入力してください。');
+                return;
+            }
+            location = customLocation ? `other:${customLocation}` : 'other';
+        }
+        isSavingSettings = true;
+        try {
+            const response = await fetch(`/api/admin/events/${currentActiveEvent.id}/sports/${eventSport.sport_id}/settings`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ location, description: editingDescription.trim() || null })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || '競技設定を更新できませんでした');
+            await fetchEventSports(currentActiveEvent.id);
+            cancelEditSportSettings();
+            alert('場所と概要を更新しました。');
+        } catch (error) {
+            alert(`更新エラー: ${error.message}`);
+        } finally {
+            isSavingSettings = false;
+        }
     }
 
     function startEditCapacity(eventId, sportId) {
@@ -497,11 +554,51 @@
                                                 {/if}
                                             </td>
                                             <td class="px-4 py-3">
-                                                <button onclick={() => deleteAssignedSport(es.sport_id)} class="text-red-600 hover:text-red-800 font-semibold text-xs py-1 px-3 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-150">
-                                                    解除
-                                                </button>
+                                                <div class="flex flex-wrap gap-2">
+                                                    {#if canEditSportSettings(es)}
+                                                        <button onclick={() => editingSportId === es.sport_id ? cancelEditSportSettings() : startEditSportSettings(es)} disabled={isSavingSettings} class="text-indigo-700 hover:text-indigo-900 font-semibold text-xs py-1 px-3 rounded-full bg-indigo-100 hover:bg-indigo-200">
+                                                            {editingSportId === es.sport_id ? '取消' : '場所・概要を編集'}
+                                                        </button>
+                                                    {/if}
+                                                    <button onclick={() => deleteAssignedSport(es.sport_id)} class="text-red-600 hover:text-red-800 font-semibold text-xs py-1 px-3 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-150">
+                                                        解除
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
+                                        {#if editingSportId === es.sport_id}
+                                            <tr class="border-t bg-indigo-50">
+                                                <td colspan="5" class="px-4 py-4">
+                                                    <div class="grid gap-3 sm:grid-cols-2">
+                                                        <div>
+                                                            <label for="edit-location-{es.sport_id}" class="block text-sm font-medium text-gray-700">場所</label>
+                                                            <select id="edit-location-{es.sport_id}" bind:value={editingLocation} class="mt-1 w-full rounded-md border-gray-300">
+                                                                {#each allLocations as loc (loc)}
+                                                                    <option value={loc} disabled={usedLocations.includes(loc) && loc !== es.location}>
+                                                                        {locationOptionLabel(loc)} {usedLocations.includes(loc) && loc !== es.location ? '(使用中)' : ''}
+                                                                    </option>
+                                                                {/each}
+                                                            </select>
+                                                        </div>
+                                                        {#if editingLocation === 'other'}
+                                                            <div>
+                                                                <label for="edit-other-location-{es.sport_id}" class="block text-sm font-medium text-gray-700">具体的な開催地</label>
+                                                                <input id="edit-other-location-{es.sport_id}" bind:value={editingOtherLocation} maxlength="249" class="mt-1 w-full rounded-md border-gray-300" placeholder="例: 中庭ステージ" />
+                                                            </div>
+                                                        {/if}
+                                                        <div class="sm:col-span-2">
+                                                            <label for="edit-description-{es.sport_id}" class="block text-sm font-medium text-gray-700">概要</label>
+                                                            <textarea id="edit-description-{es.sport_id}" bind:value={editingDescription} class="mt-1 w-full rounded-md border-gray-300" rows="2"></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <p class="mt-3 text-xs text-gray-600">競技の割り当て、メンバー、トーナメントは保持されます。</p>
+                                                    <div class="mt-3 flex gap-2">
+                                                        <button onclick={() => saveSportSettings(es)} disabled={isSavingSettings} class="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">{isSavingSettings ? '保存中...' : '変更を保存'}</button>
+                                                        <button onclick={cancelEditSportSettings} disabled={isSavingSettings} class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-800 disabled:opacity-50">取消</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {/if}
                                     {:else}
                                         <tr>
                                             <td colspan="5" class="text-center py-6 text-gray-500 italic">
