@@ -364,6 +364,19 @@ func (m *MockTournamentRepository) SaveMissingSportTournaments(eventID int, spor
 	return args.Error(0)
 }
 
+func (m *MockTournamentRepository) GetTournamentSeedOrder(eventID, tournamentID int) ([]repository.TournamentSeedTeam, error) {
+	args := m.Called(eventID, tournamentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]repository.TournamentSeedTeam), args.Error(1)
+}
+
+func (m *MockTournamentRepository) UpdateTournamentSeedOrder(eventID, tournamentID int, expectedIDs, teamIDs []int) error {
+	args := m.Called(eventID, tournamentID, expectedIDs, teamIDs)
+	return args.Error(0)
+}
+
 func (m *MockTournamentRepository) DeleteTournamentsByEventID(eventID int) error {
 	args := m.Called(eventID)
 	return args.Error(0)
