@@ -462,7 +462,8 @@ func (r *classRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*mod
 }
 
 // attachSportScores includes assigned competitions even before their first result.
-// A sport ID, rather than a location, also separates sports sharing "other".
+// Ordinary sports are separated by sport ID. Board games are additionally
+// separated by tournament so shogi's A and B blocks are displayed independently.
 func (r *classRepository) attachSportScores(eventIDs []int, scores map[int][]*models.ClassScore) error {
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(eventIDs)), ",")
 	args := make([]interface{}, len(eventIDs))
@@ -472,16 +473,47 @@ func (r *classRepository) attachSportScores(eventIDs []int, scores map[int][]*mo
 	// #nosec G201 -- only internally generated placeholders are interpolated; IDs are bound.
 	rows, err := r.db.Query(fmt.Sprintf(`
 		SELECT es.event_id, c.id, s.id, s.name,
-			EXISTS(SELECT 1 FROM board_game_runs bg WHERE bg.event_id=es.event_id AND bg.sport_id=es.sport_id),
-			COALESCE(sl.reason, ''), COALESCE(SUM(sl.points), 0)
+			0 AS tournament_id, '' AS tournament_name, '' AS slot_key, FALSE AS is_board_game,
+			COALESCE(sl.reason, '') AS reason, COALESCE(SUM(sl.points), 0) AS points
 		FROM event_sports es
 		JOIN sports s ON s.id=es.sport_id
 		JOIN classes c ON c.event_id=es.event_id
 		LEFT JOIN score_logs sl ON sl.event_id=es.event_id AND sl.class_id=c.id AND sl.sport_id=es.sport_id
 		WHERE es.event_id IN (%s) AND es.location <> 'noon_game'
+			AND NOT EXISTS (
+				SELECT 1 FROM board_game_runs bg
+				WHERE bg.event_id=es.event_id AND bg.sport_id=es.sport_id
+			)
 		GROUP BY es.event_id, es.sport_id, c.id, s.id, s.name, sl.reason
-		ORDER BY es.event_id, c.id, s.id, sl.reason
-	`, placeholders), args...)
+
+		UNION ALL
+
+		SELECT bg.event_id, c.id, s.id, s.name,
+			block.tournament_id, block.tournament_name, block.slot_key, TRUE AS is_board_game,
+			COALESCE(sl.reason, '') AS reason, COALESCE(SUM(sl.points), 0) AS points
+		FROM board_game_runs bg
+		JOIN sports s ON s.id=bg.sport_id
+		JOIN classes c ON c.event_id=bg.event_id
+		JOIN (
+			SELECT DISTINCT entry.run_id, entry.tournament_id, tournament.name AS tournament_name, entry.slot_key
+			FROM board_game_entries entry
+			JOIN tournaments tournament ON tournament.id=entry.tournament_id
+		) block ON block.run_id=bg.id
+		LEFT JOIN score_logs sl ON sl.event_id=bg.event_id
+			AND sl.class_id=c.id
+			AND sl.sport_id=bg.sport_id
+			AND sl.board_game_run_id=bg.id
+			AND EXISTS (
+				SELECT 1 FROM matches source_match
+				WHERE source_match.id=sl.source_match_id
+					AND source_match.tournament_id=block.tournament_id
+			)
+		WHERE bg.event_id IN (%s)
+		GROUP BY bg.event_id, c.id, s.id, s.name,
+			block.tournament_id, block.tournament_name, block.slot_key, sl.reason
+
+		ORDER BY 1, 2, 3, 5, 9
+	`, placeholders, placeholders), append(args, args...)...)
 	if err != nil {
 		return fmt.Errorf("failed to get sport scores: %w", err)
 	}
@@ -495,18 +527,27 @@ func (r *classRepository) attachSportScores(eventIDs []int, scores map[int][]*mo
 		}
 	}
 	for rows.Next() {
-		var eventID, classID, sportID, points int
-		var name, reason string
+		var eventID, classID, sportID, tournamentID, points int
+		var name, tournamentName, slotKey, reason string
 		var boardGame bool
-		if err := rows.Scan(&eventID, &classID, &sportID, &name, &boardGame, &reason, &points); err != nil {
+		if err := rows.Scan(&eventID, &classID, &sportID, &name, &tournamentID, &tournamentName, &slotKey, &boardGame, &reason, &points); err != nil {
 			return err
 		}
 		score := byClass[eventID][classID]
 		if score == nil {
 			continue
 		}
-		if len(score.SportScores) == 0 || score.SportScores[len(score.SportScores)-1].SportID != sportID {
-			score.SportScores = append(score.SportScores, models.SportScore{SportID: sportID, SportName: name, IsBoardGame: boardGame})
+		if len(score.SportScores) == 0 ||
+			score.SportScores[len(score.SportScores)-1].SportID != sportID ||
+			score.SportScores[len(score.SportScores)-1].TournamentID != tournamentID {
+			score.SportScores = append(score.SportScores, models.SportScore{
+				SportID:        sportID,
+				SportName:      name,
+				TournamentID:   tournamentID,
+				TournamentName: tournamentName,
+				SlotKey:        slotKey,
+				IsBoardGame:    boardGame,
+			})
 		}
 		sport := &score.SportScores[len(score.SportScores)-1]
 		switch {

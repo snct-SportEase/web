@@ -4,6 +4,9 @@ package models
 type SportScore struct {
 	SportID                    int    `json:"sport_id"`
 	SportName                  string `json:"sport_name"`
+	TournamentID               int    `json:"tournament_id,omitempty"`
+	TournamentName             string `json:"tournament_name,omitempty"`
+	SlotKey                    string `json:"slot_key,omitempty"`
 	IsBoardGame                bool   `json:"is_board_game"`
 	Win1Points                 int    `json:"win1_points"`
 	Win2Points                 int    `json:"win2_points"`
