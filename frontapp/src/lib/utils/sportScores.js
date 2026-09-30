@@ -8,20 +8,31 @@ const tournamentFields = [
 
 export function sportScoreGroups(score) {
   if (!Array.isArray(score?.sport_scores)) return null;
-  return score.sport_scores.map((sport) => ({
-    location: `sport_${sport.sport_id}`,
-    label: sport.sport_name,
-    items: (sport.is_board_game
-      ? [['win_points', '勝利点'], ['rank_points', '順位点']]
-      : tournamentFields)
-      .map(([field, label]) => ({
-        key: `sport_${sport.sport_id}_${field}`,
+  return score.sport_scores.map((sport) => {
+    const tournamentId = Number(sport.tournament_id) || 0;
+    const blockLabel =
+      sport.is_board_game && sport.slot_key && sport.slot_key !== 'MAIN'
+        ? ` ${sport.slot_key}ブロック`
+        : '';
+    return {
+      location: `sport_${sport.sport_id}${tournamentId ? `_tournament_${tournamentId}` : ''}`,
+      label: `${sport.sport_name}${blockLabel}`,
+      items: (sport.is_board_game
+        ? [
+            ['win_points', '勝利点'],
+            ['rank_points', '順位点']
+          ]
+        : tournamentFields
+      ).map(([field, label]) => ({
+        key: `sport_${sport.sport_id}${tournamentId ? `_tournament_${tournamentId}` : ''}_${field}`,
         label,
         field,
         sportId: sport.sport_id,
+        tournamentId,
         value: Number(sport[field]) || 0
       }))
-  }));
+    };
+  });
 }
 
 export function sportScoreItems(score) {
@@ -32,7 +43,13 @@ export function sportScoreItems(score) {
 
 export function scoreItemValue(score, item) {
   if (item.sportId !== undefined) {
-    return score.sport_scores?.find((sport) => sport.sport_id === item.sportId)?.[item.field] || 0;
+    return (
+      score.sport_scores?.find(
+        (sport) =>
+          sport.sport_id === item.sportId &&
+          (Number(sport.tournament_id) || 0) === (item.tournamentId || 0)
+      )?.[item.field] || 0
+    );
   }
   return score[item.key] || 0;
 }
