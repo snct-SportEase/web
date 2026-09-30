@@ -26,6 +26,7 @@ type ClassScore struct {
 	InitialPoints                  int               `json:"initial_points"`
 	SurveyPoints                   int               `json:"survey_points"`
 	AttendancePoints               int               `json:"attendance_points"`
+	MicPoints                      int               `json:"mic_points"`
 	Gym1Win1Points                 int               `json:"gym1_win1_points"`
 	Gym1Win2Points                 int               `json:"gym1_win2_points"`
 	Gym1Win3Points                 int               `json:"gym1_win3_points"`

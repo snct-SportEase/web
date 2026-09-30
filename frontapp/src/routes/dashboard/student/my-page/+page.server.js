@@ -233,6 +233,7 @@ const buildScoreBreakdown = (classScore) => {
 		...(isAutumn ? [{ key: 'initial_points', label: '初期点', value: toNumber(classScore.initial_points) }] : []),
 		...(isAutumn ? [{ key: 'survey_points', label: 'アンケート', value: toNumber(classScore.survey_points) }] : []),
 		{ key: 'attendance_points', label: '出席', value: toNumber(classScore.attendance_points) },
+		{ key: 'mic_points', label: 'MIC点', value: toNumber(classScore.mic_points) },
 		{ key: 'noon_game_points', label: '昼競技', value: toNumber(classScore.noon_game_points) }
 	];
 
@@ -305,6 +306,7 @@ const buildScoreBreakdown = (classScore) => {
 	const categoryBreakdown = [
 		...(isAutumn ? [{ label: 'アンケート', value: toNumber(classScore.survey_points) }] : []),
 		{ label: '出席', value: toNumber(classScore.attendance_points) },
+		{ label: 'MIC点', value: toNumber(classScore.mic_points) },
 		...sportSections.map((section) => ({
 			label: section.label,
 			value: section.total

@@ -171,6 +171,7 @@
         { key: 'initial_points', label: '初期点' },
         { key: 'survey_points', label: 'アンケート' },
         { key: 'attendance_points', label: '出席点' },
+        { key: 'mic_points', label: 'MIC点' },
         ...(sportScoreItems(scores[0]) ?? [
             { key: 'gym1_win1_points', label: `${getSportName('gym1')}1勝点` },
             { key: 'gym1_win2_points', label: `${getSportName('gym1')}2勝点` },
