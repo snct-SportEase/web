@@ -28,8 +28,8 @@ func TestSportScoresAndMigrationMySQL(t *testing.T) {
             points INT, reason VARCHAR(100), source_match_id INT NULL, board_game_run_id INT NULL,
             CONSTRAINT chk_score_logs_reason CHECK (reason <> 'unsupported')
         );
-        INSERT INTO sports VALUES (10,'サッカー'),(11,'キックベース'),(12,'将棋'),(13,'未開始競技');
-        INSERT INTO event_sports VALUES (1,10,'other'),(1,11,'other:校庭'),(1,12,'other'),(1,13,'other'),(2,10,'other');
+		INSERT INTO sports VALUES (10,'サッカー'),(11,'キックベース'),(12,'将棋'),(13,'未開始競技'),(14,'将棋');
+		INSERT INTO event_sports VALUES (1,10,'other'),(1,11,'other:校庭'),(1,12,'other'),(1,13,'other'),(1,14,'other'),(2,10,'other');
         INSERT INTO tournaments VALUES
             (1,1,10,'サッカー'),(2,1,11,'キックベース'),
             (3,1,12,'将棋 Aブロック'),(4,1,12,'将棋 Bブロック');
@@ -80,6 +80,9 @@ func TestSportScoresAndMigrationMySQL(t *testing.T) {
 	require.Equal(t, models.SportScore{SportID: 12, SportName: "将棋", TournamentID: 3, TournamentName: "将棋 Aブロック", SlotKey: "A", IsBoardGame: true, WinPoints: 7, RankPoints: 80}, scores[1][0].SportScores[2])
 	require.Equal(t, models.SportScore{SportID: 12, SportName: "将棋", TournamentID: 4, TournamentName: "将棋 Bブロック", SlotKey: "B", IsBoardGame: true, WinPoints: 14, RankPoints: 60}, scores[1][0].SportScores[3])
 	require.Equal(t, models.SportScore{SportID: 13, SportName: "未開始競技"}, scores[1][0].SportScores[4])
+	for _, sport := range scores[1][0].SportScores {
+		require.NotEqual(t, 14, sport.SportID, "legacy ordinary shogi must not create zero-point tournament fields")
+	}
 	require.Equal(t, models.SportScore{SportID: 10, SportName: "サッカー"}, scores[2][0].SportScores[0], "events must stay isolated")
 
 	down, err := os.ReadFile("../../db/migrations/0027_add_sport_scoped_score_logs.down.sql")

@@ -254,6 +254,7 @@ func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassSco
 			cs.initial_points,
 			cs.survey_points,
 			cs.attendance_points,
+			cs.mic_points,
 			cs.gym1_win1_points,
 			cs.gym1_win2_points,
 			cs.gym1_win3_points,
@@ -297,6 +298,7 @@ func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassSco
 			&score.InitialPoints,
 			&score.SurveyPoints,
 			&score.AttendancePoints,
+			&score.MicPoints,
 			&score.Gym1Win1Points,
 			&score.Gym1Win2Points,
 			&score.Gym1Win3Points,
@@ -384,6 +386,7 @@ func (r *classRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*mod
 			cs.initial_points,
 			cs.survey_points,
 			cs.attendance_points,
+			cs.mic_points,
 			cs.gym1_win1_points,
 			cs.gym1_win2_points,
 			cs.gym1_win3_points,
@@ -426,6 +429,7 @@ func (r *classRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*mod
 			&score.InitialPoints,
 			&score.SurveyPoints,
 			&score.AttendancePoints,
+			&score.MicPoints,
 			&score.Gym1Win1Points,
 			&score.Gym1Win2Points,
 			&score.Gym1Win3Points,
@@ -481,8 +485,11 @@ func (r *classRepository) attachSportScores(eventIDs []int, scores map[int][]*mo
 		LEFT JOIN score_logs sl ON sl.event_id=es.event_id AND sl.class_id=c.id AND sl.sport_id=es.sport_id
 		WHERE es.event_id IN (%s) AND es.location <> 'noon_game'
 			AND NOT EXISTS (
-				SELECT 1 FROM board_game_runs bg
-				WHERE bg.event_id=es.event_id AND bg.sport_id=es.sport_id
+				SELECT 1
+				FROM board_game_runs bg
+				JOIN sports board_sport ON board_sport.id=bg.sport_id
+				WHERE bg.event_id=es.event_id
+					AND (bg.sport_id=es.sport_id OR TRIM(board_sport.name)=TRIM(s.name))
 			)
 		GROUP BY es.event_id, es.sport_id, c.id, s.id, s.name, sl.reason
 

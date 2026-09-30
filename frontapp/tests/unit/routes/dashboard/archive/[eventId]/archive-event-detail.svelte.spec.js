@@ -123,6 +123,7 @@ describe('Archive Event Detail Page', () => {
               class_name: '1A',
               season: 'spring',
               attendance_points: 5,
+              mic_points: 3,
               gym1_win1_points: 3,
               gym1_win2_points: 0,
               gym1_win3_points: 0,
@@ -137,9 +138,9 @@ describe('Archive Event Detail Page', () => {
               ground_win3_points: 0,
               ground_champion_points: 0,
               noon_game_points: 2,
-              total_points_current_event: 10,
+              total_points_current_event: 13,
               rank_current_event: 1,
-              total_points_overall: 10,
+              total_points_overall: 13,
               rank_overall: 1,
               sport_names: {
                 gym1: 'バスケットボール',
@@ -235,6 +236,7 @@ describe('Archive Event Detail Page', () => {
     await detailsToggle.click();
 
     await expect.element(page.getByText('出席点')).toBeInTheDocument();
+    await expect.element(page.getByText('MIC点')).toBeInTheDocument();
     await expect.element(page.getByText('昼競技', { exact: true })).toBeInTheDocument();
     await expect.element(page.getByText('バスケットボール1勝点')).toBeInTheDocument();
   });

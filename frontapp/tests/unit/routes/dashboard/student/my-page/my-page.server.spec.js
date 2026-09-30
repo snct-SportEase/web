@@ -90,7 +90,7 @@ describe('student my-page server load', () => {
 	});
 
 	it('得点非表示中でも管理者は得点情報を取得できる', async () => {
-		expect.assertions(4);
+		expect.assertions(5);
 
 		const fetchMock = vi.fn((url) => {
 			if (hasPath(url, '/api/events/active')) {
@@ -109,6 +109,7 @@ describe('student my-page server load', () => {
 								class_id: 10,
 								class_name: '1A',
 								season: 'spring',
+								mic_points: 3,
 								rank_current_event: 2,
 								rank_overall: 3,
 								total_points_current_event: 80,
@@ -130,6 +131,7 @@ describe('student my-page server load', () => {
 		expect(result.scoresHidden).toBeUndefined();
 		expect(result.myClassScore.primaryRank).toBe(2);
 		expect(result.myClassScore.primaryPoints).toBe(80);
+		expect(result.scoreItems).toContainEqual({ key: 'mic_points', label: 'MIC点', value: 3 });
 		expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/api\/scores\/class$/), expect.any(Object));
 	});
 
