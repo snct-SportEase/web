@@ -1,3 +1,4 @@
+import { sportScoreGroups } from '$lib/utils/sportScores.js';
 import { env } from '$env/dynamic/private';
 const BACKEND_URL = env.BACKEND_URL;
 
@@ -235,7 +236,7 @@ const buildScoreBreakdown = (classScore) => {
 		{ key: 'noon_game_points', label: '昼競技', value: toNumber(classScore.noon_game_points) }
 	];
 
-	const sportGroups = [
+	const sportGroups = sportScoreGroups(classScore) ?? [
 		{
 			location: 'gym1',
 			label: sportNames.gym1 || '体育館１',
@@ -275,7 +276,7 @@ const buildScoreBreakdown = (classScore) => {
 				.map((item) => ({
 					key: item.key,
 					label: item.label,
-					value: toNumber(classScore[item.key])
+					value: toNumber(item.value ?? classScore[item.key])
 				}))
 				.filter((entry) => entry.value > 0);
 

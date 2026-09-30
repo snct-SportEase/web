@@ -322,6 +322,13 @@ func (r *classRepository) GetClassScoresByEvent(eventID int) ([]*models.ClassSco
 		scores = append(scores, score)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if err := r.attachSportScores([]int{eventID}, map[int][]*models.ClassScore{eventID: scores}); err != nil {
+		return nil, err
+	}
 	return scores, nil
 }
 
@@ -447,7 +454,79 @@ func (r *classRepository) GetClassScoresByEvents(eventIDs []int) (map[int][]*mod
 		return nil, err
 	}
 
+	rows.Close()
+	if err := r.attachSportScores(eventIDs, result); err != nil {
+		return nil, err
+	}
 	return result, nil
+}
+
+// attachSportScores includes assigned competitions even before their first result.
+// A sport ID, rather than a location, also separates sports sharing "other".
+func (r *classRepository) attachSportScores(eventIDs []int, scores map[int][]*models.ClassScore) error {
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(eventIDs)), ",")
+	args := make([]interface{}, len(eventIDs))
+	for i, id := range eventIDs {
+		args[i] = id
+	}
+	// #nosec G201 -- only internally generated placeholders are interpolated; IDs are bound.
+	rows, err := r.db.Query(fmt.Sprintf(`
+		SELECT es.event_id, c.id, s.id, s.name,
+			EXISTS(SELECT 1 FROM board_game_runs bg WHERE bg.event_id=es.event_id AND bg.sport_id=es.sport_id),
+			COALESCE(sl.reason, ''), COALESCE(SUM(sl.points), 0)
+		FROM event_sports es
+		JOIN sports s ON s.id=es.sport_id
+		JOIN classes c ON c.event_id=es.event_id
+		LEFT JOIN score_logs sl ON sl.event_id=es.event_id AND sl.class_id=c.id AND sl.sport_id=es.sport_id
+		WHERE es.event_id IN (%s) AND es.location <> 'noon_game'
+		GROUP BY es.event_id, es.sport_id, c.id, s.id, s.name, sl.reason
+		ORDER BY es.event_id, c.id, s.id, sl.reason
+	`, placeholders), args...)
+	if err != nil {
+		return fmt.Errorf("failed to get sport scores: %w", err)
+	}
+	defer rows.Close()
+	byClass := make(map[int]map[int]*models.ClassScore)
+	for eventID, eventScores := range scores {
+		byClass[eventID] = make(map[int]*models.ClassScore)
+		for _, score := range eventScores {
+			score.SportScores = []models.SportScore{}
+			byClass[eventID][score.ClassID] = score
+		}
+	}
+	for rows.Next() {
+		var eventID, classID, sportID, points int
+		var name, reason string
+		var boardGame bool
+		if err := rows.Scan(&eventID, &classID, &sportID, &name, &boardGame, &reason, &points); err != nil {
+			return err
+		}
+		score := byClass[eventID][classID]
+		if score == nil {
+			continue
+		}
+		if len(score.SportScores) == 0 || score.SportScores[len(score.SportScores)-1].SportID != sportID {
+			score.SportScores = append(score.SportScores, models.SportScore{SportID: sportID, SportName: name, IsBoardGame: boardGame})
+		}
+		sport := &score.SportScores[len(score.SportScores)-1]
+		switch {
+		case reason == "board_game_win_points":
+			sport.WinPoints += points
+		case reason == "board_game_rank_points":
+			sport.RankPoints += points
+		case strings.HasSuffix(reason, "_loser_bracket_champion_points"):
+			sport.LoserBracketChampionPoints += points
+		case strings.HasSuffix(reason, "_win1_points"):
+			sport.Win1Points += points
+		case strings.HasSuffix(reason, "_win2_points"):
+			sport.Win2Points += points
+		case strings.HasSuffix(reason, "_win3_points"):
+			sport.Win3Points += points
+		case strings.HasSuffix(reason, "_champion_points"):
+			sport.ChampionPoints += points
+		}
+	}
+	return rows.Err()
 }
 
 func (r *classRepository) UpdateClassRanks(eventID int) error {

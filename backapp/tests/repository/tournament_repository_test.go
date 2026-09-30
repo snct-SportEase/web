@@ -564,8 +564,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(team2ID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team2ID, "Loser Team", 102, 1, 1))
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
-			WithArgs(1, 101, 10, "gym1_win2_points", matchID).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id, sport_id) VALUES (?, ?, ?, ?, ?, (SELECT t.sport_id FROM matches m JOIN tournaments t ON t.id = m.tournament_id WHERE m.id = ?))")).
+			WithArgs(1, 101, 10, "gym1_win2_points", matchID, matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectCommit()
@@ -652,8 +652,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(loserID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(loserID, "Loser Team", 201, 1, 1))
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
-			WithArgs(1, 202, 10, "gym1_win3_points", matchID).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id, sport_id) VALUES (?, ?, ?, ?, ?, (SELECT t.sport_id FROM matches m JOIN tournaments t ON t.id = m.tournament_id WHERE m.id = ?))")).
+			WithArgs(1, 202, 10, "gym1_win3_points", matchID, matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectCommit()
@@ -729,8 +729,8 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(loserID, "Loser Team", 302, 2, eventID))
 
 		// Mock adding points to gym2_loser_bracket_champion_points
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
-			WithArgs(eventID, classID, 10, "gym2_loser_bracket_champion_points", matchID).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id, sport_id) VALUES (?, ?, ?, ?, ?, (SELECT t.sport_id FROM matches m JOIN tournaments t ON t.id = m.tournament_id WHERE m.id = ?))")).
+			WithArgs(eventID, classID, 10, "gym2_loser_bracket_champion_points", matchID, matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectCommit()
@@ -792,11 +792,11 @@ func TestTournamentRepository_UpdateMatchResult(t *testing.T) {
 			WithArgs(team2ID).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team2ID, "Loser Team", 402, 1, eventID))
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
-			WithArgs(eventID, 401, 50, "gym1_champion_points", matchID).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id, sport_id) VALUES (?, ?, ?, ?, ?, (SELECT t.sport_id FROM matches m JOIN tournaments t ON t.id = m.tournament_id WHERE m.id = ?))")).
+			WithArgs(eventID, 401, 50, "gym1_champion_points", matchID, matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id) VALUES (?, ?, ?, ?, ?)")).
-			WithArgs(eventID, 402, 40, "gym1_champion_points", matchID).
+		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id, sport_id) VALUES (?, ?, ?, ?, ?, (SELECT t.sport_id FROM matches m JOIN tournaments t ON t.id = m.tournament_id WHERE m.id = ?))")).
+			WithArgs(eventID, 402, 40, "gym1_champion_points", matchID, matchID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectCommit()
@@ -905,8 +905,8 @@ func TestTournamentRepository_UpdateMatchResultAwardsBoardGameWinPoints(t *testi
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT t.id, t.name, t.class_id, t.sport_id, c.event_id FROM teams t JOIN classes c ON t.class_id = c.id WHERE t.id = ?")).
 		WithArgs(team1ID).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "class_id", "sport_id", "event_id"}).AddRow(team1ID, "IS3 A", classID, 7, eventID))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id) VALUES (?,?,?,?,?,?)")).
-		WithArgs(eventID, classID, 5, "board_game_win_points", matchID, runID).
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id,sport_id) VALUES (?,?,?,?,?,?,(SELECT sport_id FROM board_game_runs WHERE id=?))")).
+		WithArgs(eventID, classID, 5, "board_game_win_points", matchID, runID, runID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 

@@ -1,4 +1,5 @@
 <script>
+	import { sportScoreItems, scoreItemValue } from '$lib/utils/sportScores.js';
 	/** @type {import('./$types').PageData} */
 	let { data } = $props();
 
@@ -17,19 +18,21 @@
 		{ key: 'initial_points', label: '初期点' },
 		{ key: 'survey_points', label: 'アンケート' },
 		{ key: 'attendance_points', label: '出席点' },
-		{ key: 'gym1_win1_points', label: `${getSportName('gym1')}1勝点` },
-		{ key: 'gym1_win2_points', label: `${getSportName('gym1')}2勝点` },
-		{ key: 'gym1_win3_points', label: `${getSportName('gym1')}3勝点` },
-		{ key: 'gym1_champion_points', label: `${getSportName('gym1')}優勝点` },
-		{ key: 'gym2_win1_points', label: `${getSportName('gym2')}1勝点` },
-		{ key: 'gym2_win2_points', label: `${getSportName('gym2')}2勝点` },
-		{ key: 'gym2_win3_points', label: `${getSportName('gym2')}3勝点` },
-		{ key: 'gym2_champion_points', label: `${getSportName('gym2')}優勝点` },
-		{ key: 'gym2_loser_bracket_champion_points', label: '敗者戦ブロック優勝' },
-		{ key: 'ground_win1_points', label: `${getSportName('ground')}1勝点` },
-		{ key: 'ground_win2_points', label: `${getSportName('ground')}2勝点` },
-		{ key: 'ground_win3_points', label: `${getSportName('ground')}3勝点` },
-		{ key: 'ground_champion_points', label: `${getSportName('ground')}優勝点` },
+		...(sportScoreItems(scores[0]) ?? [
+			{ key: 'gym1_win1_points', label: `${getSportName('gym1')}1勝点` },
+			{ key: 'gym1_win2_points', label: `${getSportName('gym1')}2勝点` },
+			{ key: 'gym1_win3_points', label: `${getSportName('gym1')}3勝点` },
+			{ key: 'gym1_champion_points', label: `${getSportName('gym1')}優勝点` },
+			{ key: 'gym2_win1_points', label: `${getSportName('gym2')}1勝点` },
+			{ key: 'gym2_win2_points', label: `${getSportName('gym2')}2勝点` },
+			{ key: 'gym2_win3_points', label: `${getSportName('gym2')}3勝点` },
+			{ key: 'gym2_champion_points', label: `${getSportName('gym2')}優勝点` },
+			{ key: 'gym2_loser_bracket_champion_points', label: '敗者戦ブロック優勝' },
+			{ key: 'ground_win1_points', label: `${getSportName('ground')}1勝点` },
+			{ key: 'ground_win2_points', label: `${getSportName('ground')}2勝点` },
+			{ key: 'ground_win3_points', label: `${getSportName('ground')}3勝点` },
+			{ key: 'ground_champion_points', label: `${getSportName('ground')}優勝点` }
+		]),
 		{ key: 'noon_game_points', label: '昼競技' },
 		{ key: 'total_points_current_event', label: '合計点' },
 		{ key: 'rank_current_event', label: '順位' },
@@ -236,7 +239,7 @@
 										{#if rankingList.includeInitialPoints || item.key !== 'initial_points'}
 											<div class="flex justify-between py-2 border-b border-black/10 last:border-b-0">
 												<span class="text-gray-500">{item.label}:</span>
-												<span class="font-semibold text-gray-800">{score[item.key] || 0}</span>
+												<span class="font-semibold text-gray-800">{scoreItemValue(score, item)}</span>
 											</div>
 										{/if}
 									{/each}
