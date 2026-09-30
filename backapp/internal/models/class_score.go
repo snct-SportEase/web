@@ -1,5 +1,19 @@
 package models
 
+// SportScore keeps competition points independent of the venue.
+type SportScore struct {
+	SportID                    int    `json:"sport_id"`
+	SportName                  string `json:"sport_name"`
+	IsBoardGame                bool   `json:"is_board_game"`
+	Win1Points                 int    `json:"win1_points"`
+	Win2Points                 int    `json:"win2_points"`
+	Win3Points                 int    `json:"win3_points"`
+	ChampionPoints             int    `json:"champion_points"`
+	LoserBracketChampionPoints int    `json:"loser_bracket_champion_points"`
+	WinPoints                  int    `json:"win_points"`
+	RankPoints                 int    `json:"rank_points"`
+}
+
 type ClassScore struct {
 	ID                             int               `json:"id"`
 	EventID                        int               `json:"event_id"`
@@ -27,5 +41,6 @@ type ClassScore struct {
 	RankCurrentEvent               int               `json:"rank_current_event"`
 	TotalPointsOverall             int               `json:"total_points_overall"`
 	RankOverall                    int               `json:"rank_overall"`
+	SportScores                    []SportScore      `json:"sport_scores"`
 	SportNames                     map[string]string `json:"sport_names"`
 }

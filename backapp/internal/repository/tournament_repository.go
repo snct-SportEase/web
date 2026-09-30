@@ -959,6 +959,17 @@ var locationColumns = map[string]locationScoreColumns{
 	},
 }
 
+func scoreColumnsForLocation(location string) (locationScoreColumns, bool) {
+	if isOtherLocation(location) {
+		return locationScoreColumns{
+			win:      [3]string{"tournament_win1_points", "tournament_win2_points", "tournament_win3_points"},
+			champion: "tournament_champion_points",
+		}, true
+	}
+	columns, ok := locationColumns[location]
+	return columns, ok
+}
+
 func (r *tournamentRepository) getTournamentMetadata(tx *sql.Tx, tournamentID int) (int, int, string, error) {
 	var eventID, sportID int
 	var location sql.NullString
@@ -985,11 +996,11 @@ func (r *tournamentRepository) addPoints(tx *sql.Tx, eventID int, classID int, c
 	}
 
 	query := `
-		INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id, sport_id)
+		VALUES (?, ?, ?, ?, ?, (SELECT t.sport_id FROM matches m JOIN tournaments t ON t.id = m.tournament_id WHERE m.id = ?))
 	`
 
-	_, err := tx.Exec(query, eventID, classID, points, column, sourceMatchID)
+	_, err := tx.Exec(query, eventID, classID, points, column, sourceMatchID, sourceMatchID)
 	return err
 }
 
@@ -999,11 +1010,11 @@ func (r *tournamentRepository) subtractPoints(tx *sql.Tx, eventID int, classID i
 	}
 
 	query := `
-		INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO score_logs (event_id, class_id, points, reason, source_match_id, sport_id)
+		VALUES (?, ?, ?, ?, ?, (SELECT t.sport_id FROM matches m JOIN tournaments t ON t.id = m.tournament_id WHERE m.id = ?))
 	`
 
-	_, err := tx.Exec(query, eventID, classID, -points, column, sourceMatchID)
+	_, err := tx.Exec(query, eventID, classID, -points, column, sourceMatchID, sourceMatchID)
 	return err
 }
 
@@ -1098,7 +1109,7 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 	if err != nil {
 		return err
 	}
-	if location == "other" {
+	if isOtherLocation(location) {
 		if runID, winPoints, ok, err := boardGameScoringConfig(tx, match.TournamentID); err != nil {
 			return err
 		} else if ok {
@@ -1109,7 +1120,7 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 			if winnerTeam == nil || winnerTeam.EventID != eventID {
 				return nil
 			}
-			_, err = tx.Exec(`INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id) VALUES (?,?,?,?,?,?)`, eventID, winnerTeam.ClassID, winPoints, "board_game_win_points", match.ID, runID)
+			_, err = tx.Exec(`INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id,sport_id) VALUES (?,?,?,?,?,?,(SELECT sport_id FROM board_game_runs WHERE id=?))`, eventID, winnerTeam.ClassID, winPoints, "board_game_win_points", match.ID, runID, runID)
 			return err
 		}
 	}
@@ -1118,7 +1129,7 @@ func (r *tournamentRepository) applyScoring(tx *sql.Tx, match *models.MatchDB, w
 		return nil
 	}
 
-	columns, ok := locationColumns[location]
+	columns, ok := scoreColumnsForLocation(location)
 	if !ok {
 		return nil
 	}
@@ -2003,7 +2014,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 	if previousWinnerID == 0 || previousLoserID == 0 {
 		return nil
 	}
-	if location == "other" {
+	if isOtherLocation(location) {
 		if _, _, ok, err := boardGameScoringConfig(tx, match.TournamentID); err != nil {
 			return err
 		} else if ok {
@@ -2016,7 +2027,7 @@ func (r *tournamentRepository) revertScoring(tx *sql.Tx, match *models.MatchDB, 
 		return nil
 	}
 
-	columns, ok := locationColumns[location]
+	columns, ok := scoreColumnsForLocation(location)
 	if !ok {
 		return nil
 	}

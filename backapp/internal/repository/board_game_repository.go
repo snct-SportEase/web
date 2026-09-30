@@ -581,7 +581,7 @@ func (r *boardGameRepository) SaveRankings(runID, tournamentID int, inputs []mod
 			return nil, err
 		}
 		if rankScore != 0 {
-			if _, err := tx.Exec(`INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id) VALUES (?,?,?,?,?,?)`, eventID, classID, rankScore, "board_game_rank_points", finalMatchID.Int64, runID); err != nil {
+			if _, err := tx.Exec(`INSERT INTO score_logs (event_id,class_id,points,reason,source_match_id,board_game_run_id,sport_id) VALUES (?,?,?,?,?,?,(SELECT sport_id FROM board_game_runs WHERE id=?))`, eventID, classID, rankScore, "board_game_rank_points", finalMatchID.Int64, runID, runID); err != nil {
 				return nil, err
 			}
 		}
