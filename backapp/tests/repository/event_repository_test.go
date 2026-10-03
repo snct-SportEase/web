@@ -251,8 +251,8 @@ func TestEventRepository_GetEventByYearAndSeason(t *testing.T) {
 
 func TestEventRepository_CreateEvent(t *testing.T) {
 	const insertQ = "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
-	const archivePreparingQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')"
+	const archivePreparingQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing', 'testing')"
 	const activeQ = "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
 
 	t.Run("success - non-active status", func(t *testing.T) {
@@ -307,6 +307,27 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold).
 			WillReturnResult(sqlmock.NewResult(10, 1))
 		mock.ExpectExec(regexp.QuoteMeta(archiveQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 2))
+		mock.ExpectExec(regexp.QuoteMeta(activeQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectCommit()
+
+		id, err := repo.CreateEvent(e)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(10), id)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("success - testing status selects the event for a test run", func(t *testing.T) {
+		repo, mock, close := setupEvent(t)
+		defer close()
+
+		e := newEvent()
+		e.Status = models.EventStatusTesting
+
+		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta(insertQ)).
+			WithArgs(e.Name, e.Year, e.Season, e.Start_date, e.End_date, e.IsRainyMode, nil, nil, e.IsSurveyPublished, e.Status, e.HideScores, e.DuplicateRegistrationThreshold).
+			WillReturnResult(sqlmock.NewResult(10, 1))
+		mock.ExpectExec(regexp.QuoteMeta(archiveQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(regexp.QuoteMeta(activeQ)).WithArgs(int64(10)).WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 
@@ -375,7 +396,7 @@ func TestEventRepository_CreateEventWithClassesRollsBackEverything(t *testing.T)
 
 func TestEventRepository_CreateEventWithClassesMigratesUsersWhenEventBecomesCurrent(t *testing.T) {
 	const insertEvent = "INSERT INTO events (name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, status, hide_scores, duplicate_registration_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')"
 	const activeQ = "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
 	repo, mock, close := setupEvent(t)
 	defer close()
@@ -442,8 +463,8 @@ func TestEventRepository_CreateAutumnEventWithClassesCarriesSpringStudentCounts(
 
 func TestEventRepository_UpdateEvent(t *testing.T) {
 	const updateQ = "UPDATE events SET name = ?, `year` = ?, season = ?, start_date = ?, end_date = ?, is_rainy_mode = ?, competition_guidelines_pdf_url = ?, survey_url = ?, is_survey_published = ?, status = ?, hide_scores = ?, duplicate_registration_threshold = ? WHERE id = ?"
-	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
-	const archivePreparingQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+	const archiveQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')"
+	const archivePreparingQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing', 'testing')"
 	const activeQ = "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
 	const clearQ = "UPDATE active_event SET event_id = NULL WHERE id = 1 AND event_id = ?"
 
@@ -554,9 +575,9 @@ func TestEventRepository_UpdateEvent(t *testing.T) {
 
 func TestEventRepository_SetActiveEvent(t *testing.T) {
 	const upsertQ = "INSERT INTO active_event (id, event_id) VALUES (1, ?) ON DUPLICATE KEY UPDATE event_id = VALUES(event_id)"
-	const archiveOthersQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+	const archiveOthersQ = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')"
 	const activateQ = "UPDATE events SET status = 'active' WHERE id = ?"
-	const archiveAllQ = "UPDATE events SET status = 'archived' WHERE status = 'active'"
+	const archiveAllQ = "UPDATE events SET status = 'archived' WHERE status IN ('active', 'testing')"
 
 	t.Run("success - set specific event", func(t *testing.T) {
 		repo, mock, close := setupEvent(t)
