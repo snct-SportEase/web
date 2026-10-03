@@ -277,7 +277,7 @@
   {#if $activeEvent?.status === 'testing'}
     <div class="border-y border-red-300 bg-red-50 px-4 py-3 text-center text-sm text-red-900" role="status">
       <strong>テスト試行中:</strong>
-      「{$activeEvent.name}」を本番と同じ流れで確認しています。終了時にDB全体が開始時点へ戻るため、通常運用は行わないでください。
+      「{$activeEvent.name}」を本番と同じ流れで確認しています。終了時にDB全体と画像・PDFが開始時点へ戻るため、通常運用は行わないでください。
     </div>
   {/if}
 

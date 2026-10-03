@@ -101,10 +101,10 @@
     const startingTestRun = currentEvent.status === 'testing' && selectedEvent?.status !== 'testing';
     const endingTestRun = selectedEvent?.status === 'testing' && currentEvent.status !== 'testing';
     if (startingTestRun && !confirm(
-      'テスト試行を開始します。現在のDB全体を保存し、終了時にこの時点へ戻します。テスト中は通常運用を行わないでください。続行しますか？'
+      'テスト試行を開始します。現在のDB全体とアップロード済みの画像・PDFを保存し、終了時にこの時点へ戻します。テスト中は通常運用を行わないでください。続行しますか？'
     )) return;
     if (endingTestRun && !confirm(
-      'テスト試行を終了して、開始時点のDBへ復元します。テスト中に行われたすべてのDB変更は削除されます。続行しますか？'
+      'テスト試行を終了して、開始時点のDBと画像・PDFへ復元します。テスト中のDB変更と新しくアップロードした画像・PDFは削除され、変更・削除した既存ファイルは元に戻ります。続行しますか？'
     )) return;
 
     isSaving = true;
@@ -140,7 +140,7 @@
       await activeEvent.init();
       closeModal();
       if (endingTestRun) {
-        alert('テスト中のDB変更をすべて削除し、開始時点の状態へ復元しました。');
+        alert('テスト中のDB変更と画像・PDFを削除し、開始時点の状態へ復元しました。');
       }
     } catch (error) {
       console.error(error);
@@ -435,7 +435,7 @@
                 <option value="archived">アーカイブ (Archived)</option>
               </select>
               <p class="mt-2 text-xs text-gray-500">
-                「テスト中」では本番と同じ操作を試せます。開始時にDB全体を保存し、終了時にテスト中の変更をすべて削除します。
+                「テスト中」では本番と同じ操作を試せます。開始時にDB全体と画像・PDFを保存し、終了時にテスト中の変更をすべて削除します。
               </p>
             </FormField>
             <FormField label="2競技への重複登録を許可するクラス人数" inputId="duplicate_registration_threshold" description="この人数以下のクラスは、1人につき2競技まで登録できます。">
