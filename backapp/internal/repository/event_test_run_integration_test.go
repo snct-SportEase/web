@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backapp/internal/models"
 	"context"
 	"database/sql"
 	"fmt"
@@ -51,7 +52,10 @@ func eventTestRunDB(t *testing.T) *sql.DB {
 		CREATE TABLE event_test_runs (
 			id TINYINT PRIMARY KEY,
 			event_id INT NOT NULL,
-			started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+			state ENUM('starting', 'testing', 'restoring', 'awaiting_notification_resume', 'failed') NOT NULL DEFAULT 'testing',
+			last_error TEXT NULL,
+			started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		);
 		CREATE TABLE event_test_run_tables (
 			table_name VARCHAR(64) PRIMARY KEY,
@@ -100,7 +104,10 @@ func TestEventTestRunSnapshotRestoreMySQL(t *testing.T) {
 	require.Equal(t, "original user", normalizedName)
 	var testRunCount int
 	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM event_test_runs").Scan(&testRunCount))
-	require.Zero(t, testRunCount)
+	require.Equal(t, 1, testRunCount)
+	var testRunState string
+	require.NoError(t, db.QueryRow("SELECT state FROM event_test_runs WHERE id = 1").Scan(&testRunState))
+	require.Equal(t, models.EventTestRunStateAwaitingNotificationResume, testRunState)
 	var snapshotCount int
 	require.NoError(t, db.QueryRow(`
 		SELECT COUNT(*) FROM information_schema.TABLES

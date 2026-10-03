@@ -133,7 +133,7 @@ func TestClaimDueNotificationsReturnsPersistedTargets(t *testing.T) {
 	scheduledAt := time.Date(2026, 10, 1, 3, 30, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`(?s)SELECT id, title, body, type, event_id, scheduled_at.*FOR UPDATE SKIP LOCKED`).
+	mock.ExpectQuery(`(?s)SELECT id, title, body, type, event_id, scheduled_at.*NOT EXISTS \(SELECT 1 FROM event_test_runs WHERE id = 1\).*FOR UPDATE SKIP LOCKED`).
 		WithArgs(100).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "body", "type", "event_id", "scheduled_at"}).
 			AddRow(20, "予約", "本文", "general", 3, scheduledAt))
@@ -171,8 +171,8 @@ func TestGetPushSubscriptionStatsByTargetsCombinesRolesAndUsers(t *testing.T) {
 	defer db.Close()
 	repo := repository.NewNotificationRepository(db)
 
-	mock.ExpectQuery(`(?s)SELECT.*COUNT\(DISTINCT u.id\).*WHERE \(r.name IN \(\?,\?\) OR u.id IN \(\?\)\).*NOT EXISTS.*test_event.status = \?.*push_role.name IN \(\?, \?\)`).
-		WithArgs("admin", "student", "user-1", "testing", "admin", "root").
+	mock.ExpectQuery(`(?s)SELECT.*COUNT\(DISTINCT u.id\).*WHERE \(r.name IN \(\?,\?\) OR u.id IN \(\?\)\).*NOT EXISTS.*test_run.state IN \(\?, \?, \?, \?\).*test_event.status = \?.*push_role.name IN \(\?, \?\)`).
+		WithArgs("admin", "student", "user-1", "starting", "testing", "restoring", "failed", "testing", "admin", "root").
 		WillReturnRows(sqlmock.NewRows([]string{"target_user_count", "subscribed_user_count", "subscription_endpoint_count"}).AddRow(11, 7, 9))
 
 	stats, err := repo.GetPushSubscriptionStatsByTargets([]string{"admin", "student"}, []string{"user-1"})
@@ -196,8 +196,8 @@ func TestGetPushSubscriptionsByUserIDsRestrictsTestRunDeliveryToAdmins(t *testin
 	repo := repository.NewNotificationRepository(db)
 	createdAt := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 
-	mock.ExpectQuery(`(?s)FROM push_subscriptions ps.*ps.user_id IN \(\?,\?\).*NOT EXISTS.*test_event.status = \?.*push_ur.user_id = ps.user_id.*push_ur.event_id IS NULL.*push_role.name IN \(\?, \?\)`).
-		WithArgs("student-1", "admin-1", "testing", "admin", "root").
+	mock.ExpectQuery(`(?s)FROM push_subscriptions ps.*ps.user_id IN \(\?,\?\).*NOT EXISTS.*test_run.state IN \(\?, \?, \?, \?\).*test_event.status = \?.*push_ur.user_id = ps.user_id.*push_ur.event_id IS NULL.*push_role.name IN \(\?, \?\)`).
+		WithArgs("student-1", "admin-1", "starting", "testing", "restoring", "failed", "testing", "admin", "root").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "endpoint", "auth_key", "p256dh_key", "created_at"}).
 			AddRow(1, "admin-1", "https://push.example/admin", "auth", "p256dh", createdAt))
 

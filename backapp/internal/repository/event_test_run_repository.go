@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backapp/internal/models"
 	"context"
 	"database/sql"
 	"errors"
@@ -27,6 +28,8 @@ type EventTestRunRepository interface {
 	Begin(ctx context.Context, eventID int) error
 	Restore(ctx context.Context, eventID int) error
 	Discard(ctx context.Context, eventID int) error
+	GetStatus(ctx context.Context) (*models.EventTestRunStatus, error)
+	ResolveNotificationDelivery(ctx context.Context, policy string) error
 }
 
 type eventTestRunRepository struct {
@@ -67,19 +70,36 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 		if err := r.dropOrphanedSnapshots(ctx, conn); err != nil {
 			return err
 		}
+		if _, err := conn.ExecContext(ctx, "DELETE FROM event_test_run_tables"); err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, "INSERT INTO event_test_runs (id, event_id, state) VALUES (1, ?, ?)", eventID, models.EventTestRunStateStarting); err != nil {
+			return err
+		}
+
 		uploadSnapshotCreated := false
+		created := []string{}
+		snapshotCommitted := false
+		defer func() {
+			if snapshotCommitted {
+				return
+			}
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = r.dropSnapshotTables(cleanupCtx, conn, created)
+			_, _ = conn.ExecContext(cleanupCtx, "DELETE FROM event_test_run_tables")
+			_, _ = conn.ExecContext(cleanupCtx, "DELETE FROM event_test_runs WHERE id = 1")
+			if uploadSnapshotCreated {
+				_ = r.removeUploadSnapshot()
+			}
+		}()
+
 		if r.hasUploadSnapshot() {
 			if err := r.createUploadSnapshot(); err != nil {
 				return fmt.Errorf("snapshot uploaded files: %w", err)
 			}
 			uploadSnapshotCreated = true
 		}
-		snapshotCommitted := false
-		defer func() {
-			if uploadSnapshotCreated && !snapshotCommitted {
-				_ = r.removeUploadSnapshot()
-			}
-		}()
 
 		tables, err := r.listApplicationTables(ctx, conn)
 		if err != nil {
@@ -92,15 +112,13 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 			return err
 		}
 
-		created := make([]string, 0, len(tables))
+		created = make([]string, 0, len(tables))
 		for _, table := range tables {
 			snapshotName, err := snapshotTableName(table.name)
 			if err != nil {
-				r.dropSnapshotTables(context.Background(), conn, created)
 				return err
 			}
 			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s LIKE %s", quoteIdentifier(snapshotName), quoteIdentifier(table.name))); err != nil {
-				r.dropSnapshotTables(context.Background(), conn, created)
 				return fmt.Errorf("create snapshot for %s: %w", table.name, err)
 			}
 			created = append(created, snapshotName)
@@ -108,7 +126,6 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 
 		tx, err := conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 		if err != nil {
-			r.dropSnapshotTables(context.Background(), conn, created)
 			return err
 		}
 		defer tx.Rollback()
@@ -120,14 +137,8 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 			// codeql[go/sql-injection]
 			if _, err := tx.ExecContext(ctx, query); err != nil {
 				_ = tx.Rollback()
-				r.dropSnapshotTables(context.Background(), conn, created)
 				return fmt.Errorf("copy snapshot for %s: %w", table.name, err)
 			}
-		}
-		if _, err := tx.ExecContext(ctx, "INSERT INTO event_test_runs (id, event_id) VALUES (1, ?)", eventID); err != nil {
-			_ = tx.Rollback()
-			r.dropSnapshotTables(context.Background(), conn, created)
-			return err
 		}
 		for _, table := range tables {
 			var value any
@@ -136,12 +147,13 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 			}
 			if _, err := tx.ExecContext(ctx, "INSERT INTO event_test_run_tables (table_name, auto_increment_value) VALUES (?, ?)", table.name, value); err != nil {
 				_ = tx.Rollback()
-				r.dropSnapshotTables(context.Background(), conn, created)
 				return err
 			}
 		}
 		if err := tx.Commit(); err != nil {
-			r.dropSnapshotTables(context.Background(), conn, created)
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, "UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1", models.EventTestRunStateTesting); err != nil {
 			return err
 		}
 		snapshotCommitted = true
@@ -150,11 +162,19 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 }
 
 func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error {
-	return r.withLock(ctx, func(conn *sql.Conn) error {
+	return r.withLock(ctx, func(conn *sql.Conn) (restoreErr error) {
 		tables, err := r.loadSnapshotTables(ctx, conn, eventID)
 		if err != nil {
 			return err
 		}
+		if _, err := conn.ExecContext(ctx, "UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1", models.EventTestRunStateRestoring); err != nil {
+			return err
+		}
+		defer func() {
+			if restoreErr != nil {
+				_, _ = conn.ExecContext(context.Background(), "UPDATE event_test_runs SET state = ?, last_error = ? WHERE id = 1", models.EventTestRunStateFailed, restoreErr.Error())
+			}
+		}()
 		if err := r.populateWritableColumns(ctx, conn, tables); err != nil {
 			return err
 		}
@@ -202,7 +222,36 @@ func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error
 				return fmt.Errorf("restore auto increment for %s: %w", table.name, err)
 			}
 		}
-		if err := r.clearSnapshot(ctx, conn, tables); err != nil {
+		if err := r.clearSnapshotArtifacts(ctx, conn, tables); err != nil {
+			return err
+		}
+		_ = r.removeUploadSnapshot()
+		if _, err := conn.ExecContext(ctx, "UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1", models.EventTestRunStateAwaitingNotificationResume); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (r *eventTestRunRepository) Discard(ctx context.Context, eventID int) error {
+	return r.withLock(ctx, func(conn *sql.Conn) error {
+		var activeEventID int
+		if err := conn.QueryRowContext(ctx, "SELECT event_id FROM event_test_runs WHERE id = 1").Scan(&activeEventID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrTestRunNotFound
+			}
+			return err
+		}
+		if activeEventID != eventID {
+			return ErrTestRunEventMismatch
+		}
+		if err := r.dropOrphanedSnapshots(ctx, conn); err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, "DELETE FROM event_test_run_tables"); err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, "DELETE FROM event_test_runs WHERE id = 1"); err != nil {
 			return err
 		}
 		_ = r.removeUploadSnapshot()
@@ -210,17 +259,63 @@ func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error
 	})
 }
 
-func (r *eventTestRunRepository) Discard(ctx context.Context, eventID int) error {
+func (r *eventTestRunRepository) GetStatus(ctx context.Context) (*models.EventTestRunStatus, error) {
+	var status models.EventTestRunStatus
+	var lastError sql.NullString
+	err := r.db.QueryRowContext(ctx, `
+		SELECT event_id, state, started_at, updated_at, last_error,
+			(SELECT COUNT(*) FROM notifications
+			 WHERE scheduled_at IS NOT NULL AND sent_at IS NULL AND scheduled_at <= UTC_TIMESTAMP(6))
+		FROM event_test_runs
+		WHERE id = 1`,
+	).Scan(&status.EventID, &status.State, &status.StartedAt, &status.UpdatedAt, &lastError, &status.OverdueNotificationCount)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if lastError.Valid {
+		value := lastError.String
+		status.LastError = &value
+	}
+	return &status, nil
+}
+
+func (r *eventTestRunRepository) ResolveNotificationDelivery(ctx context.Context, policy string) error {
 	return r.withLock(ctx, func(conn *sql.Conn) error {
-		tables, err := r.loadSnapshotTables(ctx, conn, eventID)
-		if err != nil {
+		var state string
+		if err := conn.QueryRowContext(ctx, "SELECT state FROM event_test_runs WHERE id = 1").Scan(&state); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrTestRunNotFound
+			}
 			return err
 		}
-		if err := r.clearSnapshot(ctx, conn, tables); err != nil {
-			return err
+		if state != models.EventTestRunStateAwaitingNotificationResume {
+			return fmt.Errorf("notification delivery cannot be resumed while test run state is %s", state)
 		}
-		_ = r.removeUploadSnapshot()
-		return nil
+
+		switch policy {
+		case models.NotificationResumePolicyResume:
+			// The next worker tick sends reservations that became due while paused.
+		case models.NotificationResumePolicyShift:
+			if _, err := conn.ExecContext(ctx, `
+				UPDATE notifications n
+				INNER JOIN event_test_runs tr ON tr.id = 1
+				SET n.scheduled_at = DATE_ADD(n.scheduled_at, INTERVAL TIMESTAMPDIFF(SECOND, tr.started_at, tr.updated_at) SECOND)
+				WHERE n.scheduled_at IS NOT NULL AND n.sent_at IS NULL`); err != nil {
+				return err
+			}
+		case models.NotificationResumePolicyCancelOverdue:
+			if _, err := conn.ExecContext(ctx, "DELETE FROM notifications WHERE scheduled_at IS NOT NULL AND sent_at IS NULL AND scheduled_at <= UTC_TIMESTAMP(6)"); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("invalid notification resume policy: %s", policy)
+		}
+
+		_, err := conn.ExecContext(ctx, "DELETE FROM event_test_runs WHERE id = 1")
+		return err
 	})
 }
 
@@ -347,14 +442,7 @@ func (r *eventTestRunRepository) populateWritableColumns(ctx context.Context, co
 	return nil
 }
 
-func (r *eventTestRunRepository) clearSnapshot(ctx context.Context, conn *sql.Conn, tables []testRunTable) error {
-	if _, err := conn.ExecContext(ctx, "DELETE FROM event_test_run_tables"); err != nil {
-		return err
-	}
-	if _, err := conn.ExecContext(ctx, "DELETE FROM event_test_runs WHERE id = 1"); err != nil {
-		return err
-	}
-
+func (r *eventTestRunRepository) clearSnapshotArtifacts(ctx context.Context, conn *sql.Conn, tables []testRunTable) error {
 	names := make([]string, 0, len(tables))
 	for _, table := range tables {
 		snapshotName, err := snapshotTableName(table.name)
@@ -363,7 +451,11 @@ func (r *eventTestRunRepository) clearSnapshot(ctx context.Context, conn *sql.Co
 		}
 		names = append(names, snapshotName)
 	}
-	return r.dropSnapshotTables(ctx, conn, names)
+	if err := r.dropSnapshotTables(ctx, conn, names); err != nil {
+		return err
+	}
+	_, err := conn.ExecContext(ctx, "DELETE FROM event_test_run_tables")
+	return err
 }
 
 func (r *eventTestRunRepository) dropOrphanedSnapshots(ctx context.Context, conn *sql.Conn) error {

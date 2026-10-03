@@ -1,10 +1,12 @@
 package repository
 
 import (
+	"backapp/internal/models"
 	"context"
 	"database/sql"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
@@ -25,6 +27,11 @@ func TestEventTestRunRepositoryBegin(t *testing.T) {
 	mock.ExpectQuery("(?s)SELECT TABLE_NAME.*LEFT\\(TABLE_NAME").
 		WithArgs(len(testRunSnapshotPrefix), testRunSnapshotPrefix).
 		WillReturnRows(sqlmock.NewRows([]string{"TABLE_NAME"}))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM event_test_run_tables")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO event_test_runs (id, event_id, state) VALUES (1, ?, ?)")).
+		WithArgs(7, models.EventTestRunStateStarting).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectQuery("(?s)SELECT TABLE_NAME, AUTO_INCREMENT.*TABLE_NAME NOT IN").
 		WithArgs(len(testRunSnapshotPrefix), testRunSnapshotPrefix).
 		WillReturnRows(sqlmock.NewRows([]string{"TABLE_NAME", "AUTO_INCREMENT"}).
@@ -45,9 +52,6 @@ func TestEventTestRunRepositoryBegin(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `_event_test_snapshot_users` (`id`, `name`) SELECT `id`, `name` FROM `users`")).
 		WillReturnResult(sqlmock.NewResult(0, 3))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO event_test_runs (id, event_id) VALUES (1, ?)")).
-		WithArgs(7).
-		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO event_test_run_tables (table_name, auto_increment_value) VALUES (?, ?)")).
 		WithArgs("events", int64(9)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -55,6 +59,9 @@ func TestEventTestRunRepositoryBegin(t *testing.T) {
 		WithArgs("users", nil).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1")).
+		WithArgs(models.EventTestRunStateTesting).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta("SELECT RELEASE_LOCK(?)")).
 		WithArgs(testRunLockName).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -84,6 +91,9 @@ func TestEventTestRunRepositoryRestore(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"table_name", "auto_increment_value"}).
 			AddRow("events", 9).
 			AddRow("users", nil))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1")).
+		WithArgs(models.EventTestRunStateRestoring).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("(?s)SELECT COLUMN_NAME.*EXTRA NOT LIKE").
 		WithArgs("events").
 		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME"}).AddRow("id").AddRow("name"))
@@ -102,10 +112,12 @@ func TestEventTestRunRepositoryRestore(t *testing.T) {
 	mock.ExpectCommit()
 	mock.ExpectExec(regexp.QuoteMeta("ALTER TABLE `events` AUTO_INCREMENT = 9")).
 		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM event_test_run_tables")).WillReturnResult(sqlmock.NewResult(0, 2))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM event_test_runs WHERE id = 1")).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta("DROP TABLE IF EXISTS `_event_test_snapshot_events`, `_event_test_snapshot_users`")).
 		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM event_test_run_tables")).WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1")).
+		WithArgs(models.EventTestRunStateAwaitingNotificationResume).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta("SET FOREIGN_KEY_CHECKS = 1")).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(regexp.QuoteMeta("SELECT RELEASE_LOCK(?)")).
 		WithArgs(testRunLockName).
@@ -128,5 +140,60 @@ func TestSnapshotTableNameRejectsOverlongNames(t *testing.T) {
 func TestSnapshotTableNameRejectsUnsafeIdentifier(t *testing.T) {
 	if _, err := snapshotTableName("events`; DROP TABLE users; --"); err == nil {
 		t.Fatal("expected an unsafe SQL identifier to be rejected")
+	}
+}
+
+func TestEventTestRunRepositoryGetStatusIncludesOverdueNotifications(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := NewEventTestRunRepository(db)
+	startedAt := time.Date(2026, 10, 3, 10, 0, 0, 0, time.UTC)
+	updatedAt := startedAt.Add(time.Hour)
+
+	mock.ExpectQuery(`(?s)SELECT event_id, state, started_at, updated_at, last_error.*FROM event_test_runs`).
+		WillReturnRows(sqlmock.NewRows([]string{"event_id", "state", "started_at", "updated_at", "last_error", "overdue_count"}).
+			AddRow(7, models.EventTestRunStateAwaitingNotificationResume, startedAt, updatedAt, nil, 3))
+
+	status, err := repo.GetStatus(context.Background())
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+	if status == nil || status.EventID != 7 || status.OverdueNotificationCount != 3 {
+		t.Fatalf("unexpected status: %#v", status)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEventTestRunRepositoryResolveNotificationDeliveryShiftsReservations(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := NewEventTestRunRepository(db)
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT GET_LOCK(?, 10)")).
+		WithArgs(testRunLockName).
+		WillReturnRows(sqlmock.NewRows([]string{"lock"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT state FROM event_test_runs WHERE id = 1")).
+		WillReturnRows(sqlmock.NewRows([]string{"state"}).AddRow(models.EventTestRunStateAwaitingNotificationResume))
+	mock.ExpectExec(`(?s)UPDATE notifications n.*TIMESTAMPDIFF\(SECOND, tr.started_at, tr.updated_at\)`).
+		WillReturnResult(sqlmock.NewResult(0, 4))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM event_test_runs WHERE id = 1")).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT RELEASE_LOCK(?)")).
+		WithArgs(testRunLockName).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repo.ResolveNotificationDelivery(context.Background(), models.NotificationResumePolicyShift); err != nil {
+		t.Fatalf("ResolveNotificationDelivery() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
 	}
 }

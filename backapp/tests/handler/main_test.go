@@ -127,6 +127,19 @@ func (m *MockEventTestRunRepository) Discard(ctx context.Context, eventID int) e
 	return args.Error(0)
 }
 
+func (m *MockEventTestRunRepository) GetStatus(ctx context.Context) (*models.EventTestRunStatus, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.EventTestRunStatus), args.Error(1)
+}
+
+func (m *MockEventTestRunRepository) ResolveNotificationDelivery(ctx context.Context, policy string) error {
+	args := m.Called(ctx, policy)
+	return args.Error(0)
+}
+
 type MockGuideDocumentRepository struct {
 	mock.Mock
 }

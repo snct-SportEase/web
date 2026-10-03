@@ -312,6 +312,7 @@ func (r *notificationRepository) ClaimDueNotifications(limit int) ([]models.Sche
 		WHERE scheduled_at IS NOT NULL
 			AND sent_at IS NULL
 			AND scheduled_at <= UTC_TIMESTAMP(6)
+			AND NOT EXISTS (SELECT 1 FROM event_test_runs WHERE id = 1)
 		ORDER BY scheduled_at, id
 		LIMIT ?
 		FOR UPDATE SKIP LOCKED`, limit)
@@ -436,12 +437,16 @@ func (r *notificationRepository) GetPushSubscriptionsByUserIDs(userIDs []string)
 		FROM push_subscriptions ps
 		WHERE ps.user_id IN (?` + placeholders + `)
 		AND (
-			NOT EXISTS (
+			(NOT EXISTS (
 				SELECT 1
-				FROM active_event ae
-				INNER JOIN events test_event ON test_event.id = ae.event_id
-				WHERE ae.id = 1 AND test_event.status = ?
-			)
+				FROM event_test_runs test_run
+				WHERE test_run.id = 1 AND test_run.state IN (?, ?, ?, ?)
+			) AND NOT EXISTS (
+				SELECT 1
+				FROM active_event test_active
+				INNER JOIN events test_event ON test_event.id = test_active.event_id
+				WHERE test_active.id = 1 AND test_event.status = ?
+			))
 			OR EXISTS (
 				SELECT 1
 				FROM user_roles push_ur
@@ -457,7 +462,15 @@ func (r *notificationRepository) GetPushSubscriptionsByUserIDs(userIDs []string)
 	for i, id := range userIDs {
 		args[i] = id
 	}
-	args = append(args, models.EventStatusTesting, "admin", "root")
+	args = append(args,
+		models.EventTestRunStateStarting,
+		models.EventTestRunStateTesting,
+		models.EventTestRunStateRestoring,
+		models.EventTestRunStateFailed,
+		models.EventStatusTesting,
+		"admin",
+		"root",
+	)
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -534,12 +547,16 @@ func (r *notificationRepository) GetPushSubscriptionStatsByTargets(roleNames, us
 	}
 	query += ` WHERE (` + strings.Join(filters, " OR ") + `)
 		AND (
-			NOT EXISTS (
+			(NOT EXISTS (
 				SELECT 1
-				FROM active_event test_ae
-				INNER JOIN events test_event ON test_event.id = test_ae.event_id
-				WHERE test_ae.id = 1 AND test_event.status = ?
-			)
+				FROM event_test_runs test_run
+				WHERE test_run.id = 1 AND test_run.state IN (?, ?, ?, ?)
+			) AND NOT EXISTS (
+				SELECT 1
+				FROM active_event test_active
+				INNER JOIN events test_event ON test_event.id = test_active.event_id
+				WHERE test_active.id = 1 AND test_event.status = ?
+			))
 			OR EXISTS (
 				SELECT 1
 				FROM user_roles push_ur
@@ -549,7 +566,15 @@ func (r *notificationRepository) GetPushSubscriptionStatsByTargets(roleNames, us
 					AND push_role.name IN (?, ?)
 			)
 		)` // #nosec G202 -- filters contain only fixed SQL and generated placeholders.
-	args = append(args, models.EventStatusTesting, "admin", "root")
+	args = append(args,
+		models.EventTestRunStateStarting,
+		models.EventTestRunStateTesting,
+		models.EventTestRunStateRestoring,
+		models.EventTestRunStateFailed,
+		models.EventStatusTesting,
+		"admin",
+		"root",
+	)
 
 	var stats models.PushSubscriptionStats
 	err := r.db.QueryRow(query, args...).Scan(
