@@ -1,6 +1,7 @@
 <script>
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import EditDisplayNameModal from '$lib/components/EditDisplayNameModal.svelte';
   import PWANotificationBanner from '$lib/components/PWANotificationBanner.svelte';
@@ -20,6 +21,10 @@
   let isPWA = $state(true);
   let mobileHeaderMenu = $state();
   let canSeeNotifications = $derived(user?.roles?.some(role => ['student', 'admin', 'root'].includes(role.name)));
+  let isStudentOnly = $derived(
+    user?.roles?.some((role) => role.name === 'student') &&
+    !user?.roles?.some((role) => role.name === 'admin' || role.name === 'root')
+  );
   let shouldShowPWASetupBadge = $derived(canSeeNotifications && !isPWA);
   let shouldShowPushSetupBadge = $derived(
     canSeeNotifications &&
@@ -29,8 +34,16 @@
     !$pushSubscriptionStatus.isSubscribed
   );
   
+  async function checkTestRunIsolation() {
+    const event = await activeEvent.init();
+    const isIsolating = ['starting', 'testing', 'restoring', 'failed'].includes(event?.test_run_state) || event?.status === 'testing';
+    if (isStudentOnly && isIsolating && $page.url.pathname !== '/dashboard/maintenance') {
+      await goto('/dashboard/maintenance', { invalidateAll: true });
+    }
+  }
+
   onMount(() => {
-    void activeEvent.init();
+    void checkTestRunIsolation();
     if (browser) {
       isPWA = isPWAInstalled();
 
@@ -53,10 +66,14 @@
         }
       };
       document.addEventListener('pointerdown', closeMobileHeaderMenu);
+      const testRunInterval = isStudentOnly && $page.url.pathname !== '/dashboard/maintenance'
+        ? window.setInterval(checkTestRunIsolation, 15_000)
+        : null;
       
       return () => {
         window.removeEventListener('resize', checkMobile);
         document.removeEventListener('pointerdown', closeMobileHeaderMenu);
+        if (testRunInterval) window.clearInterval(testRunInterval);
       };
     }
   });

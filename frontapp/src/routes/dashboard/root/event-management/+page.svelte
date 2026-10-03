@@ -11,6 +11,9 @@
   let selectedEvent = $state(null);
   let isNameManuallyChanged = $state(false);
   let isSaving = $state(false);
+  let testRun = $state(null);
+  let notificationResumePolicy = $state('shift');
+  let isRecovering = $state(false);
 
   let currentEvent = $state({
     id: null,
@@ -37,9 +40,80 @@
   }
 
   onMount(async () => {
-    await fetchEvents();
+    await Promise.all([fetchEvents(), fetchTestRunStatus()]);
     await activeEvent.init();
   });
+
+  async function fetchTestRunStatus() {
+    try {
+      const response = await fetch('/api/root/events/test-run', {
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+      if (!response.ok) throw new Error('テスト試行状態の取得に失敗しました');
+      const payload = await response.json();
+      testRun = payload.test_run ?? null;
+    } catch (error) {
+      console.error(error);
+      testRun = null;
+    }
+  }
+
+  async function forceRestoreTestRun() {
+    if (!confirm('テスト開始時点のDBと画像・PDFへ強制復元します。テスト中の変更はすべて削除されます。続行しますか？')) return;
+    isRecovering = true;
+    try {
+      const response = await fetch('/api/root/events/test-run/force-restore', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || '強制復元に失敗しました');
+      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init()]);
+      alert('テスト開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      isRecovering = false;
+    }
+  }
+
+  async function discardTestRun() {
+    if (!confirm('復元用スナップショットを破棄して強制終了します。テスト中の変更は元に戻せなくなります。本当に続行しますか？')) return;
+    isRecovering = true;
+    try {
+      const response = await fetch('/api/root/events/test-run/discard', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || '強制終了に失敗しました');
+      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init()]);
+      alert('復元用スナップショットを破棄しました。現在のデータがそのまま残ります。');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      isRecovering = false;
+    }
+  }
+
+  async function resumeScheduledNotifications() {
+    const descriptions = {
+      resume: '期限切れを含む予約通知の配信を直ちに再開します。',
+      shift: '未送信の予約日時をテスト実施時間分だけ後ろへずらします。',
+      cancel_overdue: '期限切れになった未送信通知を取り消し、今後の予約だけ再開します。'
+    };
+    if (!confirm(`${descriptions[notificationResumePolicy]} 続行しますか？`)) return;
+    isRecovering = true;
+    try {
+      const response = await fetch('/api/root/events/test-run/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ policy: notificationResumePolicy })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || '予約通知の再開に失敗しました');
+      await fetchTestRunStatus();
+      alert('予約通知の配信制御を解除しました。');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      isRecovering = false;
+    }
+  }
 
   async function fetchEvents() {
     try {
@@ -136,11 +210,11 @@
         throw new Error(errorData.error || 'Failed to save event');
       }
 
-      await fetchEvents();
+      await Promise.all([fetchEvents(), fetchTestRunStatus()]);
       await activeEvent.init();
       closeModal();
       if (endingTestRun) {
-        alert('テスト中のDB変更と画像・PDFを削除し、開始時点の状態へ復元しました。');
+        alert('テスト中のDB変更と画像・PDFを削除し、開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');
       }
     } catch (error) {
       console.error(error);
@@ -329,6 +403,48 @@
       </button>
     </div>
   </div>
+
+  {#if testRun}
+    <section class="mb-6 rounded-lg border p-5 shadow-sm" class:border-red-300={testRun.state === 'failed'} class:bg-red-50={testRun.state === 'failed'} class:border-amber-300={testRun.state !== 'failed'} class:bg-amber-50={testRun.state !== 'failed'} aria-live="polite">
+      {#if testRun.state === 'awaiting_notification_resume'}
+        <h2 class="text-lg font-semibold text-amber-950">テストデータの復元が完了しました</h2>
+        <p class="mt-2 text-sm text-amber-900">
+          予約通知は停止中です。期限切れの予約通知は {testRun.overdue_notification_count ?? 0} 件あります。再開方法を選択してください。
+        </p>
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label class="text-sm font-medium text-amber-950">
+            予約通知の扱い
+            <select bind:value={notificationResumePolicy} class="mt-1 block rounded-md border border-amber-300 bg-white px-3 py-2 text-sm">
+              <option value="shift">テスト時間分だけ延期して再開（推奨）</option>
+              <option value="resume">元の日時のまま再開</option>
+              <option value="cancel_overdue">期限切れを取り消して再開</option>
+            </select>
+          </label>
+          <button type="button" onclick={resumeScheduledNotifications} disabled={isRecovering} class="rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-60">
+            予約通知を再開
+          </button>
+        </div>
+      {:else}
+        <h2 class="text-lg font-semibold" class:text-red-950={testRun.state === 'failed'} class:text-amber-950={testRun.state !== 'failed'}>
+          {testRun.state === 'failed' ? 'テスト試行の復元に失敗しました' : 'テスト試行中です'}
+        </h2>
+        <p class="mt-2 text-sm" class:text-red-900={testRun.state === 'failed'} class:text-amber-900={testRun.state !== 'failed'}>
+          状態: {testRun.state}。学生向け機能と予約通知は停止しています。
+        </p>
+        {#if testRun.last_error}
+          <p class="mt-2 rounded bg-white/70 p-2 text-xs text-red-800">{testRun.last_error}</p>
+        {/if}
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button type="button" onclick={forceRestoreTestRun} disabled={isRecovering} class="rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-60">
+            開始時点へ強制復元
+          </button>
+          <button type="button" onclick={discardTestRun} disabled={isRecovering} class="rounded-md border border-red-400 bg-white px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-60">
+            復元せず強制終了
+          </button>
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   <div class="bg-white shadow-md rounded-lg overflow-x-auto">
     <table class="min-w-full leading-normal">

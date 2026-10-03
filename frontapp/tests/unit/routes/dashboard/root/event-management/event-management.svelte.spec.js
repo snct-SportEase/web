@@ -79,9 +79,11 @@ describe('Event Management Page', () => {
   let createObjectURLMock;
   let revokeObjectURLMock;
   let anchorClickMock;
+  let testRunPayload;
 
   beforeEach(() => {
     vi.restoreAllMocks();
+		testRunPayload = null;
 
     fetchMock = vi.fn((url, options = {}) => {
       if (url === '/api/root/events') {
@@ -97,6 +99,18 @@ describe('Event Management Page', () => {
           json: () => Promise.resolve(mockEvents)
         });
       }
+
+		if (url === '/api/root/events/test-run') {
+			return Promise.resolve({
+				ok: true,
+				json: () => Promise.resolve({ test_run: testRunPayload })
+			});
+		}
+
+		if (url === '/api/root/events/test-run/notifications' && options.method === 'POST') {
+			testRunPayload = null;
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({ message: 'resumed' }) });
+		}
 
       if (url === '/api/root/events/1') {
         return Promise.resolve({
@@ -286,8 +300,26 @@ describe('Event Management Page', () => {
     await page.getByRole('button', { name: '保存' }).click();
 
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('テスト中のDB変更と新しくアップロードした画像・PDFは削除され'));
-    expect(alert).toHaveBeenCalledWith('テスト中のDB変更と画像・PDFを削除し、開始時点の状態へ復元しました。');
+		expect(alert).toHaveBeenCalledWith('テスト中のDB変更と画像・PDFを削除し、開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');
   });
+
+	it('復元後に予約通知の扱いを選んで再開できること', async () => {
+		testRunPayload = {
+			event_id: 4,
+			state: 'awaiting_notification_resume',
+			overdue_notification_count: 2
+		};
+		render(Page);
+
+		await expect.element(page.getByText('テストデータの復元が完了しました')).toBeInTheDocument();
+		await expect.element(page.getByText(/期限切れの予約通知は 2 件/)).toBeInTheDocument();
+		await page.getByRole('button', { name: '予約通知を再開' }).click();
+
+		const resumeCall = fetchMock.mock.calls.find(([url, options]) =>
+			url === '/api/root/events/test-run/notifications' && options?.method === 'POST'
+		);
+		expect(JSON.parse(resumeCall[1].body)).toEqual({ policy: 'shift' });
+	});
 
   it('新規作成ではスコア非表示設定が初期値falseであること', async () => {
     render(Page);

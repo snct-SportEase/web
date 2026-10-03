@@ -1,6 +1,7 @@
 import { createBackendProxyHeaders } from '$lib/server/backendProxyHeaders.js';
 import { resolveBackendOrigin } from '$lib/server/backendUrl.js';
 import { applyCSRFProxyProtection } from '$lib/server/csrfProxy.js';
+import { isStudentOnly, requiresTestRunMaintenance } from '$lib/server/testRunMaintenance.js';
 
 const BACKEND_URL = resolveBackendOrigin(process.env.BACKEND_URL);
 const BACKEND_PROXY_PREFIXES = ['/api', '/swagger'];
@@ -109,6 +110,32 @@ export async function handle({ event, resolve }) {
     if (!event.locals.user) {
       return redirectResponse(event, 302, '/');
     }
+
+		if (isStudentOnly(event.locals.user)) {
+			let testRunState = '';
+			let stateAvailable = false;
+			try {
+				const statusResponse = await fetch(new URL('/api/events/active', BACKEND_URL), {
+					headers: { cookie: `session_token=${sessionToken}` }
+				});
+				if (statusResponse.ok) {
+					const statusPayload = await statusResponse.json();
+					testRunState = statusPayload.test_run_state ?? '';
+					stateAvailable = true;
+				}
+			} catch {
+				stateAvailable = false;
+			}
+
+			const maintenanceRequired = requiresTestRunMaintenance(event.locals.user, testRunState, stateAvailable);
+			const onMaintenancePage = event.url.pathname === '/dashboard/maintenance';
+			if (maintenanceRequired && !onMaintenancePage) {
+				return redirectResponse(event, 303, '/dashboard/maintenance');
+			}
+			if (!maintenanceRequired && onMaintenancePage) {
+				return redirectResponse(event, 303, '/dashboard');
+			}
+		}
   }
 
   // Redirect from login page if already logged in

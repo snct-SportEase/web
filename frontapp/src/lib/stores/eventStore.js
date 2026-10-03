@@ -34,6 +34,7 @@ export const activeEvent = {
 					is_rainy_mode: data.is_rainy_mode || false,
 					competition_guidelines_pdf_url: data.competition_guidelines_pdf_url,
 					hide_scores: data.hide_scores || false,
+					test_run_state: data.test_run_state || '',
 				};
 				set(active);
 				return active;
