@@ -30,6 +30,7 @@ func TestActiveEventStatusRequired(t *testing.T) {
 		wantStatus int
 	}{
 		{name: "allows active event", status: models.EventStatusActive, wantStatus: http.StatusNoContent},
+		{name: "allows testing event", status: models.EventStatusTesting, wantStatus: http.StatusNoContent},
 		{name: "rejects preparing event", status: models.EventStatusPreparing, wantStatus: http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -43,7 +44,11 @@ func TestActiveEventStatusRequired(t *testing.T) {
 			mock.ExpectQuery(regexp.QuoteMeta(eventQuery)).WithArgs(1).WillReturnRows(sqlmock.NewRows(columns).AddRow(1, "大会", 2026, "spring", nil, nil, false, nil, nil, false, true, tc.status, false, 31))
 
 			router := gin.New()
-			router.Use(middleware.ActiveEventStatusRequired(repository.NewEventRepository(db), models.EventStatusActive))
+			router.Use(middleware.ActiveEventStatusRequired(
+				repository.NewEventRepository(db),
+				models.EventStatusActive,
+				models.EventStatusTesting,
+			))
 			router.PUT("/result", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
 			recorder := httptest.NewRecorder()

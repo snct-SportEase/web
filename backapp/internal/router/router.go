@@ -4,6 +4,7 @@ import (
 	"backapp/internal/config"
 	"backapp/internal/handler"
 	"backapp/internal/middleware"
+	"backapp/internal/models"
 	"backapp/internal/push"
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
@@ -224,7 +225,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
 			admin.PUT("/matches/:match_id/rainy-mode-start-time", tournHandler.UpdateMatchRainyModeStartTimeHandler)
-			resultEntryRequired := middleware.ActiveEventStatusRequired(eventRepo, "active")
+			resultEntryRequired := middleware.ActiveEventStatusRequired(
+				eventRepo,
+				models.EventStatusActive,
+				models.EventStatusTesting,
+			)
 			admin.PUT("/matches/:match_id/result", resultEntryRequired, tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/board-game-runs/:run_id/tournaments/:tournament_id/rankings", resultEntryRequired, boardGameHandler.SaveRankings)
 			admin.PUT("/noon-game/matches/:match_id/result", resultEntryRequired, noonHandler.RecordMatchResult)
