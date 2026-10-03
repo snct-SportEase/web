@@ -432,15 +432,32 @@ func (r *notificationRepository) GetPushSubscriptionsByUserIDs(userIDs []string)
 	placeholders := strings.Repeat(",?", len(userIDs)-1)
 	// #nosec G202 -- only the number of bound placeholders is constructed from userIDs.
 	query := `
-		SELECT id, user_id, endpoint, auth_key, p256dh_key, created_at
-		FROM push_subscriptions
-		WHERE user_id IN (?` + placeholders + `)
+		SELECT ps.id, ps.user_id, ps.endpoint, ps.auth_key, ps.p256dh_key, ps.created_at
+		FROM push_subscriptions ps
+		WHERE ps.user_id IN (?` + placeholders + `)
+		AND (
+			NOT EXISTS (
+				SELECT 1
+				FROM active_event ae
+				INNER JOIN events test_event ON test_event.id = ae.event_id
+				WHERE ae.id = 1 AND test_event.status = ?
+			)
+			OR EXISTS (
+				SELECT 1
+				FROM user_roles push_ur
+				INNER JOIN roles push_role ON push_role.id = push_ur.role_id
+				WHERE push_ur.user_id = ps.user_id
+					AND push_ur.event_id IS NULL
+					AND push_role.name IN (?, ?)
+			)
+		)
 	`
 
 	args := make([]interface{}, len(userIDs))
 	for i, id := range userIDs {
 		args[i] = id
 	}
+	args = append(args, models.EventStatusTesting, "admin", "root")
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -515,7 +532,24 @@ func (r *notificationRepository) GetPushSubscriptionStatsByTargets(roleNames, us
 			args = append(args, userID)
 		}
 	}
-	query += " WHERE (" + strings.Join(filters, " OR ") + ")" // #nosec G202 -- filters contain only fixed SQL and generated placeholders.
+	query += ` WHERE (` + strings.Join(filters, " OR ") + `)
+		AND (
+			NOT EXISTS (
+				SELECT 1
+				FROM active_event test_ae
+				INNER JOIN events test_event ON test_event.id = test_ae.event_id
+				WHERE test_ae.id = 1 AND test_event.status = ?
+			)
+			OR EXISTS (
+				SELECT 1
+				FROM user_roles push_ur
+				INNER JOIN roles push_role ON push_role.id = push_ur.role_id
+				WHERE push_ur.user_id = u.id
+					AND push_ur.event_id IS NULL
+					AND push_role.name IN (?, ?)
+			)
+		)` // #nosec G202 -- filters contain only fixed SQL and generated placeholders.
+	args = append(args, models.EventStatusTesting, "admin", "root")
 
 	var stats models.PushSubscriptionStats
 	err := r.db.QueryRow(query, args...).Scan(

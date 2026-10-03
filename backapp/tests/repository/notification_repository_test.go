@@ -171,8 +171,8 @@ func TestGetPushSubscriptionStatsByTargetsCombinesRolesAndUsers(t *testing.T) {
 	defer db.Close()
 	repo := repository.NewNotificationRepository(db)
 
-	mock.ExpectQuery(`(?s)SELECT.*COUNT\(DISTINCT u.id\).*WHERE \(r.name IN \(\?,\?\) OR u.id IN \(\?\)\)`).
-		WithArgs("admin", "student", "user-1").
+	mock.ExpectQuery(`(?s)SELECT.*COUNT\(DISTINCT u.id\).*WHERE \(r.name IN \(\?,\?\) OR u.id IN \(\?\)\).*NOT EXISTS.*test_event.status = \?.*push_role.name IN \(\?, \?\)`).
+		WithArgs("admin", "student", "user-1", "testing", "admin", "root").
 		WillReturnRows(sqlmock.NewRows([]string{"target_user_count", "subscribed_user_count", "subscription_endpoint_count"}).AddRow(11, 7, 9))
 
 	stats, err := repo.GetPushSubscriptionStatsByTargets([]string{"admin", "student"}, []string{"user-1"})
@@ -181,6 +181,32 @@ func TestGetPushSubscriptionStatsByTargetsCombinesRolesAndUsers(t *testing.T) {
 	}
 	if stats.TargetUserCount != 11 || stats.SubscribedUserCount != 7 || stats.SubscriptionEndpointCount != 9 {
 		t.Fatalf("unexpected stats: %#v", stats)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetPushSubscriptionsByUserIDsRestrictsTestRunDeliveryToAdmins(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer db.Close()
+	repo := repository.NewNotificationRepository(db)
+	createdAt := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery(`(?s)FROM push_subscriptions ps.*ps.user_id IN \(\?,\?\).*NOT EXISTS.*test_event.status = \?.*push_ur.user_id = ps.user_id.*push_ur.event_id IS NULL.*push_role.name IN \(\?, \?\)`).
+		WithArgs("student-1", "admin-1", "testing", "admin", "root").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "endpoint", "auth_key", "p256dh_key", "created_at"}).
+			AddRow(1, "admin-1", "https://push.example/admin", "auth", "p256dh", createdAt))
+
+	subscriptions, err := repo.GetPushSubscriptionsByUserIDs([]string{"student-1", "admin-1"})
+	if err != nil {
+		t.Fatalf("get push subscriptions: %v", err)
+	}
+	if len(subscriptions) != 1 || subscriptions[0].UserID != "admin-1" {
+		t.Fatalf("unexpected subscriptions: %#v", subscriptions)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
