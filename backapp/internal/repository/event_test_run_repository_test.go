@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"context"
 	"database/sql"
+	"errors"
 	"regexp"
 	"testing"
 	"time"
@@ -87,13 +88,15 @@ func TestEventTestRunRepositoryRestore(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"lock"}).AddRow(1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT event_id FROM event_test_runs WHERE id = 1")).
 		WillReturnRows(sqlmock.NewRows([]string{"event_id"}).AddRow(7))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1")).
+		WithArgs(models.EventTestRunStateRestoring).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT event_id FROM event_test_runs WHERE id = 1")).
+		WillReturnRows(sqlmock.NewRows([]string{"event_id"}).AddRow(7))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT table_name, auto_increment_value FROM event_test_run_tables ORDER BY table_name")).
 		WillReturnRows(sqlmock.NewRows([]string{"table_name", "auto_increment_value"}).
 			AddRow("events", 9).
 			AddRow("users", nil))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1")).
-		WithArgs(models.EventTestRunStateRestoring).
-		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("(?s)SELECT COLUMN_NAME.*EXTRA NOT LIKE").
 		WithArgs("events").
 		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME"}).AddRow("id").AddRow("name"))
@@ -125,6 +128,41 @@ func TestEventTestRunRepositoryRestore(t *testing.T) {
 
 	if err := repo.Restore(context.Background(), 7); err != nil {
 		t.Fatalf("Restore() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEventTestRunRepositoryRestoreRecordsFailureForIncompleteSnapshot(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := NewEventTestRunRepository(db)
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT GET_LOCK(?, 10)")).
+		WithArgs(testRunLockName).
+		WillReturnRows(sqlmock.NewRows([]string{"lock"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT event_id FROM event_test_runs WHERE id = 1")).
+		WillReturnRows(sqlmock.NewRows([]string{"event_id"}).AddRow(7))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1")).
+		WithArgs(models.EventTestRunStateRestoring).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT event_id FROM event_test_runs WHERE id = 1")).
+		WillReturnRows(sqlmock.NewRows([]string{"event_id"}).AddRow(7))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT table_name, auto_increment_value FROM event_test_run_tables ORDER BY table_name")).
+		WillReturnRows(sqlmock.NewRows([]string{"table_name", "auto_increment_value"}))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE event_test_runs SET state = ?, last_error = ? WHERE id = 1")).
+		WithArgs(models.EventTestRunStateFailed, ErrTestRunNotFound.Error()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT RELEASE_LOCK(?)")).
+		WithArgs(testRunLockName).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repo.Restore(context.Background(), 7); !errors.Is(err, ErrTestRunNotFound) {
+		t.Fatalf("Restore() error = %v, want ErrTestRunNotFound", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

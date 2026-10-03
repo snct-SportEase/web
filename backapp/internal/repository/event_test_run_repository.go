@@ -163,9 +163,15 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 
 func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error {
 	return r.withLock(ctx, func(conn *sql.Conn) (restoreErr error) {
-		tables, err := r.loadSnapshotTables(ctx, conn, eventID)
-		if err != nil {
+		var activeEventID int
+		if err := conn.QueryRowContext(ctx, "SELECT event_id FROM event_test_runs WHERE id = 1").Scan(&activeEventID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrTestRunNotFound
+			}
 			return err
+		}
+		if activeEventID != eventID {
+			return ErrTestRunEventMismatch
 		}
 		if _, err := conn.ExecContext(ctx, "UPDATE event_test_runs SET state = ?, last_error = NULL WHERE id = 1", models.EventTestRunStateRestoring); err != nil {
 			return err
@@ -175,6 +181,11 @@ func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error
 				_, _ = conn.ExecContext(context.Background(), "UPDATE event_test_runs SET state = ?, last_error = ? WHERE id = 1", models.EventTestRunStateFailed, restoreErr.Error())
 			}
 		}()
+
+		tables, err := r.loadSnapshotTables(ctx, conn, eventID)
+		if err != nil {
+			return err
+		}
 		if err := r.populateWritableColumns(ctx, conn, tables); err != nil {
 			return err
 		}
