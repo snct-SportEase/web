@@ -101,7 +101,7 @@
     const startingTestRun = currentEvent.status === 'testing' && selectedEvent?.status !== 'testing';
     const endingTestRun = selectedEvent?.status === 'testing' && currentEvent.status !== 'testing';
     if (startingTestRun && !confirm(
-      'テスト試行を開始します。現在のDB全体とアップロード済みの画像・PDFを保存し、終了時にこの時点へ戻します。テスト中は通常運用を行わないでください。続行しますか？'
+      'テスト試行を開始します。現在のDB全体とアップロード済みの画像・PDFを保存し、終了時にこの時点へ戻します。テスト中は予約通知の配信を停止し、Push通知は選択した宛先のうちadmin/rootにだけ送信します。通常運用を行わないでください。続行しますか？'
     )) return;
     if (endingTestRun && !confirm(
       'テスト試行を終了して、開始時点のDBと画像・PDFへ復元します。テスト中のDB変更と新しくアップロードした画像・PDFは削除され、変更・削除した既存ファイルは元に戻ります。続行しますか？'
