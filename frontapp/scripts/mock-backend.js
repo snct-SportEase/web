@@ -391,9 +391,12 @@ createServer(async (req, res) => {
   if (url.pathname === '/__set-active-event' && req.method === 'POST') {
     const body = await readJson(req);
     const eventId = Number(body.event_id ?? 1);
+    const requestedStatus = body.status === 'testing' ? 'testing' : 'active';
     events = events.map((event) => ({
       ...event,
-      status: event.id === eventId ? 'active' : event.status === 'active' ? 'upcoming' : event.status,
+      status: event.id === eventId
+        ? requestedStatus
+        : ['active', 'testing'].includes(event.status) ? 'upcoming' : event.status,
       hide_scores: event.id === eventId ? Boolean(body.hide_scores) : event.hide_scores,
       competition_guidelines_pdf_url: event.id === eventId
         ? body.competition_guidelines_pdf_url ?? event.competition_guidelines_pdf_url
@@ -620,7 +623,7 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/events/active' && req.method === 'GET') {
-    const activeEvent = events.find((event) => event.status === 'active') ?? events[0] ?? null;
+    const activeEvent = events.find((event) => ['active', 'testing'].includes(event.status)) ?? events[0] ?? null;
     sendJson(
       res,
       200,

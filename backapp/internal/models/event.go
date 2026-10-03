@@ -4,6 +4,7 @@ import "time"
 
 const (
 	EventStatusPreparing = "preparing"
+	EventStatusTesting   = "testing"
 	EventStatusUpcoming  = "upcoming"
 	EventStatusActive    = "active"
 	EventStatusArchived  = "archived"
@@ -11,7 +12,7 @@ const (
 
 func IsValidEventStatus(status string) bool {
 	switch status {
-	case EventStatusPreparing, EventStatusUpcoming, EventStatusActive, EventStatusArchived:
+	case EventStatusPreparing, EventStatusTesting, EventStatusUpcoming, EventStatusActive, EventStatusArchived:
 		return true
 	default:
 		return false

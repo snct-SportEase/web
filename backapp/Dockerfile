@@ -22,7 +22,7 @@ WORKDIR /app
 RUN apk add --no-cache mysql-client \
     && addgroup -S app \
     && adduser -S -D -H -G app app \
-    && mkdir -p /app/uploads \
+    && mkdir -p /app/uploads /app/test-run-snapshots \
     && chown -R app:app /app
 
 COPY --from=builder --chown=app:app /app/server ./server

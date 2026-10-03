@@ -43,3 +43,16 @@ func (m *HubManager) BroadcastTo(topic string, v interface{}) {
 		hub.BroadcastJSON(v)
 	}
 }
+
+func (m *HubManager) DisconnectAll() {
+	m.mu.Lock()
+	hubs := make([]*Hub, 0, len(m.hubs))
+	for _, hub := range m.hubs {
+		hubs = append(hubs, hub)
+	}
+	m.mu.Unlock()
+
+	for _, hub := range hubs {
+		hub.DisconnectAll()
+	}
+}

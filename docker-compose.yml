@@ -154,6 +154,7 @@ services:
       TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
     volumes:
       - uploads-data:/app/uploads
+      - test-run-snapshot-data:/app/test-run-snapshots
       - ./latex/how-to-use:/app/uploads/demo:ro
     depends_on:
       sportease-db:
@@ -229,3 +230,4 @@ networks:
 volumes:
   db-data:
   uploads-data:
+  test-run-snapshot-data:

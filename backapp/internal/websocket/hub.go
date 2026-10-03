@@ -16,6 +16,7 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	unregister chan *Client
+	disconnect chan struct{}
 
 	stopped chan struct{}
 	onEmpty func()
@@ -30,6 +31,7 @@ func NewHub(onEmpty ...func()) *Hub {
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		disconnect: make(chan struct{}),
 		clients:    make(map[*Client]bool),
 		stopped:    make(chan struct{}),
 		onEmpty:    emptyCallback,
@@ -60,7 +62,23 @@ func (h *Hub) Run() {
 					delete(h.clients, client)
 				}
 			}
+		case <-h.disconnect:
+			for client := range h.clients {
+				close(client.send)
+				delete(h.clients, client)
+			}
+			if h.onEmpty != nil {
+				h.onEmpty()
+			}
+			return
 		}
+	}
+}
+
+func (h *Hub) DisconnectAll() {
+	select {
+	case h.disconnect <- struct{}{}:
+	case <-h.stopped:
 	}
 }
 

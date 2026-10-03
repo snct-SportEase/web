@@ -44,6 +44,10 @@ func eventRoleDB(t *testing.T) *sql.DB {
 			created_by VARCHAR(36), event_id INT NULL, scheduled_at DATETIME(6) NULL,
 			sent_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6), created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
+		CREATE TABLE event_test_runs (
+			id TINYINT PRIMARY KEY, event_id INT NOT NULL,
+			state ENUM('starting', 'testing', 'restoring', 'awaiting_notification_resume', 'failed') NOT NULL DEFAULT 'testing'
+		);
 		CREATE TABLE notification_targets (
 			notification_id INT, role_name VARCHAR(50), PRIMARY KEY (notification_id, role_name)
 		);

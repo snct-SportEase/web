@@ -4,6 +4,7 @@ import (
 	"backapp/internal/config"
 	"backapp/internal/handler"
 	"backapp/internal/middleware"
+	"backapp/internal/models"
 	"backapp/internal/push"
 	"backapp/internal/repository"
 	"backapp/internal/websocket"
@@ -33,6 +34,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
+	testRunRepo := repository.NewEventTestRunRepositoryWithUploads(
+		db,
+		"./test-run-snapshots/current",
+		"./uploads/images",
+		"./uploads/pdfs",
+	)
 
 	classRepo := repository.NewClassRepository(db)
 	teamRepo := repository.NewTeamRepository(db)
@@ -53,7 +60,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		AllowedHosts:    cfg.WebPushAllowedHosts,
 		MaxConcurrency:  32,
 	})
-	eventHandler := handler.NewEventHandler(eventRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).WithPushSender(pushSender)
+	eventHandler := handler.NewEventHandler(eventRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).
+		WithPushSender(pushSender).
+		WithEventTestRunRepository(testRunRepo).
+		WithHubManager(hubManager)
 
 	rainyModeRepo := repository.NewRainyModeRepository(db)
 	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)
@@ -102,16 +112,16 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 	{
 		ws := api.Group("/ws")
 		{
-			ws.Use(middleware.AuthMiddleware(userRepo))
+			ws.Use(middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo))
 			ws.GET("/tournaments/:tournament_id", wsHandler.ServeTournamentWebSocket)
 			ws.GET("/progress", wsHandler.ServeProgressWebSocket)
 		}
 
-		api.GET("/classes", middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"), classHandler.GetAllClasses)
-		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), classHandler.GetClassScores)
+		api.GET("/classes", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.RoleRequired("student", "admin", "root"), classHandler.GetAllClasses)
+		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), classHandler.GetClassScores)
 
 		api.GET("/events/active", middleware.AuthMiddleware(userRepo), eventHandler.GetActiveEvent)
-		api.GET("/guide-documents", middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"), guideDocumentHandler.ListGuideDocuments)
+		api.GET("/guide-documents", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.RoleRequired("student", "admin", "root"), guideDocumentHandler.ListGuideDocuments)
 
 		auth := api.Group("/auth")
 		{
@@ -127,7 +137,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 		user := api.Group("/user")
 		{
-			user.Use(middleware.AuthMiddleware(userRepo))
+			user.Use(middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo))
 			user.PUT("/profile", authHandler.UpdateProfile)
 			user.POST("/pwa-visit", authHandler.RecordPWAVisit)
 		}
@@ -135,7 +145,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		// Events accessible to any authenticated user
 		events := api.Group("/events")
 		{
-			events.Use(middleware.AuthMiddleware(userRepo))
+			events.Use(middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo))
 			events.GET("", eventHandler.GetAllEvents)
 			// Get sports for a specific event
 			events.GET("/:id/sports", sportHandler.GetSportsByEventHandler)
@@ -144,7 +154,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		// MyID barcode check-in routes accessible to authenticated users
 		barcode := api.Group("/barcode")
 		{
-			barcode.Use(middleware.AuthMiddleware(userRepo))
+			barcode.Use(middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo))
 			barcode.GET("/teams", barcodeHandler.GetUserTeamsHandler)
 			barcode.POST("/check-in", middleware.RoleRequired("admin", "root"), middleware.RateLimit(20, time.Minute), barcodeHandler.CheckInRoundHandler)
 			barcode.GET("/matches/:match_id/check-ins", middleware.RoleRequired("admin", "root"), barcodeHandler.GetMatchCheckInsHandler)
@@ -152,7 +162,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 		student := api.Group("/student")
 		{
-			student.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
+			student.Use(middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.RoleRequired("student", "admin", "root"))
 			student.GET("/class-progress", classHandler.GetClassProgress)
 
 			studentEvents := student.Group("/events")
@@ -175,7 +185,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 		notifications := api.Group("/notifications")
 		{
-			notifications.Use(middleware.AuthMiddleware(userRepo), middleware.RoleRequired("student", "admin", "root"))
+			notifications.Use(middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.RoleRequired("student", "admin", "root"))
 			notifications.GET("", notificationHandler.ListNotifications)
 			notifications.PUT("/filters", notificationHandler.UpdateNotificationFilters)
 			notifications.GET("/subscription", notificationHandler.GetSubscription)
@@ -224,7 +234,11 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 			admin.PUT("/matches/:match_id/start-time", tournHandler.UpdateMatchStartTimeHandler)
 			admin.PUT("/matches/:match_id/rainy-mode-start-time", tournHandler.UpdateMatchRainyModeStartTimeHandler)
-			resultEntryRequired := middleware.ActiveEventStatusRequired(eventRepo, "active")
+			resultEntryRequired := middleware.ActiveEventStatusRequired(
+				eventRepo,
+				models.EventStatusActive,
+				models.EventStatusTesting,
+			)
 			admin.PUT("/matches/:match_id/result", resultEntryRequired, tournHandler.UpdateMatchResultHandler)
 			admin.PUT("/board-game-runs/:run_id/tournaments/:tournament_id/rankings", resultEntryRequired, boardGameHandler.SaveRankings)
 			admin.PUT("/noon-game/matches/:match_id/result", resultEntryRequired, noonHandler.RecordMatchResult)
@@ -285,6 +299,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 				rootEvents.GET("", eventHandler.GetAllEvents)
 				rootEvents.POST("", eventHandler.CreateEvent)
 				rootEvents.PUT("/active", eventHandler.SetActiveEvent)
+				rootEvents.GET("/test-run", eventHandler.GetTestRunStatus)
+				rootEvents.POST("/test-run/force-restore", eventHandler.ForceRestoreTestRun)
+				rootEvents.POST("/test-run/discard", eventHandler.DiscardTestRun)
+				rootEvents.POST("/test-run/notifications", eventHandler.ResolveTestRunNotifications)
 				// More specific routes must come before the generic :id route
 				rootEvents.PUT("/:id/rainy-mode", eventHandler.SetRainyMode)
 				rootEvents.GET("/:id/rainy-mode/settings", rainyModeHandler.GetRainyModeSettingsHandler)

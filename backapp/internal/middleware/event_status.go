@@ -45,7 +45,7 @@ func ActiveEventStatusRequired(eventRepo repository.EventRepository, allowedStat
 			}
 		}
 
-		c.JSON(http.StatusForbidden, gin.H{"error": "Match results can only be entered while the event is active"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Match results can only be entered while the event is active or testing"})
 		c.Abort()
 	}
 }

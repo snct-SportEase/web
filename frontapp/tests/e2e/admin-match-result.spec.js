@@ -57,4 +57,17 @@ test.describe('試合結果入力 (admin)', () => {
     await expect(page.getByText('Score: 5 - 3')).toBeVisible();
     await expect(page.getByText('Winner: 1A')).toBeVisible();
   });
+
+  test('テスト試行中も結果入力を行える', async ({ page, request }) => {
+    await request.post(`${mockBackendUrl}/__set-active-event`, {
+      data: { event_id: 1, status: 'testing' }
+    });
+    await page.reload();
+
+    await expect(page.getByText(/テスト試行中:/)).toBeVisible();
+    await page.getByLabel('トーナメント選択').selectOption('1');
+    await page.getByRole('button', { name: '結果を入力' }).click();
+
+    await expect(page.getByRole('dialog', { name: '結果入力: 1A vs 1B' })).toBeVisible();
+  });
 });

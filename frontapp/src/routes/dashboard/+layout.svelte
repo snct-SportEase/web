@@ -1,6 +1,7 @@
 <script>
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import EditDisplayNameModal from '$lib/components/EditDisplayNameModal.svelte';
   import PWANotificationBanner from '$lib/components/PWANotificationBanner.svelte';
@@ -8,6 +9,7 @@
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { pushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
   import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
+  import { activeEvent } from '$lib/stores/eventStore.js';
 
   let { children } = $props();
   let { data } = $page;
@@ -19,6 +21,10 @@
   let isPWA = $state(true);
   let mobileHeaderMenu = $state();
   let canSeeNotifications = $derived(user?.roles?.some(role => ['student', 'admin', 'root'].includes(role.name)));
+  let isStudentOnly = $derived(
+    user?.roles?.some((role) => role.name === 'student') &&
+    !user?.roles?.some((role) => role.name === 'admin' || role.name === 'root')
+  );
   let shouldShowPWASetupBadge = $derived(canSeeNotifications && !isPWA);
   let shouldShowPushSetupBadge = $derived(
     canSeeNotifications &&
@@ -28,7 +34,16 @@
     !$pushSubscriptionStatus.isSubscribed
   );
   
+  async function checkTestRunIsolation() {
+    const event = await activeEvent.init();
+    const isIsolating = ['starting', 'testing', 'restoring', 'failed'].includes(event?.test_run_state) || event?.status === 'testing';
+    if (isStudentOnly && isIsolating && $page.url.pathname !== '/dashboard/maintenance') {
+      await goto('/dashboard/maintenance', { invalidateAll: true });
+    }
+  }
+
   onMount(() => {
+    void checkTestRunIsolation();
     if (browser) {
       isPWA = isPWAInstalled();
 
@@ -51,10 +66,14 @@
         }
       };
       document.addEventListener('pointerdown', closeMobileHeaderMenu);
+      const testRunInterval = isStudentOnly && $page.url.pathname !== '/dashboard/maintenance'
+        ? window.setInterval(checkTestRunIsolation, 15_000)
+        : null;
       
       return () => {
         window.removeEventListener('resize', checkMobile);
         document.removeEventListener('pointerdown', closeMobileHeaderMenu);
+        if (testRunInterval) window.clearInterval(testRunInterval);
       };
     }
   });
@@ -270,6 +289,13 @@
         </div>
       </div>
     </header>
+  {/if}
+
+  {#if $activeEvent?.status === 'testing'}
+    <div class="border-y border-red-300 bg-red-50 px-4 py-3 text-center text-sm text-red-900" role="status">
+      <strong>テスト試行中:</strong>
+      「{$activeEvent.name}」を本番と同じ流れで確認しています。予約通知の配信は停止し、Push通知は選択した宛先のうちadmin/rootにだけ送信されます。終了時にDB全体と画像・PDFが開始時点へ戻るため、通常運用は行わないでください。
+    </div>
   {/if}
 
   <main class="p-8 flex-1">

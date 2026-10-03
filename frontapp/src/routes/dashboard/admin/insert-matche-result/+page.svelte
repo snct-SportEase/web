@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import InsertMatchResultModal from '$lib/components/InsertMatchResultModal.svelte';
 	import ConfirmMatchResultModal from '$lib/components/ConfirmMatchResultModal.svelte';
+	import { canEnterEventResults } from '$lib/utils/eventStatus.js';
 
 	let { data } = $page;
 	let user = $derived(data.user);
@@ -84,8 +85,8 @@
 	});
 
 	function openModal(match) {
-		if (activeEventStatus !== 'active') {
-			alert('試合結果は開催中の大会でのみ入力できます。');
+		if (!canEnterEventResults(activeEventStatus)) {
+			alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
 			return;
 		}
 		selectedMatch = match;
@@ -108,8 +109,8 @@
 	}
 
 	async function handleSubmit(result = {}) {
-		if (activeEventStatus !== 'active') {
-			alert('試合結果は開催中の大会でのみ入力できます。');
+		if (!canEnterEventResults(activeEventStatus)) {
+			alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
 			return;
 		}
 		if (!selectedMatch || !scoresToSubmit) return;
@@ -182,8 +183,8 @@
 	}
 
 	async function saveBoardGameRankings() {
-		if (!selectedBoardGame || activeEventStatus !== 'active') {
-			alert('順位は開催中の大会でのみ登録できます。');
+		if (!selectedBoardGame || !canEnterEventResults(activeEventStatus)) {
+			alert('順位は開催中またはテスト中の大会でのみ登録できます。');
 			return;
 		}
 		const required = Math.min(4, selectedBoardGame.tournament.entries.length);
@@ -256,9 +257,9 @@
 
 <h1 class="text-2xl font-bold mb-4">試合結果入力</h1>
 
-{#if activeEventId && activeEventStatus !== 'active'}
+{#if activeEventId && !canEnterEventResults(activeEventStatus)}
 	<p class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-		試合結果は大会が「開催中」になってから入力できます。
+		試合結果は大会が「開催中」または「テスト中」になってから入力できます。
 	</p>
 {/if}
 
@@ -306,7 +307,7 @@
 					</label>
 				{/each}
 			</div>
-			<button class="mt-3 rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50" disabled={isSavingRankings || activeEventStatus !== 'active'} onclick={saveBoardGameRankings}>
+			<button class="mt-3 rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50" disabled={isSavingRankings || !canEnterEventResults(activeEventStatus)} onclick={saveBoardGameRankings}>
 				{isSavingRankings ? '登録中...' : selectedBoardGame.tournament.rankings?.length ? '順位を修正して再集計' : '順位を確定して得点へ反映'}
 			</button>
 		</section>

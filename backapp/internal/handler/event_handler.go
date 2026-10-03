@@ -5,8 +5,10 @@ import (
 	"backapp/internal/push"
 	"backapp/internal/repository"
 	"backapp/internal/safelog"
+	"backapp/internal/websocket"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -24,7 +26,9 @@ type EventHandler struct {
 	classRepo        repository.ClassRepository
 	notificationRepo repository.NotificationRepository
 	userRepo         repository.UserRepository
+	testRunRepo      repository.EventTestRunRepository
 	pushSender       push.Sender
+	hubManager       *websocket.HubManager
 }
 
 func NewEventHandler(eventRepo repository.EventRepository, tournamentRepo repository.TournamentRepository, classRepo repository.ClassRepository, notificationRepo repository.NotificationRepository, userRepo repository.UserRepository, vapidPublicKey string, vapidPrivateKey string) *EventHandler {
@@ -43,6 +47,16 @@ func NewEventHandler(eventRepo repository.EventRepository, tournamentRepo reposi
 
 func (h *EventHandler) WithPushSender(sender push.Sender) *EventHandler {
 	h.pushSender = sender
+	return h
+}
+
+func (h *EventHandler) WithEventTestRunRepository(repo repository.EventTestRunRepository) *EventHandler {
+	h.testRunRepo = repo
+	return h
+}
+
+func (h *EventHandler) WithHubManager(hubManager *websocket.HubManager) *EventHandler {
+	h.hubManager = hubManager
 	return h
 }
 
@@ -92,6 +106,10 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 	}
 	if !models.IsValidEventStatus(req.Status) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event status"})
+		return
+	}
+	if req.Status == models.EventStatusTesting {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Create the event first, then start its test run"})
 		return
 	}
 	if req.DuplicateRegistrationThreshold != nil && *req.DuplicateRegistrationThreshold < 0 {
@@ -204,6 +222,47 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		return
 	}
 
+	startingTestRun := existingEvent.Status != models.EventStatusTesting && req.Status == models.EventStatusTesting
+	endingTestRun := existingEvent.Status == models.EventStatusTesting && req.Status != models.EventStatusTesting
+	if (startingTestRun || endingTestRun) && h.testRunRepo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Event test run storage is not configured"})
+		return
+	}
+	if startingTestRun {
+		if err := h.testRunRepo.Begin(c.Request.Context(), existingEvent.ID); err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, repository.ErrTestRunAlreadyActive) {
+				status = http.StatusConflict
+			}
+			c.JSON(status, gin.H{"error": "Failed to create the event test run snapshot"})
+			return
+		}
+	}
+	if endingTestRun {
+		if err := h.testRunRepo.Restore(c.Request.Context(), existingEvent.ID); err != nil {
+			log.Printf("failed to restore event test run snapshot: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset event test run data"})
+			return
+		}
+		if repository.GlobalCache != nil {
+			repository.GlobalCache.Flush()
+		}
+		restoredEvent, err := h.eventRepo.GetEventByID(id)
+		if err != nil || restoredEvent == nil {
+			log.Printf("failed to reload event after test run reset: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload event after resetting test data"})
+			return
+		}
+		restoredEvent.Status = req.Status
+		if err := h.eventRepo.UpdateEvent(restoredEvent); err != nil {
+			log.Printf("failed to update event status after test run reset: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Test data was reset, but the event status could not be updated"})
+			return
+		}
+		c.JSON(http.StatusOK, restoredEvent)
+		return
+	}
+
 	existingEvent.Name = req.Name
 	existingEvent.Year = req.Year
 	existingEvent.Season = req.Season
@@ -218,12 +277,123 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 
 	err = h.eventRepo.UpdateEvent(existingEvent)
 	if err != nil {
+		if startingTestRun {
+			if restoreErr := h.testRunRepo.Restore(c.Request.Context(), existingEvent.ID); restoreErr != nil {
+				log.Printf("failed to restore snapshot after test run activation failed: %v", restoreErr)
+			} else if resolveErr := h.testRunRepo.ResolveNotificationDelivery(c.Request.Context(), models.NotificationResumePolicyResume); resolveErr != nil {
+				log.Printf("failed to clear notification pause after test run activation failed: %v", resolveErr)
+			}
+		}
 		log.Printf("error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
+	if startingTestRun && h.hubManager != nil {
+		// Existing student sockets were authenticated before isolation began.
+		// Disconnect every client once; admin/root clients can reconnect, while
+		// the isolation middleware rejects student reconnects.
+		h.hubManager.DisconnectAll()
+	}
 
 	c.JSON(http.StatusOK, existingEvent)
+}
+
+func (h *EventHandler) GetTestRunStatus(c *gin.Context) {
+	if h.testRunRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Event test run storage is not configured"})
+		return
+	}
+	status, err := h.testRunRepo.GetStatus(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event test run status"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"test_run": status})
+}
+
+func (h *EventHandler) ForceRestoreTestRun(c *gin.Context) {
+	if h.testRunRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Event test run storage is not configured"})
+		return
+	}
+	status, err := h.testRunRepo.GetStatus(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event test run status"})
+		return
+	}
+	if status == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No event test run needs recovery"})
+		return
+	}
+	if status.State == models.EventTestRunStateAwaitingNotificationResume {
+		c.JSON(http.StatusConflict, gin.H{"error": "The test data is already restored; choose how to resume scheduled notifications"})
+		return
+	}
+	if err := h.testRunRepo.Restore(c.Request.Context(), status.EventID); err != nil {
+		log.Printf("forced event test run restore failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore event test run data"})
+		return
+	}
+	if repository.GlobalCache != nil {
+		repository.GlobalCache.Flush()
+	}
+	restoredStatus, _ := h.testRunRepo.GetStatus(c.Request.Context())
+	c.JSON(http.StatusOK, gin.H{"message": "Test run data was restored", "test_run": restoredStatus})
+}
+
+func (h *EventHandler) DiscardTestRun(c *gin.Context) {
+	if h.testRunRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Event test run storage is not configured"})
+		return
+	}
+	status, err := h.testRunRepo.GetStatus(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event test run status"})
+		return
+	}
+	if status == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No event test run needs recovery"})
+		return
+	}
+	if err := h.testRunRepo.Discard(c.Request.Context(), status.EventID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to discard event test run snapshot"})
+		return
+	}
+	if repository.GlobalCache != nil {
+		repository.GlobalCache.Flush()
+	}
+	event, err := h.eventRepo.GetEventByID(status.EventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Recovery data was discarded, but the event could not be reloaded"})
+		return
+	}
+	if event != nil && event.Status == models.EventStatusTesting {
+		event.Status = models.EventStatusPreparing
+		if err := h.eventRepo.UpdateEvent(event); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Recovery data was discarded, but testing status could not be cleared"})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Test run recovery data was discarded"})
+}
+
+func (h *EventHandler) ResolveTestRunNotifications(c *gin.Context) {
+	if h.testRunRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Event test run storage is not configured"})
+		return
+	}
+	var req struct {
+		Policy string `json:"policy" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A notification resume policy is required"})
+		return
+	}
+	if err := h.testRunRepo.ResolveNotificationDelivery(c.Request.Context(), req.Policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Scheduled notification delivery was resumed"})
 }
 
 func validateEventInput(name string, year int, season string, startDate, endDate *time.Time) error {
@@ -243,6 +413,19 @@ func validateEventInput(name string, year int, season string, startDate, endDate
 }
 
 func (h *EventHandler) GetActiveEvent(c *gin.Context) {
+	var testRunState string
+	if h.testRunRepo != nil {
+		testRunStatus, err := h.testRunRepo.GetStatus(c.Request.Context())
+		if err != nil {
+			log.Printf("failed to get event test run status: %v", err)
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Failed to get event test run status"})
+			return
+		}
+		if testRunStatus != nil {
+			testRunState = testRunStatus.State
+		}
+	}
+
 	event_id, err := h.eventRepo.GetActiveEvent()
 	if err != nil {
 		log.Printf("error: %v", err)
@@ -250,7 +433,7 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		return
 	}
 	if event_id == 0 {
-		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false})
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false, "test_run_state": testRunState})
 		return
 	}
 
@@ -261,8 +444,11 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		return
 	}
 	if event == nil {
-		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false})
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false, "test_run_state": testRunState})
 		return
+	}
+	if testRunState == "" && event.Status == models.EventStatusTesting {
+		testRunState = models.EventTestRunStateTesting
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -274,6 +460,7 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		"survey_url":                     event.SurveyUrl,
 		"is_survey_published":            event.IsSurveyPublished,
 		"hide_scores":                    event.HideScores,
+		"test_run_state":                 testRunState,
 	})
 }
 

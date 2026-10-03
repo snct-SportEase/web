@@ -139,12 +139,12 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 		return 0, err
 	}
 
-	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
-		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing || event.Status == models.EventStatusTesting {
+		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')"
 		if event.Status == models.EventStatusPreparing {
 			// 準備中の大会も、画面上で現在操作する大会として active_event に設定する。
-			// 操作対象は一意にするため、既存の準備中大会もアーカイブする。
-			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+			// 操作対象は一意にするため、既存の準備中・テスト中大会もアーカイブする。
+			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing', 'testing')"
 		}
 		_, err = tx.Exec(archiveQuery, id)
 		if err != nil {
@@ -200,13 +200,13 @@ func (r *eventRepository) CreateEventWithClasses(event *models.Event, classNames
 		}
 	}
 
-	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
+	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing || event.Status == models.EventStatusTesting {
 		if err := migrateUserProfilesForEventTransition(tx, eventID); err != nil {
 			return 0, err
 		}
-		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')"
 		if event.Status == models.EventStatusPreparing {
-			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing', 'testing')"
 		}
 		if _, err := tx.Exec(archiveQuery, eventID); err != nil {
 			return 0, err
@@ -293,14 +293,14 @@ func (r *eventRepository) UpdateEvent(event *models.Event) error {
 		}
 	}
 
-	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing {
+	if event.Status == models.EventStatusActive || event.Status == models.EventStatusPreparing || event.Status == models.EventStatusTesting {
 		if err := migrateUserProfilesForEventTransition(tx, event.ID); err != nil {
 			tx.Rollback()
 			return err
 		}
-		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'"
+		archiveQuery := "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')"
 		if event.Status == models.EventStatusPreparing {
-			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing')"
+			archiveQuery = "UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'preparing', 'testing')"
 		}
 		_, err = tx.Exec(archiveQuery, event.ID)
 		if err != nil {
@@ -367,7 +367,7 @@ func (r *eventRepository) SetActiveEvent(event_id *int) error {
 	}
 
 	if event_id != nil {
-		_, err = tx.Exec("UPDATE events SET status = 'archived' WHERE id != ? AND status = 'active'", *event_id)
+		_, err = tx.Exec("UPDATE events SET status = 'archived' WHERE id != ? AND status IN ('active', 'testing')", *event_id)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -378,7 +378,7 @@ func (r *eventRepository) SetActiveEvent(event_id *int) error {
 			return err
 		}
 	} else {
-		_, err = tx.Exec("UPDATE events SET status = 'archived' WHERE status = 'active'")
+		_, err = tx.Exec("UPDATE events SET status = 'archived' WHERE status IN ('active', 'testing')")
 		if err != nil {
 			tx.Rollback()
 			return err

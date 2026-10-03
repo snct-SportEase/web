@@ -515,6 +515,18 @@ func (h *NotificationHandler) StartScheduledNotificationWorker(ctx context.Conte
 // DispatchDueNotifications claims and dispatches one bounded batch. It is
 // exported to keep the worker behavior directly testable.
 func (h *NotificationHandler) DispatchDueNotifications() {
+	testRunActive, err := h.isTestRunActive()
+	if err != nil {
+		// Fail closed: do not mark reservations as sent when the delivery policy
+		// cannot be determined.
+		log.Printf("[notification-scheduler] テスト試行状態を確認できないため予約通知を停止します: %s\n", safelog.Value(err))
+		return
+	}
+	if testRunActive {
+		log.Println("[notification-scheduler] テスト試行中のため予約通知を一時停止します")
+		return
+	}
+
 	due, err := h.NotificationRepo.ClaimDueNotifications(100)
 	if err != nil {
 		log.Printf("[notification-scheduler] 予約通知の取得に失敗しました: %s\n", safelog.Value(err))
@@ -536,6 +548,30 @@ func (h *NotificationHandler) DispatchDueNotifications() {
 			notification.EventID,
 		)
 	}
+}
+
+func (h *NotificationHandler) isTestRunActive() (bool, error) {
+	if h.EventRepo == nil {
+		return false, errors.New("event repository is not configured")
+	}
+
+	activeEventID, err := h.EventRepo.GetActiveEvent()
+	if err != nil {
+		return false, err
+	}
+	if activeEventID <= 0 {
+		return false, nil
+	}
+
+	event, err := h.EventRepo.GetEventByID(activeEventID)
+	if err != nil {
+		return false, err
+	}
+	if event == nil {
+		return false, errors.New("active event was not found")
+	}
+
+	return event.Status == models.EventStatusTesting, nil
 }
 
 func (h *NotificationHandler) dispatchPushNotifications(notificationID int, title, body, notificationType string, targetRoles, targetUserIDs []string, eventID *int) {

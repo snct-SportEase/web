@@ -312,6 +312,7 @@ func (r *notificationRepository) ClaimDueNotifications(limit int) ([]models.Sche
 		WHERE scheduled_at IS NOT NULL
 			AND sent_at IS NULL
 			AND scheduled_at <= UTC_TIMESTAMP(6)
+			AND NOT EXISTS (SELECT 1 FROM event_test_runs WHERE id = 1)
 		ORDER BY scheduled_at, id
 		LIMIT ?
 		FOR UPDATE SKIP LOCKED`, limit)
@@ -432,15 +433,44 @@ func (r *notificationRepository) GetPushSubscriptionsByUserIDs(userIDs []string)
 	placeholders := strings.Repeat(",?", len(userIDs)-1)
 	// #nosec G202 -- only the number of bound placeholders is constructed from userIDs.
 	query := `
-		SELECT id, user_id, endpoint, auth_key, p256dh_key, created_at
-		FROM push_subscriptions
-		WHERE user_id IN (?` + placeholders + `)
+		SELECT ps.id, ps.user_id, ps.endpoint, ps.auth_key, ps.p256dh_key, ps.created_at
+		FROM push_subscriptions ps
+		WHERE ps.user_id IN (?` + placeholders + `)
+		AND (
+			(NOT EXISTS (
+				SELECT 1
+				FROM event_test_runs test_run
+				WHERE test_run.id = 1 AND test_run.state IN (?, ?, ?, ?)
+			) AND NOT EXISTS (
+				SELECT 1
+				FROM active_event test_active
+				INNER JOIN events test_event ON test_event.id = test_active.event_id
+				WHERE test_active.id = 1 AND test_event.status = ?
+			))
+			OR EXISTS (
+				SELECT 1
+				FROM user_roles push_ur
+				INNER JOIN roles push_role ON push_role.id = push_ur.role_id
+				WHERE push_ur.user_id = ps.user_id
+					AND push_ur.event_id IS NULL
+					AND push_role.name IN (?, ?)
+			)
+		)
 	`
 
 	args := make([]interface{}, len(userIDs))
 	for i, id := range userIDs {
 		args[i] = id
 	}
+	args = append(args,
+		models.EventTestRunStateStarting,
+		models.EventTestRunStateTesting,
+		models.EventTestRunStateRestoring,
+		models.EventTestRunStateFailed,
+		models.EventStatusTesting,
+		"admin",
+		"root",
+	)
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -515,7 +545,36 @@ func (r *notificationRepository) GetPushSubscriptionStatsByTargets(roleNames, us
 			args = append(args, userID)
 		}
 	}
-	query += " WHERE (" + strings.Join(filters, " OR ") + ")" // #nosec G202 -- filters contain only fixed SQL and generated placeholders.
+	query += ` WHERE (` + strings.Join(filters, " OR ") + `)
+		AND (
+			(NOT EXISTS (
+				SELECT 1
+				FROM event_test_runs test_run
+				WHERE test_run.id = 1 AND test_run.state IN (?, ?, ?, ?)
+			) AND NOT EXISTS (
+				SELECT 1
+				FROM active_event test_active
+				INNER JOIN events test_event ON test_event.id = test_active.event_id
+				WHERE test_active.id = 1 AND test_event.status = ?
+			))
+			OR EXISTS (
+				SELECT 1
+				FROM user_roles push_ur
+				INNER JOIN roles push_role ON push_role.id = push_ur.role_id
+				WHERE push_ur.user_id = u.id
+					AND push_ur.event_id IS NULL
+					AND push_role.name IN (?, ?)
+			)
+		)` // #nosec G202 -- filters contain only fixed SQL and generated placeholders.
+	args = append(args,
+		models.EventTestRunStateStarting,
+		models.EventTestRunStateTesting,
+		models.EventTestRunStateRestoring,
+		models.EventTestRunStateFailed,
+		models.EventStatusTesting,
+		"admin",
+		"root",
+	)
 
 	var stats models.PushSubscriptionStats
 	err := r.db.QueryRow(query, args...).Scan(

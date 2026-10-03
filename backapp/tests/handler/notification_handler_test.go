@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -172,7 +173,10 @@ func TestNotificationHandler_CreateNotification_RejectsPastSchedule(t *testing.T
 
 func TestNotificationHandler_DispatchDueNotificationsClaimsBatch(t *testing.T) {
 	mockNotifRepo := new(MockNotificationRepository)
-	h := handler.NewNotificationHandler(mockNotifRepo, new(MockEventRepository), new(MockRoleRepository), new(MockUserRepository), "", "")
+	mockEventRepo := new(MockEventRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, new(MockRoleRepository), new(MockUserRepository), "", "")
+	mockEventRepo.On("GetActiveEvent").Return(3, nil).Once()
+	mockEventRepo.On("GetEventByID", 3).Return(&models.Event{ID: 3, Status: models.EventStatusActive}, nil).Once()
 	mockNotifRepo.On("ClaimDueNotifications", 100).Return([]models.ScheduledNotification{{
 		ID:          20,
 		Title:       "予約のお知らせ",
@@ -184,6 +188,32 @@ func TestNotificationHandler_DispatchDueNotificationsClaimsBatch(t *testing.T) {
 	h.DispatchDueNotifications()
 
 	mockNotifRepo.AssertExpectations(t)
+	mockEventRepo.AssertExpectations(t)
+}
+
+func TestNotificationHandler_DispatchDueNotificationsPausesDuringTestRun(t *testing.T) {
+	mockNotifRepo := new(MockNotificationRepository)
+	mockEventRepo := new(MockEventRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, new(MockRoleRepository), new(MockUserRepository), "", "")
+	mockEventRepo.On("GetActiveEvent").Return(3, nil).Once()
+	mockEventRepo.On("GetEventByID", 3).Return(&models.Event{ID: 3, Status: models.EventStatusTesting}, nil).Once()
+
+	h.DispatchDueNotifications()
+
+	mockNotifRepo.AssertNotCalled(t, "ClaimDueNotifications", mock.Anything)
+	mockEventRepo.AssertExpectations(t)
+}
+
+func TestNotificationHandler_DispatchDueNotificationsFailsClosedWhenEventStateIsUnavailable(t *testing.T) {
+	mockNotifRepo := new(MockNotificationRepository)
+	mockEventRepo := new(MockEventRepository)
+	h := handler.NewNotificationHandler(mockNotifRepo, mockEventRepo, new(MockRoleRepository), new(MockUserRepository), "", "")
+	mockEventRepo.On("GetActiveEvent").Return(0, errors.New("database unavailable")).Once()
+
+	h.DispatchDueNotifications()
+
+	mockNotifRepo.AssertNotCalled(t, "ClaimDueNotifications", mock.Anything)
+	mockEventRepo.AssertExpectations(t)
 }
 
 func TestNotificationHandler_CreateNotification_RejectsMissingTargets(t *testing.T) {

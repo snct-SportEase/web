@@ -1,0 +1,171 @@
+package repository
+
+import (
+	"backapp/internal/models"
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/go-sql-driver/mysql"
+	"github.com/stretchr/testify/require"
+)
+
+func eventTestRunDB(t *testing.T) *sql.DB {
+	t.Helper()
+	dsn := os.Getenv("SPORTEASE_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("MySQL統合テストには SPORTEASE_TEST_MYSQL_DSN が必要です")
+	}
+	cfg, err := mysql.ParseDSN(dsn)
+	require.NoError(t, err)
+	cfg.DBName = ""
+	cfg.MultiStatements = true
+	admin, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	t.Cleanup(func() { admin.Close() })
+
+	dbName := fmt.Sprintf("sportease_test_run_test_%d", time.Now().UnixNano())
+	_, err = admin.Exec("CREATE DATABASE " + dbName)
+	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = admin.Exec("DROP DATABASE " + dbName) })
+
+	cfg.DBName = dbName
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	_, err = db.Exec(`
+		CREATE TABLE events (
+			id INT PRIMARY KEY AUTO_INCREMENT,
+			name VARCHAR(100) NOT NULL,
+			status VARCHAR(20) NOT NULL
+		);
+		CREATE TABLE users (
+			id INT PRIMARY KEY AUTO_INCREMENT,
+			name VARCHAR(100) NOT NULL,
+			normalized_name VARCHAR(100) GENERATED ALWAYS AS (LOWER(name)) VIRTUAL
+		);
+		CREATE TABLE schema_migrations (version BIGINT NOT NULL, dirty BOOLEAN NOT NULL);
+		CREATE TABLE event_test_runs (
+			id TINYINT PRIMARY KEY,
+			event_id INT NOT NULL,
+			state ENUM('starting', 'testing', 'restoring', 'awaiting_notification_resume', 'failed') NOT NULL DEFAULT 'testing',
+			last_error TEXT NULL,
+			started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		);
+		CREATE TABLE event_test_run_tables (
+			table_name VARCHAR(64) PRIMARY KEY,
+			auto_increment_value BIGINT UNSIGNED NULL
+		);
+		INSERT INTO events (name, status) VALUES ('original event', 'preparing');
+		INSERT INTO users (name) VALUES ('original user');
+		INSERT INTO schema_migrations VALUES (29, FALSE);
+	`)
+	require.NoError(t, err)
+	return db
+}
+
+func TestEventTestRunSnapshotRestoreMySQL(t *testing.T) {
+	db := eventTestRunDB(t)
+	root := t.TempDir()
+	images := filepath.Join(root, "uploads", "images")
+	pdfs := filepath.Join(root, "uploads", "pdfs")
+	snapshot := filepath.Join(root, "snapshots", "current")
+	mustWriteTestFile(t, filepath.Join(images, "original.png"), "original image")
+	mustWriteTestFile(t, filepath.Join(pdfs, "original.pdf"), "original pdf")
+	repo := NewEventTestRunRepositoryWithUploads(db, snapshot, images, pdfs)
+	ctx := context.Background()
+
+	require.NoError(t, repo.Begin(ctx, 1))
+	_, err := db.Exec(`
+		UPDATE events SET name = 'test event', status = 'testing' WHERE id = 1;
+		INSERT INTO users (name) VALUES ('test-only user');
+	`)
+	require.NoError(t, err)
+	mustWriteTestFile(t, filepath.Join(images, "original.png"), "changed image")
+	mustWriteTestFile(t, filepath.Join(images, "test-only.png"), "test image")
+	require.NoError(t, os.Remove(filepath.Join(pdfs, "original.pdf")))
+
+	require.NoError(t, repo.Restore(ctx, 1))
+
+	var eventName, status string
+	require.NoError(t, db.QueryRow("SELECT name, status FROM events WHERE id = 1").Scan(&eventName, &status))
+	require.Equal(t, "original event", eventName)
+	require.Equal(t, "preparing", status)
+	var userCount int
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM users").Scan(&userCount))
+	require.Equal(t, 1, userCount)
+	var normalizedName string
+	require.NoError(t, db.QueryRow("SELECT normalized_name FROM users WHERE id = 1").Scan(&normalizedName))
+	require.Equal(t, "original user", normalizedName)
+	var testRunCount int
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM event_test_runs").Scan(&testRunCount))
+	require.Equal(t, 1, testRunCount)
+	var testRunState string
+	require.NoError(t, db.QueryRow("SELECT state FROM event_test_runs WHERE id = 1").Scan(&testRunState))
+	require.Equal(t, models.EventTestRunStateAwaitingNotificationResume, testRunState)
+	var snapshotCount int
+	require.NoError(t, db.QueryRow(`
+		SELECT COUNT(*) FROM information_schema.TABLES
+		WHERE TABLE_SCHEMA = DATABASE() AND LEFT(TABLE_NAME, ?) = ?
+	`, len(testRunSnapshotPrefix), testRunSnapshotPrefix).Scan(&snapshotCount))
+	require.Zero(t, snapshotCount)
+	assertTestFileContent(t, filepath.Join(images, "original.png"), "original image")
+	assertTestFileContent(t, filepath.Join(pdfs, "original.pdf"), "original pdf")
+	_, err = os.Stat(filepath.Join(images, "test-only.png"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(snapshot)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestEventTestRunSnapshotRestoreWithFullSchemaMySQL(t *testing.T) {
+	dsn := os.Getenv("SPORTEASE_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("MySQL統合テストには SPORTEASE_TEST_MYSQL_DSN が必要です")
+	}
+	cfg, err := mysql.ParseDSN(dsn)
+	require.NoError(t, err)
+	cfg.DBName = ""
+	cfg.MultiStatements = true
+	admin, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	t.Cleanup(func() { admin.Close() })
+	dbName := fmt.Sprintf("sportease_test_run_full_schema_%d", time.Now().UnixNano())
+	_, err = admin.Exec("CREATE DATABASE " + dbName)
+	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = admin.Exec("DROP DATABASE " + dbName) })
+
+	cfg.DBName = dbName
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	migrations, err := filepath.Glob("../../db/migrations/*.up.sql")
+	require.NoError(t, err)
+	require.NotEmpty(t, migrations)
+	for _, migration := range migrations {
+		sqlBytes, err := os.ReadFile(migration)
+		require.NoError(t, err)
+		_, err = db.Exec(string(sqlBytes))
+		require.NoErrorf(t, err, "migration failed: %s", migration)
+	}
+	_, err = db.Exec("INSERT INTO events (name, `year`, season, status) VALUES ('original event', 2026, 'spring', 'preparing')")
+	require.NoError(t, err)
+
+	repo := NewEventTestRunRepository(db)
+	ctx := context.Background()
+	require.NoError(t, repo.Begin(ctx, 1))
+	_, err = db.Exec("UPDATE events SET name = 'test event' WHERE id = 1; INSERT INTO sports (name) VALUES ('test-only sport')")
+	require.NoError(t, err)
+	require.NoError(t, repo.Restore(ctx, 1))
+
+	var eventName string
+	require.NoError(t, db.QueryRow("SELECT name FROM events WHERE id = 1").Scan(&eventName))
+	require.Equal(t, "original event", eventName)
+	var sportCount int
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM sports").Scan(&sportCount))
+	require.Zero(t, sportCount)
+}

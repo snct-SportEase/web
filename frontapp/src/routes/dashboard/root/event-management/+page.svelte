@@ -10,6 +10,10 @@
   let showModal = $state(false);
   let selectedEvent = $state(null);
   let isNameManuallyChanged = $state(false);
+  let isSaving = $state(false);
+  let testRun = $state(null);
+  let notificationResumePolicy = $state('shift');
+  let isRecovering = $state(false);
 
   let currentEvent = $state({
     id: null,
@@ -36,9 +40,80 @@
   }
 
   onMount(async () => {
-    await fetchEvents();
+    await Promise.all([fetchEvents(), fetchTestRunStatus()]);
     await activeEvent.init();
   });
+
+  async function fetchTestRunStatus() {
+    try {
+      const response = await fetch('/api/root/events/test-run', {
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+      if (!response.ok) throw new Error('テスト試行状態の取得に失敗しました');
+      const payload = await response.json();
+      testRun = payload.test_run ?? null;
+    } catch (error) {
+      console.error(error);
+      testRun = null;
+    }
+  }
+
+  async function forceRestoreTestRun() {
+    if (!confirm('テスト開始時点のDBと画像・PDFへ強制復元します。テスト中の変更はすべて削除されます。続行しますか？')) return;
+    isRecovering = true;
+    try {
+      const response = await fetch('/api/root/events/test-run/force-restore', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || '強制復元に失敗しました');
+      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init()]);
+      alert('テスト開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      isRecovering = false;
+    }
+  }
+
+  async function discardTestRun() {
+    if (!confirm('復元用スナップショットを破棄して強制終了します。テスト中の変更は元に戻せなくなります。本当に続行しますか？')) return;
+    isRecovering = true;
+    try {
+      const response = await fetch('/api/root/events/test-run/discard', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || '強制終了に失敗しました');
+      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init()]);
+      alert('復元用スナップショットを破棄しました。現在のデータがそのまま残ります。');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      isRecovering = false;
+    }
+  }
+
+  async function resumeScheduledNotifications() {
+    const descriptions = {
+      resume: '期限切れを含む予約通知の配信を直ちに再開します。',
+      shift: '未送信の予約日時をテスト実施時間分だけ後ろへずらします。',
+      cancel_overdue: '期限切れになった未送信通知を取り消し、今後の予約だけ再開します。'
+    };
+    if (!confirm(`${descriptions[notificationResumePolicy]} 続行しますか？`)) return;
+    isRecovering = true;
+    try {
+      const response = await fetch('/api/root/events/test-run/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ policy: notificationResumePolicy })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || '予約通知の再開に失敗しました');
+      await fetchTestRunStatus();
+      alert('予約通知の配信制御を解除しました。');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      isRecovering = false;
+    }
+  }
 
   async function fetchEvents() {
     try {
@@ -97,6 +172,16 @@
   }
 
   async function handleSave() {
+    const startingTestRun = currentEvent.status === 'testing' && selectedEvent?.status !== 'testing';
+    const endingTestRun = selectedEvent?.status === 'testing' && currentEvent.status !== 'testing';
+    if (startingTestRun && !confirm(
+      'テスト試行を開始します。現在のDB全体とアップロード済みの画像・PDFを保存し、終了時にこの時点へ戻します。テスト中は予約通知の配信を停止し、Push通知は選択した宛先のうちadmin/rootにだけ送信します。通常運用を行わないでください。続行しますか？'
+    )) return;
+    if (endingTestRun && !confirm(
+      'テスト試行を終了して、開始時点のDBと画像・PDFへ復元します。テスト中のDB変更と新しくアップロードした画像・PDFは削除され、変更・削除した既存ファイルは元に戻ります。続行しますか？'
+    )) return;
+
+    isSaving = true;
     try {
       const duplicateRegistrationThreshold = Number(currentEvent.duplicate_registration_threshold);
       if (!Number.isInteger(duplicateRegistrationThreshold) || duplicateRegistrationThreshold < 0) {
@@ -125,12 +210,17 @@
         throw new Error(errorData.error || 'Failed to save event');
       }
 
-      await fetchEvents();
+      await Promise.all([fetchEvents(), fetchTestRunStatus()]);
       await activeEvent.init();
       closeModal();
+      if (endingTestRun) {
+        alert('テスト中のDB変更と画像・PDFを削除し、開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');
+      }
     } catch (error) {
       console.error(error);
       alert(error.message);
+    } finally {
+      isSaving = false;
     }
   }
 
@@ -314,6 +404,48 @@
     </div>
   </div>
 
+  {#if testRun}
+    <section class="mb-6 rounded-lg border p-5 shadow-sm" class:border-red-300={testRun.state === 'failed'} class:bg-red-50={testRun.state === 'failed'} class:border-amber-300={testRun.state !== 'failed'} class:bg-amber-50={testRun.state !== 'failed'} aria-live="polite">
+      {#if testRun.state === 'awaiting_notification_resume'}
+        <h2 class="text-lg font-semibold text-amber-950">テストデータの復元が完了しました</h2>
+        <p class="mt-2 text-sm text-amber-900">
+          予約通知は停止中です。期限切れの予約通知は {testRun.overdue_notification_count ?? 0} 件あります。再開方法を選択してください。
+        </p>
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label class="text-sm font-medium text-amber-950">
+            予約通知の扱い
+            <select bind:value={notificationResumePolicy} class="mt-1 block rounded-md border border-amber-300 bg-white px-3 py-2 text-sm">
+              <option value="shift">テスト時間分だけ延期して再開（推奨）</option>
+              <option value="resume">元の日時のまま再開</option>
+              <option value="cancel_overdue">期限切れを取り消して再開</option>
+            </select>
+          </label>
+          <button type="button" onclick={resumeScheduledNotifications} disabled={isRecovering} class="rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-60">
+            予約通知を再開
+          </button>
+        </div>
+      {:else}
+        <h2 class="text-lg font-semibold" class:text-red-950={testRun.state === 'failed'} class:text-amber-950={testRun.state !== 'failed'}>
+          {testRun.state === 'failed' ? 'テスト試行の復元に失敗しました' : 'テスト試行中です'}
+        </h2>
+        <p class="mt-2 text-sm" class:text-red-900={testRun.state === 'failed'} class:text-amber-900={testRun.state !== 'failed'}>
+          状態: {testRun.state}。学生向け機能と予約通知は停止しています。
+        </p>
+        {#if testRun.last_error}
+          <p class="mt-2 rounded bg-white/70 p-2 text-xs text-red-800">{testRun.last_error}</p>
+        {/if}
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button type="button" onclick={forceRestoreTestRun} disabled={isRecovering} class="rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-60">
+            開始時点へ強制復元
+          </button>
+          <button type="button" onclick={discardTestRun} disabled={isRecovering} class="rounded-md border border-red-400 bg-white px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-60">
+            復元せず強制終了
+          </button>
+        </div>
+      {/if}
+    </section>
+  {/if}
+
   <div class="bg-white shadow-md rounded-lg overflow-x-auto">
     <table class="min-w-full leading-normal">
       <thead>
@@ -340,6 +472,8 @@
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">
               {#if event.status === 'preparing'}
                 <Badge variant="warning">準備中</Badge>
+              {:else if event.status === 'testing'}
+                <Badge variant="danger">テスト中</Badge>
               {:else if event.status === 'active'}
                 <Badge variant="success">開催中</Badge>
               {:else if event.status === 'archived'}
@@ -411,10 +545,14 @@
             <FormField label="ステータス" inputId="status">
               <select id="status" bind:value={currentEvent.status} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 <option value="preparing">準備中 (Preparing)</option>
+                <option value="testing" disabled={!selectedEvent}>テスト中 (Testing)</option>
                 <option value="upcoming">予定 (Upcoming)</option>
                 <option value="active">開催中 (Active)</option>
                 <option value="archived">アーカイブ (Archived)</option>
               </select>
+              <p class="mt-2 text-xs text-gray-500">
+                「テスト中」では本番と同じ操作を試せます。開始時にDB全体と画像・PDFを保存し、終了時にテスト中の変更をすべて削除します。
+              </p>
             </FormField>
             <FormField label="2競技への重複登録を許可するクラス人数" inputId="duplicate_registration_threshold" description="この人数以下のクラスは、1人につき2競技まで登録できます。">
               <input type="number" id="duplicate_registration_threshold" min="0" required bind:value={currentEvent.duplicate_registration_threshold} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -431,6 +569,6 @@
             </div>
   </div>
   {#snippet footer()}
-    <ModalFooter onconfirm={handleSave} oncancel={closeModal} />
+    <ModalFooter onconfirm={handleSave} oncancel={closeModal} confirmDisabled={isSaving} confirmLoading={isSaving} />
   {/snippet}
 </Modal>
