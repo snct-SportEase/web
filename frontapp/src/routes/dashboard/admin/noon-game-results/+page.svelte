@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
+  import { canEnterEventResults } from '$lib/utils/eventStatus.js';
   import { get } from 'svelte/store';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { dndzone } from 'svelte-dnd-action';
@@ -140,8 +141,8 @@
   }
 
   async function submitResult(match) {
-    if (activeEventStatus !== 'active') {
-      alert('試合結果は開催中の大会でのみ入力できます。');
+    if (!canEnterEventResults(activeEventStatus)) {
+      alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
       return;
     }
     const form = resultForms[match.id];
@@ -501,8 +502,8 @@
   }
 
   async function submitTemplateResult(run, match, template, finalize = true) {
-    if (activeEventStatus !== 'active') {
-      alert('試合結果は開催中の大会でのみ入力できます。');
+    if (!canEnterEventResults(activeEventStatus)) {
+      alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
       return;
     }
     const formKey = `${run.key}-${match.id}`;
@@ -801,9 +802,9 @@
 
 <div class="space-y-8 p-4 md:p-8">
   <h1 class="text-3xl font-bold text-gray-800 border-b pb-2">昼競技結果入力</h1>
-  {#if activeEventStatus !== 'active'}
+  {#if !canEnterEventResults(activeEventStatus)}
     <p class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-      試合結果は大会が「開催中」になってから入力できます。
+      試合結果は大会が「開催中」または「テスト中」になってから入力できます。
     </p>
   {/if}
   {#if errorMessage}
@@ -844,8 +845,8 @@
         <p class="text-sm text-gray-600">typing-results-v1 の JSON を読み込み、順位点を大会得点へ反映します。</p>
         <div class="flex flex-wrap items-center gap-3">
           <input type="file" accept="application/json,.json" onchange={(event) => { typingFile = event.currentTarget.files?.[0] ?? null; }} />
-          <button class="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50" onclick={() => importTypingResults(false)} disabled={!typingFile || importingTypingResults || activeEventStatus !== 'active'}>{importingTypingResults ? 'インポート中…' : '結果をインポート'}</button>
-          <button class="px-4 py-2 border border-orange-500 text-orange-700 rounded disabled:opacity-50" onclick={() => importTypingResults(true)} disabled={!typingFile || importingTypingResults || activeEventStatus !== 'active'}>置換インポート</button>
+          <button class="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50" onclick={() => importTypingResults(false)} disabled={!typingFile || importingTypingResults || !canEnterEventResults(activeEventStatus)}>{importingTypingResults ? 'インポート中…' : '結果をインポート'}</button>
+          <button class="px-4 py-2 border border-orange-500 text-orange-700 rounded disabled:opacity-50" onclick={() => importTypingResults(true)} disabled={!typingFile || importingTypingResults || !canEnterEventResults(activeEventStatus)}>置換インポート</button>
         </div>
       </section>
     {/if}
@@ -951,12 +952,12 @@
                       </div>
 					<div class="flex justify-end gap-3">
 						{#if run.type === 'borrowing-race'}
-							<button class="px-4 py-2 border border-indigo-600 text-indigo-700 rounded disabled:opacity-50" onclick={() => submitTemplateResult(run, match, template, false)} disabled={saving[formKey] || activeEventStatus !== 'active'}>途中経過を保存</button>
+							<button class="px-4 py-2 border border-indigo-600 text-indigo-700 rounded disabled:opacity-50" onclick={() => submitTemplateResult(run, match, template, false)} disabled={saving[formKey] || !canEnterEventResults(activeEventStatus)}>途中経過を保存</button>
 						{/if}
                         <button
                           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                           onclick={() => submitTemplateResult(run, match, template)}
-                          disabled={saving[formKey] || activeEventStatus !== 'active'}>
+                          disabled={saving[formKey] || !canEnterEventResults(activeEventStatus)}>
 						{saving[formKey] ? '送信中...' : run.type === 'borrowing-race' ? '結果を確定' : '結果を登録'}
                         </button>
                       </div>
@@ -1065,7 +1066,7 @@
               <div class="flex justify-end">
                 <button class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                   onclick={() => submitResult(match)}
-                  disabled={saving[match.id] || activeEventStatus !== 'active'}>
+                  disabled={saving[match.id] || !canEnterEventResults(activeEventStatus)}>
                   {saving[match.id] ? '送信中...' : '結果を登録'}
                 </button>
               </div>

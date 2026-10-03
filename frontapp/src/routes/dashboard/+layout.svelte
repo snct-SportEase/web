@@ -8,6 +8,7 @@
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { pushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
   import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
+  import { activeEvent } from '$lib/stores/eventStore.js';
 
   let { children } = $props();
   let { data } = $page;
@@ -29,6 +30,7 @@
   );
   
   onMount(() => {
+    void activeEvent.init();
     if (browser) {
       isPWA = isPWAInstalled();
 
@@ -270,6 +272,13 @@
         </div>
       </div>
     </header>
+  {/if}
+
+  {#if $activeEvent?.status === 'testing'}
+    <div class="border-y border-red-300 bg-red-50 px-4 py-3 text-center text-sm text-red-900" role="status">
+      <strong>テスト試行中:</strong>
+      「{$activeEvent.name}」を本番と同じ流れで確認しています。入力内容は大会データに保存されます。
+    </div>
   {/if}
 
   <main class="p-8 flex-1">

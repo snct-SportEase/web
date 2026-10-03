@@ -60,6 +60,18 @@ describe('Event Management Page', () => {
       survey_url: null,
       hide_scores: false,
       duplicate_registration_threshold: 31
+    },
+    {
+      id: 4,
+      name: '2026春季リハーサル大会',
+      year: 2026,
+      season: 'spring',
+      start_date: null,
+      end_date: null,
+      status: 'testing',
+      survey_url: null,
+      hide_scores: false,
+      duplicate_registration_threshold: 31
     }
   ];
 
@@ -240,6 +252,16 @@ describe('Event Management Page', () => {
 
     const nameInput = page.getByRole('textbox', { name: '大会名' });
     await expect.element(nameInput).toHaveValue('2025春季スポーツ大会');
+  });
+
+  it('テスト中の大会を識別し、ステータスを編集できること', async () => {
+    render(Page);
+
+    await expect.element(page.getByText('テスト中')).toBeInTheDocument();
+    await page.getByText('2026春季リハーサル大会').click();
+
+    await expect.element(page.getByRole('combobox', { name: 'ステータス' })).toHaveValue('testing');
+    await expect.element(page.getByText(/本番と同じ結果入力を試せます/)).toBeInTheDocument();
   });
 
   it('新規作成ではスコア非表示設定が初期値falseであること', async () => {
