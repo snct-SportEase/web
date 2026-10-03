@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -97,4 +98,52 @@ func TestEventTestRunSnapshotRestoreMySQL(t *testing.T) {
 		WHERE TABLE_SCHEMA = DATABASE() AND LEFT(TABLE_NAME, ?) = ?
 	`, len(testRunSnapshotPrefix), testRunSnapshotPrefix).Scan(&snapshotCount))
 	require.Zero(t, snapshotCount)
+}
+
+func TestEventTestRunSnapshotRestoreWithFullSchemaMySQL(t *testing.T) {
+	dsn := os.Getenv("SPORTEASE_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("MySQL統合テストには SPORTEASE_TEST_MYSQL_DSN が必要です")
+	}
+	cfg, err := mysql.ParseDSN(dsn)
+	require.NoError(t, err)
+	cfg.DBName = ""
+	cfg.MultiStatements = true
+	admin, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	t.Cleanup(func() { admin.Close() })
+	dbName := fmt.Sprintf("sportease_test_run_full_schema_%d", time.Now().UnixNano())
+	_, err = admin.Exec("CREATE DATABASE " + dbName)
+	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = admin.Exec("DROP DATABASE " + dbName) })
+
+	cfg.DBName = dbName
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	migrations, err := filepath.Glob("../../db/migrations/*.up.sql")
+	require.NoError(t, err)
+	require.NotEmpty(t, migrations)
+	for _, migration := range migrations {
+		sqlBytes, err := os.ReadFile(migration)
+		require.NoError(t, err)
+		_, err = db.Exec(string(sqlBytes))
+		require.NoErrorf(t, err, "migration failed: %s", migration)
+	}
+	_, err = db.Exec("INSERT INTO events (name, `year`, season, status) VALUES ('original event', 2026, 'spring', 'preparing')")
+	require.NoError(t, err)
+
+	repo := NewEventTestRunRepository(db)
+	ctx := context.Background()
+	require.NoError(t, repo.Begin(ctx, 1))
+	_, err = db.Exec("UPDATE events SET name = 'test event' WHERE id = 1; INSERT INTO sports (name) VALUES ('test-only sport')")
+	require.NoError(t, err)
+	require.NoError(t, repo.Restore(ctx, 1))
+
+	var eventName string
+	require.NoError(t, db.QueryRow("SELECT name FROM events WHERE id = 1").Scan(&eventName))
+	require.Equal(t, "original event", eventName)
+	var sportCount int
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM sports").Scan(&sportCount))
+	require.Zero(t, sportCount)
 }
