@@ -34,6 +34,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
+	testRunRepo := repository.NewEventTestRunRepository(db)
 
 	classRepo := repository.NewClassRepository(db)
 	teamRepo := repository.NewTeamRepository(db)
@@ -54,7 +55,9 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		AllowedHosts:    cfg.WebPushAllowedHosts,
 		MaxConcurrency:  32,
 	})
-	eventHandler := handler.NewEventHandler(eventRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).WithPushSender(pushSender)
+	eventHandler := handler.NewEventHandler(eventRepo, tournRepo, classRepo, notificationRepo, userRepo, cfg.WebPushPublicKey, cfg.WebPushPrivateKey).
+		WithPushSender(pushSender).
+		WithEventTestRunRepository(testRunRepo)
 
 	rainyModeRepo := repository.NewRainyModeRepository(db)
 	rainyModeHandler := handler.NewRainyModeHandler(rainyModeRepo, eventRepo)

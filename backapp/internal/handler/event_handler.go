@@ -7,6 +7,7 @@ import (
 	"backapp/internal/safelog"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -24,6 +25,7 @@ type EventHandler struct {
 	classRepo        repository.ClassRepository
 	notificationRepo repository.NotificationRepository
 	userRepo         repository.UserRepository
+	testRunRepo      repository.EventTestRunRepository
 	pushSender       push.Sender
 }
 
@@ -43,6 +45,11 @@ func NewEventHandler(eventRepo repository.EventRepository, tournamentRepo reposi
 
 func (h *EventHandler) WithPushSender(sender push.Sender) *EventHandler {
 	h.pushSender = sender
+	return h
+}
+
+func (h *EventHandler) WithEventTestRunRepository(repo repository.EventTestRunRepository) *EventHandler {
+	h.testRunRepo = repo
 	return h
 }
 
@@ -92,6 +99,10 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 	}
 	if !models.IsValidEventStatus(req.Status) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event status"})
+		return
+	}
+	if req.Status == models.EventStatusTesting {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Create the event first, then start its test run"})
 		return
 	}
 	if req.DuplicateRegistrationThreshold != nil && *req.DuplicateRegistrationThreshold < 0 {
@@ -204,6 +215,47 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		return
 	}
 
+	startingTestRun := existingEvent.Status != models.EventStatusTesting && req.Status == models.EventStatusTesting
+	endingTestRun := existingEvent.Status == models.EventStatusTesting && req.Status != models.EventStatusTesting
+	if (startingTestRun || endingTestRun) && h.testRunRepo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Event test run storage is not configured"})
+		return
+	}
+	if startingTestRun {
+		if err := h.testRunRepo.Begin(c.Request.Context(), existingEvent.ID); err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, repository.ErrTestRunAlreadyActive) {
+				status = http.StatusConflict
+			}
+			c.JSON(status, gin.H{"error": "Failed to create the event test run snapshot"})
+			return
+		}
+	}
+	if endingTestRun {
+		if err := h.testRunRepo.Restore(c.Request.Context(), existingEvent.ID); err != nil {
+			log.Printf("failed to restore event test run snapshot: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset event test run data"})
+			return
+		}
+		if repository.GlobalCache != nil {
+			repository.GlobalCache.Flush()
+		}
+		restoredEvent, err := h.eventRepo.GetEventByID(id)
+		if err != nil || restoredEvent == nil {
+			log.Printf("failed to reload event after test run reset: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload event after resetting test data"})
+			return
+		}
+		restoredEvent.Status = req.Status
+		if err := h.eventRepo.UpdateEvent(restoredEvent); err != nil {
+			log.Printf("failed to update event status after test run reset: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Test data was reset, but the event status could not be updated"})
+			return
+		}
+		c.JSON(http.StatusOK, restoredEvent)
+		return
+	}
+
 	existingEvent.Name = req.Name
 	existingEvent.Year = req.Year
 	existingEvent.Season = req.Season
@@ -218,6 +270,11 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 
 	err = h.eventRepo.UpdateEvent(existingEvent)
 	if err != nil {
+		if startingTestRun {
+			if restoreErr := h.testRunRepo.Restore(c.Request.Context(), existingEvent.ID); restoreErr != nil {
+				log.Printf("failed to restore snapshot after test run activation failed: %v", restoreErr)
+			}
+		}
 		log.Printf("error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return

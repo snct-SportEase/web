@@ -3,6 +3,7 @@ package handler_test
 import (
 	"backapp/internal/models"
 	"backapp/internal/repository"
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -105,6 +106,25 @@ func (m *MockClassRepository) SetSurveyPoints(eventID int, points map[int]int) e
 
 type MockEventRepository struct {
 	mock.Mock
+}
+
+type MockEventTestRunRepository struct {
+	mock.Mock
+}
+
+func (m *MockEventTestRunRepository) Begin(ctx context.Context, eventID int) error {
+	args := m.Called(ctx, eventID)
+	return args.Error(0)
+}
+
+func (m *MockEventTestRunRepository) Restore(ctx context.Context, eventID int) error {
+	args := m.Called(ctx, eventID)
+	return args.Error(0)
+}
+
+func (m *MockEventTestRunRepository) Discard(ctx context.Context, eventID int) error {
+	args := m.Called(ctx, eventID)
+	return args.Error(0)
 }
 
 type MockGuideDocumentRepository struct {
