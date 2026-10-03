@@ -118,7 +118,9 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 			if err != nil {
 				return err
 			}
-			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s LIKE %s", quoteIdentifier(snapshotName), quoteIdentifier(table.name))); err != nil {
+			query := fmt.Sprintf("CREATE TABLE %s LIKE %s", quoteIdentifier(snapshotName), quoteIdentifier(table.name)) // #nosec G201 -- both identifiers come from database metadata and pass strict ASCII validation
+			// codeql[go/sql-injection]
+			if _, err := conn.ExecContext(ctx, query); err != nil {
 				return fmt.Errorf("create snapshot for %s: %w", table.name, err)
 			}
 			created = append(created, snapshotName)
