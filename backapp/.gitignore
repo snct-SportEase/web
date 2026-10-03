@@ -11,6 +11,7 @@ cover.out
 
 # Uploads
 uploads/
+test-run-snapshots/
 
 # Infra / Docker (from root)
 letsencrypt/

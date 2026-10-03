@@ -34,7 +34,12 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
-	testRunRepo := repository.NewEventTestRunRepository(db)
+	testRunRepo := repository.NewEventTestRunRepositoryWithUploads(
+		db,
+		"./test-run-snapshots/current",
+		"./uploads/images",
+		"./uploads/pdfs",
+	)
 
 	classRepo := repository.NewClassRepository(db)
 	teamRepo := repository.NewTeamRepository(db)
