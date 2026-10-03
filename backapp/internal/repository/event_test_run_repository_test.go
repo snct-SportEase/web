@@ -124,3 +124,9 @@ func TestSnapshotTableNameRejectsOverlongNames(t *testing.T) {
 		t.Fatal("expected an overlong snapshot table name to be rejected")
 	}
 }
+
+func TestSnapshotTableNameRejectsUnsafeIdentifier(t *testing.T) {
+	if _, err := snapshotTableName("events`; DROP TABLE users; --"); err == nil {
+		t.Fatal("expected an unsafe SQL identifier to be rejected")
+	}
+}

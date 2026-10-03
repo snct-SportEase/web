@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ var (
 	ErrTestRunAlreadyActive = errors.New("an event test run is already active")
 	ErrTestRunNotFound      = errors.New("event test run snapshot not found")
 	ErrTestRunEventMismatch = errors.New("event test run belongs to another event")
+	sqlIdentifierPattern    = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 )
 
 type EventTestRunRepository interface {
@@ -114,7 +116,8 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 		for _, table := range tables {
 			snapshotName, _ := snapshotTableName(table.name)
 			columns := quoteIdentifiers(table.columns)
-			query := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", quoteIdentifier(snapshotName), columns, columns, quoteIdentifier(table.name))
+			query := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", quoteIdentifier(snapshotName), columns, columns, quoteIdentifier(table.name)) // #nosec G201 -- every identifier is validated against sqlIdentifierPattern after loading database metadata
+			// codeql[go/sql-injection]
 			if _, err := tx.ExecContext(ctx, query); err != nil {
 				_ = tx.Rollback()
 				r.dropSnapshotTables(context.Background(), conn, created)
@@ -180,7 +183,8 @@ func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error
 		for _, table := range tables {
 			snapshotName, _ := snapshotTableName(table.name)
 			columns := quoteIdentifiers(table.columns)
-			query := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", quoteIdentifier(table.name), columns, columns, quoteIdentifier(snapshotName))
+			query := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s", quoteIdentifier(table.name), columns, columns, quoteIdentifier(snapshotName)) // #nosec G201 -- every identifier is validated against sqlIdentifierPattern after loading database metadata
+			// codeql[go/sql-injection]
 			if _, err := tx.ExecContext(ctx, query); err != nil {
 				return fmt.Errorf("restore %s: %w", table.name, err)
 			}
@@ -263,6 +267,9 @@ func (r *eventTestRunRepository) listApplicationTables(ctx context.Context, conn
 		if err := rows.Scan(&table.name, &table.autoIncrement); err != nil {
 			return nil, err
 		}
+		if err := validateSQLIdentifier(table.name); err != nil {
+			return nil, fmt.Errorf("invalid application table name: %w", err)
+		}
 		tables = append(tables, table)
 	}
 	return tables, rows.Err()
@@ -292,6 +299,9 @@ func (r *eventTestRunRepository) loadSnapshotTables(ctx context.Context, conn *s
 		if err := rows.Scan(&table.name, &table.autoIncrement); err != nil {
 			return nil, err
 		}
+		if err := validateSQLIdentifier(table.name); err != nil {
+			return nil, fmt.Errorf("invalid snapshot table metadata: %w", err)
+		}
 		tables = append(tables, table)
 	}
 	if err := rows.Err(); err != nil {
@@ -320,6 +330,10 @@ func (r *eventTestRunRepository) populateWritableColumns(ctx context.Context, co
 			if err := rows.Scan(&column); err != nil {
 				rows.Close()
 				return err
+			}
+			if err := validateSQLIdentifier(column); err != nil {
+				rows.Close()
+				return fmt.Errorf("invalid column name for table %s: %w", tables[index].name, err)
 			}
 			tables[index].columns = append(tables[index].columns, column)
 		}
@@ -370,6 +384,10 @@ func (r *eventTestRunRepository) dropOrphanedSnapshots(ctx context.Context, conn
 			rows.Close()
 			return err
 		}
+		if err := validateSQLIdentifier(name); err != nil {
+			rows.Close()
+			return fmt.Errorf("invalid orphaned snapshot table name: %w", err)
+		}
 		names = append(names, name)
 	}
 	if err := rows.Close(); err != nil {
@@ -388,18 +406,33 @@ func (r *eventTestRunRepository) dropSnapshotTables(ctx context.Context, conn *s
 		if !strings.HasPrefix(name, testRunSnapshotPrefix) {
 			return fmt.Errorf("refusing to drop non-snapshot table %q", name)
 		}
+		if err := validateSQLIdentifier(name); err != nil {
+			return err
+		}
 		quoted = append(quoted, quoteIdentifier(name))
 	}
-	_, err := conn.ExecContext(ctx, "DROP TABLE IF EXISTS "+strings.Join(quoted, ", "))
+	query := "DROP TABLE IF EXISTS " + strings.Join(quoted, ", ") // #nosec G202 -- names require the snapshot prefix and strict ASCII SQL identifier validation
+	// codeql[go/sql-injection]
+	_, err := conn.ExecContext(ctx, query)
 	return err
 }
 
 func snapshotTableName(tableName string) (string, error) {
+	if err := validateSQLIdentifier(tableName); err != nil {
+		return "", err
+	}
 	name := testRunSnapshotPrefix + tableName
 	if len(name) > 64 {
 		return "", fmt.Errorf("snapshot table name is too long for %q", tableName)
 	}
 	return name, nil
+}
+
+func validateSQLIdentifier(identifier string) error {
+	if identifier == "" || len(identifier) > 64 || !sqlIdentifierPattern.MatchString(identifier) {
+		return fmt.Errorf("unsafe SQL identifier %q", identifier)
+	}
+	return nil
 }
 
 func quoteIdentifier(identifier string) string {

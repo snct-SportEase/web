@@ -179,6 +179,16 @@ func copyDirectory(source, destination string) error {
 	if err := os.MkdirAll(destination, sourceInfo.Mode().Perm()); err != nil {
 		return err
 	}
+	sourceRoot, err := os.OpenRoot(source)
+	if err != nil {
+		return err
+	}
+	defer sourceRoot.Close()
+	destinationRoot, err := os.OpenRoot(destination)
+	if err != nil {
+		return err
+	}
+	defer destinationRoot.Close()
 
 	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -194,29 +204,28 @@ func copyDirectory(source, destination string) error {
 		if err != nil {
 			return err
 		}
-		target := filepath.Join(destination, relative)
 		info, err := entry.Info()
 		if err != nil {
 			return err
 		}
 		if entry.IsDir() {
-			return os.MkdirAll(target, info.Mode().Perm())
+			return destinationRoot.MkdirAll(relative, info.Mode().Perm())
 		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("unsupported upload file type: %q", path)
 		}
-		return copyRegularFile(path, target, info.Mode().Perm())
+		return copyRegularFile(sourceRoot, destinationRoot, relative, info.Mode().Perm())
 	})
 }
 
-func copyRegularFile(source, destination string, mode fs.FileMode) error {
-	input, err := os.Open(source)
+func copyRegularFile(sourceRoot, destinationRoot *os.Root, name string, mode fs.FileMode) error {
+	input, err := sourceRoot.Open(name)
 	if err != nil {
 		return err
 	}
 	defer input.Close()
 
-	output, err := os.OpenFile(destination, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	output, err := destinationRoot.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
