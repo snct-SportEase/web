@@ -1369,6 +1369,66 @@ func TestEventHandler_TestRunLifecycle(t *testing.T) {
 	})
 }
 
+func TestEventHandler_ForceRestoreTestRun(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	eventRepo := new(MockEventRepository)
+	testRunRepo := new(MockEventTestRunRepository)
+	h := handler.NewEventHandler(eventRepo, nil, nil, nil, nil, "", "").WithEventTestRunRepository(testRunRepo)
+	testRunRepo.On("GetStatus", mock.Anything).
+		Return(&models.EventTestRunStatus{EventID: 3, State: models.EventTestRunStateFailed}, nil).Once()
+	testRunRepo.On("Restore", mock.Anything, 3).Return(nil).Once()
+	testRunRepo.On("GetStatus", mock.Anything).
+		Return(&models.EventTestRunStatus{EventID: 3, State: models.EventTestRunStateAwaitingNotificationResume}, nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events/test-run/force-restore", nil)
+	h.ForceRestoreTestRun(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), models.EventTestRunStateAwaitingNotificationResume)
+	testRunRepo.AssertExpectations(t)
+}
+
+func TestEventHandler_ResolveTestRunNotifications(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	testRunRepo := new(MockEventTestRunRepository)
+	h := handler.NewEventHandler(new(MockEventRepository), nil, nil, nil, nil, "", "").WithEventTestRunRepository(testRunRepo)
+	testRunRepo.On("ResolveNotificationDelivery", mock.Anything, models.NotificationResumePolicyShift).Return(nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events/test-run/notifications", bytes.NewBufferString(`{"policy":"shift"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.ResolveTestRunNotifications(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	testRunRepo.AssertExpectations(t)
+}
+
+func TestEventHandler_DiscardTestRunClearsTestingStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	eventRepo := new(MockEventRepository)
+	testRunRepo := new(MockEventTestRunRepository)
+	h := handler.NewEventHandler(eventRepo, nil, nil, nil, nil, "", "").WithEventTestRunRepository(testRunRepo)
+	testRunRepo.On("GetStatus", mock.Anything).
+		Return(&models.EventTestRunStatus{EventID: 3, State: models.EventTestRunStateFailed}, nil).Once()
+	testRunRepo.On("Discard", mock.Anything, 3).Return(nil).Once()
+	eventRepo.On("GetEventByID", 3).Return(&models.Event{ID: 3, Name: "大会", Year: 2026, Season: "spring", Status: models.EventStatusTesting}, nil).Once()
+	eventRepo.On("UpdateEvent", mock.MatchedBy(func(event *models.Event) bool {
+		return event.Status == models.EventStatusPreparing
+	})).Return(nil).Once()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/root/events/test-run/discard", nil)
+	h.DiscardTestRun(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	testRunRepo.AssertExpectations(t)
+	eventRepo.AssertExpectations(t)
+}
+
 func TestEventHandler_UpdateEvent_HideScores(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

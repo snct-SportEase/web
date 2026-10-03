@@ -77,3 +77,22 @@ func TestHubManager_RemovesHubAfterLastClientDisconnects(t *testing.T) {
 
 	assert.NotSame(t, hub, m.GetHub("tournament:20"))
 }
+
+func TestHubManager_DisconnectAllClosesExistingClients(t *testing.T) {
+	m := NewHubManager()
+	hub := m.GetHub("tournament:30")
+	send := make(chan []byte, 1)
+	hub.register <- &Client{hub: hub, send: send}
+
+	m.DisconnectAll()
+
+	require.Eventually(t, func() bool {
+		_, open := <-send
+		return !open
+	}, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return len(m.hubs) == 0
+	}, time.Second, 10*time.Millisecond)
+}
