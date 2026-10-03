@@ -67,7 +67,13 @@ func eventTestRunDB(t *testing.T) *sql.DB {
 
 func TestEventTestRunSnapshotRestoreMySQL(t *testing.T) {
 	db := eventTestRunDB(t)
-	repo := NewEventTestRunRepository(db)
+	root := t.TempDir()
+	images := filepath.Join(root, "uploads", "images")
+	pdfs := filepath.Join(root, "uploads", "pdfs")
+	snapshot := filepath.Join(root, "snapshots", "current")
+	mustWriteTestFile(t, filepath.Join(images, "original.png"), "original image")
+	mustWriteTestFile(t, filepath.Join(pdfs, "original.pdf"), "original pdf")
+	repo := NewEventTestRunRepositoryWithUploads(db, snapshot, images, pdfs)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Begin(ctx, 1))
@@ -76,6 +82,9 @@ func TestEventTestRunSnapshotRestoreMySQL(t *testing.T) {
 		INSERT INTO users (name) VALUES ('test-only user');
 	`)
 	require.NoError(t, err)
+	mustWriteTestFile(t, filepath.Join(images, "original.png"), "changed image")
+	mustWriteTestFile(t, filepath.Join(images, "test-only.png"), "test image")
+	require.NoError(t, os.Remove(filepath.Join(pdfs, "original.pdf")))
 
 	require.NoError(t, repo.Restore(ctx, 1))
 
@@ -98,6 +107,12 @@ func TestEventTestRunSnapshotRestoreMySQL(t *testing.T) {
 		WHERE TABLE_SCHEMA = DATABASE() AND LEFT(TABLE_NAME, ?) = ?
 	`, len(testRunSnapshotPrefix), testRunSnapshotPrefix).Scan(&snapshotCount))
 	require.Zero(t, snapshotCount)
+	assertTestFileContent(t, filepath.Join(images, "original.png"), "original image")
+	assertTestFileContent(t, filepath.Join(pdfs, "original.pdf"), "original pdf")
+	_, err = os.Stat(filepath.Join(images, "test-only.png"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(snapshot)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestEventTestRunSnapshotRestoreWithFullSchemaMySQL(t *testing.T) {

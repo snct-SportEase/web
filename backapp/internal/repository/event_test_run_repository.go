@@ -28,7 +28,9 @@ type EventTestRunRepository interface {
 }
 
 type eventTestRunRepository struct {
-	db *sql.DB
+	db                 *sql.DB
+	uploadSnapshotRoot string
+	uploadDirectories  []string
 }
 
 type testRunTable struct {
@@ -39,6 +41,14 @@ type testRunTable struct {
 
 func NewEventTestRunRepository(db *sql.DB) EventTestRunRepository {
 	return &eventTestRunRepository{db: db}
+}
+
+func NewEventTestRunRepositoryWithUploads(db *sql.DB, snapshotRoot string, uploadDirectories ...string) EventTestRunRepository {
+	return &eventTestRunRepository{
+		db:                 db,
+		uploadSnapshotRoot: snapshotRoot,
+		uploadDirectories:  uploadDirectories,
+	}
 }
 
 func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
@@ -55,6 +65,20 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 		if err := r.dropOrphanedSnapshots(ctx, conn); err != nil {
 			return err
 		}
+		uploadSnapshotCreated := false
+		if r.hasUploadSnapshot() {
+			if err := r.createUploadSnapshot(); err != nil {
+				return fmt.Errorf("snapshot uploaded files: %w", err)
+			}
+			uploadSnapshotCreated = true
+		}
+		snapshotCommitted := false
+		defer func() {
+			if uploadSnapshotCreated && !snapshotCommitted {
+				_ = r.removeUploadSnapshot()
+			}
+		}()
+
 		tables, err := r.listApplicationTables(ctx, conn)
 		if err != nil {
 			return err
@@ -117,6 +141,7 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 			r.dropSnapshotTables(context.Background(), conn, created)
 			return err
 		}
+		snapshotCommitted = true
 		return nil
 	})
 }
@@ -129,6 +154,11 @@ func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error
 		}
 		if err := r.populateWritableColumns(ctx, conn, tables); err != nil {
 			return err
+		}
+		if r.hasUploadSnapshot() {
+			if err := r.restoreUploadSnapshot(); err != nil {
+				return fmt.Errorf("restore uploaded files: %w", err)
+			}
 		}
 
 		if _, err := conn.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
@@ -168,7 +198,11 @@ func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error
 				return fmt.Errorf("restore auto increment for %s: %w", table.name, err)
 			}
 		}
-		return r.clearSnapshot(ctx, conn, tables)
+		if err := r.clearSnapshot(ctx, conn, tables); err != nil {
+			return err
+		}
+		_ = r.removeUploadSnapshot()
+		return nil
 	})
 }
 
@@ -178,7 +212,11 @@ func (r *eventTestRunRepository) Discard(ctx context.Context, eventID int) error
 		if err != nil {
 			return err
 		}
-		return r.clearSnapshot(ctx, conn, tables)
+		if err := r.clearSnapshot(ctx, conn, tables); err != nil {
+			return err
+		}
+		_ = r.removeUploadSnapshot()
+		return nil
 	})
 }
 
