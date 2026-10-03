@@ -261,7 +261,32 @@ describe('Event Management Page', () => {
     await page.getByText('2026春季リハーサル大会').click();
 
     await expect.element(page.getByRole('combobox', { name: 'ステータス' })).toHaveValue('testing');
-    await expect.element(page.getByText(/本番と同じ結果入力を試せます/)).toBeInTheDocument();
+    await expect.element(page.getByText(/開始時にDB全体を保存/)).toBeInTheDocument();
+  });
+
+  it('テスト試行の開始前にDBスナップショットの確認を求めること', async () => {
+    render(Page);
+
+    await page.getByText('2025春季スポーツ大会').click();
+    await page.getByRole('combobox', { name: 'ステータス' }).selectOptions('testing');
+    await page.getByRole('button', { name: '保存' }).click();
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('現在のDB全体を保存'));
+    const updateCall = fetchMock.mock.calls.find(([url, options]) =>
+      url === '/api/root/events/1' && options?.method === 'PUT'
+    );
+    expect(JSON.parse(updateCall[1].body)).toEqual(expect.objectContaining({ status: 'testing' }));
+  });
+
+  it('テスト試行の終了時にDB変更の削除を確認して完了を通知すること', async () => {
+    render(Page);
+
+    await page.getByText('2026春季リハーサル大会').click();
+    await page.getByRole('combobox', { name: 'ステータス' }).selectOptions('preparing');
+    await page.getByRole('button', { name: '保存' }).click();
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('すべてのDB変更は削除されます'));
+    expect(alert).toHaveBeenCalledWith('テスト中のDB変更をすべて削除し、開始時点の状態へ復元しました。');
   });
 
   it('新規作成ではスコア非表示設定が初期値falseであること', async () => {

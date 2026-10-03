@@ -10,6 +10,7 @@
   let showModal = $state(false);
   let selectedEvent = $state(null);
   let isNameManuallyChanged = $state(false);
+  let isSaving = $state(false);
 
   let currentEvent = $state({
     id: null,
@@ -97,6 +98,16 @@
   }
 
   async function handleSave() {
+    const startingTestRun = currentEvent.status === 'testing' && selectedEvent?.status !== 'testing';
+    const endingTestRun = selectedEvent?.status === 'testing' && currentEvent.status !== 'testing';
+    if (startingTestRun && !confirm(
+      'テスト試行を開始します。現在のDB全体を保存し、終了時にこの時点へ戻します。テスト中は通常運用を行わないでください。続行しますか？'
+    )) return;
+    if (endingTestRun && !confirm(
+      'テスト試行を終了して、開始時点のDBへ復元します。テスト中に行われたすべてのDB変更は削除されます。続行しますか？'
+    )) return;
+
+    isSaving = true;
     try {
       const duplicateRegistrationThreshold = Number(currentEvent.duplicate_registration_threshold);
       if (!Number.isInteger(duplicateRegistrationThreshold) || duplicateRegistrationThreshold < 0) {
@@ -128,9 +139,14 @@
       await fetchEvents();
       await activeEvent.init();
       closeModal();
+      if (endingTestRun) {
+        alert('テスト中のDB変更をすべて削除し、開始時点の状態へ復元しました。');
+      }
     } catch (error) {
       console.error(error);
       alert(error.message);
+    } finally {
+      isSaving = false;
     }
   }
 
@@ -413,13 +429,13 @@
             <FormField label="ステータス" inputId="status">
               <select id="status" bind:value={currentEvent.status} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 <option value="preparing">準備中 (Preparing)</option>
-                <option value="testing">テスト中 (Testing)</option>
+                <option value="testing" disabled={!selectedEvent}>テスト中 (Testing)</option>
                 <option value="upcoming">予定 (Upcoming)</option>
                 <option value="active">開催中 (Active)</option>
                 <option value="archived">アーカイブ (Archived)</option>
               </select>
               <p class="mt-2 text-xs text-gray-500">
-                「テスト中」では本番と同じ結果入力を試せます。入力内容はこの大会のデータとして保存されます。
+                「テスト中」では本番と同じ操作を試せます。開始時にDB全体を保存し、終了時にテスト中の変更をすべて削除します。
               </p>
             </FormField>
             <FormField label="2競技への重複登録を許可するクラス人数" inputId="duplicate_registration_threshold" description="この人数以下のクラスは、1人につき2競技まで登録できます。">
@@ -437,6 +453,6 @@
             </div>
   </div>
   {#snippet footer()}
-    <ModalFooter onconfirm={handleSave} oncancel={closeModal} />
+    <ModalFooter onconfirm={handleSave} oncancel={closeModal} confirmDisabled={isSaving} confirmLoading={isSaving} />
   {/snippet}
 </Modal>
