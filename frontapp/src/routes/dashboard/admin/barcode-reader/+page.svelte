@@ -8,6 +8,8 @@
 	let barcodeVideo = $state();
 	let barcodeStream = null;
 	let barcodeScanFrame = null;
+	let cameraPermission = $state('unknown');
+	let cameraPermissionStatus = null;
 	let selectionClockInterval = null;
 	let errorMessage = $state('');
 	let verificationResult = $state(null);
@@ -48,6 +50,7 @@
 
 	onMount(() => {
 		loadInitialData();
+		checkCameraPermission();
 		window.addEventListener('keydown', handleKeydown);
 		selectionClockInterval = window.setInterval(() => {
 			currentTime = Date.now();
@@ -59,9 +62,29 @@
 				window.clearInterval(selectionClockInterval);
 				selectionClockInterval = null;
 			}
+			if (cameraPermissionStatus) {
+				cameraPermissionStatus.onchange = null;
+				cameraPermissionStatus = null;
+			}
 			stopScan();
 		};
 	});
+
+	async function checkCameraPermission() {
+		if (!navigator.permissions?.query) {
+			return;
+		}
+
+		try {
+			cameraPermissionStatus = await navigator.permissions.query({ name: 'camera' });
+			cameraPermission = cameraPermissionStatus.state;
+			cameraPermissionStatus.onchange = () => {
+				cameraPermission = cameraPermissionStatus?.state || 'unknown';
+			};
+		} catch {
+			// Permission API is not available in every supported browser.
+		}
+	}
 
 	async function loadInitialData() {
 		loading = true;
@@ -579,16 +602,10 @@
 		verificationResult = null;
 
 		try {
+			// Request camera access before initializing the detector so the browser
+			// permission prompt is triggered directly from the user's click.
+			barcodeStream = await requestCameraStream();
 			const barcodeDetector = await createBarcodeDetector();
-			if (!navigator.mediaDevices?.getUserMedia) {
-				throw new Error('このブラウザではカメラを利用できません。手入力を使用してください');
-			}
-
-			barcodeStream = await navigator.mediaDevices.getUserMedia({
-				video: {
-					facingMode: { ideal: 'environment' }
-				}
-			});
 			if (!barcodeVideo) {
 				throw new Error('バーコード読み取り領域を初期化できませんでした');
 			}
@@ -598,8 +615,49 @@
 			scanBarcodeFrame(barcodeDetector);
 		} catch (err) {
 			await stopScan();
-			errorMessage = err.message || `スキャナーの開始に失敗しました: ${err}`;
+			errorMessage = getCameraErrorMessage(err);
 		}
+	}
+
+	async function requestCameraPermission() {
+		try {
+			const stream = await requestCameraStream();
+			stream.getTracks().forEach((track) => track.stop());
+			errorMessage = '';
+		} catch (err) {
+			errorMessage = getCameraErrorMessage(err);
+		}
+	}
+
+	async function requestCameraStream() {
+		if (!navigator.mediaDevices?.getUserMedia) {
+			throw new Error('このブラウザではカメラを利用できません。手入力を使用してください');
+		}
+
+		try {
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: {
+					facingMode: { ideal: 'environment' }
+				}
+			});
+			cameraPermission = 'granted';
+			return stream;
+		} catch (err) {
+			if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+				cameraPermission = 'denied';
+			}
+			throw err;
+		}
+	}
+
+	function getCameraErrorMessage(err) {
+		if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+			return 'カメラの使用が許可されていません。ブラウザまたは端末の設定でカメラを許可してから、もう一度お試しください。手入力も使用できます。';
+		}
+		if (err?.name === 'NotFoundError') {
+			return '利用できるカメラが見つかりません。端末のカメラを確認するか、手入力を使用してください。';
+		}
+		return err?.message || `カメラの開始に失敗しました: ${err}`;
 	}
 
 	async function createBarcodeDetector() {
@@ -881,6 +939,14 @@
 				<div class="mt-4 flex flex-wrap gap-3">
 					<button
 						type="button"
+						onclick={requestCameraPermission}
+						disabled={cameraPermission === 'granted' || isScanning || isVerifying}
+						class="rounded border border-blue-300 bg-blue-50 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500"
+					>
+						{cameraPermission === 'granted' ? 'カメラ許可済み' : 'カメラの使用を許可'}
+					</button>
+					<button
+						type="button"
 						onclick={startScan}
 						disabled={!canVerify() || isScanning || isVerifying}
 						class="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
@@ -904,6 +970,15 @@
 						リセット
 					</button>
 				</div>
+				<p class="mt-2 text-sm text-gray-600" role="status">
+					{#if cameraPermission === 'granted'}
+						カメラの使用が許可されています。
+					{:else if cameraPermission === 'denied'}
+						カメラの使用が拒否されています。ブラウザまたは端末の設定から許可してください。
+					{:else}
+						バーコード読み取りにはカメラの使用許可が必要です。
+					{/if}
+				</p>
 			</section>
 
 			<aside class="rounded bg-white p-6 shadow-sm">
