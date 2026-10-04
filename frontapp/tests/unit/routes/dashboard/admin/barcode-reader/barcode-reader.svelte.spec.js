@@ -21,6 +21,12 @@ function jsonResponse(body, ok = true) {
 	});
 }
 
+class UnsupportedBarcodeDetector {
+	static getSupportedFormats() {
+		return Promise.resolve([]);
+	}
+}
+
 describe('Barcode Reader Page', () => {
 	let fetchMock;
 	let checkInResponse;
@@ -184,6 +190,100 @@ describe('Barcode Reader Page', () => {
 				String(url).includes('/api/barcode/matches/31/check-ins?event_id=1&sport_id=7&match_ids=31%2C32')
 			)
 		).toBe(true);
+	});
+
+	it('カメラの使用許可をボタンから要求できる', async () => {
+		const stop = vi.fn();
+		const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] });
+		const permissionStatus = { state: 'prompt', onchange: null };
+		vi.stubGlobal('navigator', {
+			...navigator,
+			mediaDevices: { getUserMedia },
+			permissions: { query: vi.fn().mockResolvedValue(permissionStatus) }
+		});
+
+		render(Page);
+
+		await page.getByRole('button', { name: 'カメラの使用を許可' }).click();
+
+		await expect.element(page.getByRole('button', { name: 'カメラ許可済み' })).toBeDisabled();
+		expect(getUserMedia).toHaveBeenCalledWith({
+			video: { facingMode: { ideal: 'environment' } }
+		});
+		expect(stop).toHaveBeenCalled();
+	});
+
+	it('カメラの使用を拒否された場合に設定変更を案内する', async () => {
+		const permissionError = new DOMException('Permission denied', 'NotAllowedError');
+		const getUserMedia = vi.fn().mockRejectedValue(permissionError);
+		vi.stubGlobal('navigator', {
+			...navigator,
+			mediaDevices: { getUserMedia },
+			permissions: { query: vi.fn().mockResolvedValue({ state: 'prompt', onchange: null }) }
+		});
+
+		render(Page);
+
+		await page.getByRole('button', { name: 'カメラの使用を許可' }).click();
+
+		await expect
+			.element(page.getByText('カメラの使用が許可されていません。ブラウザまたは端末の設定でカメラを許可してから、もう一度お試しください。手入力も使用できます。'))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByText('カメラの使用が拒否されています。ブラウザまたは端末の設定から許可してください。'))
+			.toBeInTheDocument();
+	});
+
+	it('Permission API が使えなくてもカメラ許可要求を継続できる', async () => {
+		const getUserMedia = vi.fn().mockRejectedValue(new DOMException('No camera', 'NotFoundError'));
+		vi.stubGlobal('navigator', { ...navigator, mediaDevices: { getUserMedia }, permissions: undefined });
+
+		render(Page);
+
+		await page.getByRole('button', { name: 'カメラの使用を許可' }).click();
+
+		await expect
+			.element(page.getByText('利用できるカメラが見つかりません。端末のカメラを確認するか、手入力を使用してください。'))
+			.toBeInTheDocument();
+	});
+
+	it('カメラ許可状態がブラウザ側で拒否に変わった場合に画面へ反映する', async () => {
+		const permissionStatus = { state: 'granted', onchange: null };
+		vi.stubGlobal('navigator', {
+			...navigator,
+			permissions: { query: vi.fn().mockResolvedValue(permissionStatus) }
+		});
+
+		render(Page);
+
+		await expect.element(page.getByText('カメラの使用が許可されています。')).toBeInTheDocument();
+		permissionStatus.state = 'denied';
+		permissionStatus.onchange();
+
+		await expect
+			.element(page.getByText('カメラの使用が拒否されています。ブラウザまたは端末の設定から許可してください。'))
+			.toBeInTheDocument();
+	});
+
+	it('カメラ取得後に検出器の初期化へ失敗した場合はストリームを停止する', async () => {
+		const stop = vi.fn();
+		const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] });
+		vi.stubGlobal('navigator', {
+			...navigator,
+			mediaDevices: { getUserMedia },
+			permissions: { query: vi.fn().mockResolvedValue({ state: 'prompt', onchange: null }) }
+		});
+		vi.stubGlobal('BarcodeDetector', UnsupportedBarcodeDetector);
+
+		render(Page);
+		await page.getByLabelText('競技').selectOptions('7');
+		await page.getByLabelText('試合').selectOptions('time:31-32');
+		await page.getByRole('button', { name: '読み取り開始' }).click();
+
+		await expect
+			.element(page.getByText('このブラウザは対応するバーコード形式を読み取れません。手入力を使用してください'))
+			.toBeInTheDocument();
+		expect(stop).toHaveBeenCalledTimes(1);
 	});
 
 	it('開始10分より前の試合は選択できない', async () => {
