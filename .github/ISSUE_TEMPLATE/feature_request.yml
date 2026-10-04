@@ -2,6 +2,7 @@ name: 新機能提案
 description: 追加してほしい機能を提案する
 title: "[Feature]: "
 labels: [enhancement]
+type: feature
 body:
   - type: textarea
     id: problem
