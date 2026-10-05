@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,69 +39,16 @@ func NewSportHandler(sportRepo repository.SportRepository, classRepo repository.
 	}
 }
 
-func (h *SportHandler) ensureDefaultNoonGameSports() error {
-	if h == nil || h.sportRepo == nil {
-		return nil
-	}
-
-	for _, name := range defaultNoonGameSportNames {
-		trimmedName := strings.TrimSpace(name)
-		if trimmedName == "" {
-			continue
-		}
-
-		sport, err := h.sportRepo.GetSportByName(trimmedName)
-		if err != nil {
-			return err
-		}
-		if sport != nil {
-			continue
-		}
-
-		if _, err := h.sportRepo.CreateSport(&models.Sport{Name: trimmedName}); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // GetAllSportsHandler handles the request to get all sports.
 func (h *SportHandler) GetAllSportsHandler(c *gin.Context) {
-	cacheKey := "all_sports"
-
-	if err := h.ensureDefaultNoonGameSports(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize default sports"})
-		return
-	}
-
-	// 1. Try to get from cache
-	if val, found := repository.GlobalCache.Get(cacheKey); found {
-		c.JSON(http.StatusOK, val)
-		return
-	}
-
-	// 2. Use Singleflight to prevent multiple DB queries for the same key
-	sports, err, _ := repository.GlobalSFGroup.Do(cacheKey, func() (interface{}, error) {
-		res, err := h.sportRepo.GetAllSports()
-		if err != nil {
-			return nil, err
-		}
-
-		if res == nil {
-			res = []*models.Sport{}
-		}
-
-		// Cache for 10 minutes
-		repository.GlobalCache.Set(cacheKey, res, 10*time.Minute)
-		return res, nil
-	})
-
+	sports, err := h.sportRepo.GetAllSportsWithDefaults(defaultNoonGameSportNames)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve sports"})
 		return
 	}
-
+	if sports == nil {
+		sports = []*models.Sport{}
+	}
 	c.JSON(http.StatusOK, sports)
 }
 
@@ -126,9 +72,6 @@ func (h *SportHandler) CreateSportHandler(c *gin.Context) {
 		return
 	}
 	sport.ID = int(id)
-
-	// Clear sports cache
-	repository.GlobalCache.Delete("all_sports")
 
 	c.JSON(http.StatusCreated, sport)
 }

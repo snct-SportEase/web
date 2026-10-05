@@ -541,6 +541,14 @@ type MockSportRepository struct {
 	mock.Mock
 }
 
+func (m *MockSportRepository) GetAllSportsWithDefaults(names []string) ([]*models.Sport, error) {
+	args := m.Called(names)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Sport), args.Error(1)
+}
+
 func (m *MockSportRepository) GetAllSports() ([]*models.Sport, error) {
 	args := m.Called()
 	if args.Get(0) == nil {

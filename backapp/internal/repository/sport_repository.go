@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 )
 
 // SportRepository defines the interface for sport and event_sport related database operations.
 type SportRepository interface {
 	GetAllSports() ([]*models.Sport, error)
+	GetAllSportsWithDefaults(names []string) ([]*models.Sport, error)
 	GetSportByID(sportID int) (*models.Sport, error)
 	GetSportByName(name string) (*models.Sport, error)
 	CreateSport(sport *models.Sport) (int64, error)
@@ -53,7 +55,46 @@ func (r *sportRepository) GetAllSports() ([]*models.Sport, error) {
 		}
 		sports = append(sports, sport)
 	}
-	return sports, nil
+	return sports, rows.Err()
+}
+
+// GetAllSportsWithDefaults checks missing defaults only on a cache miss. The
+// sports revision also covers board-game renames, creations and test restores.
+func (r *sportRepository) GetAllSportsWithDefaults(names []string) ([]*models.Sport, error) {
+	return cachedRead(r.db, "sports", "defaults:"+strings.Join(names, "\x00"), func() ([]*models.Sport, error) {
+		// Keep initialization singleflight independent of write revisions:
+		// creating a missing default advances the revision while loading.
+		result, err, _ := GlobalSFGroup.Do(cacheNamespace(r.db, "sport-default-init")+strings.Join(names, "\x00"), func() (any, error) {
+			sports, err := r.GetAllSports()
+			if err != nil {
+				return nil, err
+			}
+			existing := make(map[string]bool, len(sports))
+			for _, sport := range sports {
+				existing[strings.TrimSpace(sport.Name)] = true
+			}
+			for _, name := range names {
+				name = strings.TrimSpace(name)
+				if name == "" || existing[name] {
+					continue
+				}
+				sport := &models.Sport{Name: name}
+				id, err := r.CreateSport(sport)
+				if err != nil {
+					return nil, err
+				}
+				sport.ID = int(id)
+				sports = append(sports, sport)
+				existing[name] = true
+			}
+			sort.Slice(sports, func(i, j int) bool { return sports[i].ID < sports[j].ID })
+			return sports, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result.([]*models.Sport), nil
+	})
 }
 
 // CreateSport adds a new sport to the database.
