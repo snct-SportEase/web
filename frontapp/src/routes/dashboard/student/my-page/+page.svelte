@@ -1,6 +1,6 @@
 <script>
 	import { onDestroy, onMount } from 'svelte';
-	import Chart from 'chart.js/auto';
+	let Chart = $state.raw(null);
 
 	let { data } = $props();
 
@@ -117,7 +117,7 @@
 	}
 
 	function syncChart() {
-		if (typeof document === 'undefined') {
+		if (!Chart || typeof document === 'undefined') {
 			return;
 		}
 
@@ -148,8 +148,12 @@
 	}
 
 	onMount(() => {
-		syncChart();
-	});
+        let mounted = true;
+        void import('chart.js/auto').then((module) => {
+            if (mounted) Chart = module.default;
+        }).catch((error) => console.error('Chart could not be loaded:', error));
+        return () => { mounted = false; };
+    });
 
 	$effect(() => {
 		syncChart();
