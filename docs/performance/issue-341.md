@@ -146,3 +146,38 @@ go test ./internal/repository -run '^$' -bench BenchmarkCachedReadHits \
 76件、関連E2E 14件、npm ci済みbuilderでのproduction buildと変更ファイルlintを通過。
 E2EにはAPI回数、得点非表示、通知、競技作成・割り当て、クラスの競技割り当てを含む。
 本番p95・DBプール待機は引き続き未計測。
+
+## 敵対的テスト（2026-10-05）
+
+最適化の境界を狙う28ケースを追加した。
+同時実行の順序はGoのchannelとJavaScriptの待機promiseで制御し、sleepでタイミングを推測しない。
+
+| テスト | 追加ケース | 検証する境界 |
+| --- | ---: | --- |
+| `read_cache_adversarial_test.go` | 4 | 3世代の読み取りを逆順に完了、DB/ユーザー/大会の分離、64並列の呼び出し側変更、JSON符号化失敗後の再試行 |
+| `sport_defaults_cache_test.go` | 1 | 一部の初期競技登録だけ成功した後の再試行で重複登録しない |
+| `class_progress_adversarial_test.go` | 9 | 未認証・クラス未所属・別大会・DB障害等で要約データの取得へ進まない |
+| `hooks.server.adversarial.spec.js` | 6 | 認証/大会の通信・JSON障害、同時SSRを逆順に完了してもユーザーと大会が混ざらない |
+| `notificationBadgeStore.adversarial.spec.js` | 8 | Pushの連続到着、503、ログアウト、ユーザー切替、JSON解析失敗、古い既読処理、破損した既読データ |
+
+通知の2件は修正前にテストが失敗することを確認し、回帰テストとともに修正した。
+
+- Pushによる追加取得の開始後に次のPushが届くと、追加取得を共有して最新通知を取りこぼしていた。
+  開始後のPushを記録し、完了後にもう一度取得する。同時に届いたPushはまとめる。
+- 前ユーザーの既読処理が遅れて実行されると、現在のユーザーの通知バッジも消していた。
+  既読保存は対象ユーザーに行い、現在のバッジは同じユーザーの場合だけ変更する。
+
+キャッシュのテストについても、作業ツリーを変更しないGo overlayで
+世代をキーから除く変更とDB識別子を除く変更をそれぞれ適用し、追加テストが失敗することを確認した。
+この一時変更はコミットしていない。
+
+競合を含む主要ケースは次を20回繰り返してrace detectorを通過した。
+
+```sh
+cd backapp
+go test -race -count=20 ./internal/repository ./tests/handler \
+  -run 'TestCachedReadOverlappingRevisions|TestCachedReadConcurrentCallerMutations|TestSportDefaultsPartialFailure|TestClassProgressSummaryRejects'
+```
+
+変更後のバックエンド全テスト、repository/handlerのrace detector、frontend server unit tests
+90件、通知・得点非表示・API回数のE2E 8件、production build、変更ファイルlintを通過。
