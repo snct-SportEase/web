@@ -23,7 +23,7 @@ func privateReferenceJSON(c *gin.Context, value any) {
 	c.Writer.Header().Del("Pragma")
 	c.Writer.Header().Del("Expires")
 	c.Header("ETag", etag)
-	c.Header("Vary", "Cookie, Authorization")
+	c.Writer.Header().Add("Vary", "Cookie, Authorization")
 	ifNoneMatch := ""
 	if c.Request != nil {
 		ifNoneMatch = c.GetHeader("If-None-Match")

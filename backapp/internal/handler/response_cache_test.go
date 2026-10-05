@@ -13,6 +13,7 @@ func TestPrivateReferenceJSONRevalidation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(middleware.NoStore())
+	router.Use(func(c *gin.Context) { c.Header("Vary", "Origin"); c.Next() })
 	value := "original"
 	router.GET("/reference", func(c *gin.Context) { privateReferenceJSON(c, gin.H{"name": value}) })
 	get := func(etag string) *httptest.ResponseRecorder {
@@ -25,6 +26,9 @@ func TestPrivateReferenceJSONRevalidation(t *testing.T) {
 	first := get("")
 	if first.Code != 200 || first.Header().Get("Cache-Control") != "private, max-age=0, must-revalidate" || first.Header().Get("Pragma") != "" {
 		t.Fatal("reference policy not applied")
+	}
+	if values := first.Header().Values("Vary"); len(values) != 2 || values[0] != "Origin" {
+		t.Fatal("existing Vary header was overwritten")
 	}
 	etag := first.Header().Get("ETag")
 	second := get(`"other", W/` + etag)
