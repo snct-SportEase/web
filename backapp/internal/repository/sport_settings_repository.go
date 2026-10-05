@@ -27,6 +27,7 @@ func validRegularSportLocation(location string) bool {
 // UpdateSportLocationAndDescription keeps the event/sport identity intact, so
 // existing teams, members, tournament matches, and class roles are preserved.
 func (r *sportRepository) UpdateSportLocationAndDescription(eventID, sportID int, location string, description *string) error {
+	defer invalidateReads(r.db, "sports")
 	if !validRegularSportLocation(location) {
 		return ErrInvalidSportLocation
 	}
