@@ -23,4 +23,36 @@ describe('dashboard active event sharing', () => {
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(response.headers.get('Server-Timing')).toMatch(/^ssr;dur=/);
  });
+ it('認証レスポンスを待たずに大会の取得を開始する', async () => {
+  vi.stubEnv('BACKEND_URL', 'http://127.0.0.1:8080');
+  let completeAuth;
+  const fetch = vi.fn(url => String(url).endsWith('/api/auth/user')
+    ? new Promise(resolve => { completeAuth = resolve; })
+    : Promise.resolve(new Response(JSON.stringify({ event_id: 7, test_run_state: '' })))
+  );
+  vi.stubGlobal('fetch', fetch);
+  const { handle } = await import('$src/hooks.server.js');
+  const pending = handle({
+   event: { url: new URL('http://localhost/dashboard'), cookies: { get: () => 'session' }, locals: {} },
+   resolve: async () => new Response('ok')
+  });
+  expect(fetch).toHaveBeenCalledTimes(2);
+  completeAuth(new Response(JSON.stringify({ id: 'student', roles: [{ name: 'student' }] })));
+  expect((await pending).status).toBe(200);
+ });
+ it('大会取得が失敗した場合も学生のメンテナンス判定を維持する', async () => {
+  vi.stubEnv('BACKEND_URL', 'http://127.0.0.1:8080');
+  vi.stubGlobal('fetch', vi.fn(async url => String(url).endsWith('/api/auth/user')
+   ? new Response(JSON.stringify({ id: 'student', roles: [{ name: 'student' }] }))
+   : new Response('unavailable', { status: 503 })
+  ));
+  const { handle } = await import('$src/hooks.server.js');
+  const response = await handle({
+   event: { url: new URL('http://localhost/dashboard'), cookies: { get: () => 'session' }, locals: {} },
+   resolve: vi.fn()
+  });
+  expect(response.status).toBe(303);
+  expect(response.headers.get('location')).toBe('http://localhost/dashboard/maintenance');
+ });
+
 });

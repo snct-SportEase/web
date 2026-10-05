@@ -77,6 +77,19 @@ export async function handle({ event, resolve }) {
   }
 
   const sessionToken = event.cookies.get('session_token');
+  const onDashboard = event.url.pathname.startsWith('/dashboard');
+  const activeEventPromise = (async () => {
+    if (!sessionToken || !onDashboard) return null;
+    try {
+      const response = await fetch(new URL('/api/events/active', BACKEND_URL), {
+        headers: { cookie: `session_token=${sessionToken}` }
+      });
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
+    }
+  })();
+
 
   if (sessionToken) {
     try {
@@ -112,20 +125,10 @@ export async function handle({ event, resolve }) {
       return redirectResponse(event, 302, '/');
     }
 
-        // Share this request-local snapshot with all dashboard server loads.
-        event.locals.activeEvent = null;
-        let stateAvailable = false;
-        try {
-            const statusResponse = await fetch(new URL('/api/events/active', BACKEND_URL), {
-                headers: { cookie: `session_token=${sessionToken}` }
-            });
-            if (statusResponse.ok) {
-                event.locals.activeEvent = await statusResponse.json();
-                stateAvailable = true;
-            }
-        } catch {
-            stateAvailable = false;
-        }
+    // Authentication and active-event lookup run concurrently. Each backend
+    // endpoint still validates the session independently.
+    event.locals.activeEvent = await activeEventPromise;
+    const stateAvailable = event.locals.activeEvent !== null;
 
 		if (isStudentOnly(event.locals.user)) {
 			const testRunState = event.locals.activeEvent?.test_run_state ?? '';
