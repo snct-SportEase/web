@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install dependencies. Copy .npmrc first so npm uses Takumi Guard.
 COPY package*.json .npmrc ./
-RUN npm install
+RUN npm ci
 
 # Copy source code and build
 COPY . .
@@ -21,6 +21,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 CMD ["npm", "run", "test:e2e"]
 
+# Install only the runtime dependencies. Build tooling remains in the builder.
+FROM node:20-alpine AS production-deps
+WORKDIR /app
+COPY package*.json .npmrc ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+
 # Stage 3: Production stage
 FROM node:20-alpine AS production
 
@@ -29,7 +35,7 @@ WORKDIR /app
 # Copy built assets from builder stage
 COPY --from=builder --chown=node:node /app/build ./build
 RUN ln -s ../../client ./build/server/chunks/client
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=production-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/package.json ./
 
 # Expose the port the app will run on
