@@ -655,3 +655,44 @@ func TestClassHandler_GetClassProgress(t *testing.T) {
 		mockTournamentRepo.AssertExpectations(t)
 	})
 }
+
+func TestClassProgressSummarySkipsMemberAssignments(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, countError := range []error{nil, errors.New("count failed")} {
+		classRepo := new(MockClassRepository)
+		eventRepo := new(MockEventRepository)
+		teamRepo := new(MockTeamRepository)
+		tournamentRepo := new(MockTournamentRepository)
+		h := handler.NewClassHandler(classRepo, eventRepo, teamRepo, tournamentRepo)
+		classID, eventID := 10, 1
+		eventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		classRepo.On("GetClassByID", classID).Return(&models.Class{ID: classID, EventID: &eventID, Name: "IS3"}, nil).Once()
+		classRepo.On("CountClassMembers", classID).Return(40, countError).Once()
+		teamRepo.On("GetTeamsByClassID", classID, eventID).Return([]*models.TeamWithSport{{ID: 100, SportName: "Basketball"}}, nil).Once()
+		if countError == nil {
+			tournamentRepo.On("GetMatchesForTeams", eventID, []int{100}).Return(map[int][]*models.MatchDetail{}, nil).Once()
+		}
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/student/class-progress?view=summary", nil)
+		c.Set("user", &models.User{ID: "student", ClassID: &classID})
+		h.GetClassProgress(c)
+		if countError != nil {
+			assert.Equal(t, 500, w.Code)
+		} else {
+			assert.Equal(t, 200, w.Code)
+			var payload map[string]any
+			assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &payload))
+			assert.Equal(t, float64(40), payload["class_info"].(map[string]any)["student_count"])
+			assert.NotContains(t, payload, "members")
+			assert.Len(t, payload["progress"], 1)
+		}
+		classRepo.AssertNotCalled(t, "GetClassMembers", mock.Anything)
+		teamRepo.AssertNotCalled(t, "GetAssignmentTeamsByClassID", mock.Anything, mock.Anything)
+		teamRepo.AssertNotCalled(t, "GetTeamMembersByTeamIDs", mock.Anything)
+		classRepo.AssertExpectations(t)
+		eventRepo.AssertExpectations(t)
+		teamRepo.AssertExpectations(t)
+		tournamentRepo.AssertExpectations(t)
+	}
+}

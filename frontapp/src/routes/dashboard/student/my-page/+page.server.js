@@ -341,6 +341,7 @@ export const load = async ({ fetch, locals, request }) => {
 		classInfo: null,
 		classProgress: [],
 		notifications: [],
+ notificationSnapshot: undefined,
 		sportGuidelines: [],
 		competitionGuidelinesUrl: null,
 		surveyUrl: null,
@@ -371,11 +372,12 @@ export const load = async ({ fetch, locals, request }) => {
 			headers.Authorization = authHeader;
 		}
 
-		let activeEvent = null;
-		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
-		if (activeEventResponse.ok) {
-			activeEvent = await activeEventResponse.json();
-		}
+        let activeEvent = locals.activeEvent;
+        if (activeEvent === undefined) {
+            const response = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
+            activeEvent = response.ok ? await response.json() : null;
+        }
+
 		const activeEventId = activeEvent?.event_id ?? activeEvent?.id ?? null;
 		let scoresHidden = Boolean(activeEvent?.hide_scores && !canViewHiddenScores(user));
 		let scoreResponse = null;
@@ -397,11 +399,11 @@ export const load = async ({ fetch, locals, request }) => {
 				sportsResponse
 			] = await Promise.all([
 				scoresHidden ? Promise.resolve(null) : fetch(`${BACKEND_URL}/api/scores/class`, { headers }),
-				fetch(`${BACKEND_URL}/api/student/class-progress`, { headers }),
+				fetch(`${BACKEND_URL}/api/student/class-progress?view=summary`, { headers }),
 				fetch(`${BACKEND_URL}/api/barcode/teams`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers }),
-				fetch(`${BACKEND_URL}/api/notifications?limit=3`, { headers }),
+				fetch(`${BACKEND_URL}/api/notifications?limit=50`, { headers }),
 				fetch(`${BACKEND_URL}/api/events/${activeEventId}/sports`, { headers })
 			]);
 		}
@@ -477,6 +479,11 @@ export const load = async ({ fetch, locals, request }) => {
 			matchResults,
 			classInfo: classPayload?.class_info ?? null,
 			classProgress: Array.isArray(classPayload?.progress) ? classPayload.progress : [],
+			notificationSnapshot: Array.isArray(notificationPayload?.notifications)
+                ? notificationPayload.notifications.map(notification => notification?.id != null
+                    ? { id: notification.id }
+                    : { title: notification?.title, created_at: notification?.created_at })
+                : undefined,
 			notifications: Array.isArray(notificationPayload?.notifications) ? notificationPayload.notifications.slice(0, 3) : [],
 			sportGuidelines,
 			competitionGuidelinesUrl: activeEvent?.competition_guidelines_pdf_url ?? null,

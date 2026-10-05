@@ -139,7 +139,7 @@ export async function load({ fetch, request, locals }) {
 	const headers = createHeaders(request);
 
 	try {
-		const response = await fetch(`${BACKEND_URL}/api/student/class-progress`, {
+		const response = await fetch(`${BACKEND_URL}/api/student/class-progress?view=summary`, {
 			headers
 		});
 
@@ -160,31 +160,19 @@ export async function load({ fetch, request, locals }) {
 		const classId = payload.class_id ?? null;
 		const progress = Array.isArray(payload.progress) ? [...payload.progress] : [];
 
-		if (classId !== null) {
-			const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
-			if (activeEventResponse.ok) {
-				const activeEventPayload = await activeEventResponse.json();
-				const activeEventId = activeEventPayload?.event_id ?? null;
-
-				if (activeEventId) {
-					const noonResponse = await fetch(
-						`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`,
-						{ headers }
-					);
-
-					if (noonResponse.ok) {
-						const noonPayload = await noonResponse.json();
-						const noonProgress = buildNoonProgressEntries(
-							noonPayload?.session,
-							noonPayload?.matches,
-							classId,
-							payload.class_name ?? className
-						);
-						progress.push(...noonProgress);
-					}
-				}
-			}
-		}
+        const eventId = payload.event_id;
+        if (classId !== null && eventId) {
+            const noonResponse = await fetch(
+                `${BACKEND_URL}/api/student/events/${eventId}/noon-game/session`, { headers }
+            );
+            if (noonResponse.ok) {
+                const noonPayload = await noonResponse.json();
+                progress.push(...buildNoonProgressEntries(
+                    noonPayload?.session, noonPayload?.matches,
+                    classId, payload.class_name ?? className
+                ));
+            }
+        }
 
 		return {
 			isClassMember: true,

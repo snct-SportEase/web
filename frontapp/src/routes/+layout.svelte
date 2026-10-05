@@ -7,10 +7,14 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { isPWAInstalled } from '$lib/utils/pwa.js';
+  import { seedNotificationSnapshot } from '$lib/stores/notificationBadgeStore.js';
 
   let { children } = $props();
   let data = $derived($page.data);
   let lastReportedPWAUserId = null;
+
+  if (browser) seedNotificationSnapshot(data.user, data.notificationSnapshot);
+  $effect(() => { seedNotificationSnapshot(data.user, data.notificationSnapshot); });
 
   $effect(() => {
     const userId = data.user?.id;

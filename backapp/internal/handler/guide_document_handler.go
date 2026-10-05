@@ -30,7 +30,7 @@ func (h *GuideDocumentHandler) ListGuideDocuments(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "資料一覧の取得に失敗しました"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"documents": docs})
+	privateReferenceJSON(c, gin.H{"documents": docs})
 }
 
 func (h *GuideDocumentHandler) CreateGuideDocument(c *gin.Context) {

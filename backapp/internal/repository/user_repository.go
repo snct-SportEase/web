@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -24,6 +25,7 @@ type UserRepository interface {
 }
 
 func (r *userRepository) DeleteUserRole(userID string, roleName string, eventID *int) error {
+	defer invalidateReads(r.db, "user:"+userID)
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -59,6 +61,7 @@ func NewUserRepository(db *sql.DB) UserRepository {
 }
 
 func (r *userRepository) AddUserRoleIfNotExists(userID string, roleName string) error {
+	defer invalidateReads(r.db, "user:"+userID)
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -95,6 +98,7 @@ func (r *userRepository) AddUserRoleIfNotExists(userID string, roleName string) 
 }
 
 func (r *userRepository) ReplaceMasterRole(userID string, roleName string) error {
+	defer invalidateReads(r.db, "user:"+userID)
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -296,6 +300,7 @@ func (r *userRepository) GetUserByEmail(email string) (*models.User, error) {
 }
 
 func (r *userRepository) CreateUser(user *models.User, role string) error {
+	defer invalidateReads(r.db, "user:"+user.ID)
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -343,17 +348,33 @@ func (r *userRepository) CreateUser(user *models.User, role string) error {
 }
 
 func (r *userRepository) UpdateUser(user *models.User) error {
+	defer invalidateReads(r.db, "user:"+user.ID)
 	_, err := r.db.Exec("UPDATE users SET display_name = ?, class_id = ?, is_profile_complete = ? WHERE id = ?",
 		user.DisplayName, user.ClassID, user.IsProfileComplete, user.ID)
 	return err
 }
 
 func (r *userRepository) UpdateUserDisplayName(userID string, displayName string) error {
+	defer invalidateReads(r.db, "user:"+userID)
 	_, err := r.db.Exec("UPDATE users SET display_name = ? WHERE id = ?", displayName, userID)
 	return err
 }
 
 func (r *userRepository) GetUserWithRoles(userID string) (*models.User, error) {
+	if GlobalCache == nil {
+		return r.loadUserWithRoles(userID)
+	}
+	revision := readRevision(r.db, "events")
+	eventID, err := (&eventRepository{db: r.db}).GetActiveEvent()
+	if err != nil {
+		return nil, err
+	}
+	return cachedRead(r.db, "user:"+userID, fmt.Sprintf("%d:%d:%s", revision, eventID, userID), func() (*models.User, error) {
+		return r.loadUserWithRoles(userID)
+	})
+}
+
+func (r *userRepository) loadUserWithRoles(userID string) (*models.User, error) {
 	// ユーザー情報を取得
 	row := r.db.QueryRow("SELECT id, email, display_name, class_id, notification_filters, is_profile_complete, created_at, updated_at FROM users WHERE id = ?", userID)
 
@@ -414,11 +435,15 @@ func (r *userRepository) GetUserWithRoles(userID string) (*models.User, error) {
 		roles = append(roles, role)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	user.Roles = roles
 	return user, nil
 }
 
 func (r *userRepository) UpdateUserRole(userID string, roleName string, eventID *int) error {
+	defer invalidateReads(r.db, "user:"+userID)
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -460,6 +485,7 @@ func (r *userRepository) UpdateUserRole(userID string, roleName string, eventID 
 }
 
 func (r *userRepository) UpdateNotificationFilters(userID string, filters []string) error {
+	defer invalidateReads(r.db, "user:"+userID)
 	filtersJSON, err := json.Marshal(filters)
 	if err != nil {
 		return err

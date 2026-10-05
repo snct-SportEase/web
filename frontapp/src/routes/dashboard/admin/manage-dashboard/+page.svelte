@@ -1,6 +1,7 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
 	import { onMount, onDestroy } from 'svelte';
-	import Chart from 'chart.js/auto';
+	let Chart;
 
 	let attendanceRate = $state(null);
 	let attendanceError = $state('');
@@ -17,13 +18,16 @@
 		const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
 		try {
-			const [attendance, participation, scores, progress, activeEvent] = await Promise.allSettled([
+			const [attendance, participation, scores, progress, activeEvent, chartModule] = await Promise.allSettled([
 				fetchJson('/api/admin/statistics/attendance', { headers }),
 				fetchJson('/api/admin/statistics/participation', { headers }),
 				fetchJson('/api/admin/statistics/scores', { headers }),
 				fetchJson('/api/admin/statistics/progress', { headers }),
-				fetchJson('/api/events/active', { headers })
+				activeEventStore.init(),
+                import('chart.js/auto')
 			]);
+
+            if (chartModule.status === 'fulfilled') Chart = chartModule.value.default;
 
 			if (attendance.status === 'fulfilled') {
 				const rate = Number(attendance.value.attendance_rate);
@@ -59,7 +63,7 @@
 			}
 
 			if (activeEvent.status === 'fulfilled') {
-				hideScores = Boolean(activeEvent.value.hide_scores);
+				hideScores = Boolean(activeEvent.value?.hide_scores);
 			} else {
 				console.error(activeEvent.reason);
 			}
@@ -97,6 +101,7 @@
 	});
 
 	function drawCharts() {
+        if (!Chart) return;
 		// 参加率のグラフ
 		const ctx = document.getElementById('participationChart');
 		if (ctx) {

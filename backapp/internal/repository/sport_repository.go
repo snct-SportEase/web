@@ -4,13 +4,17 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
+	"sort"
 	"strings"
+	"sync"
 )
 
 // SportRepository defines the interface for sport and event_sport related database operations.
 type SportRepository interface {
 	GetAllSports() ([]*models.Sport, error)
+	GetAllSportsWithDefaults(names []string) ([]*models.Sport, error)
 	GetSportByID(sportID int) (*models.Sport, error)
 	GetSportByName(name string) (*models.Sport, error)
 	CreateSport(sport *models.Sport) (int64, error)
@@ -27,7 +31,8 @@ type SportRepository interface {
 var ErrEventSportNotFound = errors.New("sport is not assigned to event")
 
 type sportRepository struct {
-	db *sql.DB
+	db         *sql.DB
+	defaultsMu sync.Mutex
 }
 
 // NewSportRepository creates a new instance of SportRepository.
@@ -52,11 +57,48 @@ func (r *sportRepository) GetAllSports() ([]*models.Sport, error) {
 		}
 		sports = append(sports, sport)
 	}
-	return sports, nil
+	return sports, rows.Err()
+}
+
+// GetAllSportsWithDefaults checks missing defaults only on a cache miss. The
+// sports revision also covers board-game renames, creations and test restores.
+func (r *sportRepository) GetAllSportsWithDefaults(names []string) ([]*models.Sport, error) {
+	return cachedRead(r.db, "sports", "defaults:"+strings.Join(names, "\x00"), func() ([]*models.Sport, error) {
+		// Creating defaults advances the cache revision. Serialize cold reads
+		// without sharing results across revisions, so a restore cannot reuse
+		// a read started before it completed.
+		r.defaultsMu.Lock()
+		defer r.defaultsMu.Unlock()
+		sports, err := r.GetAllSports()
+		if err != nil {
+			return nil, err
+		}
+		existing := make(map[string]bool, len(sports))
+		for _, sport := range sports {
+			existing[strings.TrimSpace(sport.Name)] = true
+		}
+		for _, name := range names {
+			name = strings.TrimSpace(name)
+			if name == "" || existing[name] {
+				continue
+			}
+			sport := &models.Sport{Name: name}
+			id, err := r.CreateSport(sport)
+			if err != nil {
+				return nil, err
+			}
+			sport.ID = int(id)
+			sports = append(sports, sport)
+			existing[name] = true
+		}
+		sort.Slice(sports, func(i, j int) bool { return sports[i].ID < sports[j].ID })
+		return sports, nil
+	})
 }
 
 // CreateSport adds a new sport to the database.
 func (r *sportRepository) CreateSport(sport *models.Sport) (int64, error) {
+	defer invalidateReads(r.db, "sports")
 	query := "INSERT INTO sports (name) VALUES (?)"
 	result, err := r.db.Exec(query, sport.Name)
 	if err != nil {
@@ -99,6 +141,10 @@ func (r *sportRepository) GetSportByName(name string) (*models.Sport, error) {
 
 // GetSportsByEventID retrieves all sports assigned to a specific event.
 func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport, error) {
+	return cachedRead(r.db, "sports", fmt.Sprint(eventID), func() ([]*models.EventSport, error) { return r.loadGetSportsByEventID(eventID) })
+}
+
+func (r *sportRepository) loadGetSportsByEventID(eventID int) ([]*models.EventSport, error) {
 	query := `
 		SELECT es.event_id, es.sport_id, s.name, es.description, es.rules_pdf_url, es.location, es.template_key, es.min_capacity, es.max_capacity
 		FROM event_sports es
@@ -132,7 +178,7 @@ func (r *sportRepository) GetSportsByEventID(eventID int) ([]*models.EventSport,
 		}
 		eventSports = append(eventSports, eventSport)
 	}
-	return eventSports, nil
+	return eventSports, rows.Err()
 }
 
 func isBoardGameTemplate(templateKey *string) bool {
@@ -141,6 +187,7 @@ func isBoardGameTemplate(templateKey *string) bool {
 
 // AssignSportToEvent assigns a sport to an event in the database.
 func (r *sportRepository) AssignSportToEvent(eventSport *models.EventSport) error {
+	defer invalidateReads(r.db, "sports")
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -188,6 +235,7 @@ func isOtherLocation(location string) bool {
 
 // DeleteSportFromEvent removes the assignment of a sport from an event.
 func (r *sportRepository) DeleteSportFromEvent(eventID int, sportID int) error {
+	defer invalidateReads(r.db, "sports")
 	query := "DELETE FROM event_sports WHERE event_id = ? AND sport_id = ?"
 	_, err := r.db.Exec(query, eventID, sportID)
 	return err
@@ -276,6 +324,7 @@ func (r *sportRepository) GetSportDetails(eventID int, sportID int) (*models.Eve
 }
 
 func (r *sportRepository) UpdateSportDetails(eventID int, sportID int, details models.EventSport) error {
+	defer invalidateReads(r.db, "sports")
 	query := "UPDATE event_sports SET description = ?, rules_pdf_url = ?, min_capacity = ?, max_capacity = ? WHERE event_id = ? AND sport_id = ?"
 	result, err := r.db.Exec(query, details.Description, details.RulesPdfURL, details.MinCapacity, details.MaxCapacity, eventID, sportID)
 	if err != nil {

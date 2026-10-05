@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
   import ActionCard from '$lib/components/ActionCard.svelte';
@@ -10,18 +11,17 @@
 
   onMount(async () => {
     try {
-      const eventResponse = await fetch('/api/events/active');
-      if (eventResponse.ok) {
-        const data = await eventResponse.json();
-        if (data.event_id) {
+      const data = await activeEventStore.init();
+      if (data) {
+        if (data.id) {
           activeEvent = {
-            id: data.event_id,
-            name: data.event_name
+            id: data.id,
+            name: data.name
           };
           if (data.competition_guidelines_pdf_url) {
             competitionGuidelinesUrl = data.competition_guidelines_pdf_url;
           }
-          const documentsResponse = await fetch(`/api/guide-documents?event_id=${data.event_id}`);
+          const documentsResponse = await fetch(`/api/guide-documents?event_id=${data.id}`);
           if (documentsResponse.ok) {
             const documentsData = await documentsResponse.json();
             guideDocuments = documentsData.documents ?? [];

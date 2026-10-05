@@ -22,51 +22,48 @@ export async function load({ locals, fetch, request }) {
     progress: []
   };
 
-  try {
-    // Fetch classes
-    const classesResponse = await fetch(`${BACKEND_URL}/api/classes`, { headers: backendHeaders });
-    if (classesResponse.ok) {
-      returnData.classes = await classesResponse.json();
-    }
-  } catch (e) {
-    console.error('Failed to fetch classes:', e);
+  const tasks = [];
+  if (!locals.user?.is_profile_complete) {
+    tasks.push(async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/classes`, { headers: backendHeaders });
+        if (response.ok) returnData.classes = await response.json();
+      } catch (error) {
+        console.error('Failed to fetch classes:', error);
+      }
+    });
   }
 
-  // Fetch events if user is root
   const isRoot = locals.user?.roles?.some(role => role.name === 'root');
   if (isRoot && locals.user?.is_profile_complete) {
-    try {
-      const eventResponse = await fetch(`${BACKEND_URL}/api/root/events`, {
-        headers: backendHeaders
-      });
-      if (eventResponse.ok) {
-        returnData.events = await eventResponse.json();
+    tasks.push(async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/root/events`, { headers: backendHeaders });
+        if (response.ok) returnData.events = await response.json();
+      } catch (error) {
+        console.error('Failed to fetch events:', error);
       }
-    } catch (e) {
-      console.error('Failed to fetch events:', e);
-    }
+    });
   }
 
-  const classId = locals.user?.class_id;
-  if (classId) {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/student/class-progress`, {
-        headers: backendHeaders
-      });
-      if (response.ok) {
-        const payload = await response.json();
-        returnData.isClassMember = true;
-        returnData.className = payload.class_name ?? null;
-        returnData.classInfo = payload.class_info ?? null;
-        returnData.members = payload.members ?? [];
-        returnData.progress = payload.progress ?? [];
-      } else if (response.status === 403) {
-        returnData.isClassMember = false;
+  if (locals.user?.class_id) {
+    tasks.push(async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/student/class-progress`, { headers: backendHeaders });
+        if (response.ok) {
+          const payload = await response.json();
+          returnData.isClassMember = true;
+          returnData.className = payload.class_name ?? null;
+          returnData.classInfo = payload.class_info ?? null;
+          returnData.members = payload.members ?? [];
+          returnData.progress = payload.progress ?? [];
+        }
+      } catch (error) {
+        console.error('Failed to fetch class progress:', error);
       }
-    } catch (e) {
-      console.error('Failed to fetch class progress:', e);
-    }
+    });
   }
+  await Promise.all(tasks.map(task => task()));
 
   return returnData;
 }

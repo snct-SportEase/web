@@ -8,9 +8,11 @@ import (
 	"backapp/internal/router"
 	"backapp/internal/safelog"
 	"backapp/internal/websocket"
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"time"
 
@@ -35,6 +37,24 @@ func main() {
 	}
 	defer db.Close()
 	log.Println("Database connection successful.")
+
+	if os.Getenv("PERFORMANCE_METRICS") == "true" {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					stats := db.Stats()
+					log.Printf("[db-pool] open=%d in_use=%d idle=%d wait_count=%d wait_duration_ms=%.3f", stats.OpenConnections, stats.InUse, stats.Idle, stats.WaitCount, float64(stats.WaitDuration)/float64(time.Millisecond))
+				}
+			}
+		}()
+	}
 
 	// Redisセッションストアを初期化
 	middleware.InitSessionStore(cfg.RedisAddr)

@@ -25,6 +25,7 @@ type boardGameRepository struct{ db *sql.DB }
 func NewBoardGameRepository(db *sql.DB) BoardGameRepository { return &boardGameRepository{db: db} }
 
 func (r *boardGameRepository) CreateRun(input *models.BoardGameRunCreate) (*models.BoardGameRun, error) {
+	defer invalidateReads(r.db, "sports")
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, err

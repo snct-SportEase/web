@@ -71,11 +71,25 @@ async function proxyToBackend(event) {
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
+  const startedAt = performance.now();
   if (shouldProxyToBackend(event.url.pathname)) {
     return proxyToBackend(event);
   }
 
   const sessionToken = event.cookies.get('session_token');
+  const onDashboard = event.url.pathname.startsWith('/dashboard');
+  const activeEventPromise = (async () => {
+    if (!sessionToken || !onDashboard) return null;
+    try {
+      const response = await fetch(new URL('/api/events/active', BACKEND_URL), {
+        headers: { cookie: `session_token=${sessionToken}` }
+      });
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
+    }
+  })();
+
 
   if (sessionToken) {
     try {
@@ -111,21 +125,13 @@ export async function handle({ event, resolve }) {
       return redirectResponse(event, 302, '/');
     }
 
+    // Authentication and active-event lookup run concurrently. Each backend
+    // endpoint still validates the session independently.
+    event.locals.activeEvent = await activeEventPromise;
+    const stateAvailable = event.locals.activeEvent !== null;
+
 		if (isStudentOnly(event.locals.user)) {
-			let testRunState = '';
-			let stateAvailable = false;
-			try {
-				const statusResponse = await fetch(new URL('/api/events/active', BACKEND_URL), {
-					headers: { cookie: `session_token=${sessionToken}` }
-				});
-				if (statusResponse.ok) {
-					const statusPayload = await statusResponse.json();
-					testRunState = statusPayload.test_run_state ?? '';
-					stateAvailable = true;
-				}
-			} catch {
-				stateAvailable = false;
-			}
+			const testRunState = event.locals.activeEvent?.test_run_state ?? '';
 
 			const maintenanceRequired = requiresTestRunMaintenance(event.locals.user, testRunState, stateAvailable);
 			const onMaintenancePage = event.url.pathname === '/dashboard/maintenance';
@@ -145,5 +151,9 @@ export async function handle({ event, resolve }) {
     }
   }
 
-  return resolve(event);
+  const response = await resolve(event);
+  if (event.url.pathname.startsWith('/dashboard')) {
+    response.headers.append('Server-Timing', `ssr;dur=${(performance.now() - startedAt).toFixed(2)}`);
+  }
+  return response;
 }

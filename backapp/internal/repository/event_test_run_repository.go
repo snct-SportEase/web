@@ -164,6 +164,7 @@ func (r *eventTestRunRepository) Begin(ctx context.Context, eventID int) error {
 }
 
 func (r *eventTestRunRepository) Restore(ctx context.Context, eventID int) error {
+	defer invalidateReads(r.db, "events", "sports", "guides")
 	return r.withLock(ctx, func(conn *sql.Conn) (restoreErr error) {
 		var activeEventID int
 		if err := conn.QueryRowContext(ctx, "SELECT event_id FROM event_test_runs WHERE id = 1").Scan(&activeEventID); err != nil {

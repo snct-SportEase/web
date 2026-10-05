@@ -2,6 +2,7 @@ import { page } from '@vitest/browser/context';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from '$src/routes/dashboard/+page.svelte';
+import { activeEvent } from '$lib/stores/eventStore.js';
 
 vi.mock('$env/dynamic/public', () => ({
 	env: {
@@ -26,7 +27,10 @@ const studentUser = {
 	roles: [{ name: 'student' }]
 };
 
-function renderDashboard(user = rootUser) {
+function renderDashboard(user = rootUser, eventSnapshot = null) {
+	// Rendering Page alone omits Layout's SSR snapshot initialization.
+	// Supply it for every case, including an explicit absence of an event.
+	activeEvent.seed(eventSnapshot);
 	return render(Page, {
 		props: {
 			data: {
@@ -73,6 +77,7 @@ describe('Dashboard shortcuts', () => {
 	});
 
 	afterEach(() => {
+		activeEvent.seed(null);
 		vi.unstubAllGlobals();
 		window.localStorage.clear();
 	});
@@ -139,10 +144,14 @@ describe('Dashboard shortcuts', () => {
 			return Promise.resolve({ ok: true, json: () => Promise.resolve({ count: 0, endpoints: [] }) });
 		});
 
-		renderDashboard(studentUser);
+		renderDashboard(studentUser, { id: 1, name: '2026春季スポーツ大会' });
 
 		await expect.element(page.getByRole('heading', { name: '昼競技情報' })).toBeInTheDocument();
 		await expect.element(page.getByText('借り物競走')).toBeInTheDocument();
+		expect(fetchMock).toHaveBeenCalledWith('/api/student/events/1/noon-game/sessions');
+		expect(fetchMock).toHaveBeenCalledWith('/api/student/events/1/noon-game/sessions/10');
+		expect(fetchMock).toHaveBeenCalledWith('/api/barcode/teams');
+		expect(fetchMock).not.toHaveBeenCalledWith('/api/events/active');
 	});
 	it('割り当てがない昼競技は表示しない', async () => {
 		fetchMock.mockImplementation((url) => {
@@ -167,9 +176,12 @@ describe('Dashboard shortcuts', () => {
 			return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
 		});
 
-		renderDashboard(studentUser);
+		renderDashboard(studentUser, { id: 1, name: '2026春季スポーツ大会' });
 
+		await expect.poll(() => fetchMock.mock.calls.some(([url]) => url === '/api/barcode/teams')).toBe(true);
 		await expect.element(page.getByText('現在表示できる昼競技情報はありません。')).toBeInTheDocument();
 		await expect.element(page.getByText('借り物競走')).not.toBeInTheDocument();
+		expect(fetchMock).toHaveBeenCalledWith('/api/student/events/1/noon-game/sessions/10');
+		expect(fetchMock).not.toHaveBeenCalledWith('/api/events/active');
 	});
 });

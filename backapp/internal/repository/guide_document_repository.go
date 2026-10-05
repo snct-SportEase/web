@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 type GuideDocumentRepository interface {
@@ -21,6 +22,10 @@ func NewGuideDocumentRepository(db *sql.DB) GuideDocumentRepository {
 }
 
 func (r *guideDocumentRepository) ListGuideDocuments(eventID int) ([]*models.GuideDocument, error) {
+	return cachedRead(r.db, "guides", fmt.Sprint(eventID), func() ([]*models.GuideDocument, error) { return r.loadListGuideDocuments(eventID) })
+}
+
+func (r *guideDocumentRepository) loadListGuideDocuments(eventID int) ([]*models.GuideDocument, error) {
 	rows, err := r.db.Query(`
 		SELECT id, event_id, title, description, pdf_url, created_at, updated_at
 		FROM guide_documents
@@ -45,10 +50,11 @@ func (r *guideDocumentRepository) ListGuideDocuments(eventID int) ([]*models.Gui
 		docs = append(docs, doc)
 	}
 
-	return docs, nil
+	return docs, rows.Err()
 }
 
 func (r *guideDocumentRepository) CreateGuideDocument(doc *models.GuideDocument) (int64, error) {
+	defer invalidateReads(r.db, "guides")
 	result, err := r.db.Exec(`
 		INSERT INTO guide_documents (event_id, title, description, pdf_url)
 		VALUES (?, ?, ?, ?)
@@ -60,6 +66,7 @@ func (r *guideDocumentRepository) CreateGuideDocument(doc *models.GuideDocument)
 }
 
 func (r *guideDocumentRepository) DeleteGuideDocument(id int) error {
+	defer invalidateReads(r.db, "guides")
 	result, err := r.db.Exec("DELETE FROM guide_documents WHERE id = ?", id)
 	if err != nil {
 		return err

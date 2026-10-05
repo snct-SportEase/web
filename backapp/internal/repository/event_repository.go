@@ -4,6 +4,7 @@ import (
 	"backapp/internal/models"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 type EventRepository interface {
@@ -101,6 +102,10 @@ func NewEventRepository(db *sql.DB) EventRepository {
 }
 
 func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
+	return cachedRead(r.db, "events", fmt.Sprint(id), func() (*models.Event, error) { return r.loadEventByID(id) })
+}
+
+func (r *eventRepository) loadEventByID(id int) (*models.Event, error) {
 	query := "SELECT id, name, `year`, season, start_date, end_date, is_rainy_mode, competition_guidelines_pdf_url, survey_url, is_survey_published, is_mic_voting_enabled, status, hide_scores, duplicate_registration_threshold FROM events WHERE id = ?"
 	event := &models.Event{}
 	var competitionGuidelinesPdfUrl sql.NullString
@@ -122,6 +127,7 @@ func (r *eventRepository) GetEventByID(id int) (*models.Event, error) {
 }
 
 func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
+	defer invalidateReads(r.db, "events")
 	tx, err := r.db.Begin()
 	if err != nil {
 		return 0, err
@@ -171,6 +177,7 @@ func (r *eventRepository) CreateEvent(event *models.Event) (int64, error) {
 // carry-over points in one transaction. The active event is not changed when
 // any of these steps fails.
 func (r *eventRepository) CreateEventWithClasses(event *models.Event, classNames []string) (int64, error) {
+	defer invalidateReads(r.db, "events")
 	tx, err := r.db.Begin()
 	if err != nil {
 		return 0, err
@@ -275,6 +282,7 @@ func (r *eventRepository) GetAllEvents() ([]*models.Event, error) {
 }
 
 func (r *eventRepository) UpdateEvent(event *models.Event) error {
+	defer invalidateReads(r.db, "events")
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -326,7 +334,11 @@ func (r *eventRepository) UpdateEvent(event *models.Event) error {
 	return tx.Commit()
 }
 
-func (r *eventRepository) GetActiveEvent() (event_id int, err error) {
+func (r *eventRepository) GetActiveEvent() (int, error) {
+	return cachedRead(r.db, "events", "active", func() (int, error) { return r.loadActiveEvent() })
+}
+
+func (r *eventRepository) loadActiveEvent() (event_id int, err error) {
 	query := "SELECT event_id FROM active_event WHERE id = 1"
 	var nullableEventId sql.NullInt64
 	err = r.db.QueryRow(query).Scan(&nullableEventId)
@@ -346,6 +358,7 @@ func (r *eventRepository) GetActiveEvent() (event_id int, err error) {
 }
 
 func (r *eventRepository) SetActiveEvent(event_id *int) error {
+	defer invalidateReads(r.db, "events")
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -429,18 +442,21 @@ func (r *eventRepository) CopyClassScores(fromEventID int, toEventID int) error 
 }
 
 func (r *eventRepository) SetRainyMode(eventID int, isRainyMode bool) error {
+	defer invalidateReads(r.db, "events")
 	query := "UPDATE events SET is_rainy_mode = ? WHERE id = ?"
 	_, err := r.db.Exec(query, isRainyMode, eventID)
 	return err
 }
 
 func (r *eventRepository) SetMICVotingEnabled(eventID int, isEnabled bool) error {
+	defer invalidateReads(r.db, "events")
 	query := "UPDATE events SET is_mic_voting_enabled = ? WHERE id = ?"
 	_, err := r.db.Exec(query, isEnabled, eventID)
 	return err
 }
 
 func (r *eventRepository) PublishSurvey(eventID int) error {
+	defer invalidateReads(r.db, "events")
 	query := "UPDATE events SET is_survey_published = TRUE WHERE id = ?"
 	_, err := r.db.Exec(query, eventID)
 	return err

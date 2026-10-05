@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import FormField from '$lib/components/FormField.svelte';
   import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
@@ -16,19 +17,13 @@
 
   onMount(async () => {
     try {
-      const eventRes = await fetch('/api/events/active');
-      if (!eventRes.ok) {
-        alert('開催中のイベント情報の取得に失敗しました。');
-        isLoading = false;
-        return;
-      }
-      const eventData = await eventRes.json();
-      if (!eventData.event_id) {
+      const eventData = await activeEventStore.init();
+      if (!eventData?.id) {
         alert('開催中のイベントがありません。');
         isLoading = false;
         return;
       }
-      eventId = eventData.event_id;
+      eventId = eventData.id;
 
       const classRes = await fetch(`/api/admin/mic/eligible-classes?event_id=${eventId}`);
       if (classRes.ok) {

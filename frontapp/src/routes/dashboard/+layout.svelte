@@ -11,8 +11,12 @@
   import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
   import { activeEvent } from '$lib/stores/eventStore.js';
 
-  let { children } = $props();
-  let { data } = $page;
+  let { children, data } = $props();
+
+  if (browser && data.activeEventAvailable) activeEvent.seed(data.activeEvent);
+  $effect(() => {
+    if (data.activeEventAvailable) activeEvent.seed(data.activeEvent);
+  });
   let user = $derived(data.user);
 
   let showEditDisplayNameModal = $state(false);
@@ -34,8 +38,8 @@
     !$pushSubscriptionStatus.isSubscribed
   );
   
-  async function checkTestRunIsolation() {
-    const event = await activeEvent.init();
+  async function checkTestRunIsolation(force = false) {
+    const event = await activeEvent.init({ force });
     const isIsolating = ['starting', 'testing', 'restoring', 'failed'].includes(event?.test_run_state) || event?.status === 'testing';
     if (isStudentOnly && isIsolating && $page.url.pathname !== '/dashboard/maintenance') {
       await goto('/dashboard/maintenance', { invalidateAll: true });
@@ -67,7 +71,7 @@
       };
       document.addEventListener('pointerdown', closeMobileHeaderMenu);
       const testRunInterval = isStudentOnly && $page.url.pathname !== '/dashboard/maintenance'
-        ? window.setInterval(checkTestRunIsolation, 15_000)
+        ? window.setInterval(() => checkTestRunIsolation(true), 15_000)
         : null;
       
       return () => {

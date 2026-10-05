@@ -21,6 +21,7 @@ type ClassRepository interface {
 	GetClassScoresByEvents(eventIDs []int) (map[int][]*models.ClassScore, error)
 	UpdateClassRanks(eventID int) error
 	GetClassMembers(classID int) ([]*models.User, error)
+	CountClassMembers(classID int) (int, error)
 	SetNoonGamePoints(eventID int, points map[int]int) error
 	SetSurveyPoints(eventID int, points map[int]int) error
 }
@@ -580,6 +581,13 @@ func (r *classRepository) attachSportScores(eventIDs []int, scores map[int][]*mo
 func (r *classRepository) UpdateClassRanks(eventID int) error {
 	// class_scores is a VIEW, ranking is dynamic
 	return nil
+}
+
+// CountClassMembers avoids loading and sorting personal data for summary views.
+func (r *classRepository) CountClassMembers(classID int) (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM users WHERE class_id = ?", classID).Scan(&count)
+	return count, err
 }
 
 // GetClassMembers gets all users in a class

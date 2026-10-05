@@ -320,9 +320,20 @@ function getSessionToken(req) {
   return cookie?.split('=')[1] ?? null;
 }
 
+let apiRequestCounts = new Map();
+
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
   console.log(`[Mock] ${req.method} ${url.pathname}`);
+  if (url.pathname === '/__request-counts') {
+    sendJson(res, 200, Object.fromEntries(apiRequestCounts));
+    return;
+  }
+  if (url.pathname === '/__reset' && req.method === 'POST') apiRequestCounts.clear();
+  if (url.pathname.startsWith('/api/')) {
+    const key = `${req.method} ${url.pathname}`;
+    apiRequestCounts.set(key, (apiRequestCounts.get(key) ?? 0) + 1);
+  }
 
   if (url.pathname === '/health') {
     sendJson(res, 200, { ok: true });
@@ -671,6 +682,7 @@ createServer(async (req, res) => {
 
   if (url.pathname === '/api/student/class-progress' && req.method === 'GET') {
     sendJson(res, 200, {
+      event_id: (events.find((event) => ['active', 'testing'].includes(event.status)) ?? events[0])?.id ?? null,
       class_id: 1,
       class_name: '1A',
       class_info: {

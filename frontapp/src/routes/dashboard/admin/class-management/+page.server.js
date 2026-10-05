@@ -42,16 +42,13 @@ export async function load({ fetch, locals, request }) {
 	let error = null;
 
 	try {
-		const activeEventRes = await fetch(`${BACKEND_URL}/api/events/active`, {
-			headers
-		});
-		if (activeEventRes.ok) {
-			const eventData = await activeEventRes.json();
-			activeEventId = eventData?.event_id ?? null;
-		} else if (activeEventRes.status !== 404) {
-			const text = await activeEventRes.text();
-			throw new Error(`Failed to fetch active event: ${activeEventRes.status} ${text}`);
-		}
+        let eventData = locals.activeEvent;
+        if (eventData === undefined) {
+            const response = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
+            if (!response.ok && response.status !== 404) throw new Error('Failed to fetch active event');
+            eventData = response.ok ? await response.json() : null;
+        }
+        activeEventId = eventData?.event_id ?? null;
 
 		const classesRes = await fetch(`${BACKEND_URL}/api/admin/class-team/managed-class`, {
 			headers
