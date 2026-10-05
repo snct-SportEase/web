@@ -181,3 +181,15 @@ go test -race -count=20 ./internal/repository ./tests/handler \
 
 変更後のバックエンド全テスト、repository/handlerのrace detector、frontend server unit tests
 90件、通知・得点非表示・API回数のE2E 8件、production build、変更ファイルlintを通過。
+
+## CIのブラウザーテスト初期化
+
+DashboardのPageを単独renderするテストでも、Layoutが共有するSSR大会snapshotを
+ケースごとに明示的にseedする。大会なしの場合も `null` をseedし、終了時に状態を戻す。
+15秒cacheを導入した後、前ケースの大会なし状態が残って昼競技表示テストが失敗していた。
+
+昼競技の表示・非表示テストはsession一覧・詳細・割り当ての取得を確認し、
+API取得を省略しただけで非表示のテストが通らないようにした。
+修正前のブラウザーテスト失敗をローカルでも再現し、修正後は4件すべて通過。
+Node 20とnpm ci依存関係のDocker環境で全ファイルlint、全Vitest 200件（46ファイル）、
+production buildも通過した。
