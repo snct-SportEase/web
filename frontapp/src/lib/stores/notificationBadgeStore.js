@@ -29,15 +29,30 @@ async function getNotifications(user, fetcher, force) {
   }
   if (pending.has(userKey)) {
     if (!force) return pending.get(userKey);
-    if (forcedPending.has(userKey)) return forcedPending.get(userKey);
+    const queued = forcedPending.get(userKey);
+    if (queued) {
+      if (queued.started) queued.repeat = true;
+      return queued.promise;
+    }
     // A Push can arrive after an existing read started. Read again once it ends.
     const previous = pending.get(userKey);
-    const refresh = (async () => {
+    const refresh = { started: false, repeat: false, promise: null };
+    refresh.promise = (async () => {
       try { await previous; } catch { /* Retry even if the earlier read failed. */ }
-      return getNotifications(user, fetcher, true);
+      let notifications;
+      do {
+        refresh.started = true;
+        refresh.repeat = false;
+        try {
+          notifications = await getNotifications(user, fetcher, true);
+        } catch (error) {
+          if (!refresh.repeat) throw error;
+        }
+      } while (refresh.repeat);
+      return notifications;
     })();
     forcedPending.set(userKey, refresh);
-    try { return await refresh; }
+    try { return await refresh.promise; }
     finally { forcedPending.delete(userKey); }
   }
   const revision = snapshotRevision;
@@ -128,5 +143,5 @@ export function markNotificationsSeen(user, notifications = null) {
     : latestUserKey === getUserKey(user) ? latestNotificationIds : [];
 
   saveSeenIds(user, [...idsToMark, ...getSeenIds(user)]);
-  notificationBadgeCount.set(0);
+  if (latestUserKey === getUserKey(user)) notificationBadgeCount.set(0);
 }
