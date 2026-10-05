@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "0732a39",
+  "environment": "Playwright Chromium; Vite development server; mock backend; networkidle includes a 500ms quiet period",
+  "before": [
+    {
+      "path": "my-page",
+      "counts": {
+        "GET /api/auth/user": 1,
+        "GET /api/events/active": 3,
+        "GET /api/scores/class": 1,
+        "GET /api/student/class-progress": 1,
+        "GET /api/barcode/teams": 1,
+        "GET /api/student/events/1/tournaments": 1,
+        "GET /api/student/events/1/noon-game/session": 1,
+        "GET /api/notifications": 2,
+        "GET /api/events/1/sports": 1,
+        "GET /api/events": 1
+      },
+      "navigationMs": 1104.6723259999999,
+      "totalBackendRequests": 13
+    },
+    {
+      "path": "score-list",
+      "counts": {
+        "GET /api/auth/user": 1,
+        "GET /api/events/active": 3,
+        "GET /api/scores/class": 1,
+        "GET /api/notifications": 1,
+        "GET /api/events": 1
+      },
+      "navigationMs": 726.0926379999999,
+      "totalBackendRequests": 7
+    },
+    {
+      "path": "class-info",
+      "counts": {
+        "GET /api/auth/user": 1,
+        "GET /api/events/active": 3,
+        "GET /api/student/class-progress": 1,
+        "GET /api/student/events/1/noon-game/session": 1,
+        "GET /api/notifications": 1,
+        "GET /api/events": 1
+      },
+      "navigationMs": 721.2226989999999,
+      "totalBackendRequests": 8
+    }
+  ],
+  "after": [
+    {
+      "path": "my-page",
+      "counts": {
+        "GET /api/auth/user": 1,
+        "GET /api/events/active": 1,
+        "GET /api/scores/class": 1,
+        "GET /api/student/class-progress": 1,
+        "GET /api/barcode/teams": 1,
+        "GET /api/student/events/1/tournaments": 1,
+        "GET /api/student/events/1/noon-game/session": 1,
+        "GET /api/notifications": 2,
+        "GET /api/events/1/sports": 1,
+        "GET /api/notifications/subscription": 1
+      },
+      "serverTiming": "ssr;dur=130.77",
+      "navigationMs": 1109.124708,
+      "totalBackendRequests": 11
+    },
+    {
+      "path": "score-list",
+      "counts": {
+        "GET /api/auth/user": 1,
+        "GET /api/events/active": 1,
+        "GET /api/scores/class": 1,
+        "GET /api/notifications": 1,
+        "GET /api/notifications/subscription": 1
+      },
+      "serverTiming": "ssr;dur=36.24",
+      "navigationMs": 770.5380349999998,
+      "totalBackendRequests": 5
+    },
+    {
+      "path": "class-info",
+      "counts": {
+        "GET /api/auth/user": 1,
+        "GET /api/events/active": 1,
+        "GET /api/student/class-progress": 1,
+        "GET /api/student/events/1/noon-game/session": 1,
+        "GET /api/notifications": 1,
+        "GET /api/notifications/subscription": 1
+      },
+      "serverTiming": "ssr;dur=30.76",
+      "navigationMs": 752.58716,
+      "totalBackendRequests": 6
+    }
+  ]
+}
