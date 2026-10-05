@@ -148,7 +148,7 @@ func (h *SportHandler) GetSportsByEventHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, eventSports)
+	privateReferenceJSON(c, eventSports)
 }
 
 // AssignSportToEventHandler handles the request to assign a sport to an event.
