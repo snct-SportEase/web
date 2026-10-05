@@ -1,0 +1,220 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "5fc028a",
+  "implementation_commit": "6f943e2",
+  "api_counts": {
+    "environment": "Playwright Chromium; Vite development server; mock backend; networkidle includes a 500ms quiet period",
+    "before": [
+      {
+        "path": "my-page",
+        "counts": {
+          "GET /api/auth/user": 1,
+          "GET /api/events/active": 1,
+          "GET /api/scores/class": 1,
+          "GET /api/student/class-progress": 1,
+          "GET /api/barcode/teams": 1,
+          "GET /api/student/events/1/tournaments": 1,
+          "GET /api/student/events/1/noon-game/session": 1,
+          "GET /api/notifications": 2,
+          "GET /api/events/1/sports": 1,
+          "GET /api/notifications/subscription": 1
+        },
+        "serverTiming": "ssr;dur=130.77",
+        "navigationMs": 1109.124708,
+        "totalBackendRequests": 11
+      },
+      {
+        "path": "score-list",
+        "counts": {
+          "GET /api/auth/user": 1,
+          "GET /api/events/active": 1,
+          "GET /api/scores/class": 1,
+          "GET /api/notifications": 1,
+          "GET /api/notifications/subscription": 1
+        },
+        "serverTiming": "ssr;dur=36.24",
+        "navigationMs": 770.5380349999998,
+        "totalBackendRequests": 5
+      },
+      {
+        "path": "class-info",
+        "counts": {
+          "GET /api/auth/user": 1,
+          "GET /api/events/active": 1,
+          "GET /api/student/class-progress": 1,
+          "GET /api/student/events/1/noon-game/session": 1,
+          "GET /api/notifications": 1,
+          "GET /api/notifications/subscription": 1
+        },
+        "serverTiming": "ssr;dur=30.76",
+        "navigationMs": 752.58716,
+        "totalBackendRequests": 6
+      }
+    ],
+    "after": [
+      {
+        "path": "my-page",
+        "counts": {
+          "GET /api/events/active": 1,
+          "GET /api/auth/user": 1,
+          "GET /api/scores/class": 1,
+          "GET /api/student/class-progress": 1,
+          "GET /api/barcode/teams": 1,
+          "GET /api/student/events/1/tournaments": 1,
+          "GET /api/student/events/1/noon-game/session": 1,
+          "GET /api/notifications": 1,
+          "GET /api/events/1/sports": 1,
+          "GET /api/notifications/subscription": 1
+        },
+        "serverTiming": "ssr;dur=61.76",
+        "navigationMs": 825.288918,
+        "totalBackendRequests": 10
+      },
+      {
+        "path": "score-list",
+        "counts": {
+          "GET /api/events/active": 1,
+          "GET /api/auth/user": 1,
+          "GET /api/scores/class": 1,
+          "GET /api/notifications": 1,
+          "GET /api/notifications/subscription": 1
+        },
+        "serverTiming": "ssr;dur=33.64",
+        "navigationMs": 772.6965339999997,
+        "totalBackendRequests": 5
+      },
+      {
+        "path": "class-info",
+        "counts": {
+          "GET /api/events/active": 1,
+          "GET /api/auth/user": 1,
+          "GET /api/student/class-progress": 1,
+          "GET /api/student/events/1/noon-game/session": 1,
+          "GET /api/notifications": 1,
+          "GET /api/notifications/subscription": 1
+        },
+        "serverTiming": "ssr;dur=31.23",
+        "navigationMs": 769.486429,
+        "totalBackendRequests": 6
+      },
+      {
+        "path": "dashboard",
+        "counts": {
+          "GET /api/events/active": 1,
+          "GET /api/auth/user": 1,
+          "GET /api/student/class-progress": 1,
+          "GET /api/notifications": 1,
+          "GET /api/notifications/subscription": 2,
+          "GET /api/student/events/1/noon-game/sessions": 1,
+          "GET /api/barcode/teams": 1
+        },
+        "serverTiming": "ssr;dur=134.17",
+        "navigationMs": 954.6794660000005,
+        "totalBackendRequests": 8
+      }
+    ],
+    "note": "Single development-server timing samples are not production latency measurements. Dashboard has no baseline sample."
+  },
+  "repository_queries": {
+    "evidence": "Handler mocks, repository sqlmock expectations and SQL call paths; not a live MySQL measurement. Excludes authentication and active-event lookup.",
+    "class_progress": {
+      "condition": "Class has regular teams and assignment teams",
+      "full_view": 6,
+      "summary_view": 4
+    },
+    "sports_list": {
+      "condition": "All three default sports already exist",
+      "warm_before": 3,
+      "warm_after": 0,
+      "cold_before": 4,
+      "cold_after": 1
+    }
+  },
+  "cache_hit_benchmark": {
+    "environment": "linux/amd64; AMD Ryzen 5 7535U; 12 parallel workers; three local samples per case",
+    "baseline_commit": "83e46e5",
+    "optimized_commit": "8936aaa",
+    "command": "go test ./internal/repository -run ^$ -bench BenchmarkCachedReadHits -benchmem -benchtime=200ms -count=3",
+    "before": {
+      "active-event": [
+        {
+          "ns_per_op": 680.8,
+          "bytes_per_op": 382,
+          "allocs_per_op": 9
+        },
+        {
+          "ns_per_op": 863.7,
+          "bytes_per_op": 383,
+          "allocs_per_op": 9
+        },
+        {
+          "ns_per_op": 720.5,
+          "bytes_per_op": 382,
+          "allocs_per_op": 9
+        }
+      ],
+      "user-roles": [
+        {
+          "ns_per_op": 1379.0,
+          "bytes_per_op": 822,
+          "allocs_per_op": 24
+        },
+        {
+          "ns_per_op": 1376.0,
+          "bytes_per_op": 822,
+          "allocs_per_op": 24
+        },
+        {
+          "ns_per_op": 1379.0,
+          "bytes_per_op": 822,
+          "allocs_per_op": 24
+        }
+      ]
+    },
+    "after": {
+      "active-event": [
+        {
+          "ns_per_op": 151.0,
+          "bytes_per_op": 248,
+          "allocs_per_op": 5
+        },
+        {
+          "ns_per_op": 218.7,
+          "bytes_per_op": 248,
+          "allocs_per_op": 5
+        },
+        {
+          "ns_per_op": 250.9,
+          "bytes_per_op": 248,
+          "allocs_per_op": 5
+        }
+      ],
+      "user-roles": [
+        {
+          "ns_per_op": 1358.0,
+          "bytes_per_op": 672,
+          "allocs_per_op": 20
+        },
+        {
+          "ns_per_op": 1427.0,
+          "bytes_per_op": 672,
+          "allocs_per_op": 20
+        },
+        {
+          "ns_per_op": 1294.0,
+          "bytes_per_op": 672,
+          "allocs_per_op": 20
+        }
+      ]
+    },
+    "note": "Microbenchmark measures only warmed process-local reads, including JSON decoding. It does not measure HTTP latency."
+  },
+  "verification": {
+    "backend_full_suite": "passed",
+    "repository_and_handler_race": "passed",
+    "frontend_server_unit_tests": 76,
+    "related_e2e_tests": 14,
+    "frontend_production_build": "passed",
+    "changed_frontend_files_lint": "passed"
+  }
+}

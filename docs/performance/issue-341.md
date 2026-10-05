@@ -2,7 +2,7 @@
 
 2026-10-05に実装・検証。変更前は `0732a39`。
 
-## ローカルで確認した結果
+## 最初の改善で確認した結果
 
 同じmock backendとChromiumで初回表示からnetworkidleまでのリクエストを集計。
 変更前のソースは一時ディレクトリへ展開し、集計用のmock endpointのみ追加した。
@@ -90,3 +90,59 @@ docker compose logs --no-log-prefix sportease-backapp | python3 scripts/summariz
 MySQLのクエリ総数は専用の負荷計測環境で同じユーザー・画面を実行し、
 performance_schemaのdigest実行回数を区間差分で比較する。
 本番計測と残る管理画面の追加分割は別途実施する。
+
+## 追加の改善（2026-10-05）
+
+`5fc028a` から追加で改善。生データは
+[issue-341-phase2-measurements.json](issue-341-phase2-measurements.json)。
+
+| 対象 | 前回 → 今回 | 確認方法 |
+| --- | --- | --- |
+| マイページのbackend API総数 | 11 → 10 | Chromium + mock backend |
+| マイページの通知API | 2 → 1 | 同上 |
+| クラス状況のSQL | 6 → 4 | handler mockとrepositoryのSQL経路 |
+| 競技マスタ一覧のSQL（cache hit） | 3 → 0 | repository sqlmockとSQL経路 |
+| 競技マスタ一覧のSQL（cache miss） | 4 → 1 | 同上、初期競技登録済みの場合 |
+
+マイページは最初の変更前13回から10回になった。得点一覧5回、クラス情報6回も維持。
+Dashboardトップでも大会APIは1回になり、プロフィール設定済みならクラス一覧APIを呼ばない。
+Dashboardトップの総数は8回だったが、変更前の同条件計測がないため削減率は示さない。
+
+クラス状況のSQL数は通常競技チームと割り当てチームがある場合で、認証・大会取得を除く。
+`?view=summary` をマイページとクラス情報に指定し、割り当てチームとチーム所属学生の取得を省略。
+学生一覧取得も `COUNT(*)` に替え、氏名・メール・割り当てを含む `members` は返さない。
+handlerのテストで省略対象のrepositoryを呼ばず、人数・進捗を返すことを確認した。
+メンバー情報が必要なDashboardトップは従来の取得を続ける。
+
+競技マスタ一覧は、cache missの一覧取得で初期競技の不足も判断する。
+競技作成・名称変更・テスト大会restoreで無効化し、5秒TTLとDB別の世代を使う。
+初期競技作成中のcold readは直列化するが、更新前後の世代で結果を共有しない。
+
+通知はSSRで50件を取得してサイドバーにIDだけを共有し、マイページ表示は従来どおり3件。
+browser内でユーザー別の15秒snapshotと同時取得を共有する。
+Pushは強制更新し、取得中に届いた場合は完了後に追加で取得する。
+ユーザー変更・新しいSSRデータの到着後に古いレスポンスがバッジを上書きしないこともテストした。
+認証と大会取得、Dashboardの独立した取得は並列に実行する。
+
+プロセス内キャッシュはhit時にsingleflightへ入らず、世代参照にはRWMutexを使う。
+12並列・各3回のmicrobenchmarkでは次の結果だった。
+
+| cache hit | ns/opの中央値: 前 → 後 | bytes/op: 前 → 後 | allocs/op: 前 → 後 |
+| --- | ---: | ---: | ---: |
+| Active Event ID | 720.5 → 218.7 | 382 → 248 | 9 → 5 |
+| User/Role snapshot | 1379 → 1358 | 822 → 672 | 24 → 20 |
+
+Active Event IDのcache hit処理は約70%短縮。User/Roleは割り当てが減ったが、
+処理時間の差は小さく速度改善とは判断しない。いずれもJSON復元を含むcache hitのみの計測で、
+HTTP応答時間・本番p95の改善率ではない。
+
+```sh
+cd backapp
+go test ./internal/repository -run '^$' -bench BenchmarkCachedReadHits \
+  -benchmem -benchtime=200ms -count=3
+```
+
+追加変更後にバックエンド全テスト、repository/handlerのrace detector、frontend server unit tests
+76件、関連E2E 14件、npm ci済みbuilderでのproduction buildと変更ファイルlintを通過。
+E2EにはAPI回数、得点非表示、通知、競技作成・割り当て、クラスの競技割り当てを含む。
+本番p95・DBプール待機は引き続き未計測。
