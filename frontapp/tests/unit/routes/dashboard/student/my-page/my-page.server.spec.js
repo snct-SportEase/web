@@ -151,7 +151,7 @@ describe('student my-page server load', () => {
 			if (value.endsWith('/api/barcode/teams')) return Promise.resolve({ ok: true, json: () => Promise.resolve([{ id: 101, event_id: 1, sport_id: 1, sport_name: 'バスケットボール', name: '1A' }]) });
 			if (value.endsWith('/api/student/events/1/tournaments')) return Promise.resolve({ ok: true, json: () => Promise.resolve([{ id: 1, name: 'バスケットボール', data: { rounds: [{ name: '決勝' }], contestants: { c0: { players: [{ title: '1A' }] }, c1: { players: [{ title: '1B' }] } }, matches: [{ id: 1, roundIndex: 0, order: 0, matchStatus: 'completed', sides: [{ contestantId: 'c0', teamId: 101, isWinner: true, scores: [{ mainScore: 3 }] }, { contestantId: 'c1', teamId: 102, scores: [{ mainScore: 1 }] }] }] } }]) });
 			if (value.endsWith('/api/student/events/1/noon-game/session')) return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-			if (value.includes('/api/notifications?limit=3')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ notifications: [{ id: 1, title: '集合時刻変更', body: '9時集合です。' }] }) });
+			if (value.includes('/api/notifications?limit=50')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ notifications: [{ id: 1, title: '集合時刻変更', body: '9時集合です。' }] }) });
 			if (value.endsWith('/api/events/1/sports')) return Promise.resolve({ ok: true, json: () => Promise.resolve([{ sport_id: 1, sport_name: 'バスケットボール', rules_pdf_url: 'https://example.com/basketball.pdf' }]) });
 			return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
 		});
@@ -162,6 +162,7 @@ describe('student my-page server load', () => {
 		expect(result.classProgress).toHaveLength(1);
 		expect(result.matchResults[0]).toMatchObject({ result: '勝利', score: '3 - 1', opponent_name: '1B' });
 		expect(result.notifications[0].title).toBe('集合時刻変更');
+ expect(result.notificationSnapshot).toEqual([{ id: 1 }]);
 		expect(result.sportGuidelines[0]).toEqual({ id: 1, name: 'バスケットボール', url: 'https://example.com/basketball.pdf' });
 		expect(result.competitionGuidelinesUrl).toBe('https://example.com/event.pdf');
 		expect(result.surveyUrl).toBe('https://example.com/survey');

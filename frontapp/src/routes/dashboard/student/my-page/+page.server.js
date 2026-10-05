@@ -341,6 +341,7 @@ export const load = async ({ fetch, locals, request }) => {
 		classInfo: null,
 		classProgress: [],
 		notifications: [],
+ notificationSnapshot: undefined,
 		sportGuidelines: [],
 		competitionGuidelinesUrl: null,
 		surveyUrl: null,
@@ -402,7 +403,7 @@ export const load = async ({ fetch, locals, request }) => {
 				fetch(`${BACKEND_URL}/api/barcode/teams`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers }),
-				fetch(`${BACKEND_URL}/api/notifications?limit=3`, { headers }),
+				fetch(`${BACKEND_URL}/api/notifications?limit=50`, { headers }),
 				fetch(`${BACKEND_URL}/api/events/${activeEventId}/sports`, { headers })
 			]);
 		}
@@ -478,6 +479,11 @@ export const load = async ({ fetch, locals, request }) => {
 			matchResults,
 			classInfo: classPayload?.class_info ?? null,
 			classProgress: Array.isArray(classPayload?.progress) ? classPayload.progress : [],
+			notificationSnapshot: Array.isArray(notificationPayload?.notifications)
+                ? notificationPayload.notifications.map(notification => notification?.id != null
+                    ? { id: notification.id }
+                    : { title: notification?.title, created_at: notification?.created_at })
+                : undefined,
 			notifications: Array.isArray(notificationPayload?.notifications) ? notificationPayload.notifications.slice(0, 3) : [],
 			sportGuidelines,
 			competitionGuidelinesUrl: activeEvent?.competition_guidelines_pdf_url ?? null,

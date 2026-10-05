@@ -35,8 +35,8 @@
 
     isPWA = isPWAInstalled();
 
-    const refreshBadge = () => {
-      refreshNotificationBadge(user, { initializeSeen: true }).catch((error) => {
+    const refreshBadge = (force = false) => {
+      refreshNotificationBadge(user, { initializeSeen: true, force: force === true }).catch((error) => {
         console.error('[notification-badge] Failed to refresh:', error);
       });
     };
@@ -50,7 +50,7 @@
     };
     const handleServiceWorkerMessage = (event) => {
       if (event.data?.type === 'sportease:new-notification') {
-        refreshBadge();
+        refreshBadge(true);
       }
     };
 
