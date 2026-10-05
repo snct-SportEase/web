@@ -2,6 +2,7 @@ package repository
 
 import (
 	"backapp/internal/models"
+	"errors"
 	"testing"
 	"time"
 
@@ -38,6 +39,42 @@ func TestSportDefaultsCacheSkipsAllWarmQueries(t *testing.T) {
 	sports, err := repo.GetAllSportsWithDefaults(names)
 	if err != nil || len(sports) != 3 {
 		t.Fatal("new sport did not invalidate cache")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSportDefaultsPartialFailureRetriesWithoutDuplicateNames(t *testing.T) {
+	isolateAdversarialReadCache(t)
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := NewSportRepository(db)
+	names := []string{"Relay", "Tug"}
+	rows := func() *sqlmock.Rows { return sqlmock.NewRows([]string{"id", "name"}) }
+	mock.ExpectQuery("SELECT id, name FROM sports").WillReturnRows(rows())
+	mock.ExpectExec("INSERT INTO sports").WithArgs("Relay").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO sports").WithArgs("Tug").WillReturnError(errors.New("connection lost"))
+	if _, err := repo.GetAllSportsWithDefaults(names); err == nil {
+		t.Fatal("partial default creation must report its failure")
+	}
+	// The first insertion succeeded. Retry must read it, not insert it again.
+	mock.ExpectQuery("SELECT id, name FROM sports").WillReturnRows(rows().AddRow(1, "Relay"))
+	mock.ExpectExec("INSERT INTO sports").WithArgs("Tug").WillReturnResult(sqlmock.NewResult(2, 1))
+	sports, err := repo.GetAllSportsWithDefaults(names)
+	if err != nil || len(sports) != 2 {
+		t.Fatalf("partial initialization did not recover: %v, %v", sports, err)
+	}
+	// A write invalidated the retry generation; cache only the fresh full list.
+	mock.ExpectQuery("SELECT id, name FROM sports").WillReturnRows(rows().AddRow(1, "Relay").AddRow(2, "Tug"))
+	for i := 0; i < 4; i++ {
+		sports, err := repo.GetAllSportsWithDefaults(names)
+		if err != nil || len(sports) != 2 {
+			t.Fatalf("recovered snapshot: %v, %v", sports, err)
+		}
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
