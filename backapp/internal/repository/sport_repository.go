@@ -8,6 +8,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // SportRepository defines the interface for sport and event_sport related database operations.
@@ -30,7 +31,8 @@ type SportRepository interface {
 var ErrEventSportNotFound = errors.New("sport is not assigned to event")
 
 type sportRepository struct {
-	db *sql.DB
+	db         *sql.DB
+	defaultsMu sync.Mutex
 }
 
 // NewSportRepository creates a new instance of SportRepository.
@@ -62,38 +64,35 @@ func (r *sportRepository) GetAllSports() ([]*models.Sport, error) {
 // sports revision also covers board-game renames, creations and test restores.
 func (r *sportRepository) GetAllSportsWithDefaults(names []string) ([]*models.Sport, error) {
 	return cachedRead(r.db, "sports", "defaults:"+strings.Join(names, "\x00"), func() ([]*models.Sport, error) {
-		// Keep initialization singleflight independent of write revisions:
-		// creating a missing default advances the revision while loading.
-		result, err, _ := GlobalSFGroup.Do(cacheNamespace(r.db, "sport-default-init")+strings.Join(names, "\x00"), func() (any, error) {
-			sports, err := r.GetAllSports()
-			if err != nil {
-				return nil, err
-			}
-			existing := make(map[string]bool, len(sports))
-			for _, sport := range sports {
-				existing[strings.TrimSpace(sport.Name)] = true
-			}
-			for _, name := range names {
-				name = strings.TrimSpace(name)
-				if name == "" || existing[name] {
-					continue
-				}
-				sport := &models.Sport{Name: name}
-				id, err := r.CreateSport(sport)
-				if err != nil {
-					return nil, err
-				}
-				sport.ID = int(id)
-				sports = append(sports, sport)
-				existing[name] = true
-			}
-			sort.Slice(sports, func(i, j int) bool { return sports[i].ID < sports[j].ID })
-			return sports, nil
-		})
+		// Creating defaults advances the cache revision. Serialize cold reads
+		// without sharing results across revisions, so a restore cannot reuse
+		// a read started before it completed.
+		r.defaultsMu.Lock()
+		defer r.defaultsMu.Unlock()
+		sports, err := r.GetAllSports()
 		if err != nil {
 			return nil, err
 		}
-		return result.([]*models.Sport), nil
+		existing := make(map[string]bool, len(sports))
+		for _, sport := range sports {
+			existing[strings.TrimSpace(sport.Name)] = true
+		}
+		for _, name := range names {
+			name = strings.TrimSpace(name)
+			if name == "" || existing[name] {
+				continue
+			}
+			sport := &models.Sport{Name: name}
+			id, err := r.CreateSport(sport)
+			if err != nil {
+				return nil, err
+			}
+			sport.ID = int(id)
+			sports = append(sports, sport)
+			existing[name] = true
+		}
+		sort.Slice(sports, func(i, j int) bool { return sports[i].ID < sports[j].ID })
+		return sports, nil
 	})
 }
 
