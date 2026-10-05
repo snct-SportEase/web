@@ -51,6 +51,22 @@ describe('notification snapshots', () => {
   resolveFetch(response([{ id: 1 }]));
   expect(await pending).toBe(2);
  });
+ it('取得中のPush更新は完了後に一度だけ新しい通知を取得する', async () => {
+  const { refreshNotificationBadge, notificationBadgeCount } = await import('$lib/stores/notificationBadgeStore.js');
+  let resolveFirst;
+  const fetcher = vi.fn()
+   .mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; }))
+   .mockResolvedValueOnce(response([{ id: 1 }, { id: 2 }]));
+  const initial = refreshNotificationBadge(student, { fetcher });
+  const firstPush = refreshNotificationBadge(student, { fetcher, force: true });
+  const secondPush = refreshNotificationBadge(student, { fetcher, force: true });
+  resolveFirst(response([{ id: 1 }]));
+  expect(await initial).toBe(1);
+  expect(await firstPush).toBe(2);
+  expect(await secondPush).toBe(2);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(get(notificationBadgeCount)).toBe(2);
+ });
  it('TTL経過後は通知APIを再取得する', async () => {
   vi.useFakeTimers();
   const { seedNotificationSnapshot, refreshNotificationBadge } = await import('$lib/stores/notificationBadgeStore.js');

@@ -9,6 +9,7 @@ let latestNotificationIds = [];
 let latestUserKey = null;
 let snapshot = null;
 const pending = new Map();
+const forcedPending = new Map();
 let snapshotRevision = 0;
 const SNAPSHOT_TTL = 15_000;
 
@@ -26,7 +27,19 @@ async function getNotifications(user, fetcher, force) {
   if (!force && snapshot?.userKey === userKey && Date.now() - snapshot.loadedAt < SNAPSHOT_TTL) {
     return snapshot.notifications;
   }
-  if (pending.has(userKey)) return pending.get(userKey);
+  if (pending.has(userKey)) {
+    if (!force) return pending.get(userKey);
+    if (forcedPending.has(userKey)) return forcedPending.get(userKey);
+    // A Push can arrive after an existing read started. Read again once it ends.
+    const previous = pending.get(userKey);
+    const refresh = (async () => {
+      try { await previous; } catch { /* Retry even if the earlier read failed. */ }
+      return getNotifications(user, fetcher, true);
+    })();
+    forcedPending.set(userKey, refresh);
+    try { return await refresh; }
+    finally { forcedPending.delete(userKey); }
+  }
   const revision = snapshotRevision;
   const request = (async () => {
     const response = await fetcher('/api/notifications?limit=50');
