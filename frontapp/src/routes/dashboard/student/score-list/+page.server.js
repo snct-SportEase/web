@@ -2,9 +2,6 @@ import { redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 const BACKEND_URL = env.BACKEND_URL;
 
-const canViewHiddenScores = (user) =>
-	user?.roles?.some((role) => role?.name === 'admin' || role?.name === 'root') ?? false;
-
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ fetch, locals, request }) {
 	if (!locals.user) {
@@ -20,16 +17,6 @@ export async function load({ fetch, locals, request }) {
 			headers.Authorization = authHeader;
 		}
 
-		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, {
-			headers
-		});
-		if (activeEventResponse.ok) {
-			const activeEvent = await activeEventResponse.json();
-			if (activeEvent?.hide_scores && !canViewHiddenScores(locals.user)) {
-				return { scores: [], error: '得点一覧は現在非表示です。' };
-			}
-		}
-
 		const response = await fetch(`${BACKEND_URL}/api/scores/class`, {
 			headers
 		});
@@ -39,6 +26,9 @@ export async function load({ fetch, locals, request }) {
 			return { scores };
 		}
 
+        if (response.status === 403) {
+            return { scores: [], error: '得点一覧は現在非表示です。' };
+        }
 		return { scores: [] };
 	} catch (error) {
 		console.error('Error loading scores:', error);

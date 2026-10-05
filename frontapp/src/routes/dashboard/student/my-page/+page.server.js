@@ -371,11 +371,12 @@ export const load = async ({ fetch, locals, request }) => {
 			headers.Authorization = authHeader;
 		}
 
-		let activeEvent = null;
-		const activeEventResponse = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
-		if (activeEventResponse.ok) {
-			activeEvent = await activeEventResponse.json();
-		}
+        let activeEvent = locals.activeEvent;
+        if (activeEvent === undefined) {
+            const response = await fetch(`${BACKEND_URL}/api/events/active`, { headers });
+            activeEvent = response.ok ? await response.json() : null;
+        }
+
 		const activeEventId = activeEvent?.event_id ?? activeEvent?.id ?? null;
 		let scoresHidden = Boolean(activeEvent?.hide_scores && !canViewHiddenScores(user));
 		let scoreResponse = null;

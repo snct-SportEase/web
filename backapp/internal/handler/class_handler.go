@@ -432,6 +432,7 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{
+		"event_id":   activeEventID,
 		"class_id":   class.ID,
 		"class_name": class.Name,
 		"class_info": gin.H{

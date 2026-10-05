@@ -28,6 +28,13 @@ describe('student my-page server load', () => {
 		vi.clearAllMocks();
 	});
 
+ it('hookから大会を共有した場合はActive Eventを再取得しない', async () => {
+  const fetch = vi.fn(async () => ({ ok: true, json: async () => [] }));
+  await load({ fetch, request: makeRequest(), locals: { user: student, activeEvent: { event_id: 1, hide_scores: false } } });
+  expect(fetch).toHaveBeenCalledTimes(7);
+  expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/api/events/active'))).toBe(false);
+ });
+
 	it('得点非表示中の一般ユーザーには得点APIを呼ばず非表示状態を返す', async () => {
 		expect.assertions(5);
 
