@@ -51,7 +51,7 @@ func TestSportCacheInvalidatesAfterUnassignment(t *testing.T) {
 	defer db.Close()
 	repo := NewSportRepository(db)
 	columns := []string{"event", "sport", "name", "description", "pdf", "location", "template", "min", "max"}
-	mock.ExpectQuery("SELECT es.event_id").WithArgs(1).WillReturnRows(sqlmock.NewRows(columns).AddRow(1, 2, "Basketball", nil, nil, nil, nil, nil, nil))
+	mock.ExpectQuery("SELECT es.event_id").WithArgs(1).WillReturnRows(sqlmock.NewRows(columns).AddRow(1, 2, "Basketball", nil, nil, "gym1", nil, nil, nil))
 	for i := 0; i < 2; i++ {
 		sports, err := repo.GetSportsByEventID(1)
 		if err != nil || len(sports) != 1 {

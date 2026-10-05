@@ -7,6 +7,6 @@ export function load({ locals, url }) {
   return {
     user: locals.user,
     activeEvent: normalizeActiveEvent(locals.activeEvent),
-    activeEventAvailable: locals.activeEvent !== null
+    activeEventAvailable: locals.activeEvent != null
   };
 }

@@ -93,8 +93,8 @@
 
 		try {
 			const eventData = await activeEventStore.init();
-			activeEventId = eventData?.id ?? eventData?.id ?? null;
-			activeEventName = eventData?.event_name ?? eventData?.name ?? '';
+			activeEventId = eventData?.id ?? null;
+			activeEventName = eventData?.name ?? '';
 
 			if (!activeEventId) {
 				sports = [];
