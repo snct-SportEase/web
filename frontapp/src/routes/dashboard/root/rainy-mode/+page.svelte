@@ -53,7 +53,7 @@
       isRainyMode = result.is_rainy_mode;
       
       // アクティブなイベント情報を再取得して更新
-      const active = await activeEvent.init();
+      const active = await activeEvent.init({ force: true });
       if (active) {
         currentEvent = active;
         isRainyMode = active.is_rainy_mode || false;

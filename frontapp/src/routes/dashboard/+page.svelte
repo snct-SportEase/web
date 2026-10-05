@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import ProfileSetupModal from '$lib/components/ProfileSetupModal.svelte';
@@ -33,13 +34,12 @@
     loadShortcutPreferences();
 
     try {
-      const response = await fetch('/api/events/active');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.event_id) {
+      const data = await activeEventStore.init();
+      if (data) {
+        if (data.id) {
           activeEvent = {
-            id: data.event_id,
-            name: data.event_name,
+            id: data.id,
+            name: data.name,
             survey_url: data.survey_url,
             is_survey_published: data.is_survey_published
           };
@@ -47,7 +47,7 @@
             competitionGuidelinesUrl = data.competition_guidelines_pdf_url;
           }
           if (isStudent) {
-            await fetchNoonGameInfo(data.event_id);
+            await fetchNoonGameInfo(data.id);
           }
         }
       }

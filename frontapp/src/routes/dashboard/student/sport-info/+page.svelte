@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import { error } from '@sveltejs/kit';
 
@@ -7,14 +8,8 @@
   onMount(async () => {
     try {
       // Fetch the active event
-      const eventRes = await fetch(`/api/events/active`, { credentials: 'include' });
-      if (!eventRes.ok) {
-        const errorBody = await eventRes.text();
-        console.error(`Failed to load active event: ${eventRes.status} ${errorBody}`);
-        throw error(eventRes.status, 'Failed to load active event');
-      }
-      const eventData = await eventRes.json();
-      const activeEventId = eventData.event_id;
+      const eventData = await activeEventStore.init();
+      const activeEventId = eventData?.id;
 
       if (!activeEventId) {
         eventSports = [];

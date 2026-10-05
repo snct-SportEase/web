@@ -3,6 +3,7 @@
   It allows admins to register and update sport details, including overview, rules PDFs, and match start times.
 -->
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
@@ -36,16 +37,13 @@
 
   onMount(async () => {
     // Fetch active event
-    const res = await fetch('/api/events/active');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.event_id) {
-        selectedEventId = data.event_id;
-        activeEventName = data.event_name;
+    const data = await activeEventStore.init();
+    if (data) {
+      if (data.id) {
+        selectedEventId = data.id;
+        activeEventName = data.name;
         isRainyMode = data.is_rainy_mode || false;
-        await fetchSports();
-        await fetchClasses();
-        await fetchTournaments(selectedEventId);
+        await Promise.all([fetchSports(), fetchClasses(), fetchTournaments(selectedEventId)]);
       }
     }
     await renderBracket();
@@ -72,10 +70,8 @@
   }
 
   async function fetchActiveEventDetails() {
-    const res = await fetch('/api/events/active');
-    if (!res.ok) return;
-    const event = await res.json();
-    isRainyMode = event.is_rainy_mode || false;
+    const event = await activeEventStore.init();
+    isRainyMode = event?.is_rainy_mode || false;
   }
 
   async function fetchClasses() {

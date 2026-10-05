@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
@@ -60,12 +61,10 @@
 
 	onMount(async () => {
 		try {
-			const eventResponse = await fetch('/api/events/active');
-			if (!eventResponse.ok) throw new Error('Failed to get active event');
-			const eventData = await eventResponse.json();
-			activeEventId = eventData.event_id;
-			activeEventStatus = eventData.status || '';
-			isRainyMode = eventData.is_rainy_mode || false;
+			const eventData = await activeEventStore.init();
+			activeEventId = eventData?.id;
+			activeEventStatus = eventData?.status || '';
+			isRainyMode = eventData?.is_rainy_mode || false;
 
 			if (activeEventId) {
 				const tournamentsResponse = await fetch(`/api/admin/events/${activeEventId}/tournaments`);

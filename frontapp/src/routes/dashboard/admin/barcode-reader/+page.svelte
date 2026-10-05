@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
 	import { onMount } from 'svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
@@ -91,14 +92,8 @@
 		errorMessage = '';
 
 		try {
-			const eventResponse = await fetch('/api/events/active', { credentials: 'include' });
-
-			if (!eventResponse.ok) {
-				throw new Error('開催中イベントの取得に失敗しました');
-			}
-
-			const eventData = await eventResponse.json();
-			activeEventId = eventData?.event_id ?? eventData?.id ?? null;
+			const eventData = await activeEventStore.init();
+			activeEventId = eventData?.id ?? eventData?.id ?? null;
 			activeEventName = eventData?.event_name ?? eventData?.name ?? '';
 
 			if (!activeEventId) {

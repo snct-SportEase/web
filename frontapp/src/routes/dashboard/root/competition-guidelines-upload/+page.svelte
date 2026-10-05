@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
@@ -20,12 +21,11 @@
   onMount(async () => {
     await fetchEvents();
     try {
-      const response = await fetch('/api/events/active');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.event_id) {
-          selectedEventId = data.event_id;
-          await Promise.all([loadEventDetails(data.event_id), fetchGuideDocuments(data.event_id)]);
+      const data = await activeEventStore.init();
+      if (data) {
+        if (data.id) {
+          selectedEventId = data.id;
+          await Promise.all([loadEventDetails(data.id), fetchGuideDocuments(data.id)]);
         }
       }
     } catch (error) {

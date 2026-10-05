@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
 
   let eventId = $state(null);
@@ -18,15 +19,11 @@
     micResult = null;
 
     try {
-      const eventRes = await fetch('/api/events/active');
-      if (!eventRes.ok) {
-        throw new Error('開催中のイベント情報の取得に失敗しました。');
-      }
-      const eventData = await eventRes.json();
-      if (!eventData?.event_id) {
+      const eventData = await activeEventStore.init();
+      if (!eventData?.id) {
         throw new Error('開催中のイベントがありません。');
       }
-      eventId = eventData.event_id;
+      eventId = eventData.id;
 
       const settingsRes = await fetch(`/api/root/events/${eventId}/mic/settings`);
       if (!settingsRes.ok) {

@@ -111,21 +111,23 @@ export async function handle({ event, resolve }) {
       return redirectResponse(event, 302, '/');
     }
 
+        // Share this request-local snapshot with all dashboard server loads.
+        event.locals.activeEvent = null;
+        let stateAvailable = false;
+        try {
+            const statusResponse = await fetch(new URL('/api/events/active', BACKEND_URL), {
+                headers: { cookie: `session_token=${sessionToken}` }
+            });
+            if (statusResponse.ok) {
+                event.locals.activeEvent = await statusResponse.json();
+                stateAvailable = true;
+            }
+        } catch {
+            stateAvailable = false;
+        }
+
 		if (isStudentOnly(event.locals.user)) {
-			let testRunState = '';
-			let stateAvailable = false;
-			try {
-				const statusResponse = await fetch(new URL('/api/events/active', BACKEND_URL), {
-					headers: { cookie: `session_token=${sessionToken}` }
-				});
-				if (statusResponse.ok) {
-					const statusPayload = await statusResponse.json();
-					testRunState = statusPayload.test_run_state ?? '';
-					stateAvailable = true;
-				}
-			} catch {
-				stateAvailable = false;
-			}
+			const testRunState = event.locals.activeEvent?.test_run_state ?? '';
 
 			const maintenanceRequired = requiresTestRunMaintenance(event.locals.user, testRunState, stateAvailable);
 			const onMaintenancePage = event.url.pathname === '/dashboard/maintenance';

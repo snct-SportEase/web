@@ -65,7 +65,7 @@
       const response = await fetch('/api/root/events/test-run/force-restore', { method: 'POST' });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || '強制復元に失敗しました');
-      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init()]);
+      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init({ force: true })]);
       alert('テスト開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');
     } catch (error) {
       alert(error.message);
@@ -81,7 +81,7 @@
       const response = await fetch('/api/root/events/test-run/discard', { method: 'POST' });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || '強制終了に失敗しました');
-      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init()]);
+      await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init({ force: true })]);
       alert('復元用スナップショットを破棄しました。現在のデータがそのまま残ります。');
     } catch (error) {
       alert(error.message);
@@ -211,7 +211,7 @@
       }
 
       await Promise.all([fetchEvents(), fetchTestRunStatus()]);
-      await activeEvent.init();
+      await activeEvent.init({ force: true });
       closeModal();
       if (endingTestRun) {
         alert('テスト中のDB変更と画像・PDFを削除し、開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');

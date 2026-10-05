@@ -1,4 +1,5 @@
 <script>
+  import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
 	import { onMount, onDestroy } from 'svelte';
 	import Chart from 'chart.js/auto';
 
@@ -22,7 +23,7 @@
 				fetchJson('/api/admin/statistics/participation', { headers }),
 				fetchJson('/api/admin/statistics/scores', { headers }),
 				fetchJson('/api/admin/statistics/progress', { headers }),
-				fetchJson('/api/events/active', { headers })
+				activeEventStore.init()
 			]);
 
 			if (attendance.status === 'fulfilled') {
