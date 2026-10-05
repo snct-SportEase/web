@@ -452,15 +452,21 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"event_id":                       event.ID,
-		"event_name":                     event.Name,
-		"status":                         event.Status,
-		"is_rainy_mode":                  event.IsRainyMode,
-		"competition_guidelines_pdf_url": event.CompetitionGuidelinesPdfUrl,
-		"survey_url":                     event.SurveyUrl,
-		"is_survey_published":            event.IsSurveyPublished,
-		"hide_scores":                    event.HideScores,
-		"test_run_state":                 testRunState,
+		"event_id":                         event.ID,
+		"event_name":                       event.Name,
+		"year":                             event.Year,
+		"season":                           event.Season,
+		"start_date":                       event.Start_date,
+		"end_date":                         event.End_date,
+		"is_mic_voting_enabled":            event.IsMICVotingEnabled,
+		"duplicate_registration_threshold": event.DuplicateRegistrationThreshold,
+		"status":                           event.Status,
+		"is_rainy_mode":                    event.IsRainyMode,
+		"competition_guidelines_pdf_url":   event.CompetitionGuidelinesPdfUrl,
+		"survey_url":                       event.SurveyUrl,
+		"is_survey_published":              event.IsSurveyPublished,
+		"hide_scores":                      event.HideScores,
+		"test_run_state":                   testRunState,
 	})
 }
 

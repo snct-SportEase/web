@@ -1,51 +1,49 @@
 import { writable, get, derived } from 'svelte/store';
+import { normalizeActiveEvent } from '$lib/utils/activeEvent.js';
 
 // activeEvent store holds the active event object or null
 const { subscribe, set } = writable(null);
+let pending = null;
+let loaded = false;
+let loadedAt = 0;
+let revision = 0;
 
 export const activeEvent = {
     subscribe,
     // internal setter
-    _set: set,
-    // initialize store by fetching current active event from backend
-    init: async () => {
-        try {
-            const fetchOpts = { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' } };
-            const res = await fetch('/api/events/active', fetchOpts);
-            if (!res.ok) {
-                console.warn('Failed to fetch active event:', res.status);
-                set(null);
-                return null;
-            }
-            const data = await res.json();
-            // Expecting { event_id: <id> } from backend; fetch full event if id present
-            if (data && data.event_id) {
-                const evRes = await fetch(`/api/events`, fetchOpts);
-                if (evRes.ok) {
-                    const events = await evRes.json();
-                    const active = events.find(e => e.id === data.event_id) || null;
-                    set(active);
-                    return active;
-                }
-				const active = {
-					id: data.event_id,
-					name: data.event_name,
-					status: data.status,
-					is_rainy_mode: data.is_rainy_mode || false,
-					competition_guidelines_pdf_url: data.competition_guidelines_pdf_url,
-					hide_scores: data.hide_scores || false,
-					test_run_state: data.test_run_state || '',
-				};
-				set(active);
-				return active;
-            }
-            set(null);
-            return null;
-        } catch (err) {
-            console.error('Error initializing activeEvent:', err);
-            set(null);
-            return null;
+    _set: (event) => activeEvent.seed(event),
+    // Seed only in the browser; server loaders must keep data request-local.
+    seed: (event) => {
+        revision += 1;
+        set(event);
+        loaded = true;
+        loadedAt = Date.now();
+    },
+    init: ({ force = false } = {}) => {
+        if (pending) return pending;
+        if (!force && loaded && Date.now() - loadedAt < 15_000) {
+            return Promise.resolve(get({ subscribe }));
         }
+        const requestRevision = revision;
+        pending = (async () => {
+            try {
+                const res = await fetch('/api/events/active');
+                if (!res.ok) throw new Error(`Failed to fetch active event: ${res.status}`);
+                const event = normalizeActiveEvent(await res.json());
+                if (requestRevision === revision) activeEvent.seed(event);
+                return get({ subscribe });
+            } catch (err) {
+                console.error('Error initializing activeEvent:', err);
+                if (requestRevision === revision) {
+                    set(null);
+                    loaded = false;
+                }
+                return get({ subscribe });
+            } finally {
+                pending = null;
+            }
+        })();
+        return pending;
     },
     // set active event by passing full event object
     setActiveEvent: async (eventObj) => {
@@ -59,15 +57,16 @@ export const activeEvent = {
                 if (!res.ok) {
                     throw new Error('Failed to set active event on server');
                 }
-                set(eventObj);
+                activeEvent.seed(eventObj);
             } else {
                 // clear
-                await fetch('/api/root/events/active', {
+                const res = await fetch('/api/root/events/active', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ event_id: null }),
                 });
-                set(null);
+                if (!res.ok) throw new Error('Failed to clear active event on server');
+                activeEvent.seed(null);
             }
         } catch (err) {
             console.error('Failed to persist activeEvent to backend:', err);
