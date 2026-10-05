@@ -27,6 +27,12 @@ func invalidateReads(db *sql.DB, names ...string) {
 	}
 }
 
+func readRevision(db *sql.DB, namespace string) uint64 {
+	readCacheState.Lock()
+	defer readCacheState.Unlock()
+	return readCacheState.revisions[cacheNamespace(db, namespace)]
+}
+
 // JSON snapshots give each caller its own pointers and slices. Errors are never
 // cached. Old revision entries expire naturally, without a global cache flush.
 func cachedRead[T any](db *sql.DB, namespace, key string, load func() (T, error)) (T, error) {
@@ -34,9 +40,7 @@ func cachedRead[T any](db *sql.DB, namespace, key string, load func() (T, error)
 		return load()
 	}
 	ns := cacheNamespace(db, namespace)
-	readCacheState.Lock()
-	revision := readCacheState.revisions[ns]
-	readCacheState.Unlock()
+	revision := readRevision(db, namespace)
 	cacheKey := fmt.Sprintf("%s:%d:%s", ns, revision, key)
 	result, err, _ := GlobalSFGroup.Do(cacheKey, func() (any, error) {
 		if data, ok := GlobalCache.Get(cacheKey); ok {
