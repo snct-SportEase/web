@@ -11,6 +11,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClassRepository_CreateClasses(t *testing.T) {
@@ -258,4 +259,16 @@ func TestClassRepository_GetClassMembers(t *testing.T) {
 		assert.Nil(t, users)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+}
+
+func TestClassRepository_CountClassMembers(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	repo := repository.NewClassRepository(db)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM users WHERE class_id = ?")).WithArgs(10).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(40))
+	count, err := repo.CountClassMembers(10)
+	require.NoError(t, err)
+	assert.Equal(t, 40, count)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

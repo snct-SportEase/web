@@ -5,7 +5,7 @@ describe('class-info load', () => {
  it('class-progressの大会IDで昼競技を取得し、大会APIを再取得しない', async () => {
   const fetch = vi.fn(async (url) => ({
    ok: true,
-   json: async () => String(url).endsWith('/class-progress')
+   json: async () => String(url).endsWith('/class-progress?view=summary')
     ? { event_id: 7, class_id: 1, class_name: '1A', progress: [] }
     : { session: { name: '昼競技' }, matches: [] }
   }));

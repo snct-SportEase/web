@@ -86,6 +86,11 @@ func (m *MockClassRepository) UpdateClassRanks(eventID int) error {
 	return args.Error(0)
 }
 
+func (m *MockClassRepository) CountClassMembers(classID int) (int, error) {
+	args := m.Called(classID)
+	return args.Int(0), args.Error(1)
+}
+
 func (m *MockClassRepository) GetClassMembers(classID int) ([]*models.User, error) {
 	args := m.Called(classID)
 	if args.Get(0) == nil {

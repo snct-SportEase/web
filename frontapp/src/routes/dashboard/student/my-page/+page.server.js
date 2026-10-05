@@ -398,7 +398,7 @@ export const load = async ({ fetch, locals, request }) => {
 				sportsResponse
 			] = await Promise.all([
 				scoresHidden ? Promise.resolve(null) : fetch(`${BACKEND_URL}/api/scores/class`, { headers }),
-				fetch(`${BACKEND_URL}/api/student/class-progress`, { headers }),
+				fetch(`${BACKEND_URL}/api/student/class-progress?view=summary`, { headers }),
 				fetch(`${BACKEND_URL}/api/barcode/teams`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/tournaments`, { headers }),
 				fetch(`${BACKEND_URL}/api/student/events/${activeEventId}/noon-game/session`, { headers }),

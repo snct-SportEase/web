@@ -139,7 +139,7 @@ export async function load({ fetch, request, locals }) {
 	const headers = createHeaders(request);
 
 	try {
-		const response = await fetch(`${BACKEND_URL}/api/student/class-progress`, {
+		const response = await fetch(`${BACKEND_URL}/api/student/class-progress?view=summary`, {
 			headers
 		});
 

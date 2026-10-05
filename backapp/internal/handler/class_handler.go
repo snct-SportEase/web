@@ -328,33 +328,42 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return
 	}
 
+	summary := c.Query("view") == "summary"
 	var teams []*models.TeamWithSport
 	var assignmentTeams []*models.TeamWithSport
 	var members []*models.User
+	var actualStudentCount int
 	var g errgroup.Group
-	// 3つのDB読み取りは互いに依存しないため、待ち時間を重ねる。
 	g.Go(func() error {
 		var err error
 		teams, err = h.teamRepo.GetTeamsByClassID(class.ID, activeEventID)
 		return err
 	})
-	g.Go(func() error {
-		var err error
-		assignmentTeams, err = h.teamRepo.GetAssignmentTeamsByClassID(class.ID, activeEventID)
-		return err
-	})
-	g.Go(func() error {
-		var err error
-		members, err = h.classRepo.GetClassMembers(class.ID)
-		return err
-	})
+	if summary {
+		g.Go(func() error {
+			var err error
+			actualStudentCount, err = h.classRepo.CountClassMembers(class.ID)
+			return err
+		})
+	} else {
+		g.Go(func() error {
+			var err error
+			assignmentTeams, err = h.teamRepo.GetAssignmentTeamsByClassID(class.ID, activeEventID)
+			return err
+		})
+		g.Go(func() error {
+			var err error
+			members, err = h.classRepo.GetClassMembers(class.ID)
+			return err
+		})
+	}
 	if err := g.Wait(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get class progress data"})
 		return
 	}
-
-	// 実際のクラスメンバー数を取得
-	actualStudentCount := len(members)
+	if !summary {
+		actualStudentCount = len(members)
+	}
 
 	memberLookup := make(map[string]*models.ClassMemberView)
 	memberList := make([]*models.ClassMemberView, 0, len(members))
@@ -380,35 +389,38 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return
 	}
 
-	assignmentTeamIDs := make([]int, 0, len(assignmentTeams))
-	for _, team := range assignmentTeams {
-		assignmentTeamIDs = append(assignmentTeamIDs, team.ID)
-	}
-
-	teamMembersByTeamID, err := h.teamRepo.GetTeamMembersByTeamIDs(assignmentTeamIDs)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
-		return
-	}
-
-	for _, team := range assignmentTeams {
-		for _, tm := range teamMembersByTeamID[team.ID] {
-			view, exists := memberLookup[tm.ID]
-			if !exists {
-				view = &models.ClassMemberView{
-					ID:          tm.ID,
-					Email:       tm.Email,
-					DisplayName: tm.DisplayName,
-					Assignments: []models.ClassMemberAssignment{},
-				}
-				memberLookup[tm.ID] = view
-				memberList = append(memberList, view)
-			}
-			view.Assignments = append(view.Assignments, models.ClassMemberAssignment{
-				SportName: team.SportName,
-				TeamName:  team.Name,
-			})
+	if !summary {
+		assignmentTeamIDs := make([]int, 0, len(assignmentTeams))
+		for _, team := range assignmentTeams {
+			assignmentTeamIDs = append(assignmentTeamIDs, team.ID)
 		}
+
+		teamMembersByTeamID, err := h.teamRepo.GetTeamMembersByTeamIDs(assignmentTeamIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
+			return
+		}
+
+		for _, team := range assignmentTeams {
+			for _, tm := range teamMembersByTeamID[team.ID] {
+				view, exists := memberLookup[tm.ID]
+				if !exists {
+					view = &models.ClassMemberView{
+						ID:          tm.ID,
+						Email:       tm.Email,
+						DisplayName: tm.DisplayName,
+						Assignments: []models.ClassMemberAssignment{},
+					}
+					memberLookup[tm.ID] = view
+					memberList = append(memberList, view)
+				}
+				view.Assignments = append(view.Assignments, models.ClassMemberAssignment{
+					SportName: team.SportName,
+					TeamName:  team.Name,
+				})
+			}
+		}
+
 	}
 
 	var progress []models.ClassProgress
@@ -431,7 +443,7 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 		return left < right
 	})
 
-	c.JSON(http.StatusOK, gin.H{
+	payload := gin.H{
 		"event_id":   activeEventID,
 		"class_id":   class.ID,
 		"class_name": class.Name,
@@ -440,9 +452,12 @@ func (h *ClassHandler) GetClassProgress(c *gin.Context) {
 			"student_count": actualStudentCount,
 			"attend_count":  class.AttendCount,
 		},
-		"members":  memberList,
 		"progress": progress,
-	})
+	}
+	if !summary {
+		payload["members"] = memberList
+	}
+	c.JSON(http.StatusOK, payload)
 }
 
 func buildClassProgress(team *models.TeamWithSport, matches []*models.MatchDetail) models.ClassProgress {
