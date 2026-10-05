@@ -71,6 +71,7 @@ async function proxyToBackend(event) {
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
+  const startedAt = performance.now();
   if (shouldProxyToBackend(event.url.pathname)) {
     return proxyToBackend(event);
   }
@@ -147,5 +148,9 @@ export async function handle({ event, resolve }) {
     }
   }
 
-  return resolve(event);
+  const response = await resolve(event);
+  if (event.url.pathname.startsWith('/dashboard')) {
+    response.headers.append('Server-Timing', `ssr;dur=${(performance.now() - startedAt).toFixed(2)}`);
+  }
+  return response;
 }
