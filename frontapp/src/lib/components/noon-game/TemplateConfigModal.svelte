@@ -97,7 +97,7 @@
                 <div class="border rounded-lg p-4 space-y-4 bg-blue-50">
                   <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">点数設定</h3>
                   <p class="text-sm text-gray-600">Aブロック、Bブロック、総合順位の点数を設定します。</p>
-                  
+
                   <div class="space-y-4">
                     <div>
                       <h4 class="text-md font-semibold text-gray-700 mb-2">Aブロック</h4>
@@ -112,7 +112,7 @@
                         {/each}
                       </div>
                     </div>
-                    
+
                     <div>
                       <h4 class="text-md font-semibold text-gray-700 mb-2">Bブロック</h4>
                       <div class="grid grid-cols-6 gap-2">
@@ -126,7 +126,7 @@
                         {/each}
                       </div>
                     </div>
-                    
+
                     <div>
                       <h4 class="text-md font-semibold text-gray-700 mb-2">総合順位</h4>
                       <div class="grid grid-cols-6 gap-2">
@@ -230,7 +230,7 @@
                   </button>
                 </div>
                 <p class="text-sm text-gray-600">各グループの名前と所属クラスを設定します。デフォルト設定として保存することもできます。</p>
-                
+
                 <div class="space-y-3">
                   {#each templateConfigForm.groups as group, index (index)}
                     <div class="border rounded p-3 bg-white">
