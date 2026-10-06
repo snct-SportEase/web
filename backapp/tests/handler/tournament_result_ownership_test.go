@@ -60,7 +60,10 @@ func TestTournamentHandler_UpdateMatchStartTimes(t *testing.T) {
 
 	t.Run("updates the regular start time", func(t *testing.T) {
 		tournamentRepo := new(MockTournamentRepository)
-		h := handler.NewTournamentHandler(tournamentRepo, nil, nil, nil, nil, nil)
+		eventRepo := new(MockEventRepository)
+		h := handler.NewTournamentHandler(tournamentRepo, nil, nil, nil, eventRepo, nil)
+		eventRepo.On("GetActiveEvent").Return(8, nil).Once()
+		tournamentRepo.On("GetEventIDByMatchID", 42).Return(8, nil).Once()
 		tournamentRepo.On("UpdateMatchStartTime", 42, "2025-04-01 09:30:00").Return(nil).Once()
 
 		w := httptest.NewRecorder()
@@ -71,12 +74,16 @@ func TestTournamentHandler_UpdateMatchStartTimes(t *testing.T) {
 		h.UpdateMatchStartTimeHandler(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+		eventRepo.AssertExpectations(t)
 		tournamentRepo.AssertExpectations(t)
 	})
 
 	t.Run("updates the rainy-mode start time", func(t *testing.T) {
 		tournamentRepo := new(MockTournamentRepository)
-		h := handler.NewTournamentHandler(tournamentRepo, nil, nil, nil, nil, nil)
+		eventRepo := new(MockEventRepository)
+		h := handler.NewTournamentHandler(tournamentRepo, nil, nil, nil, eventRepo, nil)
+		eventRepo.On("GetActiveEvent").Return(8, nil).Once()
+		tournamentRepo.On("GetEventIDByMatchID", 42).Return(8, nil).Once()
 		tournamentRepo.On("UpdateMatchRainyModeStartTime", 42, "2025-04-01 11:00:00").Return(nil).Once()
 
 		w := httptest.NewRecorder()
@@ -87,6 +94,49 @@ func TestTournamentHandler_UpdateMatchStartTimes(t *testing.T) {
 		h.UpdateMatchRainyModeStartTimeHandler(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+		eventRepo.AssertExpectations(t)
+		tournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("rejects a regular start time update for a match from another event", func(t *testing.T) {
+		tournamentRepo := new(MockTournamentRepository)
+		eventRepo := new(MockEventRepository)
+		h := handler.NewTournamentHandler(tournamentRepo, nil, nil, nil, eventRepo, nil)
+		eventRepo.On("GetActiveEvent").Return(8, nil).Once()
+		tournamentRepo.On("GetEventIDByMatchID", 42).Return(7, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "match_id", Value: "42"}}
+		c.Request = httptest.NewRequest(http.MethodPut, "/api/admin/matches/42/start-time", bytes.NewBufferString(`{"start_time":"2025-04-01 09:30:00"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.UpdateMatchStartTimeHandler(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Contains(t, w.Body.String(), "Match does not belong to the active event")
+		tournamentRepo.AssertNotCalled(t, "UpdateMatchStartTime", mock.Anything, mock.Anything)
+		eventRepo.AssertExpectations(t)
+		tournamentRepo.AssertExpectations(t)
+	})
+
+	t.Run("rejects a rainy-mode start time update for a match from another event", func(t *testing.T) {
+		tournamentRepo := new(MockTournamentRepository)
+		eventRepo := new(MockEventRepository)
+		h := handler.NewTournamentHandler(tournamentRepo, nil, nil, nil, eventRepo, nil)
+		eventRepo.On("GetActiveEvent").Return(8, nil).Once()
+		tournamentRepo.On("GetEventIDByMatchID", 42).Return(7, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "match_id", Value: "42"}}
+		c.Request = httptest.NewRequest(http.MethodPut, "/api/admin/matches/42/rainy-mode-start-time", bytes.NewBufferString(`{"rainy_mode_start_time":"2025-04-01 11:00:00"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		h.UpdateMatchRainyModeStartTimeHandler(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Contains(t, w.Body.String(), "Match does not belong to the active event")
+		tournamentRepo.AssertNotCalled(t, "UpdateMatchRainyModeStartTime", mock.Anything, mock.Anything)
+		eventRepo.AssertExpectations(t)
 		tournamentRepo.AssertExpectations(t)
 	})
 
