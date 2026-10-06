@@ -16,10 +16,37 @@ type UpdateMatchStartTimeRequest struct {
 	StartTime string `json:"start_time"`
 }
 
+func (h *TournamentHandler) requireMatchInActiveEvent(c *gin.Context, matchID int) bool {
+	activeEventID, err := h.eventRepo.GetActiveEvent()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get active event"})
+		return false
+	}
+	if activeEventID == 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No active event found"})
+		return false
+	}
+
+	matchEventID, err := h.tournRepo.GetEventIDByMatchID(matchID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
+		return false
+	}
+	if matchEventID != activeEventID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Match does not belong to the active event"})
+		return false
+	}
+
+	return true
+}
+
 func (h *TournamentHandler) UpdateMatchStartTimeHandler(c *gin.Context) {
 	matchID, err := strconv.Atoi(c.Param("match_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
+		return
+	}
+	if !h.requireMatchInActiveEvent(c, matchID) {
 		return
 	}
 
@@ -45,6 +72,9 @@ func (h *TournamentHandler) UpdateMatchRainyModeStartTimeHandler(c *gin.Context)
 	matchID, err := strconv.Atoi(c.Param("match_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid match ID"})
+		return
+	}
+	if !h.requireMatchInActiveEvent(c, matchID) {
 		return
 	}
 
