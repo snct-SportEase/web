@@ -120,6 +120,26 @@
   );
 
   let classMembers = $derived(data.members ?? []);
+  let selectedSportName = $state('');
+
+  let sportNames = $derived(
+    [...new Set(
+      classMembers.flatMap(member =>
+        (member.assignments ?? []).map(assignment => assignment.sport_name)
+      )
+    )].sort()
+  );
+
+  let filteredMembers = $derived(
+    selectedSportName === ''
+      ? classMembers
+      : classMembers.filter(member =>
+          (member.assignments ?? []).some(
+            assignment => assignment.sport_name === selectedSportName
+          )
+        )
+  );
+
   let progressEntries = $derived(data.progress ?? []);
   let classInfo = $derived(data.classInfo);
 
@@ -557,8 +577,26 @@
       <div class="grid gap-6 lg:grid-cols-2">
         <div class="space-y-3 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           <h3 class="text-lg font-semibold text-gray-800">メンバー一覧</h3>
-          {#if classMembers.length === 0}
-            <p class="text-sm text-gray-600">クラスメンバーがまだ登録されていません。</p>
+          <label class="block text-sm text-gray-700">
+            競技
+            <select
+              bind:value={selectedSportName}
+              class="mt-1 block w-full rounded-md border border-gray-300 p-2"
+            >
+              <option value="">すべての競技</option>
+              {#each sportNames as name (name)}
+                <option value={name}>{name}</option>
+              {/each}
+            </select>
+          </label>
+
+          <p class="text-sm text-gray-600">{filteredMembers.length} 名</p>
+          {#if filteredMembers.length === 0}
+            <p class="text-sm text-gray-600">
+              {selectedSportName
+                ? 'この競技に登録されているメンバーはいません。'
+                : 'クラスメンバーがまだ登録されていません。'}
+            </p>
           {:else}
             <DataTable>
               {#snippet header()}
@@ -568,7 +606,7 @@
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">担当競技</th>
                   </tr>
               {/snippet}
-                  {#each classMembers as member (member.id)}
+                  {#each filteredMembers as member (member.id)}
                     <tr class="hover:bg-gray-50">
                       <td class="px-4 py-3 font-medium text-gray-900">{memberDisplayName(member)}</td>
                       <td class="px-4 py-3 text-gray-700">{member.email}</td>
