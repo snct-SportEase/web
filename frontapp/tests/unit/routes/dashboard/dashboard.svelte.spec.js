@@ -27,7 +27,7 @@ const studentUser = {
 	roles: [{ name: 'student' }]
 };
 
-function renderDashboard(user = rootUser, eventSnapshot = null) {
+function renderDashboard(user = rootUser, eventSnapshot = null, dataOverrides = {}) {
 	// Rendering Page alone omits Layout's SSR snapshot initialization.
 	// Supply it for every case, including an explicit absence of an event.
 	activeEvent.seed(eventSnapshot);
@@ -42,13 +42,14 @@ function renderDashboard(user = rootUser, eventSnapshot = null) {
 				className: null,
 				classInfo: null,
 				members: [],
-				progress: []
+				progress: [],
+				...dataOverrides
 			}
 		}
 	});
 }
 
-describe('Dashboard shortcuts', () => {
+describe('Dashboard', () => {
 	let fetchMock;
 
 	beforeEach(() => {
@@ -184,4 +185,71 @@ describe('Dashboard shortcuts', () => {
 		expect(fetchMock).toHaveBeenCalledWith('/api/student/events/1/noon-game/sessions/10');
 		expect(fetchMock).not.toHaveBeenCalledWith('/api/events/active');
 	});
+
+	describe('競技別メンバー一覧', () => {
+		const members = [
+			{ id: 'soccer', display_name: '山田 太郎', email: 'yamada@example.test', assignments: [{ sport_name: 'サッカー', team_name: '3A_サッカー' }] },
+			{ id: 'basketball', display_name: '佐藤 花子', email: 'sato@example.test', assignments: [{ sport_name: 'バスケットボール', team_name: '3A_バスケットボール' }] },
+			{ id: 'both', display_name: '鈴木 一郎', email: 'suzuki@example.test', assignments: [{ sport_name: 'サッカー', team_name: '3A_サッカー' }, { sport_name: 'バスケットボール', team_name: '3A_バスケットボール' }] },
+			{ id: 'unassigned', display_name: '田中 美咲', email: 'tanaka@example.test' }
+		];
+
+		function renderRoster(roster = members) {
+			return renderDashboard(studentUser, null, { isClassMember: true, members: roster });
+		}
+
+		it('初期状態では未割り当てのメンバーも含めて全員と人数を表示する', async () => {
+			renderRoster();
+
+			for (const member of members) {
+				await expect.element(page.getByRole('cell', { name: member.display_name, exact: true })).toBeInTheDocument();
+			}
+			await expect.element(page.getByText('4 名', { exact: true })).toBeInTheDocument();
+			await expect.element(page.getByRole('cell', { name: '未割り当て', exact: true })).toBeInTheDocument();
+			expect(page.getByRole('combobox', { name: '競技' }).element().value).toBe('');
+			expect(page.getByRole('combobox', { name: '競技' }).element().options.length).toBe(3);
+		});
+
+		it('競技を切り替えると該当者だけを表示し、複数競技の登録者も含める', async () => {
+			renderRoster();
+			const select = page.getByRole('combobox', { name: '競技' });
+
+			await select.selectOptions('サッカー');
+			await expect.element(page.getByRole('cell', { name: '山田 太郎', exact: true })).toBeInTheDocument();
+			await expect.element(page.getByRole('cell', { name: '鈴木 一郎', exact: true })).toBeInTheDocument();
+			await expect.element(page.getByRole('cell', { name: '佐藤 花子', exact: true })).not.toBeInTheDocument();
+			await expect.element(page.getByRole('cell', { name: '田中 美咲', exact: true })).not.toBeInTheDocument();
+			await expect.element(page.getByText('2 名', { exact: true })).toBeInTheDocument();
+
+			await select.selectOptions('バスケットボール');
+			await expect.element(page.getByRole('cell', { name: '佐藤 花子', exact: true })).toBeInTheDocument();
+			await expect.element(page.getByRole('cell', { name: '鈴木 一郎', exact: true })).toBeInTheDocument();
+			await expect.element(page.getByRole('cell', { name: '山田 太郎', exact: true })).not.toBeInTheDocument();
+			await expect.element(page.getByRole('cell', { name: '田中 美咲', exact: true })).not.toBeInTheDocument();
+			await expect.element(page.getByText('2 名', { exact: true })).toBeInTheDocument();
+		});
+
+		it('すべての競技に戻すと全員と人数を再表示する', async () => {
+			renderRoster();
+			const select = page.getByRole('combobox', { name: '競技' });
+			await select.selectOptions('サッカー');
+			await expect.element(page.getByRole('cell', { name: '佐藤 花子', exact: true })).not.toBeInTheDocument();
+
+			await select.selectOptions('');
+			for (const member of members) {
+				await expect.element(page.getByRole('cell', { name: member.display_name, exact: true })).toBeInTheDocument();
+			}
+			await expect.element(page.getByText('4 名', { exact: true })).toBeInTheDocument();
+		});
+
+		it('メンバーがいない場合は0人と空状態の案内を表示する', async () => {
+			renderRoster([]);
+
+			await expect.element(page.getByText('0 名', { exact: true })).toBeInTheDocument();
+			await expect.element(page.getByText('クラスメンバーがまだ登録されていません。')).toBeInTheDocument();
+			await expect.element(page.getByRole('table')).not.toBeInTheDocument();
+			expect(page.getByRole('combobox', { name: '競技' }).element().options.length).toBe(1);
+		});
+	});
+
 });
