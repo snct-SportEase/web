@@ -121,6 +121,11 @@
     window.location.reload();
   }
 
+  function handleRefresh() {
+    if (mobileHeaderMenu) mobileHeaderMenu.open = false;
+    window.location.reload();
+  }
+
   async function handleLogout() {
     try {
       await fetch('/api/auth/logout', {
@@ -166,6 +171,15 @@
           <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-xl font-bold text-gray-800 md:text-2xl">Dashboard</h1></a>
         </div>
         <div class="flex items-center pointer-events-auto">
+          <button
+            type="button"
+            onclick={handleRefresh}
+            class="mr-1 hidden rounded-md p-2 text-gray-600 hover:bg-gray-100 md:inline-flex"
+            title="ページを更新"
+            aria-label="ページを更新"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 3v5h-5M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /></svg>
+          </button>
           <div class="mr-3 hidden items-center gap-1 md:flex" aria-label="報告・提案">
             <a
               href="https://github.com/snct-SportEase/web/issues/new?template=bug_report.yml"
@@ -206,7 +220,15 @@
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.75h.01M12 12h.01M12 17.25h.01" /></svg>
             </summary>
-            <div class="absolute right-0 top-full z-40 mt-2 w-52 rounded-md border border-gray-200 bg-white py-1 shadow-lg" aria-label="報告・提案">
+            <div class="absolute right-0 top-full z-40 mt-2 w-52 rounded-md border border-gray-200 bg-white py-1 shadow-lg" aria-label="ヘッダメニュー">
+              <button
+                type="button"
+                onclick={handleRefresh}
+                class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+              >
+                ページを更新
+              </button>
+              <div class="my-1 border-t border-gray-200"></div>
               <a
                 href="https://github.com/snct-SportEase/web/issues/new?template=bug_report.yml"
                 target="_blank"

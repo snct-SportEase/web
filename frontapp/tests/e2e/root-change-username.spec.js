@@ -58,7 +58,7 @@ test.describe('ユーザー管理 (root)', () => {
     await expect(page.locator('#displayNameInput')).toBeVisible();
     const requestPromise = page.waitForRequest((request) => request.url().endsWith('/api/root/users/display-name') && request.method() === 'PUT');
     await page.locator('#displayNameInput').fill('新しい表示名');
-    await page.getByRole('button', { name: '更新' }).click();
+    await page.getByRole('button', { name: '更新', exact: true }).click();
     const req = await requestPromise;
     expect(JSON.parse(req.postData() ?? '{}')).toEqual({
       user_id: 'user-1',
