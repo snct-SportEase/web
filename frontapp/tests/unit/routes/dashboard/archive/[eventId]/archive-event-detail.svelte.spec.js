@@ -23,6 +23,7 @@ vi.mock('$app/stores', async () => {
 describe('Archive Event Detail Page', () => {
   let mockTournaments;
   let mockRelayMatches;
+  let mockTypingSession;
   let fetchMock;
 
   beforeEach(() => {
@@ -96,6 +97,7 @@ describe('Archive Event Detail Page', () => {
         }
       }
     ];
+    mockTypingSession = null;
 
     fetchMock = vi.fn((url) => {
       if (url === '/api/events') {
@@ -163,7 +165,10 @@ describe('Archive Event Detail Page', () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
-            sessions: [{ id: 3, name: '学年対抗リレー' }]
+            sessions: [
+              { id: 3, name: '学年対抗リレー' },
+              ...(mockTypingSession ? [{ id: 4, name: '競技タイピング' }] : [])
+            ]
           })
         });
       }
@@ -177,6 +182,10 @@ describe('Archive Event Detail Page', () => {
             matches: mockRelayMatches
           })
         });
+      }
+
+      if (url === '/api/student/events/1/noon-game/sessions/4') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTypingSession) });
       }
 
       return Promise.resolve({
@@ -225,6 +234,40 @@ describe('Archive Event Detail Page', () => {
     await expect.element(page.getByText('1位 1A', { exact: true }).first()).toBeInTheDocument();
     await expect.element(page.getByText('10 点')).toBeInTheDocument();
     await expect.element(page.getByText('2位 1B', { exact: true }).first()).toBeInTheDocument();
+  });
+
+  it('インポート済みのタイピング結果をアーカイブに表示し、試合の未登録表示を出さないこと', async () => {
+    mockTypingSession = {
+      session: { id: 4, name: '競技タイピング', template_key: 'typing' },
+      matches: [{ id: 401, title: '競技タイピング 第1ラウンド' }],
+      typing_import_status: 'finalized',
+      typing_results: [{ team_name: '1年生', match_1_score: 100, match_2_score: 110, match_3_score: 120, total_score: 330, rank: 1, points: 40 }]
+    };
+
+    render(Page);
+    await page.getByRole('button', { name: '昼競技結果' }).click();
+
+    await expect.element(page.getByRole('heading', { name: '競技タイピングの結果' })).toBeInTheDocument();
+    const typingRow = page.getByRole('row', { name: /1年生/ });
+    await expect.element(typingRow.getByRole('cell', { name: '330' })).toBeInTheDocument();
+    await expect.element(typingRow.getByRole('cell', { name: '1位' })).toBeInTheDocument();
+    await expect.element(typingRow.getByRole('cell', { name: '40点' })).toBeInTheDocument();
+    await expect.element(page.getByText('競技タイピング 第1ラウンド')).not.toBeInTheDocument();
+    await expect.element(page.getByText('結果はまだ登録されていません。')).not.toBeInTheDocument();
+  });
+
+  it('タイピング結果が未確定なら専用の案内を表示すること', async () => {
+    mockTypingSession = {
+      session: { id: 4, name: '競技タイピング', template_key: 'typing' },
+      matches: [],
+      typing_import_status: 'pending',
+      typing_results: []
+    };
+
+    render(Page);
+    await page.getByRole('button', { name: '昼競技結果' }).click();
+
+    await expect.element(page.getByText('結果はまだインポート・確定されていません。')).toBeInTheDocument();
   });
 
   it('スコアカードから得点内訳を表示できること', async () => {
