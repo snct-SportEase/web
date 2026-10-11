@@ -11,6 +11,7 @@
     let scores = $state([]);
     let tournaments = $state([]);
     let noonGameMatches = $state([]);
+    let typingSessions = $state([]);
     let noonGameError = $state('');
     let loading = $state(true);
     let error = $state(null);
@@ -158,7 +159,10 @@
             }
 
             const noonGameSessions = await fetchPublishedNoonGameSessions(eventId);
-            noonGameMatches = flattenNoonGameMatches(noonGameSessions);
+            noonGameMatches = flattenNoonGameMatches(
+                noonGameSessions.filter((item) => item?.session?.template_key !== 'typing')
+            );
+            typingSessions = noonGameSessions.filter((item) => item?.session?.template_key === 'typing');
         } catch (err) {
             error = err.message;
         } finally {
@@ -447,11 +451,30 @@
                 <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {noonGameError}
                 </p>
-            {:else if noonGameMatches.length === 0}
+            {:else if noonGameMatches.length === 0 && typingSessions.length === 0}
                 <p class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
                     昼競技結果データが見つかりませんでした。
                 </p>
             {:else}
+                {#each typingSessions as typingSession (typingSession.session.id)}
+                    <section class="mb-4 rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
+                        <h3 class="text-lg font-semibold text-gray-900">{typingSession.session.name}の結果</h3>
+                        {#if typingSession.typing_results?.length}
+                            <div class="mt-4 overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">チーム</th><th class="px-3 py-2 text-right">第1試合</th><th class="px-3 py-2 text-right">第2試合</th><th class="px-3 py-2 text-right">第3試合</th><th class="px-3 py-2 text-right">合計</th><th class="px-3 py-2 text-right">順位</th><th class="px-3 py-2 text-right">大会得点</th></tr></thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        {#each typingSession.typing_results as result (result.team_name)}
+                                            <tr><td class="px-3 py-2 font-medium">{result.team_name}</td><td class="px-3 py-2 text-right">{result.match_1_score}</td><td class="px-3 py-2 text-right">{result.match_2_score}</td><td class="px-3 py-2 text-right">{result.match_3_score}</td><td class="px-3 py-2 text-right font-semibold">{result.total_score}</td><td class="px-3 py-2 text-right">{result.rank}位</td><td class="px-3 py-2 text-right font-semibold text-indigo-600">{result.points}点</td></tr>
+                                        {/each}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {:else}
+                            <p class="mt-2 text-sm text-gray-500">結果はまだインポート・確定されていません。</p>
+                        {/if}
+                    </section>
+                {/each}
                 <div class="grid gap-4 lg:grid-cols-2">
                     {#each noonGameMatches as match (match.id)}
                         <article class="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
