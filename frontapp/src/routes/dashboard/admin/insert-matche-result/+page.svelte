@@ -1,13 +1,13 @@
 <script>
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
 	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
-	import { page } from '$app/stores';
+	import { browser } from '$app/env';
+	import { page } from '$app/state';
 	import InsertMatchResultModal from '$lib/components/InsertMatchResultModal.svelte';
 	import ConfirmMatchResultModal from '$lib/components/ConfirmMatchResultModal.svelte';
 	import { canEnterEventResults } from '$lib/utils/eventStatus.js';
 
-	let { data } = $page;
+	let { data } = page;
 	let user = $derived(data.user);
 	let isRoot = $derived(user?.roles?.some(role => role.name === 'root'));
 

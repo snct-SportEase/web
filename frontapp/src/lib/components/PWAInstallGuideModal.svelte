@@ -1,5 +1,5 @@
 <script>
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { getDeviceType, getBrowserType } from '$lib/utils/pwa.js';
 
   let { isOpen = false, onClose = () => {} } = $props();

@@ -6,10 +6,8 @@ import { isPWAInstalled } from '$lib/utils/pwa.js';
 import { closePWAInstallDialog, pwaInstallDialogOpen } from '$lib/stores/pwaInstallStore.js';
 import { get } from 'svelte/store';
 
-vi.mock('$env/dynamic/public', () => ({
-	env: {
-		PUBLIC_WEBPUSH_PUBLIC_KEY: ''
-	}
+vi.mock('$app/env/public', () => ({
+	PUBLIC_WEBPUSH_PUBLIC_KEY: ''
 }));
 
 vi.mock('$lib/utils/pwa.js', () => ({

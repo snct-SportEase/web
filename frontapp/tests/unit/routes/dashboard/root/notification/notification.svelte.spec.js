@@ -3,34 +3,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from '$src/routes/dashboard/root/notification/+page.svelte';
 
-vi.mock('$app/stores', () => ({
+vi.mock('$app/state', () => ({
   page: {
-    subscribe: (callback) => {
-      callback({
-        data: {
-          notifications: [
-            {
-              id: 1,
-              title: '大会開催のお知らせ',
-              body: '春季スポーツ大会を開催します。',
-              target_roles: ['student'],
-              created_at: '2025-04-01T09:00:00Z'
-            }
-          ],
-          roles: [
-            { id: 1, name: 'student' },
-            { id: 2, name: 'admin' },
-            { id: 3, name: 'root' }
-          ],
-          subscriptionStats: {
-            target_user_count: 12,
-            subscribed_user_count: 8,
-            subscription_endpoint_count: 10
-          }
+    data: {
+      notifications: [
+        {
+          id: 1,
+          title: '大会開催のお知らせ',
+          body: '春季スポーツ大会を開催します。',
+          target_roles: ['student'],
+          created_at: '2025-04-01T09:00:00Z'
         }
-      });
-
-      return () => {};
+      ],
+      roles: [
+        { id: 1, name: 'student' },
+        { id: 2, name: 'admin' },
+        { id: 3, name: 'root' }
+      ],
+      subscriptionStats: {
+        target_user_count: 12,
+        subscribed_user_count: 8,
+        subscription_endpoint_count: 10
+          }
     }
   }
 }));

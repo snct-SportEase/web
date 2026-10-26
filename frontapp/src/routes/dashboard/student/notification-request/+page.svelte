@@ -1,11 +1,11 @@
 <script>
   import FormField from '$lib/components/FormField.svelte';
   import Button from '$lib/components/Button.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
 
-  let { data } = $page;
+  let { data } = page;
 
   let requests = $derived(data.requests ?? []);
   let activeRequest = $state(data.activeRequest);

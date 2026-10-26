@@ -14,13 +14,8 @@ const mocks = vi.hoisted(() => ({
   }
 }));
 
-vi.mock('$app/stores', () => ({
-  page: {
-    subscribe(fn) {
-      fn(mocks.pageValue);
-      return () => {};
-    }
-  }
+vi.mock('$app/state', () => ({
+  page: mocks.pageValue
 }));
 
 vi.mock('$app/navigation', () => ({

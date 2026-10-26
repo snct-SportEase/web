@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
 
   let users = $state([]);
   let searchQuery = $state('');

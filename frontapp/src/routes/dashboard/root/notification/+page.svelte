@@ -2,9 +2,9 @@
   import FormField from '$lib/components/FormField.svelte';
   import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
-  let { data } = $page;
+  let { data } = page;
   let notifications = $state(data.notifications ? [...data.notifications] : []);
   let subscriptionStats = $state(data.subscriptionStats ?? null);
 

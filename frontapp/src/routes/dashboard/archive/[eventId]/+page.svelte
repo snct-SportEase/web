@@ -2,9 +2,9 @@
     import { sportScoreItems, scoreItemValue } from '$lib/utils/sportScores.js';
     import { onMount } from 'svelte';
     import { fetchPublishedNoonGameSessions, flattenNoonGameMatches } from '$lib/utils/noonGameSessions.js';
-    import { page } from '$app/stores';
+    import { page } from '$app/state';
     
-    let eventId = $page.params.eventId;
+    let eventId = page.params.eventId;
     let activeTab = $state('scores');
     
     let eventData = $state(null);
@@ -19,7 +19,7 @@
     let syncInitialPointsMessage = $state('');
     let syncInitialPointsError = $state('');
 
-    let isRoot = $derived($page.data?.user?.roles?.some((role) => role?.name === 'root') ?? false);
+    let isRoot = $derived(page.data?.user?.roles?.some((role) => role?.name === 'root') ?? false);
     let canSyncInitialPoints = $derived(
         isRoot && eventData?.status === 'archived' && (eventData?.season === 'spring' || eventData?.season === 'autumn')
     );

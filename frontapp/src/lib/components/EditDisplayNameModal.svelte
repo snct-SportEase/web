@@ -1,5 +1,5 @@
 <script>
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { tick } from 'svelte';
 
   let { isOpen = false, currentDisplayName = '', userRoles = [], onClose = () => {}, onSave = async () => {} } = $props();

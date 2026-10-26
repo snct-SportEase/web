@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { createBackendSessionHeaders } from '$lib/server/backendSessionHeaders.js';
 const BACKEND_URL = env.BACKEND_URL;
 

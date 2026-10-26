@@ -1,6 +1,6 @@
 <script>
-  import { page } from '$app/stores';
-  import { browser } from '$app/environment';
+  import { page } from '$app/state';
+  import { browser } from '$app/env';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import EditDisplayNameModal from '$lib/components/EditDisplayNameModal.svelte';
@@ -41,7 +41,7 @@
   async function checkTestRunIsolation(force = false) {
     const event = await activeEvent.init({ force });
     const isIsolating = ['starting', 'testing', 'restoring', 'failed'].includes(event?.test_run_state) || event?.status === 'testing';
-    if (isStudentOnly && isIsolating && $page.url.pathname !== '/dashboard/maintenance') {
+    if (isStudentOnly && isIsolating && page.url.pathname !== '/dashboard/maintenance') {
       await goto('/dashboard/maintenance', { invalidateAll: true });
     }
   }
@@ -70,7 +70,7 @@
         }
       };
       document.addEventListener('pointerdown', closeMobileHeaderMenu);
-      const testRunInterval = isStudentOnly && $page.url.pathname !== '/dashboard/maintenance'
+      const testRunInterval = isStudentOnly && page.url.pathname !== '/dashboard/maintenance'
         ? window.setInterval(() => checkTestRunIsolation(true), 15_000)
         : null;
       

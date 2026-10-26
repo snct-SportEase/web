@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 const BACKEND_URL = env.BACKEND_URL;
 import { json } from '@sveltejs/kit';
 import { createBackendSessionHeaders } from '$lib/server/backendSessionHeaders.js';

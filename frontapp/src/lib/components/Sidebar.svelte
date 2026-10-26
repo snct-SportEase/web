@@ -1,8 +1,8 @@
 <script>
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
-  import { env as publicEnv } from '$env/dynamic/public';
+  import { browser } from '$app/env';
+  import * as publicEnv from '$app/env/public';
   import { notificationBadgeCount, refreshNotificationBadge } from '$lib/stores/notificationBadgeStore.js';
   import { pushSubscriptionStatus, updatePushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
   import { isPWAInstalled } from '$lib/utils/pwa.js';

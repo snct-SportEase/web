@@ -4,10 +4,8 @@ import { render } from 'vitest-browser-svelte';
 import Page from '$src/routes/dashboard/+page.svelte';
 import { activeEvent } from '$lib/stores/eventStore.js';
 
-vi.mock('$env/dynamic/public', () => ({
-	env: {
-		PUBLIC_WEBPUSH_PUBLIC_KEY: ''
-	}
+vi.mock('$app/env/public', () => ({
+	PUBLIC_WEBPUSH_PUBLIC_KEY: ''
 }));
 
 const rootUser = {
