@@ -1,5 +1,5 @@
-import { browser } from '$app/environment';
-import { env as publicEnv } from '$env/dynamic/public';
+import { browser } from '$app/env';
+import * as publicEnv from '$app/env/public';
 
 const SUPPORTED_ROLES = new Set(['student', 'admin', 'root']);
 

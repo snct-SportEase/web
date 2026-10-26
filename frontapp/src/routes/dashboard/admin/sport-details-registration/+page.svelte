@@ -5,7 +5,7 @@
 <script>
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
 
   let sports = $state([]);
   let selectedEventId = $state(null);

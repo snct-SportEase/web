@@ -5,10 +5,8 @@ import NotificationSettings from '$src/lib/components/NotificationSettings.svelt
 
 class NotificationMock {}
 
-vi.mock('$env/dynamic/public', () => ({
-	env: {
-		PUBLIC_WEBPUSH_PUBLIC_KEY: 'mock-public-key'
-	}
+vi.mock('$app/env/public', () => ({
+	PUBLIC_WEBPUSH_PUBLIC_KEY: 'mock-public-key'
 }));
 
 vi.mock('$lib/utils/push.js', () => ({

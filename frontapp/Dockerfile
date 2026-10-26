@@ -1,5 +1,5 @@
 # Stage 1: Build the SvelteKit application
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -22,13 +22,13 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 CMD ["npm", "run", "test:e2e"]
 
 # Install only the runtime dependencies. Build tooling remains in the builder.
-FROM node:20-alpine AS production-deps
+FROM node:22-alpine AS production-deps
 WORKDIR /app
 COPY package*.json .npmrc ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Stage 3: Production stage
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 
 WORKDIR /app
 

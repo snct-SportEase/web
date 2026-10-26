@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 
-vi.mock('$app/environment', () => ({ browser: true }));
+vi.mock('$app/env', () => ({ browser: true }));
 const student = { id: 'alice', roles: [{ name: 'student' }] };
 const otherStudent = { id: 'bob', roles: [{ name: 'student' }] };
 

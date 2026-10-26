@@ -3,22 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from '$src/routes/dashboard/archive/[eventId]/+page.svelte';
 
-vi.mock('$app/stores', async () => {
-  const { readable } = await import('svelte/store');
-
-  return {
-    page: readable({
-      params: {
-        eventId: '1'
-      },
-      data: {
-        user: {
-          roles: [{ name: 'root' }]
-        }
+vi.mock('$app/state', () => ({
+  page: {
+    params: {
+      eventId: '1'
+    },
+    data: {
+      user: {
+        roles: [{ name: 'root' }]
       }
-    })
-  };
-});
+    }
+  }
+}));
 
 describe('Archive Event Detail Page', () => {
   let mockTournaments;

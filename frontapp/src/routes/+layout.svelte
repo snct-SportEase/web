@@ -2,15 +2,15 @@
   import '../app.css';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import PWAInstallPromptModal from '$lib/components/PWAInstallPromptModal.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { isPWAInstalled } from '$lib/utils/pwa.js';
   import { seedNotificationSnapshot } from '$lib/stores/notificationBadgeStore.js';
 
   let { children } = $props();
-  let data = $derived($page.data);
+  let data = $derived(page.data);
   let lastReportedPWAUserId = null;
 
   if (browser) seedNotificationSnapshot(data.user, data.notificationSnapshot);

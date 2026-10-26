@@ -1,5 +1,5 @@
 <script>
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { enhance } from '$app/forms';
   import { markNotificationsSeen } from '$lib/stores/notificationBadgeStore.js';
 
@@ -16,8 +16,8 @@
     all_matches: '全ての試合'
   };
 
-  let data = $derived($page.data);
-  let form = $derived($page.form);
+  let data = $derived(page.data);
+  let form = $derived(page.form);
   let notifications = $derived(data.notifications ? [...data.notifications] : []);
   let initialSelectedFilters = $derived(data.user?.notification_filters || ['general']);
   let selectedFilters = $state([]);

@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, untrack } from 'svelte';
   import { get } from 'svelte/store';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { activeEvent } from '$lib/stores/eventStore.js';
 
   let session = $state(null);

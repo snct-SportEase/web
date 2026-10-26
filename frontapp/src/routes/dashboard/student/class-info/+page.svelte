@@ -1,7 +1,7 @@
 <script>
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
-  let data = $derived($page.data);
+  let data = $derived(page.data);
   let classInfo = $derived(data.classInfo);
   let className = $derived(data.className);
   let progressEntries = $derived(data.progress ?? []);

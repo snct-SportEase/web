@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
 
-  let { data } = $page;
+  let { data } = page;
 
   let requests = $derived(data.requests ?? []);
   let activeRequest = $state(data.activeRequest);

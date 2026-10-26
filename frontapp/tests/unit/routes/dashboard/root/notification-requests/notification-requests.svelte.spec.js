@@ -9,11 +9,10 @@ const mocks = vi.hoisted(() => ({
   invalidateAll: vi.fn(async () => {})
 }));
 
-vi.mock('$app/stores', () => ({
+vi.mock('$app/state', () => ({
   page: {
-    subscribe(fn) {
-      fn({ data: mocks.pageData });
-      return () => {};
+    get data() {
+      return mocks.pageData;
     }
   }
 }));

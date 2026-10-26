@@ -1,5 +1,5 @@
 import { sportScoreGroups } from '$lib/utils/sportScores.js';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 const BACKEND_URL = env.BACKEND_URL;
 
 const toNumber = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : 0);

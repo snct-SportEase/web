@@ -1,6 +1,6 @@
 <script>
     import { onMount, tick } from 'svelte';
-    import { browser } from '$app/environment';
+    import { browser } from '$app/env';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
     import { dndzone } from 'svelte-dnd-action';

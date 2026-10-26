@@ -1,9 +1,9 @@
 <script>
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { ensurePushSubscription, userHasPushEligibleRole } from '$lib/utils/push.js';
   import { isPWAInstalled, getDeviceType } from '$lib/utils/pwa.js';
   import { updatePushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
-  import { env as publicEnv } from '$env/dynamic/public';
+  import * as publicEnv from '$app/env/public';
   import { onMount } from 'svelte';
 
   let { user, prominent = false } = $props();
