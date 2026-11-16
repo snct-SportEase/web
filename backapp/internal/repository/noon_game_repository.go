@@ -67,6 +67,24 @@ type NoonGameRepository interface {
 
 var ErrNoonGameMatchParticipantsLocked = errors.New("result-recorded match participants cannot be changed")
 var ErrNoonGameAlreadyCheckedIn = errors.New("noon game match already checked in")
+var ErrTypingSystemAlreadyImported = errors.New("typing system result already imported")
+var ErrTypingSystemExportConflict = errors.New("typing system export_id exists with different content")
+var ErrTypingSystemActiveImportExists = errors.New("typing system import already exists for session")
+
+const lockNoonGameSessionForUpdateSQL = `SELECT id FROM noon_game_sessions WHERE id = ? FOR UPDATE`
+
+const typingSystemImportsByExportIDSQL = `
+		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
+		FROM noon_game_typing_system_imports
+		WHERE session_id = ? AND export_id = ?
+		ORDER BY requested_at DESC`
+
+const activeTypingSystemImportSQL = `
+		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
+		FROM noon_game_typing_system_imports
+		WHERE session_id = ? AND is_active = TRUE
+		ORDER BY requested_at DESC
+		LIMIT 1`
 
 type noonGameRepository struct {
 	db *sql.DB
@@ -1673,6 +1691,15 @@ func (r *noonGameRepository) ApplyTypingSystemResultImport(sessionID int, points
 	}
 	defer tx.Rollback()
 
+	// Serialize imports for this session. The handler's earlier SELECT is only a
+	// fast path; two overlapping requests must not both pass it and insert.
+	if err := lockNoonGameSessionTx(tx, sessionID); err != nil {
+		return err
+	}
+	if err := rejectDuplicateTypingImportTx(tx, sessionID, history, replace); err != nil {
+		return err
+	}
+
 	if replace {
 		if _, err := tx.Exec(`DELETE FROM noon_game_points WHERE session_id = ? AND source = ?`, sessionID, "typing_system"); err != nil {
 			return err
@@ -1710,10 +1737,54 @@ func (r *noonGameRepository) ApplyTypingSystemResultImport(sessionID int, points
 	}
 
 	if err := r.insertTypingSystemImportTx(tx, history); err != nil {
+		if isMySQLDuplicateEntryError(err) {
+			return ErrTypingSystemAlreadyImported
+		}
 		return err
 	}
 
 	return tx.Commit()
+}
+
+func lockNoonGameSessionTx(tx *sql.Tx, sessionID int) error {
+	var id int
+	err := tx.QueryRow(lockNoonGameSessionForUpdateSQL, sessionID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("noon game session not found")
+	}
+	return err
+}
+
+func rejectDuplicateTypingImportTx(tx *sql.Tx, sessionID int, history *models.NoonGameTypingSystemImportRecord, replace bool) error {
+	records, err := listTypingSystemImportsByExportID(tx, sessionID, history.ExportID)
+	if err != nil {
+		return err
+	}
+	for _, existing := range records {
+		if existing == nil {
+			continue
+		}
+		if existing.SHA256 != history.SHA256 {
+			return ErrTypingSystemExportConflict
+		}
+		if strings.EqualFold(existing.Status, "success") {
+			return ErrTypingSystemAlreadyImported
+		}
+	}
+
+	active, err := getActiveTypingSystemImport(tx, sessionID)
+	if err != nil {
+		return err
+	}
+	if active != nil && active.ExportID != history.ExportID {
+		if !replace {
+			return ErrTypingSystemActiveImportExists
+		}
+		replaced := active.ExportID
+		history.Action = "replace"
+		history.ReplacedExportID = &replaced
+	}
+	return nil
 }
 
 func (r *noonGameRepository) InsertPoints(points []*models.NoonGamePoint) error {
@@ -1757,24 +1828,20 @@ func (r *noonGameRepository) InsertPoints(points []*models.NoonGamePoint) error 
 }
 
 func (r *noonGameRepository) GetActiveTypingSystemImport(sessionID int) (*models.NoonGameTypingSystemImportRecord, error) {
-	row := r.db.QueryRow(`
-		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
-		FROM noon_game_typing_system_imports
-		WHERE session_id = ? AND is_active = TRUE
-		ORDER BY requested_at DESC
-		LIMIT 1
-	`, sessionID)
-
-	return scanTypingSystemImportRow(row)
+	return getActiveTypingSystemImport(r.db, sessionID)
 }
 
 func (r *noonGameRepository) GetTypingSystemImportsBySessionAndExportID(sessionID int, exportID string) ([]*models.NoonGameTypingSystemImportRecord, error) {
-	rows, err := r.db.Query(`
-		SELECT id, session_id, export_id, sha256, status, action, replaced_export_id, requested_by, requested_at, filename, payload_size, results, message, is_active
-		FROM noon_game_typing_system_imports
-		WHERE session_id = ? AND export_id = ?
-		ORDER BY requested_at DESC
-	`, sessionID, exportID)
+	return listTypingSystemImportsByExportID(r.db, sessionID, exportID)
+}
+
+type sqlQueryer interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func listTypingSystemImportsByExportID(q sqlQueryer, sessionID int, exportID string) ([]*models.NoonGameTypingSystemImportRecord, error) {
+	rows, err := q.Query(typingSystemImportsByExportIDSQL, sessionID, exportID)
 	if err != nil {
 		return nil, err
 	}
@@ -1793,6 +1860,10 @@ func (r *noonGameRepository) GetTypingSystemImportsBySessionAndExportID(sessionI
 	}
 
 	return out, nil
+}
+
+func getActiveTypingSystemImport(q sqlQueryer, sessionID int) (*models.NoonGameTypingSystemImportRecord, error) {
+	return scanTypingSystemImportRow(q.QueryRow(activeTypingSystemImportSQL, sessionID))
 }
 
 func (r *noonGameRepository) CreateTypingSystemImportHistory(record *models.NoonGameTypingSystemImportRecord) error {

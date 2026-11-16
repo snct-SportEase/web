@@ -12,6 +12,7 @@ import (
 
 	"backapp/internal/handler"
 	"backapp/internal/models"
+	"backapp/internal/repository"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -450,5 +451,68 @@ func TestNoonGameHandler_ImportTypingSystemResults(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		mockNoonRepo.AssertExpectations(t)
 		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success - duplicate caught inside the import transaction", func(t *testing.T) {
+		payload := buildTypingSystemImportPayload(exportID)
+
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		mockNoonRepo.On("GetSessionByID", sessionID).Return(&models.NoonGameSession{ID: sessionID, EventID: eventID}, nil).Once()
+		mockClassRepo.On("GetAllClasses", eventID).Return(buildTypingSystemImportClasses(eventID), nil).Once()
+		mockNoonRepo.On("GetTypingSystemImportsBySessionAndExportID", sessionID, exportID).Return([]*models.NoonGameTypingSystemImportRecord{}, nil).Once()
+		mockNoonRepo.On("GetActiveTypingSystemImport", sessionID).Return(nil, nil).Once()
+		mockNoonRepo.On("ApplyTypingSystemResultImport", sessionID, mock.AnythingOfType("[]*models.NoonGamePoint"), false, mock.AnythingOfType("*models.NoonGameTypingSystemImportRecord")).
+			Return(repository.ErrTypingSystemAlreadyImported).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "session_id", Value: "10"}}
+		c.Set("user", &models.User{ID: userID})
+		c.Request = buildTypingSystemImportRequest(t, payload)
+
+		h.ImportTypingSystemResults(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, "already imported", response["message"])
+		assert.Equal(t, "already_imported", response["status"])
+		mockNoonRepo.AssertNotCalled(t, "SumConfirmedPointsByEvent", mock.Anything)
+		mockNoonRepo.AssertExpectations(t)
+	})
+
+	t.Run("Conflict - active import caught inside the import transaction", func(t *testing.T) {
+		payload := buildTypingSystemImportPayload(exportID)
+
+		mockNoonRepo := new(MockNoonGameRepository)
+		mockClassRepo := new(MockClassRepository)
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewNoonGameHandler(mockNoonRepo, mockClassRepo, mockEventRepo)
+
+		mockNoonRepo.On("GetSessionByID", sessionID).Return(&models.NoonGameSession{ID: sessionID, EventID: eventID}, nil).Once()
+		mockClassRepo.On("GetAllClasses", eventID).Return(buildTypingSystemImportClasses(eventID), nil).Once()
+		mockNoonRepo.On("GetTypingSystemImportsBySessionAndExportID", sessionID, exportID).Return([]*models.NoonGameTypingSystemImportRecord{}, nil).Once()
+		mockNoonRepo.On("GetActiveTypingSystemImport", sessionID).Return(nil, nil).Once()
+		mockNoonRepo.On("ApplyTypingSystemResultImport", sessionID, mock.AnythingOfType("[]*models.NoonGamePoint"), false, mock.AnythingOfType("*models.NoonGameTypingSystemImportRecord")).
+			Return(repository.ErrTypingSystemActiveImportExists).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{gin.Param{Key: "session_id", Value: "10"}}
+		c.Set("user", &models.User{ID: userID})
+		c.Request = buildTypingSystemImportRequest(t, payload)
+
+		h.ImportTypingSystemResults(c)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var response map[string]interface{}
+		assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, "Existing import already exists for this session. Use replace=true to overwrite", response["error"])
+		mockNoonRepo.AssertNotCalled(t, "SumConfirmedPointsByEvent", mock.Anything)
+		mockNoonRepo.AssertExpectations(t)
 	})
 }
