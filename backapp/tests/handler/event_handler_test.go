@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // --- Tests ---
@@ -688,6 +689,77 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		json.Unmarshal(w.Body.Bytes(), &response)
 		assert.Nil(t, response["survey_url"])
 		assert.Equal(t, false, response["is_survey_published"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("hides preparing event from student", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(
+			mockEventRepo,
+			new(MockTournamentRepository),
+			new(MockClassRepository),
+			new(MockNotificationRepository),
+			new(MockUserRepository),
+			"",
+			"",
+		)
+
+		eventID := 9
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockEventRepo.On("GetEventByID", eventID).Return(&models.Event{
+			ID:     eventID,
+			Name:   "未発表大会",
+			Status: models.EventStatusPreparing,
+		}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+		c.Set("user", &models.User{ID: "student-1", Roles: []models.Role{{Name: "student"}}})
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Nil(t, response["event_id"])
+		assert.Nil(t, response["event_name"])
+		assert.Equal(t, "", response["test_run_state"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("allows admin to view preparing event", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(
+			mockEventRepo,
+			new(MockTournamentRepository),
+			new(MockClassRepository),
+			new(MockNotificationRepository),
+			new(MockUserRepository),
+			"",
+			"",
+		)
+
+		eventID := 9
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockEventRepo.On("GetEventByID", eventID).Return(&models.Event{
+			ID:     eventID,
+			Name:   "未発表大会",
+			Status: models.EventStatusPreparing,
+		}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+		c.Set("user", &models.User{ID: "admin-1", Roles: []models.Role{{Name: "admin"}}})
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, float64(eventID), response["event_id"])
+		assert.Equal(t, "未発表大会", response["event_name"])
 		mockEventRepo.AssertExpectations(t)
 	})
 

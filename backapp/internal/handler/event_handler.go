@@ -466,6 +466,12 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false, "test_run_state": testRunState})
 		return
 	}
+	user, _ := c.Get("user")
+	viewer, _ := user.(*models.User)
+	if !userHasAdminOrRoot(viewer) && (event.Status == models.EventStatusPreparing || event.Status == models.EventStatusTesting) {
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false, "test_run_state": ""})
+		return
+	}
 	if testRunState == "" && event.Status == models.EventStatusTesting {
 		testRunState = models.EventTestRunStateTesting
 	}

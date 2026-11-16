@@ -5,6 +5,7 @@ import (
 	"backapp/internal/push"
 	"backapp/internal/repository"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+var notificationRequestBroadcastRoles = []string{"student", "admin", "root"}
 
 type NotificationRequestHandler struct {
 	RequestRepo      repository.NotificationRequestRepository
@@ -260,15 +263,41 @@ func (h *NotificationRequestHandler) DecideRequest(c *gin.Context) {
 		return
 	}
 
-	resolverID := user.ID
-	if err := h.RequestRepo.UpdateRequestStatus(requestID, status, &resolverID); err != nil {
+	notificationID, err := h.RequestRepo.ResolveRequest(requestID, status, user.ID, notificationRequestBroadcastRoles)
+	if errors.Is(err, repository.ErrNotificationRequestAlreadyResolved) {
+		c.JSON(http.StatusConflict, gin.H{"error": "この申請はすでに処理されています"})
+		return
+	}
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ステータス更新に失敗しました"})
 		return
 	}
 
 	go h.notifyRequesterDecision(req, status, user)
+	if status == models.NotificationRequestStatusApproved {
+		go h.dispatchApprovedNotification(notificationID, req)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "処理を完了しました"})
+}
+
+func (h *NotificationRequestHandler) dispatchApprovedNotification(notificationID int64, req *models.NotificationRequest) {
+	if notificationID == 0 || req == nil || h.PushSender == nil || !h.PushSender.Enabled() {
+		return
+	}
+
+	userIDs, err := h.NotificationRepo.GetUserIDsByRoles(notificationRequestBroadcastRoles, nil)
+	if err != nil || len(userIDs) == 0 {
+		return
+	}
+
+	h.sendPushToUsers(userIDs, gin.H{
+		"title": req.Title,
+		"body":  req.Body,
+		"data": gin.H{
+			"notificationId": notificationID,
+		},
+	})
 }
 
 func (h *NotificationRequestHandler) notifyRootsOfNewRequest(requestID int, req *models.NotificationRequest) {

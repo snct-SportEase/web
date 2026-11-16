@@ -118,10 +118,10 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 		}
 
 		api.GET("/classes", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.RoleRequired("student", "admin", "root"), classHandler.GetAllClasses)
-		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), classHandler.GetClassScores)
+		api.GET("/scores/class", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.EventVisibilityRequired(eventRepo), classHandler.GetClassScores)
 
 		api.GET("/events/active", middleware.AuthMiddleware(userRepo), eventHandler.GetActiveEvent)
-		api.GET("/guide-documents", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.RoleRequired("student", "admin", "root"), guideDocumentHandler.ListGuideDocuments)
+		api.GET("/guide-documents", middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo), middleware.RoleRequired("student", "admin", "root"), middleware.EventVisibilityRequired(eventRepo), guideDocumentHandler.ListGuideDocuments)
 
 		auth := api.Group("/auth")
 		{
@@ -148,7 +148,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 			events.Use(middleware.AuthMiddleware(userRepo), middleware.TestRunIsolation(testRunRepo))
 			events.GET("", eventHandler.GetAllEvents)
 			// Get sports for a specific event
-			events.GET("/:id/sports", sportHandler.GetSportsByEventHandler)
+			events.GET("/:id/sports", middleware.EventVisibilityRequired(eventRepo), sportHandler.GetSportsByEventHandler)
 		}
 
 		// MyID barcode check-in routes accessible to authenticated users
@@ -167,6 +167,7 @@ func SetupRouter(db *sql.DB, cfg *config.Config, hubManager *websocket.HubManage
 
 			studentEvents := student.Group("/events")
 			{
+				studentEvents.Use(middleware.EventVisibilityRequired(eventRepo))
 				studentEvents.GET("/:event_id/tournaments", tournHandler.GetTournamentsByEventHandler)
 				studentEvents.GET("/:event_id/board-game-runs", boardGameHandler.ListRuns)
 				studentEvents.GET("/:event_id/noon-game/session", noonHandler.GetSession)

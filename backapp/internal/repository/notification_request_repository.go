@@ -6,9 +6,11 @@ import (
 	"errors"
 )
 
+var ErrNotificationRequestAlreadyResolved = errors.New("notification request is not pending")
+
 type NotificationRequestRepository interface {
 	CreateRequest(req *models.NotificationRequest) (int64, error)
-	UpdateRequestStatus(id int, status models.NotificationRequestStatus, resolverID *string) error
+	ResolveRequest(id int, status models.NotificationRequestStatus, resolverID string, targetRoles []string) (int64, error)
 	GetRequestByID(id int) (*models.NotificationRequest, error)
 	GetRequestsByRequester(requesterID string) ([]*models.NotificationRequest, error)
 	GetAllRequests() ([]*models.NotificationRequest, error)
@@ -37,21 +39,60 @@ func (r *notificationRequestRepository) CreateRequest(req *models.NotificationRe
 	return result.LastInsertId()
 }
 
-func (r *notificationRequestRepository) UpdateRequestStatus(id int, status models.NotificationRequestStatus, resolverID *string) error {
-	query := `
-		UPDATE notification_requests
-		SET status = ?, resolved_by = ?, resolved_at = CASE WHEN ? IS NOT NULL THEN NOW() ELSE resolved_at END
-		WHERE id = ?
-	`
-	var resolver interface{}
-	if resolverID != nil {
-		resolver = *resolverID
-	} else {
-		resolver = nil
+func (r *notificationRequestRepository) ResolveRequest(id int, status models.NotificationRequestStatus, resolverID string, targetRoles []string) (int64, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, err
 	}
-	resolvedParam := resolver
-	_, err := r.db.Exec(query, status, resolver, resolvedParam, id)
-	return err
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
+		UPDATE notification_requests
+		SET status = ?, resolved_by = ?, resolved_at = UTC_TIMESTAMP(6)
+		WHERE id = ? AND status = ?
+	`, status, resolverID, id, models.NotificationRequestStatusPending)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rowsAffected != 1 {
+		return 0, ErrNotificationRequestAlreadyResolved
+	}
+
+	var notificationID int64
+	if status == models.NotificationRequestStatusApproved {
+		result, err = tx.Exec(`
+			INSERT INTO notifications (title, body, type, created_by, event_id, sent_at)
+			SELECT title, body, 'general', ?, NULL, UTC_TIMESTAMP(6)
+			FROM notification_requests
+			WHERE id = ?
+		`, resolverID, id)
+		if err != nil {
+			return 0, err
+		}
+		notificationID, err = result.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+
+		for _, role := range targetRoles {
+			if _, err := tx.Exec(
+				"INSERT INTO notification_targets (notification_id, role_name) VALUES (?, ?)",
+				notificationID,
+				role,
+			); err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return notificationID, nil
 }
 
 func (r *notificationRequestRepository) GetRequestByID(id int) (*models.NotificationRequest, error) {
