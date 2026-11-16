@@ -2,6 +2,9 @@
   /** @type {Array<{id: number, name: string}>} */
   let { classes = [] } = $props();
 
+  // 専教は専攻科・教員枠のため、生徒の初回自己申告では選べない
+  let selectableClasses = $derived(classes.filter((cls) => cls.name !== '専教'));
+
   let isLoading = $state(false);
   let errorMessage = $state('');
 
@@ -21,7 +24,7 @@
       return;
     }
 
-    const selectedClass = classes.find(c => c.id === parseInt(classId));
+    const selectedClass = selectableClasses.find(c => c.id === parseInt(classId));
     if (!selectedClass) {
       errorMessage = '無効なクラスです。';
       return;
@@ -106,7 +109,7 @@
           <!-- クラス選択 -->
           <div>
             <label for="classId" class="block text-sm font-medium text-gray-700">クラス</label>
-            {#if classes.length === 0}
+            {#if selectableClasses.length === 0}
               <div class="w-full px-3 py-2 mt-1 text-sm text-gray-500 bg-gray-100 border border-gray-300 rounded-md">
                 クラスがまだ設定されていません。管理者に連絡してください。
               </div>
@@ -119,7 +122,7 @@
                 value={confirmData.classId}
               >
                 <option value="" disabled selected={!confirmData.classId}>クラスを選択してください</option>
-                {#each classes as cls (cls.id)}
+                {#each selectableClasses as cls (cls.id)}
                   <option value={cls.id} selected={String(cls.id) === confirmData.classId}>{cls.name}</option>
                 {/each}
               </select>
@@ -136,7 +139,7 @@
         <div class="mt-6">
           <button
             type="submit"
-            disabled={isLoading || classes.length === 0}
+            disabled={isLoading || selectableClasses.length === 0}
             class="w-full px-4 py-2 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             次へ
