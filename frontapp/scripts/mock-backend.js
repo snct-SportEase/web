@@ -429,7 +429,9 @@ createServer(async (req, res) => {
         matches: tournament.data.matches.map((match) => ({
           ...match,
           sides: match.sides.map((side) => {
-            const { scores: _scores, isWinner: _isWinner, ...pendingSide } = side;
+            const pendingSide = { ...side };
+            delete pendingSide.scores;
+            delete pendingSide.isWinner;
             return pendingSide;
           })
         }))

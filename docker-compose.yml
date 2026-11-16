@@ -43,7 +43,7 @@ services:
       retries: 5
 
   migrate:
-    image: migrate/migrate:latest
+    image: migrate/migrate:v4.20.1
     profiles:
       - migration
     volumes:
@@ -85,7 +85,7 @@ services:
       - spotease-internal
 
   demo-migrate:
-    image: migrate/migrate:latest
+    image: migrate/migrate:v4.20.1
     profiles:
       - demo
     volumes:

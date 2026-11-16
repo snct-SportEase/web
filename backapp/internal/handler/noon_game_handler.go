@@ -1053,19 +1053,19 @@ func (h *NoonGameHandler) CreateTugOfWarRun(c *gin.Context) {
 }
 
 type upsertNoonSessionRequest struct {
-	ExcludeRegistrationLimit *bool `json:"exclude_registration_limit"`
-	TemplateKey         string  `json:"template_key"`
-	Name                string  `json:"name" binding:"required"`
-	Description         *string `json:"description"`
-	ScheduledAt         *string `json:"scheduled_at"`
-	Location            *string `json:"location"`
-	Mode                string  `json:"mode"`
-	WinPoints           int     `json:"win_points"`
-	LossPoints          int     `json:"loss_points"`
-	DrawPoints          int     `json:"draw_points"`
-	ParticipationPoints int     `json:"participation_points"`
-	AllowManualPoints   *bool   `json:"allow_manual_points"`
-	Status              string  `json:"status"`
+	ExcludeRegistrationLimit *bool   `json:"exclude_registration_limit"`
+	TemplateKey              string  `json:"template_key"`
+	Name                     string  `json:"name" binding:"required"`
+	Description              *string `json:"description"`
+	ScheduledAt              *string `json:"scheduled_at"`
+	Location                 *string `json:"location"`
+	Mode                     string  `json:"mode"`
+	WinPoints                int     `json:"win_points"`
+	LossPoints               int     `json:"loss_points"`
+	DrawPoints               int     `json:"draw_points"`
+	ParticipationPoints      int     `json:"participation_points"`
+	AllowManualPoints        *bool   `json:"allow_manual_points"`
+	Status                   string  `json:"status"`
 }
 
 type upsertNoonGroupRequest struct {
@@ -1171,30 +1171,30 @@ type createCourseRelayRunResponse struct {
 
 type createTemplateRunRequest struct {
 	Session *struct {
-		ExcludeRegistrationLimit *bool `json:"exclude_registration_limit"`
-		Name                string                 `json:"name"`
-		Description         *string                `json:"description"`
-		Mode                string                 `json:"mode"`
-		WinPoints           int                    `json:"win_points"`
-		LossPoints          int                    `json:"loss_points"`
-		DrawPoints          int                    `json:"draw_points"`
-		ParticipationPoints int                    `json:"participation_points"`
-		AllowManualPoints   *bool                  `json:"allow_manual_points"`
-		PointsByRank        map[string]interface{} `json:"points_by_rank,omitempty"` // 学年対抗リレー、コース対抗リレー、綱引き用
-		Groups              []templateGroupConfig  `json:"groups,omitempty"`         // 手動グループ設定（オプション）
+		ExcludeRegistrationLimit *bool                  `json:"exclude_registration_limit"`
+		Name                     string                 `json:"name"`
+		Description              *string                `json:"description"`
+		Mode                     string                 `json:"mode"`
+		WinPoints                int                    `json:"win_points"`
+		LossPoints               int                    `json:"loss_points"`
+		DrawPoints               int                    `json:"draw_points"`
+		ParticipationPoints      int                    `json:"participation_points"`
+		AllowManualPoints        *bool                  `json:"allow_manual_points"`
+		PointsByRank             map[string]interface{} `json:"points_by_rank,omitempty"` // 学年対抗リレー、コース対抗リレー、綱引き用
+		Groups                   []templateGroupConfig  `json:"groups,omitempty"`         // 手動グループ設定（オプション）
 	} `json:"session"`
 }
 
 type createTypingRunRequest struct {
 	Session struct {
-		ExcludeRegistrationLimit *bool `json:"exclude_registration_limit"`
-		Name         string                 `json:"name"`
-		Description  *string                `json:"description"`
-		ScheduledAt  *string                `json:"scheduled_at"`
-		Location     *string                `json:"location"`
-		Status       string                 `json:"status"`
-		PointsByRank map[string]interface{} `json:"points_by_rank"`
-		Groups       []templateGroupConfig  `json:"groups"`
+		ExcludeRegistrationLimit *bool                  `json:"exclude_registration_limit"`
+		Name                     string                 `json:"name"`
+		Description              *string                `json:"description"`
+		ScheduledAt              *string                `json:"scheduled_at"`
+		Location                 *string                `json:"location"`
+		Status                   string                 `json:"status"`
+		PointsByRank             map[string]interface{} `json:"points_by_rank"`
+		Groups                   []templateGroupConfig  `json:"groups"`
 	} `json:"session"`
 }
 
@@ -1237,6 +1237,24 @@ type tugOfWarRankInput struct {
 type tugOfWarResultRequest struct {
 	Rankings []tugOfWarRankInput `json:"rankings" binding:"required"`
 	Note     *string             `json:"note"`
+}
+
+func validateTemplateRankingPointOverrides(rankToCount map[int]int, rankings []yearRelayRankInput) error {
+	for _, ranking := range rankings {
+		if ranking.Points != nil && *ranking.Points < 0 {
+			return fmt.Errorf("points must not be negative")
+		}
+		if rankToCount[ranking.Rank] > 1 {
+			if ranking.Points == nil {
+				return fmt.Errorf("同順位があるため points の指定が必須です")
+			}
+			continue
+		}
+		if ranking.Points != nil {
+			return fmt.Errorf("同順位でない順位には points を指定できません")
+		}
+	}
+	return nil
 }
 
 func (h *NoonGameHandler) GetSession(c *gin.Context) {
@@ -3425,20 +3443,9 @@ func (h *NoonGameHandler) applyYearRelayRankingsToMatch(
 		}
 	}
 
-	// 同順位がある rank は points が必須
-	for _, r := range req.Rankings {
-		if rankToCount[r.Rank] > 1 {
-			if r.Points == nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位があるため points の指定が必須です"})
-				return
-			}
-		} else {
-			// 同順位でない場合は points を受け取らない（テンプレ自動計算）
-			if r.Points != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位でない順位には points を指定できません"})
-				return
-			}
-		}
+	if err := validateTemplateRankingPointOverrides(rankToCount, req.Rankings); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	pointsEntries := make([]*models.NoonGamePoint, 0)
@@ -4138,20 +4145,9 @@ func (h *NoonGameHandler) applyCourseRelayRankingsToMatch(
 		}
 	}
 
-	// 同順位がある rank は points が必須
-	for _, r := range req.Rankings {
-		if rankToCount[r.Rank] > 1 {
-			if r.Points == nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位があるため points の指定が必須です"})
-				return
-			}
-		} else {
-			// 同順位でない場合は points を受け取らない（テンプレ自動計算）
-			if r.Points != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位でない順位には points を指定できません"})
-				return
-			}
-		}
+	if err := validateTemplateRankingPointOverrides(rankToCount, req.Rankings); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	pointsEntries := make([]*models.NoonGamePoint, 0)
@@ -4405,20 +4401,9 @@ func (h *NoonGameHandler) applyTugOfWarRankingsToMatch(
 		}
 	}
 
-	// 同順位がある rank は points が必須
-	for _, r := range req.Rankings {
-		if rankToCount[r.Rank] > 1 {
-			if r.Points == nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位があるため points の指定が必須です"})
-				return
-			}
-		} else {
-			// 同順位でない場合は points を受け取らない（テンプレ自動計算）
-			if r.Points != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "同順位でない順位には points を指定できません"})
-				return
-			}
-		}
+	if err := validateTemplateRankingPointOverrides(rankToCount, req.Rankings); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	pointsEntries := make([]*models.NoonGamePoint, 0)

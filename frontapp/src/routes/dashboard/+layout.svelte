@@ -13,8 +13,7 @@
 
   let { children, data } = $props();
 
-  if (browser && data.activeEventAvailable) activeEvent.seed(data.activeEvent);
-  $effect(() => {
+  $effect.pre(() => {
     if (data.activeEventAvailable) activeEvent.seed(data.activeEvent);
   });
   let user = $derived(data.user);

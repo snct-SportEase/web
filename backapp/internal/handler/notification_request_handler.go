@@ -273,7 +273,8 @@ func (h *NotificationRequestHandler) DecideRequest(c *gin.Context) {
 		return
 	}
 
-	go h.notifyRequesterDecision(req, status, user)
+	h.recordRequesterDecision(req, status, user)
+	go h.notifyRequesterDecision(req, status)
 	if status == models.NotificationRequestStatusApproved {
 		go h.dispatchApprovedNotification(notificationID, req)
 	}
@@ -353,7 +354,17 @@ func (h *NotificationRequestHandler) notifyParticipantsOfMessage(req *models.Not
 	h.sendPushToUsers(targetIDs, payload)
 }
 
-func (h *NotificationRequestHandler) notifyRequesterDecision(req *models.NotificationRequest, status models.NotificationRequestStatus, resolver *models.User) {
+func (h *NotificationRequestHandler) recordRequesterDecision(req *models.NotificationRequest, status models.NotificationRequestStatus, resolver *models.User) {
+	resultText := "承認"
+	if status == models.NotificationRequestStatusRejected {
+		resultText = "否認"
+	}
+
+	systemMessage := fmt.Sprintf("rootが申請を%sしました。", resultText)
+	_, _ = h.RequestRepo.AddMessage(req.ID, resolver.ID, systemMessage)
+}
+
+func (h *NotificationRequestHandler) notifyRequesterDecision(req *models.NotificationRequest, status models.NotificationRequestStatus) {
 	if h.PushSender == nil || !h.PushSender.Enabled() {
 		return
 	}
@@ -373,14 +384,6 @@ func (h *NotificationRequestHandler) notifyRequesterDecision(req *models.Notific
 		},
 	}
 	h.sendPushToUsers([]string{req.RequesterID}, payload)
-
-	resultText := "承認"
-	if status == models.NotificationRequestStatusRejected {
-		resultText = "否認"
-	}
-
-	systemMessage := fmt.Sprintf("rootが申請を%sしました。", resultText)
-	_, _ = h.RequestRepo.AddMessage(req.ID, resolver.ID, systemMessage)
 }
 
 func (h *NotificationRequestHandler) sendPushToUsers(userIDs []string, payload gin.H) {

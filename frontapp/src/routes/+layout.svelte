@@ -13,8 +13,7 @@
   let data = $derived(page.data);
   let lastReportedPWAUserId = null;
 
-  if (browser) seedNotificationSnapshot(data.user, data.notificationSnapshot);
-  $effect(() => { seedNotificationSnapshot(data.user, data.notificationSnapshot); });
+  $effect.pre(() => { seedNotificationSnapshot(data.user, data.notificationSnapshot); });
 
   $effect(() => {
     const userId = data.user?.id;

@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -77,7 +78,13 @@ func main() {
 	r := router.SetupRouter(db, cfg, hubManager)
 
 	log.Println("Starting server on :8080")
-	if err := r.Run(":8080"); err != nil {
+	server := &http.Server{
+		Addr:              ":8080",
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

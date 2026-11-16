@@ -201,6 +201,7 @@ func TestNotificationRequestHandler_DecideRequest(t *testing.T) {
 		root.ID,
 		[]string{"student", "admin", "root"},
 	).Return(int64(11), nil).Once()
+	repo.On("AddMessage", 7, root.ID, "rootが申請を承認しました。").Return(int64(12), nil).Once()
 
 	c, w := notificationRequestContext(http.MethodPost, "/api/root/notification-requests/7/decision", map[string]string{
 		"status": "approved",
