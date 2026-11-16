@@ -58,6 +58,9 @@ func TestSaveMatchResultRollsBackWhenPointInsertFails(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id FROM noon_game_matches WHERE id = ? FOR UPDATE`)).
+		WithArgs(matchID).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(matchID))
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM noon_game_points WHERE match_id = ?`)).
 		WithArgs(matchID).
 		WillReturnResult(sqlmock.NewResult(0, 2))

@@ -1,7 +1,5 @@
 /// <reference types="@sveltejs/kit" />
-import { version } from '$app/env';
-import { assets, immutable, prerendered } from '$app/manifest';
-import { resolve } from '$app/paths';
+import { build, files, prerendered, version } from '$service-worker';
 import { isApiPath, isCacheableStaticAsset } from '$lib/utils/serviceWorkerCachePolicy.js';
 import { openNotificationTarget } from '$lib/utils/notificationNavigation.js';
 
@@ -11,11 +9,10 @@ import { openNotificationTarget } from '$lib/utils/notificationNavigation.js';
 const CACHE = `static-assets-v2-${version}`;
 
 const ASSETS = [
-	...immutable, // represents all generated code and immutable assets
-	...assets, // represents all static assets in your static directory
+	...build, // represents all generated code and immutable assets
+	...files, // represents all static assets in your static directory
 	...prerendered // represents all prerendered pages and endpoints
 ]
-	.map(({ path }) => resolve(path))
 	.filter((pathname) => !isApiPath(pathname));
 const ASSET_PATHS = new Set(ASSETS);
 
