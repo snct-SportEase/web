@@ -1327,46 +1327,37 @@ func TestNoonGameHandler_CalculateYearRelayOverallBonus(t *testing.T) {
 		// グループ一覧取得（calculateAndRecordYearRelayOverallBonus内で）
 		mockNoonRepo.On("GetGroupsWithMembers", sessionID).Return(groups, nil).Once()
 
-		// 総合ボーナスのポイントクリアと挿入
-		mockNoonRepo.On("ClearPointsForMatch", matchBonusID).Return(nil).Once()
+		// 総合ボーナスの点数・結果・ステータスを同一トランザクションで保存
 		// 総合ボーナスの点数: 1位30点、2位20点、3位10点
 		// 合計点数: 1年生(30+20=50点) -> 2位 -> 20点
 		//           2年生(25+30=55点) -> 1位 -> 30点
 		//           3年生(20+25=45点) -> 3位 -> 10点
-		mockNoonRepo.On("InsertPoints", mock.MatchedBy(func(points []*models.NoonGamePoint) bool {
-			// 2年生が1位で30点、1年生が2位で20点、3年生が3位で10点が付与されることを確認
-			classPoints := make(map[int]int)
-			for _, p := range points {
-				if p.MatchID != nil && *p.MatchID == matchBonusID {
-					classPoints[p.ClassID] += p.Points
+		mockNoonRepo.On("SaveMatchResultWithStatus",
+			mock.MatchedBy(func(result *models.NoonGameResult) bool {
+				if result.MatchID != matchBonusID {
+					return false
 				}
-			}
-			// 2年生のクラス(4,5,6)に30点ずつ
-			// 1年生のクラス(1,2,3)に20点ずつ
-			// 3年生のクラス(7,8,9)に10点ずつ
-			return classPoints[4] == 30 && classPoints[5] == 30 && classPoints[6] == 30 &&
-				classPoints[1] == 20 && classPoints[2] == 20 && classPoints[3] == 20 &&
-				classPoints[7] == 10 && classPoints[8] == 10 && classPoints[9] == 10
-		})).Return(nil).Once()
-
-		// 総合ボーナスの結果保存
-		mockNoonRepo.On("SaveResult", mock.MatchedBy(func(result *models.NoonGameResult) bool {
-			if result.MatchID != matchBonusID {
-				return false
-			}
-			// 順位が正しいか確認: 2年生1位、1年生2位、3年生3位
-			rankMap := make(map[int]int) // entryID -> rank
-			for _, detail := range result.Details {
-				if detail.Rank != nil {
-					rankMap[detail.EntryID] = *detail.Rank
+				rankMap := make(map[int]int)
+				for _, detail := range result.Details {
+					if detail.Rank != nil {
+						rankMap[detail.EntryID] = *detail.Rank
+					}
 				}
-			}
-			return rankMap[22] == 1 && rankMap[21] == 2 && rankMap[23] == 3
-		})).Return(&models.NoonGameResult{ID: 503}, nil).Once()
-
-		// 総合ボーナスの試合ステータス更新
-		updatedMatchBonus := &models.NoonGameMatch{ID: matchBonusID, Status: "completed"}
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(updatedMatchBonus, nil).Once()
+				return rankMap[22] == 1 && rankMap[21] == 2 && rankMap[23] == 3
+			}),
+			mock.MatchedBy(func(points []*models.NoonGamePoint) bool {
+				classPoints := make(map[int]int)
+				for _, p := range points {
+					if p.MatchID != nil && *p.MatchID == matchBonusID {
+						classPoints[p.ClassID] += p.Points
+					}
+				}
+				return classPoints[4] == 30 && classPoints[5] == 30 && classPoints[6] == 30 &&
+					classPoints[1] == 20 && classPoints[2] == 20 && classPoints[3] == 20 &&
+					classPoints[7] == 10 && classPoints[8] == 10 && classPoints[9] == 10
+			}),
+			"completed",
+		).Return(nil).Once()
 
 		// 最終的なポイント集計（総合ボーナス含む）
 		summaryFinal := map[int]int{
@@ -1388,10 +1379,7 @@ func TestNoonGameHandler_CalculateYearRelayOverallBonus(t *testing.T) {
 		mockNoonRepo.On("GetSessionByID", sessionID).Return(session, nil)
 		mockNoonRepo.On("GetGroupsWithMembers", sessionID).Return(groups, nil)
 		mockNoonRepo.On("GetGroupMembers", mock.AnythingOfType("int")).Return([]*models.NoonGameGroupMember{}, nil)
-		mockNoonRepo.On("ClearPointsForMatch", mock.AnythingOfType("int")).Return(nil)
-		mockNoonRepo.On("InsertPoints", mock.Anything).Return(nil)
-		mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 999}, nil)
-		mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(&models.NoonGameMatch{ID: matchBonusID}, nil)
+		mockNoonRepo.On("SaveMatchResultWithStatus", mock.AnythingOfType("*models.NoonGameResult"), mock.Anything, "completed").Return(nil)
 		mockNoonRepo.On("SumPointsByClass", sessionID).Return(summaryFinal, nil)
 
 		// Bブロックの結果を登録
@@ -1558,11 +1546,8 @@ func TestNoonGameHandler_RecalculateYearRelayBonusOverwrite(t *testing.T) {
 	mockNoonRepo.On("GetMatchByID", matchBonusID).Return(matchBonusAfter, nil).Maybe()
 
 	// 既存ポイント削除・挿入・結果保存関連（柔軟に許容）
-	mockNoonRepo.On("ClearPointsForMatch", mock.AnythingOfType("int")).Return(nil).Maybe()
-	mockNoonRepo.On("InsertPoints", mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Maybe()
-	mockNoonRepo.On("SaveResult", mock.AnythingOfType("*models.NoonGameResult")).Return(&models.NoonGameResult{ID: 9002}, nil).Maybe()
 	mockNoonRepo.On("SaveMatchResult", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint")).Return(nil).Maybe()
-	mockNoonRepo.On("SaveMatch", mock.AnythingOfType("*models.NoonGameMatch")).Return(&models.NoonGameMatch{ID: matchBonusID, Status: "completed"}, nil).Maybe()
+	mockNoonRepo.On("SaveMatchResultWithStatus", mock.AnythingOfType("*models.NoonGameResult"), mock.AnythingOfType("[]*models.NoonGamePoint"), "completed").Return(nil).Maybe()
 	mockNoonRepo.On("SumPointsByClass", sessionID).Return(map[int]int{1: 30, 2: 30, 3: 20, 4: 20}, nil).Maybe()
 	mockClassRepo.On("SetNoonGamePoints", eventID, map[int]int{1: 30, 2: 30, 3: 20, 4: 20}).Return(nil).Maybe()
 

@@ -3959,42 +3959,16 @@ func (h *NoonGameHandler) calculateAndRecordYearRelayOverallBonus(runID int, use
 		})
 	}
 
-	// 既存ポイント・既存結果を消す（空結果が残っているケースに対応）
-	if err := h.noonRepo.ClearPointsForMatch(matchBonus.ID); err != nil {
-		return fmt.Errorf("failed to clear existing points: %w", err)
-	}
-	if matchBonus.Result != nil {
-		if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
-			MatchID:    matchBonus.ID,
-			Winner:     "draw",
-			RecordedBy: user.ID,
-			Note:       nil,
-			Details:    []*models.NoonGameResultDetail{}, // 既存 detail を一旦クリア
-		}); err != nil {
-			return fmt.Errorf("failed to clear existing bonus result: %w", err)
-		}
-	}
-
-	// 点数を登録
-	if err := h.noonRepo.InsertPoints(pointsEntries); err != nil {
-		return fmt.Errorf("failed to store points: %w", err)
-	}
-
-	// 試合結果を登録
-	if _, err := h.noonRepo.SaveResult(&models.NoonGameResult{
+	// 既存ポイント・結果の削除と再挿入を同一トランザクションで行う
+	// （A/Bブロック同時再登録時のボーナス倍加を防ぐ）
+	if err := h.noonRepo.SaveMatchResultWithStatus(&models.NoonGameResult{
 		MatchID:    matchBonus.ID,
 		Winner:     "draw", // 総合ボーナスは順位ベースなのでwinnerはdraw
 		RecordedBy: user.ID,
 		Note:       nil,
 		Details:    resultDetails,
-	}); err != nil {
-		return fmt.Errorf("failed to store match result: %w", err)
-	}
-
-	// 試合ステータスを更新
-	matchBonus.Status = "completed"
-	if _, err := h.noonRepo.SaveMatch(matchBonus.NoonGameMatch); err != nil {
-		return fmt.Errorf("failed to update match status: %w", err)
+	}, pointsEntries, "completed"); err != nil {
+		return fmt.Errorf("failed to store overall bonus: %w", err)
 	}
 
 	// クラス得点へ反映
