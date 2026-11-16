@@ -2751,7 +2751,21 @@ func (h *NoonGameHandler) ImportTypingSystemResults(c *gin.Context) {
 
 	replaceImport := activeHistory != nil && replace
 	if err := h.noonRepo.ApplyTypingSystemResultImport(sessionID, points, replaceImport, history); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store typing-system results"})
+		switch {
+		case errors.Is(err, repository.ErrTypingSystemAlreadyImported):
+			c.JSON(http.StatusOK, gin.H{
+				"message":    "already imported",
+				"export_id":  payload.ExportID,
+				"status":     "already_imported",
+				"is_replace": replace,
+			})
+		case errors.Is(err, repository.ErrTypingSystemExportConflict):
+			c.JSON(http.StatusConflict, gin.H{"error": "Import with same export_id already exists but file content differs"})
+		case errors.Is(err, repository.ErrTypingSystemActiveImportExists):
+			c.JSON(http.StatusConflict, gin.H{"error": "Existing import already exists for this session. Use replace=true to overwrite"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store typing-system results"})
+		}
 		return
 	}
 

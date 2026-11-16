@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"errors"
 	"regexp"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"backapp/internal/models"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -191,5 +193,244 @@ func TestReplaceMatchEntriesRejectsParticipantChangesAfterResult(t *testing.T) {
 	err = repo.replaceMatchEntriesTx(tx, 9, []*models.NoonGameMatchEntry{{ID: 21, SideType: "class", ClassID: &changedClassID}})
 	require.ErrorIs(t, err, ErrNoonGameMatchParticipantsLocked)
 	require.NoError(t, tx.Rollback())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func typingImportColumns() []string {
+	return []string{
+		"id", "session_id", "export_id", "sha256", "status", "action", "replaced_export_id",
+		"requested_by", "requested_at", "filename", "payload_size", "results", "message", "is_active",
+	}
+}
+
+func sampleTypingImport(exportID, sha string) *models.NoonGameTypingSystemImportRecord {
+	filename := "typing.json"
+	return &models.NoonGameTypingSystemImportRecord{
+		SessionID:   10,
+		ExportID:    exportID,
+		SHA256:      sha,
+		Status:      "success",
+		Action:      "import",
+		RequestedBy: "user-1",
+		Filename:    &filename,
+		PayloadSize: 12,
+		IsActive:    true,
+	}
+}
+
+func sampleTypingPoint() *models.NoonGamePoint {
+	return &models.NoonGamePoint{
+		SessionID: 10,
+		ClassID:   3,
+		Points:    40,
+		Source:    "typing_system",
+		CreatedBy: "user-1",
+	}
+}
+
+func expectTypingSessionLock(mock sqlmock.Sqlmock) {
+	mock.ExpectQuery(regexp.QuoteMeta(lockNoonGameSessionForUpdateSQL)).
+		WithArgs(10).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
+}
+
+func TestApplyTypingSystemResultImportRejectsDuplicateUnderLock(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := &noonGameRepository{db: db}
+	exportID := "4ef87d60-2e74-477a-9c16-a93423d04c20"
+	history := sampleTypingImport(exportID, "abc")
+
+	mock.ExpectBegin()
+	expectTypingSessionLock(mock)
+	mock.ExpectQuery(regexp.QuoteMeta(typingSystemImportsByExportIDSQL)).
+		WithArgs(10, exportID).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()).AddRow(
+			1, 10, exportID, "abc", "success", "import", nil, "user-1", time.Now(), "typing.json", 12, nil, nil, true,
+		))
+	mock.ExpectRollback()
+
+	err = repo.ApplyTypingSystemResultImport(10, []*models.NoonGamePoint{sampleTypingPoint()}, false, history)
+	require.ErrorIs(t, err, ErrTypingSystemAlreadyImported)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestApplyTypingSystemResultImportRejectsDifferentContentUnderLock(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := &noonGameRepository{db: db}
+	exportID := "4ef87d60-2e74-477a-9c16-a93423d04c20"
+	history := sampleTypingImport(exportID, "new-sha")
+
+	mock.ExpectBegin()
+	expectTypingSessionLock(mock)
+	mock.ExpectQuery(regexp.QuoteMeta(typingSystemImportsByExportIDSQL)).
+		WithArgs(10, exportID).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()).AddRow(
+			1, 10, exportID, "old-sha", "success", "import", nil, "user-1", time.Now(), "typing.json", 12, nil, nil, true,
+		))
+	mock.ExpectRollback()
+
+	err = repo.ApplyTypingSystemResultImport(10, []*models.NoonGamePoint{sampleTypingPoint()}, true, history)
+	require.ErrorIs(t, err, ErrTypingSystemExportConflict)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestApplyTypingSystemResultImportRejectsOtherActiveImportUnderLock(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := &noonGameRepository{db: db}
+	exportID := "4ef87d60-2e74-477a-9c16-a93423d04c20"
+	history := sampleTypingImport(exportID, "abc")
+
+	mock.ExpectBegin()
+	expectTypingSessionLock(mock)
+	mock.ExpectQuery(regexp.QuoteMeta(typingSystemImportsByExportIDSQL)).
+		WithArgs(10, exportID).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()))
+	mock.ExpectQuery(regexp.QuoteMeta(activeTypingSystemImportSQL)).
+		WithArgs(10).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()).AddRow(
+			1, 10, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "other", "success", "import", nil, "user-2", time.Now(), "old.json", 8, nil, nil, true,
+		))
+	mock.ExpectRollback()
+
+	err = repo.ApplyTypingSystemResultImport(10, []*models.NoonGamePoint{sampleTypingPoint()}, false, history)
+	require.ErrorIs(t, err, ErrTypingSystemActiveImportExists)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestApplyTypingSystemResultImportRollsBackDuplicateKey(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := &noonGameRepository{db: db}
+	exportID := "4ef87d60-2e74-477a-9c16-a93423d04c20"
+	history := sampleTypingImport(exportID, "abc")
+	point := sampleTypingPoint()
+
+	mock.ExpectBegin()
+	expectTypingSessionLock(mock)
+	mock.ExpectQuery(regexp.QuoteMeta(typingSystemImportsByExportIDSQL)).
+		WithArgs(10, exportID).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()))
+	mock.ExpectQuery(regexp.QuoteMeta(activeTypingSystemImportSQL)).
+		WithArgs(10).
+		WillReturnError(sql.ErrNoRows)
+	prepared := mock.ExpectPrepare(regexp.QuoteMeta(`
+			INSERT INTO noon_game_points (session_id, match_id, class_id, points, reason, source, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`))
+	prepared.ExpectExec().
+		WithArgs(point.SessionID, nil, point.ClassID, point.Points, nil, point.Source, point.CreatedBy).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		INSERT INTO noon_game_typing_system_imports
+		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, results, message, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)).
+		WithArgs(10, exportID, "abc", "success", "import", nil, "user-1", "typing.json", 12, nil, nil, true).
+		WillReturnError(&mysql.MySQLError{Number: 1062, Message: "Duplicate entry"})
+	mock.ExpectRollback()
+
+	err = repo.ApplyTypingSystemResultImport(10, []*models.NoonGamePoint{point}, false, history)
+	require.ErrorIs(t, err, ErrTypingSystemAlreadyImported)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestApplyTypingSystemResultImportInsertsOnceWhenHistoryIsEmpty(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := &noonGameRepository{db: db}
+	exportID := "4ef87d60-2e74-477a-9c16-a93423d04c20"
+	history := sampleTypingImport(exportID, "abc")
+	point := sampleTypingPoint()
+
+	mock.ExpectBegin()
+	expectTypingSessionLock(mock)
+	mock.ExpectQuery(regexp.QuoteMeta(typingSystemImportsByExportIDSQL)).
+		WithArgs(10, exportID).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()))
+	mock.ExpectQuery(regexp.QuoteMeta(activeTypingSystemImportSQL)).
+		WithArgs(10).
+		WillReturnError(sql.ErrNoRows)
+	prepared := mock.ExpectPrepare(regexp.QuoteMeta(`
+			INSERT INTO noon_game_points (session_id, match_id, class_id, points, reason, source, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`))
+	prepared.ExpectExec().
+		WithArgs(point.SessionID, nil, point.ClassID, point.Points, nil, point.Source, point.CreatedBy).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		INSERT INTO noon_game_typing_system_imports
+		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, results, message, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)).
+		WithArgs(10, exportID, "abc", "success", "import", nil, "user-1", "typing.json", 12, nil, nil, true).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	err = repo.ApplyTypingSystemResultImport(10, []*models.NoonGamePoint{point}, false, history)
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestApplyTypingSystemResultImportReplacesOtherActiveImportUnderLock(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := &noonGameRepository{db: db}
+	exportID := "4ef87d60-2e74-477a-9c16-a93423d04c20"
+	previousExportID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	history := sampleTypingImport(exportID, "abc")
+	point := sampleTypingPoint()
+
+	mock.ExpectBegin()
+	expectTypingSessionLock(mock)
+	mock.ExpectQuery(regexp.QuoteMeta(typingSystemImportsByExportIDSQL)).
+		WithArgs(10, exportID).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()))
+	mock.ExpectQuery(regexp.QuoteMeta(activeTypingSystemImportSQL)).
+		WithArgs(10).
+		WillReturnRows(sqlmock.NewRows(typingImportColumns()).AddRow(
+			1, 10, previousExportID, "other", "success", "import", nil, "user-2", time.Now(), "old.json", 8, nil, nil, true,
+		))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM noon_game_points WHERE session_id = ? AND source = ?`)).
+		WithArgs(10, "typing_system").
+		WillReturnResult(sqlmock.NewResult(0, 6))
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE noon_game_typing_system_imports SET is_active = FALSE WHERE session_id = ?`)).
+		WithArgs(10).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	prepared := mock.ExpectPrepare(regexp.QuoteMeta(`
+			INSERT INTO noon_game_points (session_id, match_id, class_id, points, reason, source, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`))
+	prepared.ExpectExec().
+		WithArgs(point.SessionID, nil, point.ClassID, point.Points, nil, point.Source, point.CreatedBy).
+		WillReturnResult(sqlmock.NewResult(2, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		INSERT INTO noon_game_typing_system_imports
+		(session_id, export_id, sha256, status, action, replaced_export_id, requested_by, filename, payload_size, results, message, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)).
+		WithArgs(10, exportID, "abc", "success", "replace", previousExportID, "user-1", "typing.json", 12, nil, nil, true).
+		WillReturnResult(sqlmock.NewResult(3, 1))
+	mock.ExpectCommit()
+
+	err = repo.ApplyTypingSystemResultImport(10, []*models.NoonGamePoint{point}, true, history)
+	require.NoError(t, err)
+	require.Equal(t, "replace", history.Action)
+	require.NotNil(t, history.ReplacedExportID)
+	require.Equal(t, previousExportID, *history.ReplacedExportID)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
