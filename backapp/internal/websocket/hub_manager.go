@@ -18,7 +18,13 @@ func (m *HubManager) GetHub(topic string) *Hub {
 	defer m.mu.Unlock()
 
 	if hub, ok := m.hubs[topic]; ok {
-		return hub
+		select {
+		case <-hub.stopped:
+			// Hub already exited; drop the stale entry and create a fresh one.
+			delete(m.hubs, topic)
+		default:
+			return hub
+		}
 	}
 
 	var hub *Hub

@@ -134,7 +134,14 @@ func ServeWs(hubProvider func() *Hub, w http.ResponseWriter, r *http.Request, al
 	}
 	hub := hubProvider()
 	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
-	client.hub.register <- client
+	select {
+	case client.hub.register <- client:
+		// registered; the hub's Run loop owns the client now
+	case <-client.hub.stopped:
+		// hub died after GetHub() handed it out — close so the client can retry
+		conn.Close()
+		return
+	}
 
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.
