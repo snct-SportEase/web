@@ -46,6 +46,80 @@ func TestAuthHandler_UpdateProfile(t *testing.T) {
 		mockEventRepo.AssertNotCalled(t, "GetActiveEvent")
 		mockClassRepo.AssertNotCalled(t, "GetClassByID", mock.Anything)
 	})
+
+	t.Run("rejects special class self-assignment for students", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		user := &models.User{
+			ID:                "user-2",
+			IsProfileComplete: false,
+			Roles:             []models.Role{{Name: "student"}},
+		}
+		eventID := 1
+		specialClassID := 16
+
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockClassRepo.On("GetClassByID", specialClassID).Return(&models.Class{
+			ID:      specialClassID,
+			Name:    models.SpecialClassName,
+			EventID: &eventID,
+		}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/user/profile", bytes.NewBufferString(`{"display_name":"新入生","class_id":16}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		authHandler.UpdateProfile(c)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.JSONEq(t, `{"error":"Selected class cannot be chosen during profile setup"}`, w.Body.String())
+		mockUserRepo.AssertNotCalled(t, "UpdateUser", mock.Anything)
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
+
+	t.Run("allows special class assignment for admin", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockEventRepo := new(MockEventRepository)
+		mockClassRepo := new(MockClassRepository)
+		authHandler := handler.NewAuthHandler(&config.Config{}, mockUserRepo, mockEventRepo, mockClassRepo)
+
+		user := &models.User{
+			ID:                "admin-1",
+			IsProfileComplete: false,
+			Roles:             []models.Role{{Name: "admin"}},
+		}
+		eventID := 1
+		specialClassID := 16
+
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockClassRepo.On("GetClassByID", specialClassID).Return(&models.Class{
+			ID:      specialClassID,
+			Name:    models.SpecialClassName,
+			EventID: &eventID,
+		}, nil).Once()
+		mockUserRepo.On("UpdateUser", mock.MatchedBy(func(u *models.User) bool {
+			return u.ClassID != nil && *u.ClassID == specialClassID && u.IsProfileComplete
+		})).Return(nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", user)
+		c.Request, _ = http.NewRequest(http.MethodPut, "/api/user/profile", bytes.NewBufferString(`{"display_name":"教員","class_id":16}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		authHandler.UpdateProfile(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockUserRepo.AssertExpectations(t)
+		mockEventRepo.AssertExpectations(t)
+		mockClassRepo.AssertExpectations(t)
+	})
 }
 
 func TestAuthHandler_GoogleLogin(t *testing.T) {

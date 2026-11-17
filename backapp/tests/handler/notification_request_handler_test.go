@@ -3,6 +3,7 @@ package handler_test
 import (
 	"backapp/internal/handler"
 	"backapp/internal/models"
+	"backapp/internal/repository"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -23,8 +24,9 @@ func (m *MockNotificationRequestRepository) CreateRequest(request *models.Notifi
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockNotificationRequestRepository) UpdateRequestStatus(id int, status models.NotificationRequestStatus, resolverID *string) error {
-	return m.Called(id, status, resolverID).Error(0)
+func (m *MockNotificationRequestRepository) ResolveRequest(id int, status models.NotificationRequestStatus, resolverID string, targetRoles []string) (int64, error) {
+	args := m.Called(id, status, resolverID, targetRoles)
+	return args.Get(0).(int64), args.Error(1)
 }
 
 func (m *MockNotificationRequestRepository) GetRequestByID(id int) (*models.NotificationRequest, error) {
@@ -192,9 +194,14 @@ func TestNotificationRequestHandler_DecideRequest(t *testing.T) {
 	root := &models.User{ID: "root-1", Roles: []models.Role{{Name: "root"}}}
 	request := &models.NotificationRequest{ID: 7, RequesterID: "student-1"}
 	repo.On("GetRequestByID", 7).Return(request, nil).Once()
-	repo.On("UpdateRequestStatus", 7, models.NotificationRequestStatusApproved, mock.MatchedBy(func(id *string) bool {
-		return id != nil && *id == root.ID
-	})).Return(nil).Once()
+	repo.On(
+		"ResolveRequest",
+		7,
+		models.NotificationRequestStatusApproved,
+		root.ID,
+		[]string{"student", "admin", "root"},
+	).Return(int64(11), nil).Once()
+	repo.On("AddMessage", 7, root.ID, "rootが申請を承認しました。").Return(int64(12), nil).Once()
 
 	c, w := notificationRequestContext(http.MethodPost, "/api/root/notification-requests/7/decision", map[string]string{
 		"status": "approved",
@@ -203,5 +210,30 @@ func TestNotificationRequestHandler_DecideRequest(t *testing.T) {
 	h.DecideRequest(c)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestNotificationRequestHandler_DecideRequestRejectsRepeatedDecision(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := new(MockNotificationRequestRepository)
+	h := newNotificationRequestHandler(repo)
+	root := &models.User{ID: "root-1", Roles: []models.Role{{Name: "root"}}}
+	request := &models.NotificationRequest{ID: 7, RequesterID: "student-1", Status: models.NotificationRequestStatusPending}
+	repo.On("GetRequestByID", 7).Return(request, nil).Once()
+	repo.On(
+		"ResolveRequest",
+		7,
+		models.NotificationRequestStatusApproved,
+		root.ID,
+		[]string{"student", "admin", "root"},
+	).Return(int64(0), repository.ErrNotificationRequestAlreadyResolved).Once()
+
+	c, w := notificationRequestContext(http.MethodPost, "/api/root/notification-requests/7/decision", map[string]string{
+		"status": "approved",
+	}, root)
+	c.Params = gin.Params{{Key: "request_id", Value: "7"}}
+	h.DecideRequest(c)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
 	repo.AssertExpectations(t)
 }

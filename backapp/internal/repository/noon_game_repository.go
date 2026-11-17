@@ -1564,6 +1564,16 @@ func (r *noonGameRepository) SaveMatchResultWithStatus(result *models.NoonGameRe
 	}
 	defer tx.Rollback()
 
+	// Serialize concurrent result writes for the same match (e.g. year-relay A/B
+	// blocks both recalculating the overall bonus at once).
+	var lockedMatchID int
+	if err := tx.QueryRow(`SELECT id FROM noon_game_matches WHERE id = ? FOR UPDATE`, result.MatchID).Scan(&lockedMatchID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("match not found")
+		}
+		return err
+	}
+
 	if _, err := tx.Exec(`DELETE FROM noon_game_points WHERE match_id = ?`, result.MatchID); err != nil {
 		return err
 	}

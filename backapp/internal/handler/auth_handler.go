@@ -352,6 +352,11 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected class does not belong to the active event"})
 			return
 		}
+		// 専教は専攻科・教員枠のため、生徒の自己申告では選べない（admin/root のみ許可）
+		if class.Name == models.SpecialClassName && !userHasAdminOrRoot(user) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Selected class cannot be chosen during profile setup"})
+			return
+		}
 		user.ClassID = &req.ClassID
 		user.IsProfileComplete = true
 	}
@@ -554,6 +559,18 @@ func (h *AuthHandler) PromoteUserByRoot(c *gin.Context) {
 // DemoteUserByRoot は廃止された付与・剥奪APIの互換エンドポイント
 func (h *AuthHandler) DemoteUserByRoot(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "マスタロールは剥奪ではなく交換してください"})
+}
+
+func userHasAdminOrRoot(user *models.User) bool {
+	if user == nil {
+		return false
+	}
+	for _, role := range user.Roles {
+		if role.Name == "admin" || role.Name == "root" {
+			return true
+		}
+	}
+	return false
 }
 
 // isClassManagedRole returns true for class-managed roles that should not be

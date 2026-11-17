@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // --- Tests ---
@@ -650,6 +651,115 @@ func TestEventHandler_GetActiveEvent(t *testing.T) {
 		assert.Equal(t, event.Name, response["event_name"])
 		assert.Equal(t, pdfUrl, response["competition_guidelines_pdf_url"])
 		assert.Equal(t, true, response["hide_scores"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("masks unpublished survey URL", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockTournamentRepo := new(MockTournamentRepository)
+		mockNotificationRepo := new(MockNotificationRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockClassRepo := new(MockClassRepository)
+
+		h := handler.NewEventHandler(mockEventRepo, mockTournamentRepo, mockClassRepo, mockNotificationRepo, mockUserRepo, "", "")
+
+		eventID := 1
+		secretURL := "https://forms.gle/top-secret-survey"
+		event := &models.Event{
+			ID:                eventID,
+			Name:              "2026秋季スポーツ大会",
+			Year:              2026,
+			Season:            "autumn",
+			SurveyUrl:         &secretURL,
+			IsSurveyPublished: false,
+			Status:            models.EventStatusActive,
+		}
+
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockEventRepo.On("GetEventByID", eventID).Return(event, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Nil(t, response["survey_url"])
+		assert.Equal(t, false, response["is_survey_published"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("hides preparing event from student", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(
+			mockEventRepo,
+			new(MockTournamentRepository),
+			new(MockClassRepository),
+			new(MockNotificationRepository),
+			new(MockUserRepository),
+			"",
+			"",
+		)
+
+		eventID := 9
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockEventRepo.On("GetEventByID", eventID).Return(&models.Event{
+			ID:     eventID,
+			Name:   "未発表大会",
+			Status: models.EventStatusPreparing,
+		}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+		c.Set("user", &models.User{ID: "student-1", Roles: []models.Role{{Name: "student"}}})
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Nil(t, response["event_id"])
+		assert.Nil(t, response["event_name"])
+		assert.Equal(t, "", response["test_run_state"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("allows admin to view preparing event", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		h := handler.NewEventHandler(
+			mockEventRepo,
+			new(MockTournamentRepository),
+			new(MockClassRepository),
+			new(MockNotificationRepository),
+			new(MockUserRepository),
+			"",
+			"",
+		)
+
+		eventID := 9
+		mockEventRepo.On("GetActiveEvent").Return(eventID, nil).Once()
+		mockEventRepo.On("GetEventByID", eventID).Return(&models.Event{
+			ID:     eventID,
+			Name:   "未発表大会",
+			Status: models.EventStatusPreparing,
+		}, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events/active", nil)
+		c.Set("user", &models.User{ID: "admin-1", Roles: []models.Role{{Name: "admin"}}})
+
+		h.GetActiveEvent(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, float64(eventID), response["event_id"])
+		assert.Equal(t, "未発表大会", response["event_name"])
 		mockEventRepo.AssertExpectations(t)
 	})
 
@@ -1562,6 +1672,7 @@ func TestEventHandler_GetAllEvents(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
+		c.Set("user", &models.User{Roles: []models.Role{{Name: "root"}}})
 		c.Request, _ = http.NewRequest(http.MethodGet, "/api/root/events", nil)
 
 		h.GetAllEvents(c)
@@ -1572,6 +1683,39 @@ func TestEventHandler_GetAllEvents(t *testing.T) {
 		assert.Len(t, response, 2)
 		assert.Equal(t, "active", response[0]["status"])
 		assert.Equal(t, "archived", response[1]["status"])
+		mockEventRepo.AssertExpectations(t)
+	})
+
+	t.Run("students do not see preparing events or unpublished survey URLs", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockUserRepo := new(MockUserRepository)
+		h := handler.NewEventHandler(mockEventRepo, nil, nil, nil, mockUserRepo, "", "")
+
+		secretURL := "https://forms.gle/top-secret-survey"
+		publishedURL := "https://forms.gle/public-survey"
+		events := []*models.Event{
+			{ID: 1, Name: "Active", Status: models.EventStatusActive, SurveyUrl: &secretURL, IsSurveyPublished: false},
+			{ID: 2, Name: "SecretNext", Status: models.EventStatusPreparing, SurveyUrl: &secretURL, IsSurveyPublished: false},
+			{ID: 3, Name: "Archived", Status: models.EventStatusArchived, SurveyUrl: &publishedURL, IsSurveyPublished: true},
+		}
+
+		mockEventRepo.On("GetAllEvents").Return(events, nil).Once()
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("user", &models.User{Roles: []models.Role{{Name: "student"}}})
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/events", nil)
+
+		h.GetAllEvents(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response []map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Len(t, response, 2)
+		assert.Equal(t, "Active", response[0]["name"])
+		assert.Nil(t, response[0]["survey_url"])
+		assert.Equal(t, "Archived", response[1]["name"])
+		assert.Equal(t, publishedURL, response[1]["survey_url"])
 		mockEventRepo.AssertExpectations(t)
 	})
 }

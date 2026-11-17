@@ -151,7 +151,26 @@ func (h *EventHandler) GetAllEvents(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
-	c.JSON(http.StatusOK, events)
+
+	user, _ := c.Get("user")
+	viewer, _ := user.(*models.User)
+	if userHasAdminOrRoot(viewer) {
+		c.JSON(http.StatusOK, events)
+		return
+	}
+
+	// 一般ユーザー向け: 未発表(preparing/testing)は除外し、未公開アンケートURLは返さない
+	visible := make([]*models.Event, 0, len(events))
+	for _, event := range events {
+		if event == nil {
+			continue
+		}
+		if event.Status == models.EventStatusPreparing || event.Status == models.EventStatusTesting {
+			continue
+		}
+		visible = append(visible, sanitizeEventForPublic(event))
+	}
+	c.JSON(http.StatusOK, visible)
 }
 
 func (h *EventHandler) UpdateEvent(c *gin.Context) {
@@ -447,8 +466,19 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false, "test_run_state": testRunState})
 		return
 	}
+	user, _ := c.Get("user")
+	viewer, _ := user.(*models.User)
+	if !userHasAdminOrRoot(viewer) && (event.Status == models.EventStatusPreparing || event.Status == models.EventStatusTesting) {
+		c.JSON(http.StatusOK, gin.H{"event_id": nil, "event_name": nil, "competition_guidelines_pdf_url": nil, "hide_scores": false, "test_run_state": ""})
+		return
+	}
 	if testRunState == "" && event.Status == models.EventStatusTesting {
 		testRunState = models.EventTestRunStateTesting
+	}
+
+	surveyURL := event.SurveyUrl
+	if !event.IsSurveyPublished {
+		surveyURL = nil
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -463,11 +493,23 @@ func (h *EventHandler) GetActiveEvent(c *gin.Context) {
 		"status":                           event.Status,
 		"is_rainy_mode":                    event.IsRainyMode,
 		"competition_guidelines_pdf_url":   event.CompetitionGuidelinesPdfUrl,
-		"survey_url":                       event.SurveyUrl,
+		"survey_url":                       surveyURL,
 		"is_survey_published":              event.IsSurveyPublished,
 		"hide_scores":                      event.HideScores,
 		"test_run_state":                   testRunState,
 	})
+}
+
+// sanitizeEventForPublic returns a shallow copy with unpublished survey URLs removed.
+func sanitizeEventForPublic(event *models.Event) *models.Event {
+	if event == nil {
+		return nil
+	}
+	copy := *event
+	if !copy.IsSurveyPublished {
+		copy.SurveyUrl = nil
+	}
+	return &copy
 }
 
 func (h *EventHandler) SetActiveEvent(c *gin.Context) {
