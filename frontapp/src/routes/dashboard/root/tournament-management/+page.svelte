@@ -6,6 +6,7 @@
     import { get } from 'svelte/store';
     import { dndzone } from 'svelte-dnd-action';
     import type { BracketData, BracketInstance, Match, Side, Player } from '@snct-sportease/matchline';
+    import { getMatchlineOptions } from '$lib/utils/matchlineOptions.js';
 
     type AppMatch = Omit<Match, 'id' | 'sides'> & { id?: number | string; sides?: (Side & { teamId?: number })[] };
     type TournamentData = Omit<BracketData, 'matches'> & { matches?: AppMatch[] };
@@ -411,7 +412,7 @@
             bracketInstances.get(tournament.id)?.uninstall?.();
             wrapper.innerHTML = '';
             const bracketData: BracketData = { ...tournament.data, matches: tournament.data.matches?.map((match) => ({ ...match, id: match.id == null ? undefined : String(match.id) })) };
-            bracketInstances.set(tournament.id, createBracket(bracketData, wrapper));
+            bracketInstances.set(tournament.id, createBracket(bracketData, wrapper, getMatchlineOptions()));
         }
     }
 

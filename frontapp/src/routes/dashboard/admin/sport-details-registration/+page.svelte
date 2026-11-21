@@ -7,6 +7,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/env';
   import type { BracketData, BracketInstance, Match } from '@snct-sportease/matchline';
+  import { getMatchlineOptions } from '$lib/utils/matchlineOptions.js';
   type StoredMatch = Omit<Match, 'id' | 'startTime'> & { startTime?: string; id: number | string; isLoserBracketMatch?: boolean; loserBracketBlock?: string; loserBracketRound?: number; rainyModeStartTime?: string | null };
   type StoredData = Omit<BracketData, 'matches'> & { matches: StoredMatch[] };
   type Tournament = { id: number; sport_id: number; name: string; data: StoredData | null };
@@ -232,7 +233,7 @@
           try {
             const { createBracket } = await import('@snct-sportease/matchline');
             if (version !== bracketVersion) return;
-            bracketInstance = createBracket({ ...selectedTournament.data, matches: selectedTournament.data.matches.map((match) => ({ ...match, id: String(match.id) })) }, wrapper);
+            bracketInstance = createBracket({ ...selectedTournament.data, matches: selectedTournament.data.matches.map((match) => ({ ...match, id: String(match.id) })) }, wrapper, getMatchlineOptions());
           } catch (error) {
             console.error('Failed to load createBracket:', error);
             wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';

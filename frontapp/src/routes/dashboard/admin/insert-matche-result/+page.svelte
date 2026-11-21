@@ -8,6 +8,7 @@
 	import { canEnterEventResults } from '$lib/utils/eventStatus.js';
 	import type { LayoutData } from '../$types';
 	import type { BracketData, BracketInstance, Match, Side } from '@snct-sportease/matchline';
+	import { getMatchlineOptions } from '$lib/utils/matchlineOptions.js';
 
 	type AppSide = Side & { teamId?: number };
 	type AppMatch = Omit<Match, 'id' | 'sides'> & { id: number; sides?: AppSide[]; isLoserBracketMatch?: boolean; loserBracketBlock?: string };
@@ -242,7 +243,7 @@
 						const { createBracket } = await import('@snct-sportease/matchline');
 						if (version !== bracketVersion) return;
 						const bracketData: BracketData = { ...selectedTournament.data, matches: selectedTournament.data.matches?.map((match) => ({ ...match, id: String(match.id) })) };
-						bracketInstance = createBracket(bracketData, wrapper);
+						bracketInstance = createBracket(bracketData, wrapper, getMatchlineOptions());
 					} catch (error) {
 						console.error('Failed to load createBracket:', error);
 						wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';

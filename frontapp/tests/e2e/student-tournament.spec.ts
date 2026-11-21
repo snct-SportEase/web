@@ -55,6 +55,24 @@ test.describe('トーナメント閲覧 (student)', () => {
     await expect(page.locator('#bracket-1 .ml-root')).toBeVisible();
   });
 
+  test('参加者にホバーすると勝ち上がり経路を強調する', async ({ page }) => {
+    const participant = page.locator('#bracket-1 .ml-team[data-contestant-key]').first();
+    await expect(participant).toBeVisible();
+    await participant.hover();
+    await expect(participant).toHaveClass(/ml-team--highlighted/);
+  });
+
+  test.describe('タッチ端末', () => {
+    test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+    test('参加者をタップすると勝ち上がり経路を強調する', async ({ page }) => {
+      const participant = page.locator('#bracket-1 .ml-team[data-contestant-key]').first();
+      await expect(participant).toBeVisible();
+      await participant.tap();
+      await expect(participant).toHaveClass(/ml-team--highlighted/);
+    });
+  });
+
   test('通常競技と盤上競技のトーナメント表をどちらも表示する', async ({ page }) => {
     await page.route('**/api/student/events/1/tournaments', async (route) => {
       await route.fulfill({

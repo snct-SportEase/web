@@ -4,6 +4,7 @@
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
     import type { BracketData, BracketInstance } from '@snct-sportease/matchline';
+    import { getMatchlineOptions } from '$lib/utils/matchlineOptions.js';
 
     type Tournament = { id: number; name: string; sport_id: number; data: BracketData | null };
     type TournamentResponse = Omit<Tournament, 'data'> & { data: BracketData | string | null };
@@ -107,7 +108,14 @@
             try {
                 const { createBracket } = await import('@snct-sportease/matchline');
                 if (currentVersion !== renderVersion) return;
-                bracketInstance = createBracket(data, node);
+                const bracketData: BracketData = {
+                    ...data,
+                    matches: data.matches?.map((match) => ({
+                        ...match,
+                        id: match.id == null ? undefined : String(match.id)
+                    }))
+                };
+                bracketInstance = createBracket(bracketData, node, getMatchlineOptions());
             } catch (error) {
                 console.error('Failed to load createBracket:', error);
                 if (currentVersion === renderVersion) {
