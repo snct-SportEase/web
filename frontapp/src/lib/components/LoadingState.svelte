@@ -1,9 +1,9 @@
-<script>
+<script lang="ts">
   let {
     label = '読み込み中...',
     size = 'md',
     class: className = ''
-  } = $props();
+  }: { label?: string; size?: 'sm' | 'md'; class?: string } = $props();
 
   const spinnerSize = $derived(size === 'sm' ? 'h-5 w-5' : 'h-10 w-10');
 </script>

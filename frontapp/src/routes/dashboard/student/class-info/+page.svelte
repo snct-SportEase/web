@@ -1,25 +1,26 @@
-<script>
+<script lang="ts">
   import { page } from '$app/state';
+  import type { PageData } from './$types';
 
-  let data = $derived(page.data);
+  let data = $derived(page.data as PageData);
   let classInfo = $derived(data.classInfo);
   let className = $derived(data.className);
   let progressEntries = $derived(data.progress ?? []);
 
   const formatter = new Intl.NumberFormat('ja-JP');
 
-  function formatCount(value) {
+  function formatCount(value: number | null | undefined): string {
     return formatter.format(value ?? 0);
   }
 
-  function calcAttendanceRate(item) {
+  function calcAttendanceRate(item: { student_count?: number; attend_count?: number } | null | undefined): number {
     if (!item) return 0;
     const studentCount = item.student_count ?? 0;
     if (studentCount === 0) return 0;
     return ((item.attend_count ?? 0) / studentCount) * 100;
   }
 
-  function formatJapanDateTime(value) {
+  function formatJapanDateTime(value: string | null | undefined): string {
     if (!value) return '未定';
 
     const raw = String(value).trim();

@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	let Chart = $state.raw(null);
+	import type { PageData } from './$types';
+	let Chart = $state.raw<typeof import('chart.js/auto').default | null>(null);
 
-	let { data } = $props();
+	let { data }: { data: PageData } = $props();
 
-	let scoreBreakdownChart;
+	let scoreBreakdownChart: import('chart.js').Chart<'bar', number[], string> | null = null;
 
 	let user = $derived(data.user);
 	let myClassScore = $derived(data.myClassScore);
@@ -35,7 +36,7 @@
 			: '現在の順位'
 		: '');
 
-	function formatJapanDateTime(value) {
+	function formatJapanDateTime(value: string | null | undefined): string {
 		if (!value) return '未定';
 
 		const raw = String(value).trim();
@@ -61,7 +62,8 @@
 		});
 	}
 
-	function createChart(ctx, labels, values) {
+	function createChart(ctx: HTMLCanvasElement, labels: string[], values: number[]) {
+		if (!Chart) return;
 		scoreBreakdownChart = new Chart(ctx, {
 			type: 'bar',
 			data: {
@@ -125,7 +127,7 @@
 		const values = categoryBreakdown.map((item) => item.value);
 
 		const canvas = document.getElementById('scoreBreakdownChart');
-		if (!canvas) {
+		if (!(canvas instanceof HTMLCanvasElement)) {
 			return;
 		}
 
@@ -209,7 +211,7 @@
 			</svg>
 			<span class="text-red-800 font-medium">{errorMessage}</span>
 		</div>
-	{:else if user && hasScore}
+	{:else if user && myClassScore}
 		<div class="space-y-8">
 			<section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 				<!-- プロフィールカード -->
@@ -352,7 +354,7 @@
 						種目別の詳細
 					</h2>
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-						{#each sportSections as section (section.sport_id || section.id)}
+						{#each sportSections as section (section.location)}
 							<div class="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm hover:shadow-md transition-shadow">
 								<div class="flex items-center justify-between mb-4">
 									<h3 class="text-lg font-semibold text-gray-900">{section.label}</h3>
@@ -360,7 +362,7 @@
 								</div>
 								<div class="border-t border-gray-200 my-3"></div>
 								<ul class="space-y-2 text-sm">
-									{#each section.entries as entry (entry.id || entry.label)}
+									{#each section.entries as entry (entry.key)}
 										<li class="flex items-center justify-between py-1">
 											<span class="text-gray-600">{entry.label}</span>
 											<span class="font-semibold text-gray-900">{entry.value} 点</span>

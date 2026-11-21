@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
+  import type { Snippet } from 'svelte';
   let {
     title,
     description = null,
     children,
     class: className = ''
-  } = $props();
+  }: { title: string; description?: string | null; children?: Snippet; class?: string } = $props();
 </script>
 
 <header class={`mb-6 flex flex-wrap items-start justify-between gap-4 ${className}`}>

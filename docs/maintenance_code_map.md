@@ -36,16 +36,16 @@
 | `frontapp/src/routes/` | 画面とSvelteKitのルーティング。URLとほぼ同じ構造 |
 | `frontapp/src/routes/+page.svelte` | ログイン前トップページ |
 | `frontapp/src/routes/+layout.svelte` | アプリ全体の共通レイアウト |
-| `frontapp/src/routes/+layout.server.js` | ルートレイアウトのサーバー側ロード処理 |
+| `frontapp/src/routes/+layout.server.ts` | ルートレイアウトのサーバー側ロード処理 |
 | `frontapp/src/routes/dashboard/+layout.svelte` | ログイン後ダッシュボードの共通レイアウト、ヘッダー、フッター、PWA通知導線 |
-| `frontapp/src/routes/dashboard/+layout.server.js` | ダッシュボード共通のユーザー情報受け渡し |
+| `frontapp/src/routes/dashboard/+layout.server.ts` | ダッシュボード共通のユーザー情報受け渡し |
 | `frontapp/src/routes/dashboard/+page.svelte` | ダッシュボードトップ |
 | `frontapp/src/lib/components/` | 複数画面で使うSvelteコンポーネント |
 | `frontapp/src/lib/stores/` | Svelteストア。サイドバー、イベント、通知バッジ、Push購読状態など |
 | `frontapp/src/lib/utils/` | PWA、Push通知、HTMLサニタイズなどの共通処理 |
 | `frontapp/src/app.css` | グローバルCSS |
 | `frontapp/src/app.html` | HTMLテンプレート |
-| `frontapp/src/service-worker.js` | PWAキャッシュとPush通知受信 |
+| `frontapp/src/service-worker.ts` | PWAキャッシュとPush通知受信 |
 | `frontapp/static/` | manifestやアイコンなど静的ファイル |
 
 ### 役割別画面
@@ -63,13 +63,13 @@
 
 | 場所 | 内容 |
 | --- | --- |
-| `frontapp/vite.config.js` | `/api` をバックエンドへプロキシ。テスト設定もここにある |
-| `frontapp/src/hooks.server.js` | 本番の`/api`・`/swagger`プロキシ。クライアントIPを正規化し、更新系リクエストの同一オリジン/CSRF検証を行う |
-| `frontapp/src/lib/server/backendProxyHeaders.js` | バックエンドへ渡す転送ヘッダーを構築。クライアント提供の`X-Forwarded-*`を破棄する |
-| `frontapp/src/lib/server/csrfProxy.js` | 更新系のプロキシ要求へCSRFトークンを注入する条件を検証 |
-| `frontapp/src/lib/server/backendSessionHeaders.js` | サーバー側からバックエンドを呼ぶ際のセッション・CSRFヘッダーを構築 |
-| `frontapp/src/routes/api/notifications/+server.js` | フロント側の通知API補助 |
-| `frontapp/src/routes/api/notifications/subscription/+server.js` | Push購読に関するフロント側API補助 |
+| `frontapp/vite.config.ts` | `/api` をバックエンドへプロキシ。テスト設定もここにある |
+| `frontapp/src/hooks.server.ts` | 本番の`/api`・`/swagger`プロキシ。クライアントIPを正規化し、更新系リクエストの同一オリジン/CSRF検証を行う |
+| `frontapp/src/lib/server/backendProxyHeaders.ts` | バックエンドへ渡す転送ヘッダーを構築。クライアント提供の`X-Forwarded-*`を破棄する |
+| `frontapp/src/lib/server/csrfProxy.ts` | 更新系のプロキシ要求へCSRFトークンを注入する条件を検証 |
+| `frontapp/src/lib/server/backendSessionHeaders.ts` | サーバー側からバックエンドを呼ぶ際のセッション・CSRFヘッダーを構築 |
+| `frontapp/src/routes/api/notifications/+server.ts` | フロント側の通知API補助 |
+| `frontapp/src/routes/api/notifications/subscription/+server.ts` | Push購読に関するフロント側API補助 |
 | 各 `+page.server.js` | 対象ページのサーバー側データ取得や権限確認 |
 
 ## バックエンド
@@ -112,7 +112,7 @@ APIの入口は `backapp/internal/router/router.go` です。保守時は次の�
 | `backapp/internal/middleware/csrf.go` | Cookie認証の更新系APIでCSRFトークンを検証 |
 | `backapp/internal/middleware/ratelimit.go`, `user_ratelimit.go` | 認証前のIP単位制限と、Redisを使う認証後ユーザー単位制限 |
 | `backapp/internal/repository/user_repository.go` | ユーザー、ロール、プロフィール関連のDB処理 |
-| `frontapp/src/routes/dashboard/+layout.server.js` | ログイン後画面へユーザー情報を渡す入口 |
+| `frontapp/src/routes/dashboard/+layout.server.ts` | ログイン後画面へユーザー情報を渡す入口 |
 | `frontapp/src/routes/dashboard/root/user-promotion/` | rootによるユーザー昇格・降格画面 |
 | `frontapp/src/lib/components/ProfileSetupModal.svelte` | 初回プロフィール設定 |
 | `frontapp/src/lib/components/EditDisplayNameModal.svelte` | 表示名変更 |
@@ -122,25 +122,25 @@ APIの入口は `backapp/internal/router/router.go` です。保守時は次の�
 
 | 機能 | フロント | バックエンドhandler | repository/model | テストの場所 |
 | --- | --- | --- | --- | --- |
-| 学生マイページ（参加試合・結果・クラス状況・通知・資料） | `frontapp/src/routes/dashboard/student/my-page/+page.svelte`, `+page.server.js` | `event_handler.go`, `class_handler.go`, `barcode_handler.go`, `tournament_handler.go`, `noon_game_handler.go`, `notification_handler.go`, `sport_handler.go` | `event_repository.go`, `class_repository.go`, `team_repository.go`, `tournament_repository.go`, `noon_game_repository.go`, `notification_repository.go`, `sport_repository.go` | `frontapp/tests/unit/routes/dashboard/student/my-page/my-page.server.spec.js`, `frontapp/tests/e2e/student-my-page-hidden-scores.spec.js` |
-| イベント管理（準備中ステータス・重複登録のクラス人数上限を含む） | `frontapp/src/routes/dashboard/root/event-management/` | `event_handler.go` | `event_repository.go`, `event.go`, `db/migrations/000005_add_duplicate_registration_threshold.*.sql`, `db/migrations/000006_add_preparing_event_status.*.sql` | `backapp/tests/handler/event_handler_test.go`, `backapp/tests/repository/event_repository_test.go`, `backapp/tests/middleware/event_status_test.go`, `frontapp/tests/e2e/root-event-management.spec.js` |
-| 競技管理（競技ルールはPDFのみ） | `frontapp/src/routes/dashboard/root/sport-management/`, `frontapp/src/routes/dashboard/admin/sport-details-registration/`, `frontapp/src/routes/dashboard/student/sport-info/` | `sport_handler.go`, `pdf_handler.go` | `sport_repository.go`, `sport.go` | `backapp/tests/handler/sport_handler_test.go`, `backapp/tests/repository/sport_repository_test.go`, `frontapp/tests/e2e/root-sport-management.spec.js` |
-| トーナメント管理（通常・盤上競技） | `frontapp/src/routes/dashboard/root/tournament-management/`, `frontapp/src/routes/dashboard/student/tournament/` | `tournament_handler.go`, `tournament_export_handler.go`, `all_tournament_handler.go`, `board_game_handler.go` | `tournament_repository.go`, `board_game_repository.go`, `team_repository.go`, `tournament.go`, `board_game.go` | `backapp/tests/handler/all_tournament_handler_test.go`, `backapp/internal/handler/board_game_handler_test.go`, `backapp/internal/repository/board_game_repository_test.go`, `backapp/tests/repository/tournament_repository_test.go`, `frontapp/tests/unit/routes/dashboard/root/tournament-management/tournament-management.svelte.spec.js`, `frontapp/tests/e2e/root-tournament-management.spec.js`, `frontapp/tests/e2e/student-tournament.spec.js` |
+| 学生マイページ（参加試合・結果・クラス状況・通知・資料） | `frontapp/src/routes/dashboard/student/my-page/+page.svelte`, `+page.server.js` | `event_handler.go`, `class_handler.go`, `barcode_handler.go`, `tournament_handler.go`, `noon_game_handler.go`, `notification_handler.go`, `sport_handler.go` | `event_repository.go`, `class_repository.go`, `team_repository.go`, `tournament_repository.go`, `noon_game_repository.go`, `notification_repository.go`, `sport_repository.go` | `frontapp/tests/unit/routes/dashboard/student/my-page/my-page.server.spec.ts`, `frontapp/tests/e2e/student-my-page-hidden-scores.spec.ts` |
+| イベント管理（準備中ステータス・重複登録のクラス人数上限を含む） | `frontapp/src/routes/dashboard/root/event-management/` | `event_handler.go` | `event_repository.go`, `event.go`, `db/migrations/000005_add_duplicate_registration_threshold.*.sql`, `db/migrations/000006_add_preparing_event_status.*.sql` | `backapp/tests/handler/event_handler_test.go`, `backapp/tests/repository/event_repository_test.go`, `backapp/tests/middleware/event_status_test.go`, `frontapp/tests/e2e/root-event-management.spec.ts` |
+| 競技管理（競技ルールはPDFのみ） | `frontapp/src/routes/dashboard/root/sport-management/`, `frontapp/src/routes/dashboard/admin/sport-details-registration/`, `frontapp/src/routes/dashboard/student/sport-info/` | `sport_handler.go`, `pdf_handler.go` | `sport_repository.go`, `sport.go` | `backapp/tests/handler/sport_handler_test.go`, `backapp/tests/repository/sport_repository_test.go`, `frontapp/tests/e2e/root-sport-management.spec.ts` |
+| トーナメント管理（通常・盤上競技） | `frontapp/src/routes/dashboard/root/tournament-management/`, `frontapp/src/routes/dashboard/student/tournament/` | `tournament_handler.go`, `tournament_export_handler.go`, `all_tournament_handler.go`, `board_game_handler.go` | `tournament_repository.go`, `board_game_repository.go`, `team_repository.go`, `tournament.go`, `board_game.go` | `backapp/tests/handler/all_tournament_handler_test.go`, `backapp/internal/handler/board_game_handler_test.go`, `backapp/internal/repository/board_game_repository_test.go`, `backapp/tests/repository/tournament_repository_test.go`, `frontapp/tests/unit/routes/dashboard/root/tournament-management/tournament-management.svelte.spec.ts`, `frontapp/tests/e2e/root-tournament-management.spec.ts`, `frontapp/tests/e2e/student-tournament.spec.ts` |
 | 学生向け結果一覧 | `frontapp/src/routes/dashboard/student/results/` | `tournament_handler.go`, `noon_game_handler.go` | `tournament_repository.go`, `noon_game_repository.go` | 専用フロントテスト未整備（通常試合・昼競技APIはバックエンドテストで確認） |
 | 試合結果入力 | `frontapp/src/routes/dashboard/admin/insert-matche-result/`, `frontapp/src/lib/components/InsertMatchResultModal.svelte`, `frontapp/src/lib/components/ConfirmMatchResultModal.svelte` | `tournament_handler.go` | `tournament_repository.go`, `class_score_repository.go` | `backapp/tests/handler/tournament_export_handler_test.go` など |
-| 昼競技・タイピング結果取込 | `frontapp/src/routes/dashboard/root/noon-game/`, `frontapp/src/routes/dashboard/admin/noon-game-results/`, `frontapp/src/routes/dashboard/student/noon-game/` | `noon_game_handler.go` | `noon_game_repository.go`, `noon_game.go` | `backapp/tests/handler/noon_game_*.go`, `frontapp/tests/e2e/root-noon-game.spec.js`, `frontapp/tests/e2e/admin-noon-game-results.spec.js`, `frontapp/tests/e2e/root-typing-results-import.spec.js` |
-| 雨天モード | `frontapp/src/routes/dashboard/root/rainy-mode/` | `rainy_mode_handler.go`, `event_handler.go` | `rainy_mode_repository.go`, `rainy_mode_setting.go` | `backapp/tests/handler/rainy_mode_handler_test.go`, `backapp/tests/repository/rainy_mode_repository_test.go`, `frontapp/tests/e2e/root-rainy-mode.spec.js` |
+| 昼競技・タイピング結果取込 | `frontapp/src/routes/dashboard/root/noon-game/`, `frontapp/src/routes/dashboard/admin/noon-game-results/`, `frontapp/src/routes/dashboard/student/noon-game/` | `noon_game_handler.go` | `noon_game_repository.go`, `noon_game.go` | `backapp/tests/handler/noon_game_*.go`, `frontapp/tests/e2e/root-noon-game.spec.ts`, `frontapp/tests/e2e/admin-noon-game-results.spec.ts`, `frontapp/tests/e2e/root-typing-results-import.spec.ts` |
+| 雨天モード | `frontapp/src/routes/dashboard/root/rainy-mode/` | `rainy_mode_handler.go`, `event_handler.go` | `rainy_mode_repository.go`, `rainy_mode_setting.go` | `backapp/tests/handler/rainy_mode_handler_test.go`, `backapp/tests/repository/rainy_mode_repository_test.go`, `frontapp/tests/e2e/root-rainy-mode.spec.ts` |
 | クラス・チーム管理（重複登録判定を含む） | `frontapp/src/routes/dashboard/admin/class-management/`, `frontapp/src/routes/dashboard/student/class-info/` | `class_handler.go`, `class_team_handler.go` | `class_repository.go`, `team_repository.go`, `class.go`, `team.go`, `event.go` | `backapp/tests/handler/class_handler_test.go`, `backapp/tests/handler/class_team_handler_test.go`, `backapp/tests/repository/class_repository_test.go`, `backapp/tests/repository/team_repository_test.go` |
-| クラス在籍人数 | `frontapp/src/routes/dashboard/root/class-student-count/` | `class_handler.go` | `class_repository.go` | `backapp/tests/handler/class_handler_export_test.go`, `frontapp/tests/e2e/root-class-student-count.spec.js` |
-| 出席管理 | `frontapp/src/routes/dashboard/admin/attendance-management/` | `attendance_handler.go` | `class_repository.go`, `event_repository.go` | `backapp/tests/handler/attendance_handler_test.go`, `frontapp/tests/e2e/admin-barcode-check-in.spec.js` |
-| バーコード/MyID | `frontapp/src/routes/dashboard/admin/barcode-reader/` | `barcode_handler.go`, `barcode_noon_game.go` | `team_repository.go`, `noon_game_repository.go`, `team.go`, `noon_game.go` | `backapp/tests/handler/barcode_handler_test.go`, `backapp/tests/handler/barcode_noon_game_test.go`, `frontapp/tests/e2e/admin-barcode-check-in.spec.js` |
-| 通知配信 | `frontapp/src/routes/dashboard/root/notification/`, `frontapp/src/routes/dashboard/student/notification/`, `frontapp/src/lib/components/NotificationSettings.svelte` | `notification_handler.go`, `event_handler.go`, `push_subscription.go`, `push_dispatch.go` | `notification_repository.go`, `notification.go`, `push/sender.go` | `backapp/tests/handler/notification_handler_test.go`, `backapp/internal/push/sender_test.go`, `frontapp/tests/e2e/root-notification.spec.js` |
-| 通知申請 | `frontapp/src/routes/dashboard/root/notification-requests/`, `frontapp/src/routes/dashboard/student/notification-request/` | `notification_request_handler.go` | `notification_request_repository.go`, `notification_request.go` | `backapp/tests/handler/notification_handler_test.go`, `frontapp/tests/e2e/root-notification-requests.spec.js` |
-| PWA/Push購読 | `frontapp/src/service-worker.js`, `frontapp/src/lib/utils/push.js`, `frontapp/src/lib/utils/pwa.js`, `frontapp/src/lib/stores/pushSubscriptionStore.js`, `frontapp/src/lib/components/NotificationSettings.svelte`, `frontapp/src/lib/components/PWAInstallPromptModal.svelte`, `frontapp/src/routes/api/notifications/subscription/+server.js` | `notification_handler.go`, `push/sender.go` | `notification_repository.go` | `NOTIFICATION_TROUBLESHOOTING.md`, `backapp/internal/push/sender_test.go`, `frontapp/tests/unit/lib/server/csrfProxy.spec.js`, `frontapp/tests/unit/lib/server/backendProxyHeaders.spec.js` |
-| MIC(行事委員会賞) | `frontapp/src/routes/dashboard/root/identify-mic/`, `frontapp/src/routes/dashboard/admin/vorting-mic/` | `mic_handler.go` | `mic_repository.go`, `mic.go` | `backapp/tests/handler/mic_handler_test.go`, `backapp/tests/repository/mic_repository_test.go`, `frontapp/tests/e2e/root-identify-mic.spec.js` |
-| 競技ガイド資料 | `frontapp/src/routes/dashboard/root/competition-guidelines-upload/`, `frontapp/src/routes/dashboard/guide/` | `guide_document_handler.go`, `event_handler.go` | `guide_document_repository.go`, `guide_document.go` | `backapp/tests/handler/guide_document_handler_test.go`, `frontapp/tests/e2e/root-competition-guidelines-upload.spec.js` |
+| クラス在籍人数 | `frontapp/src/routes/dashboard/root/class-student-count/` | `class_handler.go` | `class_repository.go` | `backapp/tests/handler/class_handler_export_test.go`, `frontapp/tests/e2e/root-class-student-count.spec.ts` |
+| 出席管理 | `frontapp/src/routes/dashboard/admin/attendance-management/` | `attendance_handler.go` | `class_repository.go`, `event_repository.go` | `backapp/tests/handler/attendance_handler_test.go`, `frontapp/tests/e2e/admin-barcode-check-in.spec.ts` |
+| バーコード/MyID | `frontapp/src/routes/dashboard/admin/barcode-reader/` | `barcode_handler.go`, `barcode_noon_game.go` | `team_repository.go`, `noon_game_repository.go`, `team.go`, `noon_game.go` | `backapp/tests/handler/barcode_handler_test.go`, `backapp/tests/handler/barcode_noon_game_test.go`, `frontapp/tests/e2e/admin-barcode-check-in.spec.ts` |
+| 通知配信 | `frontapp/src/routes/dashboard/root/notification/`, `frontapp/src/routes/dashboard/student/notification/`, `frontapp/src/lib/components/NotificationSettings.svelte` | `notification_handler.go`, `event_handler.go`, `push_subscription.go`, `push_dispatch.go` | `notification_repository.go`, `notification.go`, `push/sender.go` | `backapp/tests/handler/notification_handler_test.go`, `backapp/internal/push/sender_test.go`, `frontapp/tests/e2e/root-notification.spec.ts` |
+| 通知申請 | `frontapp/src/routes/dashboard/root/notification-requests/`, `frontapp/src/routes/dashboard/student/notification-request/` | `notification_request_handler.go` | `notification_request_repository.go`, `notification_request.go` | `backapp/tests/handler/notification_handler_test.go`, `frontapp/tests/e2e/root-notification-requests.spec.ts` |
+| PWA/Push購読 | `frontapp/src/service-worker.ts`, `frontapp/src/lib/utils/push.ts`, `frontapp/src/lib/utils/pwa.ts`, `frontapp/src/lib/stores/pushSubscriptionStore.ts`, `frontapp/src/lib/components/NotificationSettings.svelte`, `frontapp/src/lib/components/PWAInstallPromptModal.svelte`, `frontapp/src/routes/api/notifications/subscription/+server.ts` | `notification_handler.go`, `push/sender.go` | `notification_repository.go` | `NOTIFICATION_TROUBLESHOOTING.md`, `backapp/internal/push/sender_test.go`, `frontapp/tests/unit/lib/server/csrfProxy.spec.ts`, `frontapp/tests/unit/lib/server/backendProxyHeaders.spec.ts` |
+| MIC(行事委員会賞) | `frontapp/src/routes/dashboard/root/identify-mic/`, `frontapp/src/routes/dashboard/admin/vorting-mic/` | `mic_handler.go` | `mic_repository.go`, `mic.go` | `backapp/tests/handler/mic_handler_test.go`, `backapp/tests/repository/mic_repository_test.go`, `frontapp/tests/e2e/root-identify-mic.spec.ts` |
+| 競技ガイド資料 | `frontapp/src/routes/dashboard/root/competition-guidelines-upload/`, `frontapp/src/routes/dashboard/guide/` | `guide_document_handler.go`, `event_handler.go` | `guide_document_repository.go`, `guide_document.go` | `backapp/tests/handler/guide_document_handler_test.go`, `frontapp/tests/e2e/root-competition-guidelines-upload.spec.ts` |
 | 統計 | `frontapp/src/routes/dashboard/admin/manage-dashboard/` | `statistics_handler.go` | `class_repository.go`, `sport_repository.go`, `tournament_repository.go` | `backapp/tests/handler/statistics_handler_test.go` |
-| システムバックアップ | `frontapp/src/routes/dashboard/root/event-management/` | `system_handler.go` | DB dump、uploads dump | `backapp/tests/handler/system_handler_test.go`, `backapp/internal/handler/system_handler_dump_test.go`, `frontapp/tests/unit/routes/dashboard/root/event-management/event-management.svelte.spec.js`, `frontapp/tests/e2e/root-event-management.spec.js` |
+| システムバックアップ | `frontapp/src/routes/dashboard/root/event-management/` | `system_handler.go` | DB dump、uploads dump | `backapp/tests/handler/system_handler_test.go`, `backapp/internal/handler/system_handler_dump_test.go`, `frontapp/tests/unit/routes/dashboard/root/event-management/event-management.svelte.spec.ts`, `frontapp/tests/e2e/root-event-management.spec.ts` |
 | WebSocket | トーナメント/進行状況表示画面 | `websocket_handler.go` | `backapp/internal/websocket/` | `backapp/tests/handler/websocket_handler_test.go`, `backapp/internal/websocket/*_test.go` |
 
 ### 性能・並行処理まわり
@@ -211,7 +211,7 @@ DB変更時は、既存のSQLを直接書き換えるのではなく、新しい
 | `frontapp/.env` | フロントエンド用の環境変数 |
 | `frontapp/.env.sample` | フロントエンド環境変数のサンプル |
 | `backapp/internal/config/config.go` | バックエンドが読む環境変数の一覧 |
-| `frontapp/vite.config.js` | `BACKEND_URL` / `PUBLIC_BACKEND_URL` を使ったAPIプロキシ |
+| `frontapp/vite.config.ts` | `BACKEND_URL` / `PUBLIC_BACKEND_URL` を使ったAPIプロキシ |
 | `docker-compose.yml` | ローカル/検証用。Traefik、MySQL、Redis、migrate、frontapp、backapp |
 | `docker-compose.production.yml` | 本番用。HTTPS、セキュリティヘッダー、Traefik設定 |
 
@@ -252,7 +252,7 @@ DB変更時は、既存のSQLを直接書き換えるのではなく、新しい
 ### 通知が届かない
 
 1. `NOTIFICATION_TROUBLESHOOTING.md` を先に確認する。
-2. フロントは `frontapp/src/service-worker.js`、`frontapp/src/lib/utils/push.js`、`frontapp/src/lib/stores/pushSubscriptionStore.js` を見る。
+2. フロントは `frontapp/src/service-worker.ts`、`frontapp/src/lib/utils/push.ts`、`frontapp/src/lib/stores/pushSubscriptionStore.ts` を見る。
 3. バックエンドは `notification_handler.go`、アンケート通知なら `event_handler.go`、購読/対象者取得は `notification_repository.go` を見る。
 4. VAPID鍵は `.env` と `frontapp/.env` の両方を確認する。
 

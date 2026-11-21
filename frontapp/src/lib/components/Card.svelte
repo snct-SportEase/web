@@ -1,5 +1,6 @@
-<script>
-  let { variant = 'default', children, class: className = '' } = $props();
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+  let { variant = 'default', children, class: className = '' }: { variant?: 'default' | 'featured'; children?: Snippet; class?: string } = $props();
 
   const variantClass = $derived(
     variant === 'featured' ? 'border-indigo-100' : 'border-gray-200'

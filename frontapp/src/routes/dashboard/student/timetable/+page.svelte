@@ -1,16 +1,22 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import { fetchPublishedNoonGameSessions } from '$lib/utils/noonGameSessions.js';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
+    import type { BracketData, Match, Side } from '@snct-sportease/matchline';
 
-    let scheduleItems = $state([]);
+    type TournamentMatch = Omit<Match, 'id' | 'startTime'> & { id?: string | number; startTime?: string; rainyModeStartTime?: string };
+    type TournamentData = Omit<BracketData, 'matches'> & { matches?: TournamentMatch[] };
+    type Tournament = { id: number; name: string; data: TournamentData | string | null };
+    type ScheduleItem = { id: string; type: 'sport' | 'noon'; title: string; subtitle: string; timeStr: string; timeObj: Date; status: string };
+
+    let scheduleItems = $state<ScheduleItem[]>([]);
     let isLoading = $state(true);
 
     // ヘルパー：hh:mm 形式に変換
     // DBに "YYYY-MM-DD HH:MM:SS" 形式（スペース区切り）で保存されているため、
     // JavaScriptのDateでUTC解釈されないよう、文字列から直接時刻を抽出する
-    function formatTime(dateStr) {
+    function formatTime(dateStr: string | null | undefined): string {
         if (!dateStr) return '未定';
         try {
             const match = dateStr.match(/\d{4}-\d{2}-\d{2}[T ]\s*(\d{2}):(\d{2})/);
@@ -39,12 +45,12 @@
 
         isLoading = true;
         try {
-            const rawItems = [];
+            const rawItems: ScheduleItem[] = [];
 
             // 1. トーナメント（一般競技）の取得
             const tourRes = await fetch(`/api/student/events/${currentEvent.id}/tournaments`);
             if (tourRes.ok) {
-                const tournaments = await tourRes.json();
+                const tournaments: Tournament[] = await tourRes.json();
                 for (const tour of tournaments) {
                     let data = tour.data;
                     if (typeof data === 'string') {
@@ -54,7 +60,8 @@
                             continue;
                         }
                     }
-                    if (data && data.matches) {
+                    if (data && typeof data !== 'string' && data.matches) {
+                        const tournamentData = data;
                         for (const match of data.matches) {
                             // 開始予定時間（通常 or 雨天時）を取得
                             // 雨天時モード有効なら rainyModeStartTime を優先
@@ -67,10 +74,10 @@
 
                             if (timeStr) {
                                 // チーム名を抽出（contestants マップ経由で解決）
-                                const getTeamName = (side) => {
+                                const getTeamName = (side: Side | undefined): string => {
                                     if (!side) return "未定";
                                     if (side.title) return side.title;
-                                    const contestant = data.contestants?.[side.contestantId];
+                                    const contestant = side.contestantId ? tournamentData.contestants?.[side.contestantId] : undefined;
                                     return contestant?.players?.[0]?.title || "未定";
                                 };
                                 let team1 = "未定";

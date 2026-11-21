@@ -2,36 +2,43 @@
   This file is for the Sport Details Registration page.
   It allows admins to register and update sport details, including overview, rules PDFs, and match start times.
 -->
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/env';
+  import type { BracketData, BracketInstance, Match } from '@snct-sportease/matchline';
+  type StoredMatch = Omit<Match, 'id' | 'startTime'> & { startTime?: string; id: number | string; isLoserBracketMatch?: boolean; loserBracketBlock?: string; loserBracketRound?: number; rainyModeStartTime?: string | null };
+  type StoredData = Omit<BracketData, 'matches'> & { matches: StoredMatch[] };
+  type Tournament = { id: number; sport_id: number; name: string; data: StoredData | null };
+  type Capacity = { min: number | null; max: number | null };
+  type Team = { class_id: number; event_id: number; min_capacity: number | null; max_capacity: number | null };
+  type RainySetting = { sport_id: number; class_id: number; min_capacity: number | null; max_capacity: number | null };
 
-  let sports = $state([]);
-  let selectedEventId = $state(null);
-  let selectedSportId = $state(null);
-  let sportDetails = $state({ description: '', rules_pdf_url: null });
+  let sports = $state<{ id: number; name: string }[]>([]);
+  let selectedEventId = $state<number | null>(null);
+  let selectedSportId = $state<number | string | null>(null);
+  let sportDetails = $state<{ description: string; rules_pdf_url: string | null }>({ description: '', rules_pdf_url: null });
   let capacityMode = $state('bulk'); // 'bulk' or 'per-class'
-  let minCapacity = $state(null);
-  let maxCapacity = $state(null);
-  let classes = $state([]);
-  let classCapacities = $state({}); // { classId: { min: number | null, max: number | null } }
+  let minCapacity = $state<number | null>(null);
+  let maxCapacity = $state<number | null>(null);
+  let classes = $state<{ id: number; name: string }[]>([]);
+  let classCapacities = $state<Record<number, Capacity>>({}); // { classId: { min: number | null, max: number | null } }
   
   // Rainy mode capacity settings
   let rainyModeCapacityMode = $state('bulk'); // 'bulk' or 'per-class'
-  let rainyModeMinCapacity = $state(null);
-  let rainyModeMaxCapacity = $state(null);
-  let rainyModeClassCapacities = $state({}); // { classId: { min: number | null, max: number | null } }
-  let tournaments = $state([]);
-  let selectedTournamentId = $state(null);
-  let selectedTournament = $state(null);
-  let allMatchesForSport = $state([]); // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合
+  let rainyModeMinCapacity = $state<number | null>(null);
+  let rainyModeMaxCapacity = $state<number | null>(null);
+  let rainyModeClassCapacities = $state<Record<number, Capacity>>({}); // { classId: { min: number | null, max: number | null } }
+  let tournaments = $state<Tournament[]>([]);
+  let selectedTournamentId = $state<number | null>(null);
+  let selectedTournament = $state<Tournament | null>(null);
+  let allMatchesForSport = $state<(StoredMatch & { tournamentName: string; tournamentId: number })[]>([]); // 選択されたスポーツの全てのトーナメント（本戦+敗者戦）の試合
   let bulkStartTime = $state('');
-  let matchStartTimes = $state({});
+  let matchStartTimes = $state<Record<string, string>>({});
   let bulkRainyModeStartTime = $state('');
-  let matchRainyModeStartTimes = $state({});
-  let selectedPdfFile = $state(null);
-  let pdfPreviewUrl = $state(null);
+  let matchRainyModeStartTimes = $state<Record<string, string>>({});
+  let selectedPdfFile = $state<File | null>(null);
+  let pdfPreviewUrl = $state<string | null>(null);
   let activeEventName = $state('');
   let isRainyMode = $state(false);
 
@@ -53,8 +60,8 @@
     if (!selectedEventId) return;
     const res = await fetch(`/api/events/${selectedEventId}/sports`);
     if (res.ok) {
-      const assignedSports = await res.json();
-      const uniqueSports = [];
+      const assignedSports: { sport_id: number; sport_name: string; template_key?: string }[] = await res.json();
+      const uniqueSports: { id: number; name: string }[] = [];
       for (const sport of assignedSports) {
         const name = sport.sport_name?.trim();
         if (!name) continue;
@@ -92,7 +99,7 @@
     // Fetch teams for this sport to get class information and capacities
     const teamsRes = await fetch(`/api/admin/events/${selectedEventId}/sports/${selectedSportId}/teams`);
     if (teamsRes.ok) {
-      const teams = await teamsRes.json();
+      const teams: Team[] = await teamsRes.json();
       // Initialize class capacities from teams
       classCapacities = {};
       classes.forEach(cls => {
@@ -113,7 +120,7 @@
     }
   }
 
-  async function fetchSportDetails(eventId, sportId) {
+  async function fetchSportDetails(eventId: number | null, sportId: number | string) {
     const res = await fetch(`/api/admin/events/${eventId}/sports/${sportId}/details`);
     if (res.ok) {
       const details = await res.json();
@@ -133,18 +140,20 @@
     await fetchRainyModeSettings();
   }
 
-  async function fetchTournaments(eventId) {
+  async function fetchTournaments(eventId: number | null) {
     const res = await fetch(`/api/admin/events/${eventId}/tournaments`);
     if (res.ok) {
-      const fetched = await res.json();
+      const fetched: (Omit<Tournament, 'data'> & { data: StoredData | string | null })[] = await res.json();
       tournaments = fetched.map(t => {
-        let data = t.data;
-        if (typeof data === 'string') {
+        let data: StoredData | null;
+        if (typeof t.data === 'string') {
           try {
-            data = JSON.parse(data);
+            data = JSON.parse(t.data);
           } catch {
             data = null;
           }
+        } else {
+          data = t.data;
         }
         return { ...t, data };
       });
@@ -205,16 +214,25 @@
     });
   }
 
+  let bracketInstance: BracketInstance | null = null;
+  let bracketVersion = 0;
+  onDestroy(() => { bracketVersion++; bracketInstance?.uninstall?.(); });
+
   async function renderBracket() {
     if (!browser) return;
+    const version = ++bracketVersion;
     setTimeout(async () => {
+      if (version !== bracketVersion) return;
       const wrapper = document.getElementById('bracket-container');
       if (wrapper) {
+        bracketInstance?.uninstall?.();
+        bracketInstance = null;
         wrapper.innerHTML = '';
         if (selectedTournament && selectedTournament.data) {
           try {
-            const { createBracket } = await import('bracketry');
-            createBracket(selectedTournament.data, wrapper);
+            const { createBracket } = await import('@snct-sportease/matchline');
+            if (version !== bracketVersion) return;
+            bracketInstance = createBracket({ ...selectedTournament.data, matches: selectedTournament.data.matches.map((match) => ({ ...match, id: String(match.id) })) }, wrapper);
           } catch (error) {
             console.error('Failed to load createBracket:', error);
             wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';
@@ -226,8 +244,8 @@
     }, 0);
   }
 
-  async function handleSportChange(e) {
-    selectedSportId = e.target.value;
+  async function handleSportChange(e: Event & { currentTarget: HTMLSelectElement }) {
+    selectedSportId = e.currentTarget.value;
     if (selectedSportId) {
       await fetchSportDetails(selectedEventId, selectedSportId);
 
@@ -250,14 +268,17 @@
       selectedTournamentId = null;
       selectedTournament = null;
       if (browser) {
+        bracketVersion++;
+        bracketInstance?.uninstall?.();
+        bracketInstance = null;
         const wrapper = document.getElementById('bracket-container');
         if(wrapper) wrapper.innerHTML = '';
       }
     }
   }
 
-  function handlePdfFileSelect(e) {
-    selectedPdfFile = e.target.files[0];
+  function handlePdfFileSelect(e: Event & { currentTarget: HTMLInputElement }) {
+    selectedPdfFile = e.currentTarget.files?.[0] ?? null;
     if (selectedPdfFile) {
       pdfPreviewUrl = URL.createObjectURL(selectedPdfFile);
     } else {
@@ -322,11 +343,11 @@
     }
   }
 
-  function updateMatchTimeLocally(matchId, newTime) {
+  function updateMatchTimeLocally(matchId: number | string, newTime: string) {
     matchStartTimes[matchId] = newTime;
   }
 
-  function updateMatchRainyModeTimeLocally(matchId, newTime) {
+  function updateMatchRainyModeTimeLocally(matchId: number | string, newTime: string) {
     matchRainyModeStartTimes[matchId] = newTime;
   }
 
@@ -514,7 +535,7 @@
     }
   }
 
-  function formatTime(isoString) {
+  function formatTime(isoString: string) {
     if (!isoString) return '';
     try {
         const date = new Date(isoString);
@@ -562,7 +583,7 @@
         await fetchSportDetails(selectedEventId, selectedSportId);
       } catch (error) {
         console.error(error);
-        alert(`更新エラー: ${error.message}`);
+        alert(`更新エラー: ${error instanceof Error ? error.message : String(error)}`);
       }
     } else {
       // Per-class capacity saving
@@ -579,7 +600,7 @@
     // Validate all class capacities
     for (const [classId, capacity] of Object.entries(classCapacities)) {
       if (capacity.min !== null && capacity.max !== null && capacity.min > capacity.max) {
-        const className = classes.find(c => c.id == classId)?.name || '不明なクラス';
+        const className = classes.find(c => String(c.id) === classId)?.name || '不明なクラス';
         alert(`${className}: 最低定員は最高定員以下である必要があります。`);
         return;
       }
@@ -611,11 +632,11 @@
       await fetchClassCapacities();
     } catch (error) {
       console.error(error);
-      alert(`更新エラー: ${error.message}`);
+      alert(`更新エラー: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  function updateClassCapacity(classId, field, value) {
+  function updateClassCapacity(classId: number, field: 'min' | 'max', value: string) {
     if (!classCapacities[classId]) {
       classCapacities[classId] = { min: null, max: null };
     }
@@ -630,7 +651,7 @@
     try {
       const response = await fetch(`/api/admin/events/${selectedEventId}/rainy-mode/settings`);
       if (response.ok) {
-        const payload = await response.json();
+        const payload: RainySetting[] = await response.json();
         const allSettings = Array.isArray(payload) ? payload : [];
         // Filter settings for current sport
         const sportSettings = allSettings.filter(s => s.sport_id == selectedSportId);
@@ -732,7 +753,7 @@
         await fetchRainyModeSettings();
       } catch (error) {
         console.error(error);
-        alert(`更新エラー: ${error.message}`);
+        alert(`更新エラー: ${error instanceof Error ? error.message : String(error)}`);
       }
     } else {
       // Per-class capacity saving
@@ -749,7 +770,7 @@
     // Validate all class capacities
     for (const [classId, capacity] of Object.entries(rainyModeClassCapacities)) {
       if (capacity.min !== null && capacity.max !== null && capacity.min > capacity.max) {
-        const className = classes.find(c => c.id == classId)?.name || '不明なクラス';
+        const className = classes.find(c => String(c.id) === classId)?.name || '不明なクラス';
         alert(`${className}: 最低定員は最高定員以下である必要があります。`);
         return;
       }
@@ -781,11 +802,11 @@
       await fetchRainyModeSettings();
     } catch (error) {
       console.error(error);
-      alert(`更新エラー: ${error.message}`);
+      alert(`更新エラー: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  function updateRainyModeClassCapacity(classId, field, value) {
+  function updateRainyModeClassCapacity(classId: number, field: 'min' | 'max', value: string) {
     if (!rainyModeClassCapacities[classId]) {
       rainyModeClassCapacities[classId] = { min: null, max: null };
     }
@@ -894,7 +915,7 @@
                             placeholder="未設定"
                             min="0"
                             value={classCapacities[cls.id]?.min ?? ''}
-                            oninput={(e) => updateClassCapacity(cls.id, 'min', e.target.value)}
+                            oninput={(e) => updateClassCapacity(cls.id, 'min', e.currentTarget.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -904,7 +925,7 @@
                             placeholder="未設定"
                             min="0"
                             value={classCapacities[cls.id]?.max ?? ''}
-                            oninput={(e) => updateClassCapacity(cls.id, 'max', e.target.value)}
+                            oninput={(e) => updateClassCapacity(cls.id, 'max', e.currentTarget.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -953,7 +974,7 @@
                   type="number"
                   id="rainy-min-capacity"
                   value={rainyModeMinCapacity ?? ''}
-                  oninput={(e) => { rainyModeMinCapacity = e.target.value === '' ? null : Number(e.target.value); }}
+                  oninput={(e) => { rainyModeMinCapacity = e.currentTarget.value === '' ? null : Number(e.currentTarget.value); }}
                   placeholder="未設定"
                   min="0"
                   class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
@@ -966,7 +987,7 @@
                   type="number"
                   id="rainy-max-capacity"
                   value={rainyModeMaxCapacity ?? ''}
-                  oninput={(e) => { rainyModeMaxCapacity = e.target.value === '' ? null : Number(e.target.value); }}
+                  oninput={(e) => { rainyModeMaxCapacity = e.currentTarget.value === '' ? null : Number(e.currentTarget.value); }}
                   placeholder="未設定"
                   min="0"
                   class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
@@ -1006,7 +1027,7 @@
                             placeholder="未設定"
                             min="0"
                             value={rainyModeClassCapacities[cls.id]?.min ?? ''}
-                            oninput={(e) => updateRainyModeClassCapacity(cls.id, 'min', e.target.value)}
+                            oninput={(e) => updateRainyModeClassCapacity(cls.id, 'min', e.currentTarget.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -1016,7 +1037,7 @@
                             placeholder="未設定"
                             min="0"
                             value={rainyModeClassCapacities[cls.id]?.max ?? ''}
-                            oninput={(e) => updateRainyModeClassCapacity(cls.id, 'max', e.target.value)}
+                            oninput={(e) => updateRainyModeClassCapacity(cls.id, 'max', e.currentTarget.value)}
                             class="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                           />
                         </td>
@@ -1107,7 +1128,7 @@
                                     type="datetime-local" 
                                     class="border rounded px-2 py-1"
                                     value={match.startTime ? match.startTime.slice(0, 16) : ''} 
-                                    onchange={(e) => updateMatchTimeLocally(match.id, e.target.value)}
+                                    onchange={(e) => updateMatchTimeLocally(match.id, e.currentTarget.value)}
                                 />
                             </div>
                         </div>
@@ -1153,7 +1174,7 @@
                                       type="datetime-local" 
                                       class="border rounded px-2 py-1"
                                       value={match.rainyModeStartTime ? match.rainyModeStartTime.slice(0, 16) : ''} 
-                                      onchange={(e) => updateMatchRainyModeTimeLocally(match.id, e.target.value)}
+                                      onchange={(e) => updateMatchRainyModeTimeLocally(match.id, e.currentTarget.value)}
                                   />
                               </div>
                           </div>

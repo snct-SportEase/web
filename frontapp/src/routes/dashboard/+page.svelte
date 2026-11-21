@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
@@ -12,20 +12,25 @@
   import { fetchPublishedNoonGameSessions, flattenNoonGameMatches } from '$lib/utils/noonGameSessions.js';
   import { isPWAInstalled } from '$lib/utils/pwa.js';
   import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
+  import type { PageData } from './$types';
+  import type { NoonGameMatch } from '$lib/utils/noonGameSessions.js';
 
-  let { data } = $props();
+  type NoonEntry = NonNullable<NoonGameMatch['entries']>[number];
+  type NoonDetail = NonNullable<NonNullable<NoonGameMatch['result']>['details']>[number];
+  type Member = { email: string; display_name?: string | null; assignments?: { sport_name: string; team_name: string }[] };
+
+  let { data }: { data: PageData } = $props();
   let user = $derived(data.user);
   let classes = $derived(data.classes);
   let events = $derived(data.events);
-  let form = $derived(data.form);
   
   let showPWAInstallGuide = $state(false);
   let isPWA = $state(true);
   let shortcutSettingsOpen = $state(false);
-  let hiddenShortcutHrefs = new SvelteSet();
-  let activeEvent = $state(null);
-  let competitionGuidelinesUrl = $state(null);
-  let noonGameMatches = $state([]);
+  let hiddenShortcutHrefs = new SvelteSet<string>();
+  let activeEvent = $state<{ id: number; name: string; survey_url?: string | null; is_survey_published?: boolean } | null>(null);
+  let competitionGuidelinesUrl = $state<string | null>(null);
+  let noonGameMatches = $state<(NoonGameMatch & { session_name: string })[]>([]);
   let noonGameInfoLoading = $state(false);
   let noonGameInfoError = $state('');
 
@@ -143,12 +148,12 @@
   let progressEntries = $derived(data.progress ?? []);
   let classInfo = $derived(data.classInfo);
 
-  function memberDisplayName(member) {
+  function memberDisplayName(member: Member): string {
     if (member?.display_name) return member.display_name;
     return member?.email ?? '（名称未設定）';
   }
 
-  function formatAssignments(assignments = []) {
+  function formatAssignments(assignments: Member['assignments'] = []): string {
     if (!assignments || assignments.length === 0) {
       return '未割り当て';
     }
@@ -157,14 +162,14 @@
       .join(' / ');
   }
 
-  async function fetchNoonGameInfo(eventId) {
+  async function fetchNoonGameInfo(eventId: number) {
     noonGameInfoLoading = true;
     noonGameInfoError = '';
     try {
       const sessions = await fetchPublishedNoonGameSessions(eventId);
       const teamsResponse = await fetch('/api/barcode/teams');
       if (!teamsResponse.ok) throw new Error('競技の割り当てを取得できませんでした。');
-      const teams = await teamsResponse.json();
+      const teams: { event_id: number; location: string; sport_name: string }[] = await teamsResponse.json();
       const assignedNames = new Set(
         (Array.isArray(teams) ? teams : [])
           .filter((team) => Number(team.event_id) === Number(eventId) && team.location === 'noon_game')
@@ -177,14 +182,14 @@
       );
     } catch (error) {
       console.error('Failed to fetch noon game info:', error);
-      noonGameInfoError = error.message || '昼競技情報を取得できませんでした。';
+      noonGameInfoError = error instanceof Error ? error.message : '昼競技情報を取得できませんでした。';
       noonGameMatches = [];
     } finally {
       noonGameInfoLoading = false;
     }
   }
 
-  function formatDateTime(value) {
+  function formatDateTime(value: string | null | undefined): string {
     if (!value) return '日時未定';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '日時未定';
@@ -197,27 +202,27 @@
     }).format(date);
   }
 
-  function formatStatus(status) {
-    const labels = {
+  function formatStatus(status: string | undefined): string {
+    const labels: Record<string, string> = {
       scheduled: '予定',
       in_progress: '進行中',
       finished: '終了',
       cancelled: '中止'
     };
-    return labels[status] || status || '未定';
+    return (status && labels[status]) || status || '未定';
   }
 
-  function entryName(entry) {
+  function entryName(entry: NoonEntry | undefined): string {
     return entry?.resolved_name || entry?.display_name || '参加者未定';
   }
 
-  function resultEntries(match) {
+  function resultEntries(match: NoonGameMatch): NoonDetail[] {
     return [...(match?.result?.details || [])].sort(
       (a, b) => (a.rank || 999) - (b.rank || 999)
     );
   }
 
-  function resultEntryName(detail, match) {
+  function resultEntryName(detail: NoonDetail, match: NoonGameMatch): string {
     if (detail?.entry_resolved_name) return detail.entry_resolved_name;
     const entry = match?.entries?.find((item) => String(item.id) === String(detail?.entry_id));
     return entryName(entry);
@@ -244,7 +249,7 @@
     }
   }
 
-  function saveShortcutPreferences(nextHiddenShortcutHrefs) {
+  function saveShortcutPreferences(nextHiddenShortcutHrefs: Set<string>) {
     try {
       window.localStorage.setItem(shortcutStorageKey, JSON.stringify([...nextHiddenShortcutHrefs]));
     } catch (error) {
@@ -252,7 +257,7 @@
     }
   }
 
-  function toggleShortcutVisibility(href) {
+  function toggleShortcutVisibility(href: string) {
     if (hiddenShortcutHrefs.has(href)) {
       hiddenShortcutHrefs.delete(href);
     } else {
@@ -300,7 +305,7 @@
   {/if}
 
   {#if user && !user.is_profile_complete}
-    <ProfileSetupModal classes={classes} form={form} />
+    <ProfileSetupModal classes={classes} />
   {/if}
 
   {#if showEventSetup}

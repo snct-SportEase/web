@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
   import { browser } from '$app/env';
@@ -8,11 +8,10 @@
   import { isPWAInstalled } from '$lib/utils/pwa.js';
   import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
 
-  /** @type {import('@sveltejs/kit').MaybePromise<import('../../routes/$types').LayoutData>} */
-  let { user } = $props();
+  let { user }: { user: { id?: string; email?: string; roles?: { name: string }[] } | null } = $props();
 
-  const hasRole = (roleName) => {
-    return user?.roles?.some(role => role.name === roleName);
+  const hasRole = (roleName: string): boolean => {
+    return user?.roles?.some(role => role.name === roleName) ?? false;
   };
 
   const isStudent = hasRole('student');
@@ -44,24 +43,25 @@
     refreshBadge();
     refreshPushSubscriptionStatus();
 
-    const interval = setInterval(refreshBadge, 60 * 1000);
+    const interval = setInterval(() => refreshBadge(), 60 * 1000);
     const handleVisibilityChange = () => {
       if (!document.hidden) refreshBadge();
     };
-    const handleServiceWorkerMessage = (event) => {
+    const handleServiceWorkerMessage = (event: MessageEvent<{ type?: string }>) => {
       if (event.data?.type === 'sportease:new-notification') {
         refreshBadge(true);
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', refreshBadge);
+    const handleFocus = () => refreshBadge();
+    window.addEventListener('focus', handleFocus);
     navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', refreshBadge);
+      window.removeEventListener('focus', handleFocus);
       navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
     };
   });
@@ -112,7 +112,7 @@
     }
   }
 
-  function closeSidebar(event) {
+  function closeSidebar(event?: Event) {
     if (event) {
       event.preventDefault();
       event.stopPropagation();
@@ -120,17 +120,17 @@
     isSidebarOpen.set(false);
   }
 
-  function handleTouchStart(event) {
+  function handleTouchStart(event: TouchEvent) {
     event.preventDefault();
     event.stopPropagation();
     closeSidebar(event);
   }
 
-  function handleClick(event) {
+  function handleClick(event: MouseEvent) {
     closeSidebar(event);
   }
 
-  function handleTouchEnd(event) {
+  function handleTouchEnd(event: TouchEvent) {
     event.preventDefault();
     event.stopPropagation();
     closeSidebar(event);

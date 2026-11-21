@@ -1,5 +1,6 @@
-<script>
+<script lang="ts">
   import '../app.css';
+  import '@snct-sportease/matchline/style.css';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import PWAInstallPromptModal from '$lib/components/PWAInstallPromptModal.svelte';
   import { page } from '$app/state';
@@ -8,10 +9,12 @@
   import { browser } from '$app/env';
   import { isPWAInstalled } from '$lib/utils/pwa.js';
   import { seedNotificationSnapshot } from '$lib/stores/notificationBadgeStore.js';
+  import type { Snippet } from 'svelte';
+  import type { LayoutData } from './$types';
 
-  let { children } = $props();
-  let data = $derived(page.data);
-  let lastReportedPWAUserId = null;
+  let { children }: { children?: Snippet } = $props();
+  let data = $derived(page.data as LayoutData & { notificationSnapshot?: { id?: string | number | null; title?: string; created_at?: string }[] });
+  let lastReportedPWAUserId: string | null = null;
 
   $effect.pre(() => { seedNotificationSnapshot(data.user, data.notificationSnapshot); });
 
@@ -101,7 +104,7 @@
         type="button"
         class="app-layer-sidebar-backdrop sidebar-overlay md:hidden"
         onclick={closeSidebar}
-        ontouchstart={(e) => { e.stopPropagation(); closeSidebar(e); }}
+        ontouchstart={(e) => { e.stopPropagation(); closeSidebar(); }}
         onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? closeSidebar() : null}
         aria-label="メニューを閉じる"
       ></button>

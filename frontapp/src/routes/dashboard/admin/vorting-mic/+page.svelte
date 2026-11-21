@@ -1,18 +1,18 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import FormField from '$lib/components/FormField.svelte';
   import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
 
-  let eligibleClasses = $state([]);
+  let eligibleClasses = $state<{ id: number; name: string }[]>([]);
   let selectedClass = $state('');
   let reason = $state('');
-  let eventId = $state(null);
+  let eventId = $state<number | null>(null);
   let isMicVotingEnabled = $state(false);
   let isLoading = $state(true);
 
   let hasVoted = $state(false);
-  let votedForClassId = $state(null);
+  let votedForClassId = $state<number | null>(null);
   let votedForClassName = $state('');
 
   onMount(async () => {
@@ -64,7 +64,7 @@
     }
   });
 
-  async function vote(event) {
+  async function vote(event: SubmitEvent) {
     event?.preventDefault?.();
 
     if (!selectedClass) {

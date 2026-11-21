@@ -1,0 +1,161 @@
+import { createBackendProxyHeaders } from '$lib/server/backendProxyHeaders.js';
+import { resolveBackendOrigin } from '$lib/server/backendUrl.js';
+import { applyCSRFProxyProtection } from '$lib/server/csrfProxy.js';
+import { isStudentOnly, requiresTestRunMaintenance } from '$lib/server/testRunMaintenance.js';
+import type { RequestEvent } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
+import type { ActiveEventResponse } from '$lib/utils/activeEvent.js';
+
+const BACKEND_URL = resolveBackendOrigin(process.env.BACKEND_URL);
+const BACKEND_PROXY_PREFIXES = ['/api', '/swagger'];
+
+function redirectResponse(event: RequestEvent, status: number, location: string): Response {
+  return Response.redirect(new URL(location, event.url), status);
+}
+
+function shouldProxyToBackend(pathname: string): boolean {
+  return BACKEND_PROXY_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+async function proxyToBackend(event: RequestEvent): Promise<Response> {
+  if (!BACKEND_URL) {
+    return new Response('Backend URL is not configured', { status: 502 });
+  }
+
+  const targetUrl = new URL(event.url.pathname + event.url.search, BACKEND_URL);
+  let headers;
+  try {
+    headers = createBackendProxyHeaders(event.request.headers, {
+      clientAddress: event.getClientAddress(),
+      host: event.url.host,
+      protocol: event.url.protocol.replace(':', '')
+    });
+    headers = applyCSRFProxyProtection(headers, {
+      method: event.request.method,
+      requestOrigin: event.request.headers.get('origin'),
+      expectedOrigin: event.url.origin,
+      csrfToken: event.cookies.get('csrf_token')
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('State-changing API request')) {
+      console.warn('Backend proxy rejected a state-changing cross-origin request');
+      return new Response('Invalid CSRF token or request origin', { status: 403 });
+    }
+    console.error('Backend proxy rejected request without a trusted client address:', error);
+    return new Response('Backend proxy is not configured securely', { status: 502 });
+  }
+
+  const requestInit: RequestInit = {
+    method: event.request.method,
+    headers,
+    redirect: 'manual'
+  };
+
+  try {
+    if (event.request.method !== 'GET' && event.request.method !== 'HEAD') {
+      const body = await event.request.arrayBuffer();
+      if (body.byteLength > 0) {
+        requestInit.body = body;
+      }
+    }
+
+    return await fetch(targetUrl, requestInit);
+  } catch (error) {
+    console.error('Backend proxy failed:', {
+      method: event.request.method,
+      path: event.url.pathname,
+      target: targetUrl.toString(),
+      error
+    });
+
+    return new Response('Backend proxy failed', { status: 502 });
+  }
+}
+
+export const handle: Handle = async ({ event, resolve }) => {
+  const startedAt = performance.now();
+  if (shouldProxyToBackend(event.url.pathname)) {
+    return proxyToBackend(event);
+  }
+
+  const sessionToken = event.cookies.get('session_token');
+  const onDashboard = event.url.pathname.startsWith('/dashboard');
+  const activeEventPromise: Promise<ActiveEventResponse | null> = (async () => {
+    if (!sessionToken || !onDashboard) return null;
+    try {
+      const response = await fetch(new URL('/api/events/active', BACKEND_URL ?? ''), {
+        headers: { cookie: `session_token=${sessionToken}` }
+      });
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
+    }
+  })();
+
+
+  if (sessionToken) {
+    try {
+      const url = new URL('/api/auth/user', BACKEND_URL ?? '');
+      const response = await fetch(url, {
+        headers: {
+          'cookie': `session_token=${sessionToken}`,
+        },
+      });
+
+
+      const responseText = await response.text();
+
+      if (response.ok) {
+        try {
+          event.locals.user = JSON.parse(responseText);
+        } catch {
+          event.locals.user = null;
+        }
+      } else {
+        event.locals.user = null;
+      }
+    } catch {
+      event.locals.user = null;
+    }
+  } else {
+    event.locals.user = null;
+  }
+
+  // Protect dashboard route
+  if (event.url.pathname.startsWith('/dashboard')) {
+    if (!event.locals.user) {
+      return redirectResponse(event, 302, '/');
+    }
+
+    // Authentication and active-event lookup run concurrently. Each backend
+    // endpoint still validates the session independently.
+    event.locals.activeEvent = await activeEventPromise;
+    const stateAvailable = event.locals.activeEvent !== null;
+
+		if (isStudentOnly(event.locals.user)) {
+			const testRunState = event.locals.activeEvent?.test_run_state ?? '';
+
+			const maintenanceRequired = requiresTestRunMaintenance(event.locals.user, testRunState, stateAvailable);
+			const onMaintenancePage = event.url.pathname === '/dashboard/maintenance';
+			if (maintenanceRequired && !onMaintenancePage) {
+				return redirectResponse(event, 303, '/dashboard/maintenance');
+			}
+			if (!maintenanceRequired && onMaintenancePage) {
+				return redirectResponse(event, 303, '/dashboard');
+			}
+		}
+  }
+
+  // Redirect from login page if already logged in
+  if (event.url.pathname === '/') {
+    if (event.locals.user) {
+      return redirectResponse(event, 302, '/dashboard');
+    }
+  }
+
+  const response = await resolve(event);
+  if (event.url.pathname.startsWith('/dashboard')) {
+    response.headers.append('Server-Timing', `ssr;dur=${(performance.now() - startedAt).toFixed(2)}`);
+  }
+  return response;
+};

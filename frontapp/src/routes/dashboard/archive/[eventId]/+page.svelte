@@ -1,73 +1,86 @@
-<script>
+<script lang="ts">
     import { sportScoreItems, scoreItemValue } from '$lib/utils/sportScores.js';
     import { onMount } from 'svelte';
     import { fetchPublishedNoonGameSessions, flattenNoonGameMatches } from '$lib/utils/noonGameSessions.js';
     import { page } from '$app/state';
+    import type { BracketData, Match, Side } from '@snct-sportease/matchline';
+    import type { RankedScore } from '../../student/score-list/+page.server';
+    import type { NoonGameMatch, NoonGameSession } from '$lib/utils/noonGameSessions';
+
+    type TournamentMatch = Omit<Match, 'id'> & { id?: number | string };
+    type TournamentData = Omit<BracketData, 'matches'> & { matches: TournamentMatch[] };
+    type Tournament = { id: number; name: string; data: TournamentData | null };
+    type EventData = { id: number; name: string; status: string; season: string };
+    type RankKey = 'rank_current_event' | 'rank_overall';
+    type TotalKey = 'total_points_current_event' | 'total_points_overall';
+    type RankingList = { id: string; title: string; description: string; rankKey: RankKey; totalKey: TotalKey; totalLabel: string; includeInitialPoints: boolean };
+    type Entry = NonNullable<NoonGameMatch['entries']>[number];
+    type ResultDetail = NonNullable<NonNullable<NoonGameMatch['result']>['details']>[number];
     
-    let eventId = page.params.eventId;
+    let eventId = page.params.eventId ?? '';
     let activeTab = $state('scores');
     
-    let eventData = $state(null);
-    let scores = $state([]);
-    let tournaments = $state([]);
-    let noonGameMatches = $state([]);
-    let typingSessions = $state([]);
+    let eventData = $state<EventData | null>(null);
+    let scores = $state<RankedScore[]>([]);
+    let tournaments = $state<Tournament[]>([]);
+    let noonGameMatches = $state<(NoonGameMatch & { session_name: string })[]>([]);
+    let typingSessions = $state<NoonGameSession[]>([]);
     let noonGameError = $state('');
     let loading = $state(true);
-    let error = $state(null);
+    let error = $state<string | null>(null);
     let isSyncingInitialPoints = $state(false);
     let syncInitialPointsMessage = $state('');
     let syncInitialPointsError = $state('');
 
-    let isRoot = $derived(page.data?.user?.roles?.some((role) => role?.name === 'root') ?? false);
+    let isRoot = $derived(page.data?.user?.roles?.some((role: { name: string }) => role?.name === 'root') ?? false);
     let canSyncInitialPoints = $derived(
         isRoot && eventData?.status === 'archived' && (eventData?.season === 'spring' || eventData?.season === 'autumn')
     );
 
-    function getSportName(location) {
+    function getSportName(location: string) {
         const firstScore = scores?.[0];
         const sportNames = firstScore?.sport_names || {};
         return sportNames[location] || location;
     }
 
-    function normalizeTournament(tournament) {
-        const normalized = { ...tournament };
-
-        if (typeof normalized.data === 'string') {
+    function normalizeTournament(tournament: Omit<Tournament, 'data'> & { data: TournamentData | string | null }): Tournament {
+        let data: TournamentData | null;
+        if (typeof tournament.data === 'string') {
             try {
-                normalized.data = JSON.parse(normalized.data);
+                data = JSON.parse(tournament.data);
             } catch (parseError) {
                 console.error('Failed to parse tournament data:', parseError);
-                normalized.data = null;
+                data = null;
             }
+        } else {
+            data = tournament.data;
         }
-
-        return normalized;
+        return { ...tournament, data };
     }
 
-    function getSideName(tournament, side) {
+    function getSideName(tournament: Tournament, side: Side | undefined) {
         if (!side) return '未定';
         if (side.title) return side.title;
 
-        const contestant = tournament?.data?.contestants?.[side.contestantId];
+        const contestant = side.contestantId ? tournament.data?.contestants?.[side.contestantId] : undefined;
         const playerTitle = contestant?.players?.[0]?.title;
         return playerTitle || '未定';
     }
 
-    function getSideScore(side) {
+    function getSideScore(side: Side | undefined) {
         return side?.scores?.[0]?.mainScore;
     }
 
-    function isMatchCompleted(match) {
+    function isMatchCompleted(match: TournamentMatch) {
         return match?.sides?.some((side) => getSideScore(side) !== undefined);
     }
 
-    function getWinnerName(tournament, match) {
+    function getWinnerName(tournament: Tournament, match: TournamentMatch) {
         const winnerSide = match?.sides?.find((side) => side?.isWinner);
         return winnerSide ? getSideName(tournament, winnerSide) : '引き分け';
     }
 
-    function formatDateTime(value) {
+    function formatDateTime(value: string | null | undefined) {
         if (!value) return '日時未定';
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return '日時未定';
@@ -80,27 +93,27 @@
         }).format(date);
     }
 
-    function formatStatus(status) {
-        const labels = {
+    function formatStatus(status: string | undefined) {
+        const labels: Record<string, string> = {
             scheduled: '予定',
             in_progress: '進行中',
             finished: '終了',
             cancelled: '中止'
         };
-        return labels[status] || status || '未定';
+        return (status && labels[status]) || status || '未定';
     }
 
-    function entryName(entry) {
+    function entryName(entry: Entry | undefined) {
         return entry?.resolved_name || entry?.display_name || '参加者未定';
     }
 
-    function resultEntries(match) {
+    function resultEntries(match: NoonGameMatch) {
         return [...(match?.result?.details || [])].sort(
             (a, b) => (a.rank || 999) - (b.rank || 999)
         );
     }
 
-    function resultEntryName(detail, match) {
+    function resultEntryName(detail: ResultDetail, match: NoonGameMatch) {
         if (detail?.entry_resolved_name) return detail.entry_resolved_name;
         const entry = match?.entries?.find((item) => String(item.id) === String(detail?.entry_id));
         return entryName(entry);
@@ -128,7 +141,7 @@
             }
             syncInitialPointsMessage = '初期点を同年度の春大会の得点で再同期しました。';
         } catch (err) {
-            syncInitialPointsError = err.message;
+            syncInitialPointsError = err instanceof Error ? err.message : String(err);
         } finally {
             isSyncingInitialPoints = false;
         }
@@ -139,8 +152,8 @@
             // Fetch event info
             const eventsRes = await fetch('/api/events');
             if (eventsRes.ok) {
-                const allEvents = await eventsRes.json();
-                eventData = allEvents.find(e => e.id === parseInt(eventId));
+                const allEvents: EventData[] = await eventsRes.json();
+                eventData = allEvents.find(e => e.id === parseInt(eventId)) ?? null;
             }
 
             // Fetch scores
@@ -164,7 +177,7 @@
             );
             typingSessions = noonGameSessions.filter((item) => item?.session?.template_key === 'typing');
         } catch (err) {
-            error = err.message;
+            error = err instanceof Error ? err.message : String(err);
         } finally {
             loading = false;
         }
@@ -197,7 +210,7 @@
         { key: 'total_points_overall', label: '総合点' },
         { key: 'rank_overall', label: '総合順位' }
     ]);
-    const rankingLists = $derived(season === 'autumn'
+    const rankingLists: RankingList[] = $derived(season === 'autumn'
         ? [
             {
                 id: 'autumn',
@@ -233,7 +246,7 @@
         item.key !== 'total_points_current_event' && item.key !== 'total_points_overall'
     ));
 
-    function sortedScoresByRank(rankKey) {
+    function sortedScoresByRank(rankKey: RankKey) {
         return [...scores].sort((a, b) => {
             const rankA = a[rankKey];
             const rankB = b[rankKey];
@@ -243,7 +256,7 @@
         });
     }
 
-    function getRankBadge(rank) {
+    function getRankBadge(rank: number | null | undefined) {
         if (rank === 0 || rank === null || rank === undefined) return '未開始';
         if (rank === 1) return '🥇 1位';
         if (rank === 2) return '🥈 2位';
@@ -269,7 +282,7 @@
                 {eventData ? eventData.name : '読み込み中...'}
             </h1>
         </div>
-        {#if canSyncInitialPoints}
+        {#if canSyncInitialPoints && eventData}
             <button
                 type="button"
                 class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -456,9 +469,9 @@
                     昼競技結果データが見つかりませんでした。
                 </p>
             {:else}
-                {#each typingSessions as typingSession (typingSession.session.id)}
+                {#each typingSessions as typingSession (typingSession.session?.id)}
                     <section class="mb-4 rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
-                        <h3 class="text-lg font-semibold text-gray-900">{typingSession.session.name}の結果</h3>
+                        <h3 class="text-lg font-semibold text-gray-900">{typingSession.session?.name}の結果</h3>
                         {#if typingSession.typing_results?.length}
                             <div class="mt-4 overflow-x-auto">
                                 <table class="min-w-full divide-y divide-gray-200 text-sm">

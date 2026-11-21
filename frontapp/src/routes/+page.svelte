@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { browser } from '$app/env';
   import { onMount } from 'svelte';
 
@@ -33,7 +33,7 @@
 
     alert(errorMessage);
 
-    const newUrl = new URL(window.location);
+    const newUrl = new URL(window.location.href);
     newUrl.searchParams.delete('error');
     window.history.replaceState({}, '', newUrl);
   });
@@ -44,7 +44,7 @@
     isLineInAppBrowser = /line\//i.test(userAgent) || /liff/i.test(userAgent);
   });
 
-  function handleGoogleLoginClick(event) {
+  function handleGoogleLoginClick(event: MouseEvent) {
     if (!isLineInAppBrowser) return;
     event.preventDefault();
     alert('LINEブラウザではGoogleログインができません。SafariまたはChromeなどの外部ブラウザで開いてからサインインしてください。');

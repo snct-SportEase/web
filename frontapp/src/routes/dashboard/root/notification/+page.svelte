@@ -1,14 +1,19 @@
-<script>
+<script lang="ts">
   import FormField from '$lib/components/FormField.svelte';
   import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
+  import type { PageData } from './$types';
 
-  let { data } = page;
+  type Notification = PageData['notifications'][number];
+  type Recipient = { id: string; email: string; display_name: string | null };
+  type Role = { id: number | undefined; name: string; label: string };
+
+  let data = page.data as PageData;
   let notifications = $state(data.notifications ? [...data.notifications] : []);
   let subscriptionStats = $state(data.subscriptionStats ?? null);
 
-  const roleLabelMap = {
+  const roleLabelMap: Record<string, string> = {
     student: '学生',
     admin: '管理者',
     root: 'ルート'
@@ -24,8 +29,8 @@
     };
   }).filter((role) => role.name);
 
-  function createDefaultSelections(roles) {
-    const defaults = {};
+  function createDefaultSelections(roles: Role[]): Record<string, boolean> {
+    const defaults: Record<string, boolean> = {};
     let hasSelected = false;
     for (const role of roles) {
       const shouldSelect = role.name === 'student';
@@ -54,10 +59,10 @@
   let scheduledAt = $state('');
   let deliveryMode = $state('role');
   let selectedRoles = $state(createDefaultSelections(availableRoles));
-  let selectedUsers = $state({});
+  let selectedUsers = $state<Record<string, Recipient>>({});
   let userSearchQuery = $state('');
   let userSearchType = $state('email');
-  let userSearchResults = $state([]);
+  let userSearchResults = $state<Recipient[]>([]);
   let userSearchError = $state('');
   let isSearchingUsers = $state(false);
 
@@ -71,7 +76,7 @@
   onMount(() => {
     isInteractive = true;
   });
-  function toggleRole(roleName) {
+  function toggleRole(roleName: string) {
     selectedRoles = { ...selectedRoles, [roleName]: !selectedRoles[roleName] };
     refreshSubscriptionStats();
   }
@@ -95,14 +100,14 @@
     userSearchError = '';
   }
 
-  function isScheduledNotification(notification) {
+  function isScheduledNotification(notification: Notification): boolean {
     return Boolean(notification.scheduled_at && !notification.sent_at);
   }
 
   function getScheduledNotifications() {
     return notifications
       .filter(isScheduledNotification)
-      .sort((left, right) => new Date(left.scheduled_at).getTime() - new Date(right.scheduled_at).getTime());
+      .sort((left, right) => new Date(left.scheduled_at ?? '').getTime() - new Date(right.scheduled_at ?? '').getTime());
   }
 
   function getSentNotifications() {
@@ -131,13 +136,13 @@
     return getSelectedRoleLabels() || '未選択';
   }
 
-  function changeDeliveryMode(mode) {
+  function changeDeliveryMode(mode: 'role' | 'individual') {
     deliveryMode = mode;
     subscriptionStats = null;
     refreshSubscriptionStats();
   }
 
-  function toggleUser(user) {
+  function toggleUser(user: Recipient) {
     const next = { ...selectedUsers };
     if (next[user.id]) {
       delete next[user.id];
@@ -169,7 +174,7 @@
       const result = await response.json();
       userSearchResults = Array.isArray(result) ? result : [];
     } catch (error) {
-      userSearchError = error.message;
+      userSearchError = error instanceof Error ? error.message : String(error);
       userSearchResults = [];
     } finally {
       isSearchingUsers = false;
@@ -272,7 +277,7 @@
       await refreshNotifications();
       await refreshSubscriptionStats();
     } catch (error) {
-      errorMessage = error.message;
+      errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       isSubmitting = false;
     }
@@ -299,7 +304,7 @@
     }
   }
 
-  function formatDate(value) {
+  function formatDate(value: string | null | undefined): string {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -580,7 +585,7 @@
     <Button
       type="button"
       size="sm"
-      onclick={(e) => { e.preventDefault(); handleSubmit(e); }}
+      onclick={(e) => { e.preventDefault(); handleSubmit(); }}
       disabled={!isInteractive || (deliveryMode === 'role' && availableRoles.length === 0)}
       loading={isSubmitting}
       loadingLabel={deliveryTiming === 'scheduled' ? '予約中...' : '送信中...'}

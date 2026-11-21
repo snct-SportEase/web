@@ -1,11 +1,13 @@
-<script>
+<script lang="ts">
   import FormField from '$lib/components/FormField.svelte';
   import Button from '$lib/components/Button.svelte';
   import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
   import { browser } from '$app/env';
+  import type { PageData } from './$types';
+  import type { NotificationRequest } from '$lib/types/notificationRequest';
 
-  let { data } = page;
+  let data = page.data as PageData;
 
   let requests = $derived(data.requests ?? []);
   let activeRequest = $state(data.activeRequest);
@@ -20,7 +22,7 @@
   let isPostingMessage = $state(false);
   let errorMessage = $state(data.error);
 
-  function formatStatus(status) {
+  function formatStatus(status: NotificationRequest['status']) {
     switch (status) {
       case 'approved':
         return { label: '承認済み', class: 'bg-green-100 text-green-700' };
@@ -31,18 +33,18 @@
     }
   }
 
-  function getDisplayName(user) {
+  function getDisplayName(user: { display_name: string | null; email: string } | null | undefined): string {
     if (user?.display_name) {
       return user.display_name;
     }
     return user?.email ?? '不明なユーザー';
   }
 
-  async function refreshDetail(id) {
+  async function refreshDetail(id: number) {
     try {
       const res = await fetch(`/api/student/notification-requests/${id}`);
       if (res.ok) {
-        const { request } = await res.json();
+        const { request }: { request: NotificationRequest } = await res.json();
         activeRequest = request;
         await invalidateAll();
       }
@@ -51,7 +53,7 @@
     }
   }
 
-  async function handleCreateRequest(event) {
+  async function handleCreateRequest(event: SubmitEvent) {
     event.preventDefault();
     if (isSubmitting) return;
 
@@ -96,13 +98,13 @@
       }
     } catch (error) {
       console.error(error);
-      errorMessage = error.message ?? '申請の送信に失敗しました';
+      errorMessage = error instanceof Error ? error.message : '申請の送信に失敗しました';
     } finally {
       isSubmitting = false;
     }
   }
 
-  async function handleMessageSubmit(event) {
+  async function handleMessageSubmit(event: SubmitEvent) {
     event.preventDefault();
     if (!activeRequest || isPostingMessage) return;
 
@@ -126,13 +128,13 @@
       await refreshDetail(activeRequest.id);
     } catch (error) {
       console.error(error);
-      errorMessage = error.message ?? 'メッセージの送信に失敗しました';
+      errorMessage = error instanceof Error ? error.message : 'メッセージの送信に失敗しました';
     } finally {
       isPostingMessage = false;
     }
   }
 
-  function selectRequest(id) {
+  function selectRequest(id: number) {
     goto(`/dashboard/student/notification-request?request_id=${id}`);
   }
 </script>

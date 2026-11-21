@@ -1,15 +1,15 @@
-<script>
+<script lang="ts">
 	import { sportScoreItems, scoreItemValue } from '$lib/utils/sportScores.js';
-	/** @type {import('./$types').PageData} */
-	let { data } = $props();
+	import type { PageData } from './$types';
+	let { data }: { data: PageData } = $props();
 
 	let scores = $derived(data.scores || []);
 	let errorMessage = $derived(data.error || '');
 	let season = $derived(scores.length > 0 ? scores[0].season : '');
-	let sportNames = $derived(scores.length > 0 ? (scores[0].sport_names || {}) : {});
+	let sportNames = $derived(scores.length > 0 ? (scores[0].sport_names ?? {}) : {});
 
 	// Helper function to get sport name for a given location
-	function getSportName(location) {
+	function getSportName(location: string): string {
 		return sportNames[location] || location; // Fallback to location if sport name not found
 	}
 
@@ -41,7 +41,9 @@
 		{ key: 'rank_overall', label: '総合順位' }
 	]);
 
-	const rankingLists = $derived(season === 'autumn'
+	type RankKey = 'rank_current_event' | 'rank_overall';
+	type Ranking = { id: string; title: string; description: string; rankKey: RankKey; totalKey: 'total_points_current_event' | 'total_points_overall'; totalLabel: string; includeInitialPoints: boolean };
+	const rankingLists: Ranking[] = $derived(season === 'autumn'
 		? [
 			{
 				id: 'autumn',
@@ -78,7 +80,7 @@
 	));
 
 	// Rank 0 (未開始) should be sorted last.
-	function sortedScoresByRank(rankKey) {
+	function sortedScoresByRank(rankKey: RankKey) {
 		return [...scores].sort((a, b) => {
 			const rankA = a[rankKey];
 			const rankB = b[rankKey];
@@ -90,7 +92,7 @@
 	}
 
 	// Helper function to get rank style classes
-	function getRankStyle(rank) {
+	function getRankStyle(rank: number | null | undefined): string {
 		if (rank === 0 || rank === null || rank === undefined) {
 			return 'bg-gray-100 border-2 border-gray-300 shadow';
 		}
@@ -105,7 +107,7 @@
 	}
 
 	// Helper function to get rank badge text
-	function getRankBadge(rank) {
+	function getRankBadge(rank: number | null | undefined): string {
 		if (rank === 0 || rank === null || rank === undefined) return '未開始';
 		if (rank === 1) return '🥇';
 		if (rank === 2) return '🥈';

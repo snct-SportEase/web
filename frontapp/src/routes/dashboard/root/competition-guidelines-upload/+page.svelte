@@ -1,18 +1,20 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import { browser } from '$app/env';
 
-  let events = $state([]);
-  let selectedEventId = $state(null);
-  let selectedEvent = $state(null);
-  let pdfFile = $state(null);
-  let existingPdfUrl = $state(null);
+  type EventInfo = { id: number; name: string; competition_guidelines_pdf_url?: string | null };
+  type GuideDocument = { id: number; title: string; description?: string | null; pdf_url: string };
+  let events = $state<EventInfo[]>([]);
+  let selectedEventId = $state<number | null>(null);
+  let selectedEvent = $state<EventInfo | null>(null);
+  let pdfFile = $state<File | null>(null);
+  let existingPdfUrl = $state<string | null>(null);
 
-  let guideDocuments = $state([]);
+  let guideDocuments = $state<GuideDocument[]>([]);
   let guideTitle = $state('');
   let guideDescription = $state('');
-  let guidePdfFile = $state(null);
+  let guidePdfFile = $state<File | null>(null);
 
   let isUploading = $state(false);
   let message = $state('');
@@ -46,7 +48,7 @@
     }
   }
 
-  async function fetchGuideDocuments(eventId) {
+  async function fetchGuideDocuments(eventId: number | null) {
     if (!eventId) return;
     try {
       const response = await fetch(`/api/root/guide-documents?event_id=${eventId}`);
@@ -61,14 +63,14 @@
     }
   }
 
-  async function loadEventDetails(eventId) {
+  async function loadEventDetails(eventId: number) {
     try {
       const response = await fetch(`/api/root/events`);
       if (!response.ok) {
         throw new Error('Failed to fetch event details');
       }
-      const allEvents = await response.json();
-      selectedEvent = allEvents.find((event) => event.id === eventId);
+      const allEvents: EventInfo[] = await response.json();
+      selectedEvent = allEvents.find((event) => event.id === eventId) ?? null;
       if (selectedEvent && selectedEvent.competition_guidelines_pdf_url) {
         existingPdfUrl = selectedEvent.competition_guidelines_pdf_url;
       } else {
@@ -97,21 +99,21 @@
     }
   }
 
-  function validatePdfFile(file) {
+  function validatePdfFile(file: File | null | undefined): string {
     if (!file) return 'PDFファイルを選択してください';
     if (file.type !== 'application/pdf') return 'PDFファイルのみアップロードできます';
     if (file.size > 10 * 1024 * 1024) return 'ファイルサイズは10MB以下にしてください';
     return '';
   }
 
-  function handleFileSelect(event) {
-    const file = event.target.files[0];
+  function handleFileSelect(event: Event & { currentTarget: HTMLInputElement }) {
+    const file = event.currentTarget.files?.[0];
     if (!file) return;
 
     const validationError = validatePdfFile(file);
     if (validationError) {
       errorMessage = validationError;
-      event.target.value = '';
+      event.currentTarget.value = '';
       return;
     }
 
@@ -119,14 +121,14 @@
     errorMessage = '';
   }
 
-  function handleGuideFileSelect(event) {
-    const file = event.target.files[0];
+  function handleGuideFileSelect(event: Event & { currentTarget: HTMLInputElement }) {
+    const file = event.currentTarget.files?.[0];
     if (!file) return;
 
     const validationError = validatePdfFile(file);
     if (validationError) {
       errorMessage = validationError;
-      event.target.value = '';
+      event.currentTarget.value = '';
       return;
     }
 
@@ -134,7 +136,7 @@
     errorMessage = '';
   }
 
-  async function readErrorMessage(response, fallbackMessage) {
+  async function readErrorMessage(response: Response, fallbackMessage: string): Promise<string> {
     const contentType = response.headers.get('content-type') ?? '';
 
     if (contentType.includes('application/json')) {
@@ -154,7 +156,7 @@
     }
   }
 
-  async function uploadPdf(file) {
+  async function uploadPdf(file: File): Promise<string> {
     const formData = new FormData();
     formData.append('pdf', file);
 
@@ -168,7 +170,7 @@
       throw new Error(message);
     }
 
-    const uploadData = await uploadResponse.json();
+    const uploadData: { url: string } = await uploadResponse.json();
     return uploadData.url;
   }
 
@@ -204,12 +206,12 @@
       pdfFile = null;
       if (browser) {
         const fileInput = document.getElementById('pdf-file-input');
-        if (fileInput) fileInput.value = '';
+        if (fileInput instanceof HTMLInputElement) fileInput.value = '';
       }
       await loadEventDetails(selectedEventId);
     } catch (error) {
       console.error('Upload error:', error);
-      errorMessage = error.message || 'アップロードに失敗しました';
+      errorMessage = error instanceof Error ? error.message : 'アップロードに失敗しました';
     } finally {
       isUploading = false;
     }
@@ -243,7 +245,7 @@
       await loadEventDetails(selectedEventId);
     } catch (error) {
       console.error('Delete error:', error);
-      errorMessage = error.message || '削除に失敗しました';
+      errorMessage = error instanceof Error ? error.message : '削除に失敗しました';
     } finally {
       isUploading = false;
     }
@@ -285,19 +287,19 @@
       guidePdfFile = null;
       if (browser) {
         const fileInput = document.getElementById('guide-pdf-file-input');
-        if (fileInput) fileInput.value = '';
+        if (fileInput instanceof HTMLInputElement) fileInput.value = '';
       }
       await fetchGuideDocuments(selectedEventId);
       message = '資料を登録しました';
     } catch (error) {
       console.error('Create guide document error:', error);
-      errorMessage = error.message || '資料の登録に失敗しました';
+      errorMessage = error instanceof Error ? error.message : '資料の登録に失敗しました';
     } finally {
       isUploading = false;
     }
   }
 
-  async function handleGuideDocumentDelete(id) {
+  async function handleGuideDocumentDelete(id: number) {
     if (!confirm('この資料を削除しますか？')) return;
 
     isUploading = true;
@@ -317,7 +319,7 @@
       message = '資料を削除しました';
     } catch (error) {
       console.error('Delete guide document error:', error);
-      errorMessage = error.message || '資料の削除に失敗しました';
+      errorMessage = error instanceof Error ? error.message : '資料の削除に失敗しました';
     } finally {
       isUploading = false;
     }

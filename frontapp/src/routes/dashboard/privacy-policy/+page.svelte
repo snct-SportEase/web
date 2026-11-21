@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // ページのタイトルを設定
   let pageTitle = $state("プライバシーポリシー");
 </script>

@@ -1,16 +1,17 @@
-<script>
+<script lang="ts">
   import FormField from '$lib/components/FormField.svelte';
   import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
+  import type { PageData } from './$types';
 
-  let { data } = $props();
+  let { data }: { data: PageData } = $props();
   let classes = $derived(data?.classes ?? []);
   let managedClass = $derived(data?.managedClass ?? null);
   let canSelectAllClasses = $derived(data?.canSelectAllClasses ?? false);
   let restrictionError = $derived(data?.restrictionError ?? '');
 
-  let selectedClassId = $state(null);
-  let classDetails = $state(null);
+  let selectedClassId = $state<number | null>(null);
+  let classDetails = $state<{ name: string; student_count: number; attendance_points: number } | null>(null);
 
   let attendanceCount = $state(0);
   let isLoading = $state(false);
@@ -29,7 +30,7 @@
     }
   });
 
-  async function fetchClassDetails(classId) {
+  async function fetchClassDetails(classId: number | null) {
     if (!classId) return;
 
     isLoading = true;
@@ -52,8 +53,8 @@
     }
   }
 
-  async function handleClassSelection(event) {
-    const newClassId = parseInt(event.target.value, 10);
+  async function handleClassSelection(event: Event & { currentTarget: HTMLSelectElement }) {
+    const newClassId = parseInt(event.currentTarget.value, 10);
     selectedClassId = newClassId;
     // Reset states
     classDetails = null;
@@ -89,7 +90,7 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          class_id: parseInt(selectedClassId),
+          class_id: selectedClassId,
           attendance_count: attendanceCount,
         }),
       });
@@ -154,7 +155,7 @@
           <p>現在の出席ポイント: {classDetails.attendance_points}ポイント</p>
         </div>
 
-        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(e); }}>
+        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
           <FormField class="mb-4" label="出席人数" inputId="attendanceCount">
             <input
               type="number"

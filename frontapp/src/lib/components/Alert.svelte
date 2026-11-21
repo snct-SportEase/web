@@ -1,11 +1,12 @@
-<script>
+<script lang="ts">
+  import type { Snippet } from 'svelte';
   let {
     variant = 'info',
     size = 'md',
     title = null,
     children,
     class: className = ''
-  } = $props();
+  }: { variant?: 'info' | 'success' | 'warning' | 'error'; size?: 'sm' | 'md'; title?: string | null; children?: Snippet; class?: string } = $props();
 
   const variantClass = $derived({
     info: 'border-blue-200 bg-blue-50 text-blue-800',

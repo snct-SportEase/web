@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+  import type { Snippet } from 'svelte';
   let {
     label,
     inputId,
@@ -6,7 +7,7 @@
     labelClass = 'block text-sm font-medium text-gray-700',
     children,
     class: className = ''
-  } = $props();
+  }: { label: string; inputId?: string; description?: string | null; labelClass?: string; children?: Snippet; class?: string } = $props();
 </script>
 
 <div class={className}>

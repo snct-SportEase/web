@@ -1,6 +1,5 @@
-<script>
-  /** @type {Array<{id: number, name: string}>} */
-  let { classes = [] } = $props();
+<script lang="ts">
+  let { classes = [] }: { classes?: { id: number; name: string }[] } = $props();
 
   // 専教は専攻科・教員枠のため、生徒の初回自己申告では選べない
   let selectableClasses = $derived(classes.filter((cls) => cls.name !== '専教'));
@@ -11,15 +10,15 @@
   let isConfirming = $state(false);
   let confirmData = $state({ displayName: '', className: '', classId: '' });
 
-  function handleSubmit(event) {
+  function handleSubmit(event: SubmitEvent & { currentTarget: HTMLFormElement }) {
     event.preventDefault();
     errorMessage = '';
 
-    const formData = new FormData(event.target);
+    const formData = new FormData(event.currentTarget);
     const displayName = formData.get('displayName');
     const classId = formData.get('classId');
     
-    if (!displayName || !classId) {
+    if (typeof displayName !== 'string' || !displayName || typeof classId !== 'string' || !classId) {
       errorMessage = '表示名とクラスを入力してください。';
       return;
     }
@@ -72,7 +71,7 @@
       window.location.reload();
       
     } catch (error) {
-      errorMessage = error.message;
+      errorMessage = error instanceof Error ? error.message : String(error);
       isConfirming = false;
     } finally {
       isLoading = false;

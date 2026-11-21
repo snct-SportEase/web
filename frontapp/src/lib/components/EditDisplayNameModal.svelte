@@ -1,13 +1,13 @@
-<script>
+<script lang="ts">
   import { browser } from '$app/env';
   import { tick } from 'svelte';
 
-  let { isOpen = false, currentDisplayName = '', userRoles = [], onClose = () => {}, onSave = async () => {} } = $props();
+  let { isOpen = false, currentDisplayName = '', userRoles = [], onClose = () => {}, onSave = async () => {} }: { isOpen?: boolean; currentDisplayName?: string; userRoles?: { name: string }[]; onClose?: () => void; onSave?: (name: string) => Promise<void> } = $props();
 
   let newDisplayName = $state('');
   let isLoading = $state(false);
   let errorMessage = $state('');
-  let displayNameInput = $state();
+  let displayNameInput = $state<HTMLInputElement>();
 
   // モーダルが開かれるたびに現在の表示名をリセット
   $effect(() => {
@@ -43,7 +43,7 @@
       await onSave(newDisplayName.trim());
       onClose();
     } catch (error) {
-      errorMessage = error.message || '表示名の更新に失敗しました。';
+      errorMessage = error instanceof Error ? error.message : '表示名の更新に失敗しました。';
     } finally {
       isLoading = false;
     }
@@ -55,13 +55,13 @@
     onClose();
   }
 
-  function handleKeydown(event) {
+  function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       handleCancel();
     }
   }
 
-  function handleOverlayKeydown(event) {
+  function handleOverlayKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       event.preventDefault();
       handleCancel();

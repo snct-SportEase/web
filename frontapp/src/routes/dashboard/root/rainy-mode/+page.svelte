@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
+  import type { ActiveEvent } from '$lib/utils/activeEvent.js';
 
-  let selectedEventId = $state(null);
-  let currentEvent = $state(null);
+  let selectedEventId = $state<number | null>(null);
+  let currentEvent = $state<ActiveEvent | null>(null);
   let isRainyMode = $state(false);
   let loading = $state(false);
 
@@ -25,7 +26,7 @@
       console.log('rainy-mode page: onMount completed');
     } catch (error) {
       console.error('初期化エラー:', error);
-      alert('ページの初期化に失敗しました: ' + error.message);
+      alert('ページの初期化に失敗しました: ' + (error instanceof Error ? error.message : String(error)));
       loading = false;
     }
   });
@@ -62,7 +63,7 @@
       alert(isRainyMode ? '雨天時モードを有効にしました' : '雨天時モードを無効にしました');
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      alert(error instanceof Error ? error.message : String(error));
     } finally {
       loading = false;
     }

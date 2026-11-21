@@ -1,25 +1,38 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import { canEnterEventResults } from '$lib/utils/eventStatus.js';
   import { get } from 'svelte/store';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { dndzone } from 'svelte-dnd-action';
+  type Session = { id: number; name: string; status: string; template_key?: string };
+  type Entry = { id: number; resolved_name?: string; display_name?: string; home_display_name?: string; away_display_name?: string };
+  type Detail = { entry_id: number; rank?: number | null; points?: number | null; competition_score?: number | null };
+  type Match = { id: number; title?: string; status?: string; scheduled_at?: string; home_display_name?: string; away_display_name?: string; allow_draw?: boolean; entries: Entry[]; result?: { winner?: string; note?: string | null; details?: Detail[] } | null };
+  type ResultParticipant = { entry_id: number; name: string; rank: string; points: string };
+  type ResultForm = { useRankings: boolean; participants: ResultParticipant[]; winner: string; note: string };
+  type Template = { type: 'year-relay' | 'course-relay' | 'tug-of-war' | 'borrowing-race'; block?: string };
+  type Participant = { id: number; entry_id: number; name: string; rank: string; points: number | null; competition_score?: number };
+  type TemplateRun = { key: string; type: Template['type']; matches: { match: Match; template: Template }[]; runId: number | null };
+  type TemplateForm = { matchId: number; template: Template; participants: Participant[]; note: string };
+  type Summary = { id?: number; class_id: number; class_name: string; points: number };
+  type DndEvent = CustomEvent<{ items: Participant[] }>;
+  type Payload = { rankings: { entry_id: number; rank: number; points: number | null }[]; note: string | null; match_id: number } | { scores: { entry_id: number; competition_score: number }[]; finalize: boolean; note: string | null };
 
-  let session = $state(null);
-  let sessions = $state([]);
-  let selectedSessionId = $state(null);
-  let matches = $state([]);
-  let pointsSummary = $state([]);
+  let session = $state<Session | null>(null);
+  let sessions = $state<Session[]>([]);
+  let selectedSessionId = $state<number | null>(null);
+  let matches = $state<Match[]>([]);
+  let pointsSummary = $state<Summary[]>([]);
   let loading = $state(false);
-  let saving = $state({});
+  let saving = $state<Record<string, boolean>>({});
   let errorMessage = $state('');
 
-  let resultForms = $state({});
+  let resultForms = $state<Record<number, ResultForm>>({});
   let activeEventStatus = $state('');
-  let templateRunForms = $state({});
-  let templateRuns = $state([]);
-  let typingFile = $state(null);
+  let templateRunForms = $state<Record<string, TemplateForm>>({});
+  let templateRuns = $state<TemplateRun[]>([]);
+  let typingFile = $state<File | null>(null);
   let importingTypingResults = $state(false);
 
   onMount(async () => {
@@ -31,7 +44,7 @@
     }
   });
 
-  async function fetchSessions(eventId, preferredSessionId = selectedSessionId) {
+  async function fetchSessions(eventId: number, preferredSessionId: number | null = selectedSessionId) {
     loading = true;
     errorMessage = '';
     try {
@@ -65,7 +78,7 @@
       await initializeTemplateRuns(matches);
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
+      errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;
     }
@@ -91,17 +104,17 @@
       const current = get(activeEvent);
       if (current) await fetchSessions(current.id, session.id);
     } catch (err) {
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       importingTypingResults = false;
     }
   }
 
-  function initializeResultForms(matchList) {
-    const forms = {};
+  function initializeResultForms(matchList: Match[]) {
+    const forms: Record<number, ResultForm> = {};
     for (const match of matchList) {
       const hasEntries = Array.isArray(match.entries) && match.entries.length > 0;
-      const detailMap = new SvelteMap();
+      const detailMap = new SvelteMap<number, Detail>();
       if (match.result?.details) {
         for (const detail of match.result.details) {
           detailMap.set(detail.entry_id, detail);
@@ -140,7 +153,7 @@
     resultForms = forms;
   }
 
-  async function submitResult(match) {
+  async function submitResult(match: Match) {
     if (!canEnterEventResults(activeEventStatus)) {
       alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
       return;
@@ -157,7 +170,7 @@
     saving = { ...saving, [match.id]: true };
     errorMessage = '';
     try {
-      let rankings = [];
+      let rankings: { entry_id: number; rank: number | null; points: number }[] = [];
       if (form.useRankings) {
         rankings = form.participants
           .map((participant) => {
@@ -201,14 +214,14 @@
       alert('試合結果を登録しました。');
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
-      alert(err.message);
+      errorMessage = err instanceof Error ? err.message : String(err);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       saving = { ...saving, [match.id]: false };
     }
   }
 
-  function displayWinner(match) {
+  function displayWinner(match: Match) {
     if (!match.result) return '未登録';
     if (match.result.winner === 'home') return match.home_display_name;
     if (match.result.winner === 'away') return match.away_display_name;
@@ -216,7 +229,7 @@
     return '未登録';
   }
 
-  function updateResultForm(matchId, patch) {
+  function updateResultForm(matchId: number, patch: Partial<ResultForm>) {
     const current = resultForms[matchId] ?? {};
     resultForms = {
       ...resultForms,
@@ -227,7 +240,7 @@
     };
   }
 
-  function updateResultParticipantField(matchId, index, field, value) {
+  function updateResultParticipantField(matchId: number, index: number, field: 'rank' | 'points', value: string) {
     const form = resultForms[matchId];
     if (!form || !Array.isArray(form.participants)) return;
     const participants = [...form.participants];
@@ -238,11 +251,11 @@
     updateResultForm(matchId, { participants });
   }
 
-  function toggleResultUseRankings(matchId, value) {
+  function toggleResultUseRankings(matchId: number, value: boolean) {
     updateResultForm(matchId, { useRankings: value });
   }
 
-  async function safeJson(response) {
+  async function safeJson(response: Response): Promise<{ error?: string; status?: string } | null> {
     try {
       return await response.json();
     } catch {
@@ -251,7 +264,7 @@
   }
 
   // 試合のタイトルからテンプレートランを特定
-  function detectTemplateFromMatch(match) {
+  function detectTemplateFromMatch(match: Match): Template | null {
     const title = match.title || '';
 		if (session?.template_key === 'borrowing_race') {
 			return { type: 'borrowing-race' };
@@ -272,15 +285,15 @@
     return null;
   }
 
-  async function initializeTemplateRuns(matchList) {
+  async function initializeTemplateRuns(matchList: Match[]) {
     // テンプレートランをグループ化
-    const runs = new SvelteMap();
+    const runs = new SvelteMap<string, TemplateRun>();
     
     // 学年対抗リレーの場合、A/B/BONUSの3試合を同じrun_idとしてグループ化
-    const yearRelayMatches = [];
-    const courseRelayMatches = [];
-    const tugOfWarMatches = [];
-		const borrowingRaceMatches = [];
+    const yearRelayMatches: { match: Match; template: Template }[] = [];
+    const courseRelayMatches: { match: Match; template: Template }[] = [];
+    const tugOfWarMatches: { match: Match; template: Template }[] = [];
+		const borrowingRaceMatches: { match: Match; template: Template }[] = [];
     
     for (const match of matchList) {
       const template = detectTemplateFromMatch(match);
@@ -357,12 +370,12 @@
     templateRuns = Array.from(runs.values());
 
     // フォームを初期化（既存のフォームがある場合は順序を保持）
-    const forms = {};
+    const forms: Record<string, TemplateForm> = {};
     for (const run of templateRuns) {
       for (const { match, template } of run.matches) {
         const formKey = `${run.key}-${match.id}`;
         const hasEntries = Array.isArray(match.entries) && match.entries.length > 0;
-        const detailMap = new SvelteMap();
+        const detailMap = new SvelteMap<number, Detail>();
         if (match.result?.details) {
           for (const detail of match.result.details) {
             detailMap.set(detail.entry_id, detail);
@@ -371,7 +384,7 @@
         
         // 既存のフォームがある場合は順序を保持
         const existingForm = templateRunForms[formKey];
-        let participants = [];
+        let participants: Participant[] = [];
         
         if (hasEntries) {
           if (existingForm && existingForm.participants && existingForm.participants.length > 0) {
@@ -433,7 +446,7 @@
                 entry_id: entry.id,
                 name: name,
                 rank: rankValue,
-				points: detail ? detail.points : null,
+				points: detail?.points ?? null,
 				competition_score: detail?.competition_score ?? 0
               });
             }
@@ -453,14 +466,14 @@
                 entry_id: entry.id,
                 name: name,
                 rank: rankValue,
-                points: detail ? detail.points : null,
+                points: detail?.points ?? null,
 								competition_score: detail?.competition_score ?? 0,
                 _rank: detail && detail.rank !== undefined && detail.rank !== null ? detail.rank : 999
               };
             });
             
             // 順位で並べる（Svelte state proxy の破壊的 sort を避ける）
-            let sortedParticipantsWithRank = [];
+            let sortedParticipantsWithRank: (Participant & { _rank: number })[] = [];
             for (const participant of participantsWithRank) {
               let insertAt = sortedParticipantsWithRank.length;
               for (let i = 0; i < sortedParticipantsWithRank.length; i += 1) {
@@ -501,7 +514,7 @@
     templateRunForms = forms;
   }
 
-  async function submitTemplateResult(run, match, template, finalize = true) {
+  async function submitTemplateResult(run: TemplateRun, match: Match, template: Template, finalize = true) {
     if (!canEnterEventResults(activeEventStatus)) {
       alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
       return;
@@ -541,7 +554,7 @@
       }
 
       // 同順位チェック
-      const rankCounts = {};
+      const rankCounts: Record<number, number> = {};
       for (const r of rankings) {
         rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1;
       }
@@ -553,7 +566,7 @@
       }
 
       let endpoint = '';
-      let payload = {
+      let payload: Payload = {
         rankings,
         note: form.note || null,
         match_id: match.id
@@ -596,15 +609,15 @@
 			alert(template.type === 'borrowing-race' && !finalize ? '途中経過を保存しました。' : '試合結果を登録しました。');
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
-      alert(err.message);
+      errorMessage = err instanceof Error ? err.message : String(err);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       saving = { ...saving, [formKey]: false };
     }
   }
 
   // 試合IDからrun_idを取得
-  async function getRunIdFromMatchId(matchId) {
+  async function getRunIdFromMatchId(matchId: number): Promise<number | null> {
     try {
       const res = await fetch(`/api/admin/noon-game/matches/${matchId}/template-run`);
       if (!res.ok) {
@@ -622,7 +635,7 @@
     }
   }
 
-  function handleDndConsider(e, formKey) {
+  function handleDndConsider(e: DndEvent, formKey: string) {
     // considerイベントでは順序を更新（dndzoneが期待する動作）
     console.log('[DND] consider event:', formKey, e.detail);
     const form = templateRunForms[formKey];
@@ -636,7 +649,7 @@
     });
     
     // 既存のプロパティを保持しながら順序を更新
-    const existingMap = new SvelteMap();
+    const existingMap = new SvelteMap<number, Participant>();
     form.participants.forEach(p => {
       const key = p.entry_id || p.id;
       if (key) existingMap.set(key, p);
@@ -657,7 +670,7 @@
     };
   }
 
-  function handleDndFinalize(e, formKey) {
+  function handleDndFinalize(e: DndEvent, formKey: string) {
     console.log('[DND] finalize event start:', formKey, e.detail);
     
     try {
@@ -680,7 +693,7 @@
       console.log('[DND] Filtered participants (without placeholder):', newParticipants);
       
       // 既存のparticipantsをentry_idでマッピング（名前やその他のプロパティを保持するため）
-      const existingParticipantsMap = new SvelteMap();
+      const existingParticipantsMap = new SvelteMap<number, Participant>();
       form.participants.forEach(p => {
         const key = p.entry_id || p.id;
         if (key) {
@@ -711,7 +724,7 @@
       console.log('[DND] Participants with rank:', participantsWithRank);
       
       // 同順位チェック（同じ順位が複数ある場合は点数入力が必要）
-      const rankCounts = {};
+      const rankCounts: Record<number, number> = {};
       participantsWithRank.forEach(p => {
         const rank = Number(p.rank);
         rankCounts[rank] = (rankCounts[rank] || 0) + 1;
@@ -745,11 +758,11 @@
         });
       });
     } catch (error) {
-      console.error('[DND] Error in handleDndFinalize:', error, formKey, error.stack);
+      console.error('[DND] Error in handleDndFinalize:', error, formKey, error instanceof Error ? error.stack : undefined);
     }
   }
 
-  function updateTemplateParticipantPoints(formKey, index, value) {
+  function updateTemplateParticipantPoints(formKey: string, index: number, value: string) {
     const form = templateRunForms[formKey];
     if (!form || !Array.isArray(form.participants)) return;
     const participants = [...form.participants];
@@ -766,7 +779,7 @@
     };
   }
 
-	function updateBorrowingRaceScore(formKey, index, value) {
+	function updateBorrowingRaceScore(formKey: string, index: number, value: string) {
 		const form = templateRunForms[formKey];
 		if (!form || !Array.isArray(form.participants)) return;
 		const participants = [...form.participants];
@@ -885,7 +898,7 @@
 										<tr>
 											<td class="px-3 py-2 font-medium">{participant.name}</td>
 											<td class="px-3 py-2 text-right">{participant.rank ? `${participant.rank}位` : '自動計算'}</td>
-											<td class="px-3 py-2 text-right"><input type="number" min="0" class="w-28 rounded border px-2 py-1 text-right" value={participant.competition_score ?? 0} oninput={(event) => updateBorrowingRaceScore(formKey, index, event.target.value)} /></td>
+											<td class="px-3 py-2 text-right"><input type="number" min="0" class="w-28 rounded border px-2 py-1 text-right" value={participant.competition_score ?? 0} oninput={(event) => updateBorrowingRaceScore(formKey, index, event.currentTarget.value)} /></td>
 											<td class="px-3 py-2 text-right font-semibold text-indigo-700">{participant.points ?? 0}点</td>
 										</tr>
 									{/each}
@@ -931,7 +944,7 @@
                                     type="number"
                                     class="border border-yellow-300 rounded px-2 py-1 text-sm w-full mt-1"
                                     value={participant.points ?? ''}
-                                    oninput={(e) => updateTemplateParticipantPoints(formKey, index, e.target.value)}
+                                    oninput={(e) => updateTemplateParticipantPoints(formKey, index, e.currentTarget.value)}
                                     placeholder="点数を入力"
                                   />
                                 </div>
@@ -1003,7 +1016,7 @@
                     <input
                       type="checkbox"
                       checked={resultForms[match.id]?.useRankings}
-                      onchange={(e) => toggleResultUseRankings(match.id, e.target.checked)}
+                      onchange={(e) => toggleResultUseRankings(match.id, e.currentTarget.checked)}
                     />
                     <span>参加者ごとの手動得点入力</span>
                   </label>
@@ -1022,7 +1035,7 @@
                                 min="1"
                                 class="border rounded px-2 py-1 text-sm w-full"
                                 value={participant.rank}
-                                oninput={(e) => updateResultParticipantField(match.id, index, 'rank', e.target.value)}
+                                oninput={(e) => updateResultParticipantField(match.id, index, 'rank', e.currentTarget.value)}
                               />
                             </div>
                             <div class="space-y-1">
@@ -1032,7 +1045,7 @@
                                 type="number"
                                 class="border rounded px-2 py-1 text-sm w-full"
                                 value={participant.points}
-                                oninput={(e) => updateResultParticipantField(match.id, index, 'points', e.target.value)}
+                                oninput={(e) => updateResultParticipantField(match.id, index, 'points', e.currentTarget.value)}
                               />
                             </div>
                           </div>

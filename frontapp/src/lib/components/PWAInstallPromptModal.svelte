@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
   import {
     closePWAInstallDialog,
@@ -40,7 +40,7 @@
     }
   }
 
-  function handleKeydown(event) {
+  function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') closeDialog();
   }
 </script>

@@ -1,18 +1,19 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
+  import type { PageData } from './$types';
 
-  /** @type {import('./$types').PageData} */
-  let { data } = $props();
+  let { data }: { data: PageData } = $props();
 
-  let classes = $state([]);
-  let originalClasses = $state([]); // 保存前の状態を保持
+  type EditableClass = { id: number; name: string; student_count?: number };
+  let classes = $state<EditableClass[]>([]);
+  let originalClasses = $state<EditableClass[]>([]); // 保存前の状態を保持
   let errorMessage = $state('');
   let successMessage = $state('');
   let isSaving = $state(false);
   let isUploading = $state(false);
-  let csvFile = $state(null);
+  let csvFile = $state<File | null>(null);
 
-  function setEditableClasses(items) {
+  function setEditableClasses(items: EditableClass[]) {
     const editableClasses = (items || []).filter((classItem) => classItem.name !== '専教');
     classes = JSON.parse(JSON.stringify(editableClasses));
     originalClasses = JSON.parse(JSON.stringify(editableClasses));
@@ -58,14 +59,14 @@
       setEditableClasses(freshData);
 
     } catch (error) {
-      errorMessage = error.message;
+      errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       isSaving = false;
     }
   }
 
-  function handleFileSelect(e) {
-    csvFile = e.target.files[0];
+  function handleFileSelect(e: Event & { currentTarget: HTMLInputElement }) {
+    csvFile = e.currentTarget.files?.[0] ?? null;
   }
 
   async function handleCSVUpload() {
@@ -99,7 +100,7 @@
       csvFile = null; // ファイル選択をリセット
 
     } catch (error) {
-      errorMessage = error.message;
+      errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       isUploading = false;
     }
@@ -126,7 +127,7 @@
   <!-- CSV Upload -->
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">CSVで一括更新</h2>
-    <form onsubmit={(e) => { e.preventDefault(); handleCSVUpload(e); }} class="flex flex-col sm:flex-row items-start sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
+    <form onsubmit={(e) => { e.preventDefault(); handleCSVUpload(); }} class="flex flex-col sm:flex-row items-start sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
       <div class="flex-grow w-full">
         <label for="csvfile" class="block text-sm font-medium text-gray-700">CSVファイル</label>
         <input 
@@ -150,7 +151,7 @@
   <div class="bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-semibold mb-4">手動で更新</h2>
     <p class="mb-4 text-sm text-gray-600">専教は在籍人数による判定の対象外のため、設定一覧には表示されません。</p>
-    <form onsubmit={(e) => { e.preventDefault(); handleSave(e); }}>
+    <form onsubmit={(e) => { e.preventDefault(); handleSave(); }}>
       <div class="overflow-x-auto rounded-lg border border-gray-200">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">

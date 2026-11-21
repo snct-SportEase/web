@@ -1,6 +1,6 @@
-<script>
- let { sessionId, typingImportStatus, onImported } = $props();
- let typingFile = $state(null);
+<script lang="ts">
+ let { sessionId, typingImportStatus, onImported }: { sessionId: number | null; typingImportStatus: string; onImported: () => Promise<void> } = $props();
+ let typingFile = $state<File | null>(null);
  let importingTypingResults = $state(false);
  let typingImportError = $state('');
   async function importTypingResults(replace = false) {
@@ -17,8 +17,8 @@
       typingFile = null;
       await onImported();
     } catch (err) {
-      typingImportError = err.message;
-      alert(err.message);
+      typingImportError = err instanceof Error ? err.message : String(err);
+      alert(typingImportError);
     }
     finally { importingTypingResults = false; }
   }

@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import { error } from '@sveltejs/kit';
 
-  let eventSports = $state([]);
+  type EventSport = { sport_id: number; sport_name?: string; description?: string | null; location: string; rules_pdf_url?: string | null };
+  let eventSports = $state<EventSport[]>([]);
 
   onMount(async () => {
     try {
@@ -31,16 +32,16 @@
     }
   });
 
-  function getSportName(sport) {
+  function getSportName(sport: EventSport): string {
     return sport?.sport_name || '不明な競技';
   }
 
-  function displayLocation(location) {
+  function displayLocation(location: string): string {
     if (typeof location === 'string' && location.startsWith('other:')) {
       return location.slice('other:'.length);
     }
 
-    const labels = {
+    const labels: Record<string, string> = {
       gym1: '第一体育館',
       gym2: '第二体育館',
       ground: 'グラウンド',
@@ -50,8 +51,8 @@
     return labels[location] || location;
   }
 
-  function openRulesPdf(pdfUrl) {
-    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+  function openRulesPdf(pdfUrl: string | null | undefined) {
+    if (pdfUrl) window.open(pdfUrl, '_blank', 'noopener,noreferrer');
   }
 </script>
 

@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+  import type { Snippet } from 'svelte';
   let {
     type = 'button',
     variant = 'primary',
@@ -9,7 +10,7 @@
     onclick,
     children,
     class: className = ''
-  } = $props();
+  }: { type?: 'button' | 'submit' | 'reset'; variant?: 'primary' | 'secondary' | 'danger'; size?: 'sm' | 'md' | 'modal'; disabled?: boolean; loading?: boolean; loadingLabel?: string; onclick?: (event: MouseEvent) => void; children?: Snippet; class?: string } = $props();
 
   const variantClass = $derived({
     primary: 'border-transparent bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
@@ -24,7 +25,7 @@
         : 'px-4 py-2 text-base'
   );
 
-  function handleClick(event) {
+  function handleClick(event: MouseEvent) {
     if (disabled || loading) {
       event.preventDefault();
       return;

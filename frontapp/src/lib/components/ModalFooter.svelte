@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Button from '$lib/components/Button.svelte';
 
   let {
@@ -8,7 +8,7 @@
     confirmLoading = false,
     onconfirm,
     oncancel
-  } = $props();
+  }: { confirmLabel?: string; cancelLabel?: string | null; confirmDisabled?: boolean; confirmLoading?: boolean; onconfirm?: () => void; oncancel?: () => void } = $props();
 </script>
 
 <Button

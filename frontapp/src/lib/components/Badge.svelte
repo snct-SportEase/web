@@ -1,5 +1,6 @@
-<script>
-  let { variant = 'neutral', children, class: className = '' } = $props();
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+  let { variant = 'neutral', children, class: className = '' }: { variant?: 'neutral' | 'info' | 'success' | 'warning' | 'danger'; children?: Snippet; class?: string } = $props();
 
   const variantClass = $derived({
     neutral: 'bg-gray-100 text-gray-800',

@@ -1,9 +1,11 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
+  import type { PageData } from './$types';
+  import type { NotificationRequest } from '$lib/types/notificationRequest';
 
-  let { data } = page;
+  let data = page.data as PageData;
 
   let requests = $derived(data.requests ?? []);
   let activeRequest = $state(data.activeRequest);
@@ -19,7 +21,7 @@
     isInteractive = true;
   });
 
-  function formatStatus(status) {
+  function formatStatus(status: NotificationRequest['status']) {
     switch (status) {
       case 'approved':
         return { label: '承認済み', class: 'bg-green-100 text-green-700' };
@@ -30,22 +32,22 @@
     }
   }
 
-  function getDisplayName(user) {
+  function getDisplayName(user: { display_name: string | null; email: string } | null | undefined): string {
     if (user?.display_name) {
       return user.display_name;
     }
     return user?.email ?? '不明なユーザー';
   }
 
-  function selectRequest(id) {
+  function selectRequest(id: number) {
     goto(`/dashboard/root/notification-requests?request_id=${id}`);
   }
 
-  async function refreshDetail(id) {
+  async function refreshDetail(id: number) {
     try {
       const res = await fetch(`/api/root/notification-requests/${id}`);
       if (res.ok) {
-        const { request } = await res.json();
+        const { request }: { request: NotificationRequest | null } = await res.json();
         activeRequest = request ?? null;
         await invalidateAll();
       }
@@ -54,7 +56,7 @@
     }
   }
 
-  async function handleMessageSubmit(event) {
+  async function handleMessageSubmit(event: SubmitEvent) {
     event.preventDefault();
     if (!activeRequest || isPostingMessage) return;
     const message = messageInput.trim();
@@ -77,13 +79,13 @@
       await refreshDetail(activeRequest.id);
     } catch (error) {
       console.error(error);
-      errorMessage = error.message ?? 'メッセージの送信に失敗しました';
+      errorMessage = error instanceof Error ? error.message : 'メッセージの送信に失敗しました';
     } finally {
       isPostingMessage = false;
     }
   }
 
-  async function decide(status) {
+  async function decide(status: 'approved' | 'rejected') {
     if (!activeRequest || isDeciding) return;
     isDeciding = true;
     errorMessage = null;
@@ -103,7 +105,7 @@
       await invalidateAll();
     } catch (error) {
       console.error(error);
-      errorMessage = error.message ?? '処理に失敗しました';
+      errorMessage = error instanceof Error ? error.message : '処理に失敗しました';
     } finally {
       isDeciding = false;
     }

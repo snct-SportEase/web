@@ -1,8 +1,8 @@
-<script>
+<script lang="ts">
   import { browser } from '$app/env';
   import { isPWAInstalled, isPWAInstallable } from '$lib/utils/pwa.js';
 
-  let { show = false, onClose = () => {} } = $props();
+  let { show = false, onClose = () => {} }: { show?: boolean; onClose?: () => void } = $props();
 
   let isVisible = $state(false);
 

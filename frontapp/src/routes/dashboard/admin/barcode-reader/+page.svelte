@@ -1,36 +1,51 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
 	import { onMount } from 'svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
+	type SportInput = { id?: number | string; sport_id?: number | string; name?: string; sport_name?: string };
+	type Sport = SportInput & { id: number | string; name: string };
+	type Side = { title?: string; teamId?: number | string; contestantId?: string };
+	type Match = { id: number | string; roundIndex: number; order?: number; startTime?: string | null; rainyModeStartTime?: string | null; noonGameSessionId?: number; sides?: Side[] };
+	type TournamentData = { rounds?: { name?: string }[]; matches?: Match[]; contestants?: Record<string, { players?: { title?: string }[] }> };
+	type Tournament = { id: number | string; name: string; sport_id: number | string; data?: TournamentData | string | null };
+	type Session = { id: number; name: string };
+	type NoonMatch = { id: number; scheduled_at?: string | null; home_display_name?: string; away_display_name?: string };
+	type SelectionEntry = { tournament: Tournament; data: TournamentData; match: Match; noonGameSessionId: number | null; matchupLabel: string; sortIndex: number };
+	type TimedGroup = { round: number; roundName: string; startLabel: string; entries: SelectionEntry[] };
+	type Member = { user_id: number; team_id?: number; class_id?: number; display_name?: string; email?: string; class_name?: string; team_name?: string; checked_in_at?: string | null };
+	type MemberGroup = { key: string; name: string; checked: Member[]; unchecked: Member[] };
+	type VerificationResult = { success: true; data: { display_name?: string; student_number: string; sport_name: string; round: number; capacity_warning?: string } } | { success: false; alreadyCheckedIn?: boolean; message: string };
+	type Detector = { detect(source: HTMLVideoElement): Promise<{ rawValue?: string }[]> };
+	type DetectorClass = { new(options: { formats: string[] }): Detector; getSupportedFormats?: () => Promise<string[]> };
 	const supportedBarcodeFormats = ['code_39', 'code_128', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e'];
 	const matchSelectionOpenOffsetMs = 10 * 60 * 1000;
 
-	let barcodeVideo = $state();
-	let barcodeStream = null;
-	let barcodeScanFrame = null;
+	let barcodeVideo = $state<HTMLVideoElement>();
+	let barcodeStream: MediaStream | null = null;
+	let barcodeScanFrame: number | null = null;
 	let cameraPermission = $state('unknown');
-	let cameraPermissionStatus = null;
-	let selectionClockInterval = null;
+	let cameraPermissionStatus: PermissionStatus | null = null;
+	let selectionClockInterval: number | null = null;
 	let errorMessage = $state('');
-	let verificationResult = $state(null);
-	let activeEventId = $state(null);
+	let verificationResult = $state<VerificationResult | null>(null);
+	let activeEventId = $state<number | null>(null);
 	let activeEventName = $state('');
-	let sports = $state([]);
-	let tournaments = $state([]);
+	let sports = $state<Sport[]>([]);
+	let tournaments = $state<Tournament[]>([]);
 	let selectedSportId = $state('');
 	let selectedMatchId = $state('');
 	let manualBarcode = $state('');
 	let isScanning = $state(false);
 	let isVerifying = $state(false);
 	let loading = $state(true);
-	let matchCheckIns = $state([]);
-	let checkedInMembers = $state([]);
-	let uncheckedMembers = $state([]);
+	let matchCheckIns = $state<Member[]>([]);
+	let checkedInMembers = $state<Member[]>([]);
+	let uncheckedMembers = $state<Member[]>([]);
 	let matchCheckInCount = $state(0);
 	let checkInsLoading = $state(false);
 	let checkInsError = $state('');
-	let checkInStatusModalMode = $state(null);
+	let checkInStatusModalMode = $state<'checked' | 'unchecked' | null>(null);
 	let currentTime = $state(Date.now());
 
 	let selectedSport = $derived(
@@ -110,15 +125,16 @@
 			if (!sportsResponse.ok) throw new Error('競技一覧の取得に失敗しました');
 			if (!tournamentsResponse.ok) throw new Error('試合一覧の取得に失敗しました');
 			sports = dedupeSportsByID(await sportsResponse.json());
-			const regularTournaments = await tournamentsResponse.json();
-			const noonSessions = noonSessionsResponse.ok ? (await noonSessionsResponse.json()).sessions || [] : [];
+			const regularTournaments: Tournament[] = await tournamentsResponse.json();
+			const noonPayload: { sessions?: Session[] } = noonSessionsResponse.ok ? await noonSessionsResponse.json() : {};
+			const noonSessions = noonPayload.sessions || [];
 			const noonTournaments = await Promise.all(noonSessions.map(async (session) => {
 				const response = await fetch(`/api/admin/events/${activeEventId}/noon-game/sessions/${session.id}`, { credentials: 'include' });
 				return response.ok ? createNoonGameTournament(session, await response.json()) : null;
 			}));
-			tournaments = [...regularTournaments, ...noonTournaments.filter(Boolean)];
+			tournaments = [...regularTournaments, ...noonTournaments.filter((item): item is NonNullable<typeof item> => item !== null)];
 			} catch (err) {
-			errorMessage = err.message || '初期データの取得に失敗しました';
+			errorMessage = err instanceof Error ? err.message : '初期データの取得に失敗しました';
 		} finally {
 			loading = false;
 		}
@@ -128,7 +144,7 @@
 		return activeEventId !== null && selectedSportId !== '' && selectedMatch?.isSelectable === true;
 	}
 
-	function handleKeydown(event) {
+	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape' && verificationResult) {
 			closeResultModal();
 		}
@@ -137,11 +153,11 @@
 		}
 	}
 
-	function dedupeSportsByID(items) {
-		const seen = new SvelteSet();
+	function dedupeSportsByID(items: SportInput[]) {
+		const seen = new SvelteSet<string>();
 		return (items ?? [])
 			.map(normalizeSport)
-			.filter(Boolean)
+			.filter((sport): sport is Sport => sport !== null)
 			.filter((sport) => {
 				const key = `${sport?.id}`;
 				if (!sport?.id || seen.has(key)) {
@@ -152,7 +168,7 @@
 			});
 	}
 
-	function normalizeSport(sport) {
+	function normalizeSport(sport: SportInput): Sport | null {
 		const id = sport?.id ?? sport?.sport_id;
 		const name = sport?.name ?? sport?.sport_name;
 		if (id === undefined || id === null || !name) {
@@ -166,7 +182,7 @@
 		};
 	}
 
-	function getTournamentData(tournament) {
+	function getTournamentData(tournament: Tournament): TournamentData {
 		if (!tournament?.data) {
 			return { rounds: [], matches: [] };
 		}
@@ -180,16 +196,16 @@
 		return tournament.data;
 	}
 
-	function getMatchRound(match) {
+	function getMatchRound(match: Match) {
 		return Number(match?.roundIndex ?? 0) + 1;
 	}
 
-	function getRoundName(tournament, match) {
+	function getRoundName(tournament: Tournament, match: Match) {
 		const data = getTournamentData(tournament);
 		return data.rounds?.[match.roundIndex]?.name || `第${getMatchRound(match)}ラウンド`;
 	}
 
-	function createNoonGameTournament(session, payload) {
+	function createNoonGameTournament(session: Session, payload: { matches?: NoonMatch[] }) {
 		const sport = sports.find((item) => item.name === session.name);
 		if (!sport) return null;
 		const matches = (payload.matches || []).map((match, index) => ({
@@ -203,8 +219,8 @@
 		return { id: `noon:${session.id}`, name: session.name, sport_id: sport.id, data: { rounds: [{ name: '昼競技' }], matches } };
 	}
 
-	function buildMatchSelections(tournamentsForSport, nowMs) {
-		const timedGroups = new SvelteMap();
+	function buildMatchSelections(tournamentsForSport: Tournament[], nowMs: number) {
+		const timedGroups = new SvelteMap<string, TimedGroup>();
 		const selections = [];
 
 		tournamentsForSport.forEach((tournament, tournamentIndex) => {
@@ -241,7 +257,7 @@
 							entries: []
 						});
 					}
-					timedGroups.get(groupKey).entries.push(entry);
+					timedGroups.get(groupKey)?.entries.push(entry);
 				});
 		});
 
@@ -252,7 +268,7 @@
 		return selections.sort((a, b) => a.sortIndex - b.sortIndex);
 	}
 
-	function createMatchSelection(entries, timedGroup = null, nowMs = Date.now()) {
+	function createMatchSelection(entries: SelectionEntry[], timedGroup: TimedGroup | null = null, nowMs = Date.now()) {
 		const firstEntry = entries[0];
 		const matchIds = entries.map((entry) => entry.match.id);
 		const matchupLabels = entries.map((entry) => entry.matchupLabel).filter(Boolean);
@@ -301,11 +317,11 @@
 		};
 	}
 
-	function getMatchStartTime(match) {
+	function getMatchStartTime(match: Match) {
 		return match?.startTime || match?.rainyModeStartTime || '';
 	}
 
-	function getTeamNamesById(entries) {
+	function getTeamNamesById(entries: SelectionEntry[]) {
 		return entries.reduce((names, entry) => {
 			const sides = Array.isArray(entry.match?.sides) ? entry.match.sides : [];
 			sides.forEach((side) => {
@@ -315,10 +331,10 @@
 				names[String(side.teamId)] = getSideName(entry.data, side);
 			});
 			return names;
-		}, {});
+		}, {} as Record<string, string>);
 	}
 
-	function getSelectionStartTimeMs(entries) {
+	function getSelectionStartTimeMs(entries: SelectionEntry[]) {
 		const startTimes = entries
 			.map((entry) => parseMatchStartTimeMs(getMatchStartTime(entry.match)))
 			.filter((value) => value !== null);
@@ -329,7 +345,7 @@
 		return Math.min(...startTimes);
 	}
 
-	function parseMatchStartTimeMs(value) {
+	function parseMatchStartTimeMs(value: string) {
 		const parts = parseRegisteredJstDateTime(value);
 		if (!parts) {
 			return null;
@@ -338,7 +354,7 @@
 		return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour - 9, parts.minute, parts.second);
 	}
 
-	function formatMatchSelectionOpensAt(value) {
+	function formatMatchSelectionOpensAt(value: number | null) {
 		if (value === null) {
 			return '';
 		}
@@ -350,7 +366,7 @@
 		});
 	}
 
-	function getMatchStartTimeKey(match) {
+	function getMatchStartTimeKey(match: Match) {
 		const rawValue = getMatchStartTime(match);
 		const value = String(rawValue || '').trim();
 		if (!value) {
@@ -370,7 +386,7 @@
 		return `${year}-${month}-${day}T${hour}:${minute}`;
 	}
 
-	function getMatchStartTimeLabel(match) {
+	function getMatchStartTimeLabel(match: Match) {
 		const value = String(getMatchStartTime(match) || '').trim();
 		if (!value) {
 			return '';
@@ -389,7 +405,7 @@
 		return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
 	}
 
-	function parseRegisteredJstDateTime(value) {
+	function parseRegisteredJstDateTime(value: string) {
 		const trimmedValue = String(value || '').trim();
 		if (!trimmedValue) {
 			return null;
@@ -413,14 +429,14 @@
 		};
 	}
 
-	function getMatchLabel(tournament, match) {
+	function getMatchLabel(tournament: Tournament, match: Match) {
 		const matchNumber = Number(match.order ?? 0) + 1;
 		const matchupLabel = getMatchupLabel(getTournamentData(tournament), match);
 		const baseLabel = `${tournament.name} / ${getRoundName(tournament, match)} 第${matchNumber}試合`;
 		return matchupLabel ? `${baseLabel}（${matchupLabel}）` : baseLabel;
 	}
 
-	function getMatchupLabel(tournamentData, match) {
+	function getMatchupLabel(tournamentData: TournamentData, match: Match) {
 		const sides = Array.isArray(match?.sides) ? match.sides : [];
 		if (sides.length === 0) {
 			return '';
@@ -434,7 +450,7 @@
 		return `${teamNames[0] ?? '未定'} vs ${teamNames[1] ?? '未定'}`;
 	}
 
-	function getSideName(tournamentData, side) {
+	function getSideName(tournamentData: TournamentData, side: Side) {
 		if (!side) {
 			return '未定';
 		}
@@ -442,17 +458,17 @@
 			return side.title;
 		}
 
-		const contestant = tournamentData?.contestants?.[side.contestantId];
+		const contestant = side.contestantId ? tournamentData.contestants?.[side.contestantId] : undefined;
 		return contestant?.players?.[0]?.title || '未定';
 	}
 
-	function handleSportChange(event) {
+	function handleSportChange(event: Event & { currentTarget: HTMLSelectElement }) {
 		selectedSportId = event.currentTarget.value;
 		selectedMatchId = '';
 		clearMatchCheckIns();
 	}
 
-	async function handleMatchChange(event) {
+	async function handleMatchChange(event: Event & { currentTarget: HTMLSelectElement }) {
 		const nextMatchId = event.currentTarget.value;
 		const nextMatch = selectableMatches.find((match) => match.value === nextMatchId);
 		selectedMatchId = nextMatch?.isSelectable === false ? '' : nextMatchId;
@@ -498,7 +514,7 @@
 			matchCheckIns = checkedInMembers;
 			matchCheckInCount = data.checked_in_count ?? data.count ?? matchCheckIns.length;
 		} catch (err) {
-			checkInsError = err.message || 'チェックイン済み一覧の取得に失敗しました';
+			checkInsError = err instanceof Error ? err.message : 'チェックイン済み一覧の取得に失敗しました';
 			matchCheckIns = [];
 			checkedInMembers = [];
 			uncheckedMembers = [];
@@ -508,7 +524,7 @@
 		}
 	}
 
-	function formatCheckedInAt(value) {
+	function formatCheckedInAt(value: string | null | undefined) {
 		if (!value) {
 			return '';
 		}
@@ -524,13 +540,13 @@
 		});
 	}
 
-	async function verifyBarcode(barcodeData) {
+	async function verifyBarcode(barcodeData: string) {
 		const trimmedBarcode = barcodeData.trim();
 		if (!trimmedBarcode) {
 			errorMessage = 'バーコードを入力してください';
 			return;
 		}
-		if (!canVerify()) {
+		if (!canVerify() || !selectedMatch) {
 			errorMessage = '競技と試合を選択してください';
 			return;
 		}
@@ -638,21 +654,21 @@
 			cameraPermission = 'granted';
 			return stream;
 		} catch (err) {
-			if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+			if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
 				cameraPermission = 'denied';
 			}
 			throw err;
 		}
 	}
 
-	function getCameraErrorMessage(err) {
-		if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+	function getCameraErrorMessage(err: unknown) {
+		if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
 			return 'カメラの使用が許可されていません。ブラウザまたは端末の設定でカメラを許可してから、もう一度お試しください。手入力も使用できます。';
 		}
-		if (err?.name === 'NotFoundError') {
+		if (err instanceof Error && err.name === 'NotFoundError') {
 			return '利用できるカメラが見つかりません。端末のカメラを確認するか、手入力を使用してください。';
 		}
-		return err?.message || `カメラの開始に失敗しました: ${err}`;
+		return err instanceof Error ? err.message : `カメラの開始に失敗しました: ${String(err)}`;
 	}
 
 	async function createBarcodeDetector() {
@@ -660,7 +676,7 @@
 			throw new Error('このブラウザはバーコード読み取りに対応していません。手入力を使用してください');
 		}
 
-		const detectorClass = window.BarcodeDetector;
+		const detectorClass = window.BarcodeDetector as DetectorClass;
 		let formats = supportedBarcodeFormats;
 		if (typeof detectorClass.getSupportedFormats === 'function') {
 			const browserFormats = await detectorClass.getSupportedFormats();
@@ -673,7 +689,7 @@
 		return new detectorClass({ formats });
 	}
 
-	async function scanBarcodeFrame(barcodeDetector) {
+	async function scanBarcodeFrame(barcodeDetector: Detector) {
 		if (!isScanning || !barcodeVideo) {
 			return;
 		}
@@ -713,7 +729,7 @@
 		isScanning = false;
 	}
 
-	async function submitManualBarcode(event) {
+	async function submitManualBarcode(event: SubmitEvent) {
 		event.preventDefault();
 		await verifyBarcode(manualBarcode);
 	}
@@ -729,7 +745,7 @@
 		verificationResult = null;
 	}
 
-	function openCheckInStatusModal(mode) {
+	function openCheckInStatusModal(mode: 'checked' | 'unchecked') {
 		if (!selectedMatch) {
 			return;
 		}
@@ -751,7 +767,7 @@
 	}
 
 	function getCheckInStatusClassGroups() {
-		const groups = new SvelteMap();
+		const groups = new SvelteMap<string, MemberGroup>();
 
 		for (const member of [...checkedInMembers, ...uncheckedMembers]) {
 			const key = getMemberGroupKey(member);
@@ -775,11 +791,11 @@
 		return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'ja-JP'));
 	}
 
-	function getCheckInStatusGroupMembers(group) {
+	function getCheckInStatusGroupMembers(group: MemberGroup) {
 		return checkInStatusModalMode === 'unchecked' ? group.unchecked : group.checked;
 	}
 
-	function getCheckInStatusGroupCountLabel(group) {
+	function getCheckInStatusGroupCountLabel(group: MemberGroup) {
 		const totalCount = group.checked.length + group.unchecked.length;
 		if (checkInStatusModalMode === 'unchecked') {
 			return `未チェックイン: ${group.unchecked.length} / ${totalCount}人`;
@@ -787,20 +803,20 @@
 		return `チェックイン済み: ${group.checked.length} / ${totalCount}人`;
 	}
 
-	function getClassCheckInCountLabel(group) {
+	function getClassCheckInCountLabel(group: MemberGroup) {
 		const totalCount = group.checked.length + group.unchecked.length;
 		return `チェックイン済み: ${group.checked.length} / ${totalCount}人`;
 	}
 
-	function getMemberDisplayName(member) {
+	function getMemberDisplayName(member: Member) {
 		return member?.display_name || member?.email || '未設定';
 	}
 
-	function getMemberGroupKey(member) {
+	function getMemberGroupKey(member: Member) {
 		return `${member?.class_id ?? 'unknown'}:${getMemberClassName(member)}`;
 	}
 
-	function getMemberClassName(member) {
+	function getMemberClassName(member: Member) {
 		return (
 			member?.class_name ||
 			selectedMatch?.teamNamesById?.[String(member?.team_id)] ||
@@ -809,7 +825,7 @@
 		);
 	}
 
-	function getMemberMeta(member) {
+	function getMemberMeta(member: Member) {
 		const values = [];
 		if (member?.team_name && member.team_name !== member?.class_name) {
 			values.push(member.team_name);
@@ -1021,7 +1037,7 @@
 				<div class="mt-6 border-t border-gray-200 pt-4">
 					<div class="mb-3 flex items-center justify-between">
 						<h3 class="text-base font-semibold text-gray-900">
-							{selectedMatch?.matchIds?.length > 1 ? 'この時間帯のチェックイン状況' : 'この試合のチェックイン状況'}
+							{(selectedMatch?.matchIds.length ?? 0) > 1 ? 'この時間帯のチェックイン状況' : 'この試合のチェックイン状況'}
 						</h3>
 						<span class="text-sm font-semibold text-blue-700">{matchCheckInCount} / {matchMemberCount} 人</span>
 					</div>

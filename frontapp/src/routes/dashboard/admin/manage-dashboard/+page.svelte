@@ -1,28 +1,34 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
 	import { onMount, onDestroy } from 'svelte';
-	let Chart;
+	type ScoreEntry = { class_name: string; total_points_current_event: number };
+	type ScoreTrends = Record<string, ScoreEntry[]>;
+	type ScoreResponse = (ScoreTrends & { message?: never }) | { message: string };
+	function isScoreTrends(value: ScoreResponse): value is ScoreTrends & { message?: never } {
+		return !value.message;
+	}
+	let Chart: typeof import('chart.js/auto').default | undefined;
 
-	let attendanceRate = $state(null);
+	let attendanceRate = $state<number | null>(null);
 	let attendanceError = $state('');
-	let participationRates = $state({});
-	let scoreTrends = $state({});
-	let eventProgress = $state({});
+	let participationRates = $state<Record<string, number>>({});
+	let scoreTrends = $state<ScoreTrends>({});
+	let eventProgress = $state<Record<string, string>>({});
 
 	let hideScores = $state(false);
 
-	let ws;
+	let ws: WebSocket | undefined;
 
 	onMount(async () => {
 		const token = localStorage.getItem('token');
-		const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+		const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
 		try {
 			const [attendance, participation, scores, progress, activeEvent, chartModule] = await Promise.allSettled([
-				fetchJson('/api/admin/statistics/attendance', { headers }),
-				fetchJson('/api/admin/statistics/participation', { headers }),
-				fetchJson('/api/admin/statistics/scores', { headers }),
-				fetchJson('/api/admin/statistics/progress', { headers }),
+				fetchJson<{ attendance_rate: number }>('/api/admin/statistics/attendance', { headers }),
+				fetchJson<Record<string, number>>('/api/admin/statistics/participation', { headers }),
+				fetchJson<ScoreResponse>('/api/admin/statistics/scores', { headers }),
+				fetchJson<Record<string, string>>('/api/admin/statistics/progress', { headers }),
 				activeEventStore.init(),
                 import('chart.js/auto')
 			]);
@@ -50,7 +56,7 @@
 				console.error(participation.reason);
 			}
 
-			if (scores.status === 'fulfilled' && !scores.value.message) {
+			if (scores.status === 'fulfilled' && isScoreTrends(scores.value)) {
 				scoreTrends = scores.value;
 			} else if (scores.status === 'rejected') {
 				console.error(scores.reason);
@@ -83,7 +89,7 @@
 			};
 			ws.onmessage = async () => {
 				try {
-					eventProgress = await fetchJson('/api/admin/statistics/progress', { headers });
+					eventProgress = await fetchJson<Record<string, string>>('/api/admin/statistics/progress', { headers });
 				} catch (error) {
 					console.error(error);
 				}
@@ -104,7 +110,7 @@
         if (!Chart) return;
 		// 参加率のグラフ
 		const ctx = document.getElementById('participationChart');
-		if (ctx) {
+		if (ctx instanceof HTMLCanvasElement) {
 			new Chart(ctx, {
 				type: 'bar',
 				data: {
@@ -136,7 +142,7 @@
 		}
 
 		// スコア推移のグラフ、クラスごとに
-		const classScores = {};
+		const classScores: Record<string, { event: string; score: number }[]> = {};
 		Object.keys(scoreTrends).forEach(event => {
 			if (!Array.isArray(scoreTrends[event])) return;
 			scoreTrends[event].forEach(score => {
@@ -146,7 +152,7 @@
 		});
 
 		const ctx2 = document.getElementById('scoreChart');
-		if (ctx2) {
+		if (ctx2 instanceof HTMLCanvasElement) {
 			const datasets = Object.keys(classScores).map(className => ({
 				label: className,
 				data: classScores[className].map(d => d.score),
@@ -192,7 +198,7 @@
 		return colors[Math.floor(Math.random() * colors.length)];
 	}
 
-	async function fetchJson(url, options) {
+	async function fetchJson<T>(url: string, options: { headers: Record<string, string> }): Promise<T> {
 		const response = await fetch(url, options);
 		if (!response.ok) {
 			throw new Error(`${url} failed with status ${response.status}`);

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { browser } from '$app/env';
   import { ensurePushSubscription, userHasPushEligibleRole } from '$lib/utils/push.js';
   import { isPWAInstalled, getDeviceType } from '$lib/utils/pwa.js';
@@ -6,15 +6,15 @@
   import * as publicEnv from '$app/env/public';
   import { onMount } from 'svelte';
 
-  let { user, prominent = false } = $props();
+  let { user, prominent = false }: { user?: { roles?: { name: string }[] } | null; prominent?: boolean } = $props();
 
   let isSubscribed = $state(false);
   let isLoading = $state(false);
-  let permissionStatus = $state('default');
+  let permissionStatus = $state<'default' | 'granted' | 'denied'>('default');
   let isSupported = $state(false);
   let errorMessage = $state('');
   let subscriptionCount = $state(0);
-  let registeredEndpoints = $state([]);
+  let registeredEndpoints = $state<string[]>([]);
   let isIOS = $state(false);
   let isPWA = $state(false);
 

@@ -1,19 +1,21 @@
-<script>
+<script lang="ts">
 import { onMount } from 'svelte';
   import { browser } from '$app/env';
   import { fade, fly } from 'svelte/transition';
   import { invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
 
-  let users = $state([]);
-  let classes = $state([]); // クラス一覧
+  type User = { id: string; email: string; display_name: string | null; class_id: number | string | null; roles?: { id: number | string; name: string }[]; has_push_subscription?: boolean; pwa_last_seen_at?: string | null };
+  type ClassInfo = { id: number; name: string };
+  let users = $state<User[]>([]);
+  let classes = $state<ClassInfo[]>([]); // クラス一覧
   let searchQuery = $state('');
   let searchType = $state('email'); // 'email' or 'display_name'
   let selectedClassFilter = $state('');
   let selectedRoleFilter = $state('');
   let sortKey = $state('');
   let sortDirection = $state('asc');
-  let selectedUser = $state(null);
+  let selectedUser = $state<User | null>(null);
   let newDisplayName = $state('');
   // ロール管理用
   let newRoleName = $state('');
@@ -23,12 +25,12 @@ import { onMount } from 'svelte';
   let errorMessage = $state('');
   const masterRoles = ['student', 'admin', 'root'];
 
-	function isLegacyClassRepresentativeRole(roleName) {
+	function isLegacyClassRepresentativeRole(roleName: string): boolean {
 		return roleName.endsWith('_rep');
 	}
 
   // 指数バックオフ付きのフェッチ関数
-  async function fetchWithBackoff(url, options = {}, maxRetries = 5) {
+  async function fetchWithBackoff(url: string, options: { method?: string; headers?: Record<string, string>; body?: string } = {}, maxRetries = 5): Promise<Response> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const response = await fetch(url, options);
@@ -99,7 +101,7 @@ import { onMount } from 'svelte';
     await fetchUsers(searchQuery, searchType);
   }
 
-  function openEditModal(user) {
+  function openEditModal(user: User) {
     selectedUser = user;
     newDisplayName = user.display_name || '';
     newRoleName = '';
@@ -114,13 +116,13 @@ import { onMount } from 'svelte';
     newRoleName = '';
   }
 
-  function handleOverlayClick(event) {
+  function handleOverlayClick(event: MouseEvent) {
     if (event.target === event.currentTarget) {
       closeEditModal();
     }
   }
 
-  async function checkAndInvalidateIfSelf(targetUserId) {
+  async function checkAndInvalidateIfSelf(targetUserId: string) {
     const currentUser = page.data?.user;
     if (currentUser && currentUser.id === targetUserId) {
       await invalidateAll();
@@ -158,6 +160,7 @@ import { onMount } from 'svelte';
 
   // その他のロール追加
   async function handleRoleAdd() {
+    if (!selectedUser) return;
     if (!newRoleName.trim()) return;
     const roleToAdd = newRoleName.trim();
 
@@ -203,7 +206,8 @@ import { onMount } from 'svelte';
   }
 
   // その他のロール削除
-  async function handleRoleDelete(roleName) {
+  async function handleRoleDelete(roleName: string) {
+    if (!selectedUser) return;
     if (!confirm(`ロール "${roleName}" を削除しますか？`)) return;
 
     try {
@@ -233,7 +237,7 @@ import { onMount } from 'svelte';
     }
   }
 
-  function updateLocalUser(updatedUser) {
+  function updateLocalUser(updatedUser: User) {
     const index = users.findIndex(u => u.id === updatedUser.id);
     if (index !== -1) {
       users[index] = updatedUser;
@@ -243,24 +247,24 @@ import { onMount } from 'svelte';
     selectedUser = updatedUser;
   }
 
-  function getClass(user) {
+  function getClass(user: User) {
     return classes.find((cls) => String(cls.id) === String(user?.class_id));
   }
 
-  function getClassDisplayName(user) {
+  function getClassDisplayName(user: User) {
     if (user?.class_id === null || user?.class_id === undefined || user?.class_id === '') return '-';
     return getClass(user)?.name ?? `ID ${user.class_id}`;
   }
 
-  function getClassSortValue(user) {
+  function getClassSortValue(user: User) {
     return getClass(user)?.name ?? String(user.class_id);
   }
 
-  function hasClass(user) {
+  function hasClass(user: User) {
     return user?.class_id !== null && user?.class_id !== undefined && user?.class_id !== '';
   }
 
-  function matchesClassFilter(user) {
+  function matchesClassFilter(user: User) {
     if (selectedClassFilter === '') return true;
     if (selectedClassFilter === '__none__') return !hasClass(user);
     return String(user?.class_id) === selectedClassFilter;
@@ -274,14 +278,14 @@ import { onMount } from 'svelte';
     }));
   }
 
-  function matchesRoleFilter(user) {
+  function matchesRoleFilter(user: User) {
     const roles = user?.roles ?? [];
     if (selectedRoleFilter === '') return true;
     if (selectedRoleFilter === '__none__') return roles.length === 0;
     return roles.some((role) => role.name === selectedRoleFilter);
   }
 
-  function sortBy(key) {
+  function sortBy(key: string) {
     if (sortKey === key) {
       sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
       return;
@@ -291,7 +295,7 @@ import { onMount } from 'svelte';
     sortDirection = 'asc';
   }
 
-  function getSortIndicator(key) {
+  function getSortIndicator(key: string) {
     if (sortKey !== key) return '';
     return sortDirection === 'asc' ? '↑' : '↓';
   }
@@ -334,18 +338,18 @@ import { onMount } from 'svelte';
     });
   }
 
-  function getMasterRoles(user) {
+  function getMasterRoles(user: User) {
     return (user?.roles ?? [])
       .filter((role) => masterRoles.includes(role.name))
       .map((role) => role.name);
   }
 
-  function getCurrentMasterRole(user) {
+  function getCurrentMasterRole(user: User) {
     const userMasterRoles = getMasterRoles(user);
     return masterRoles.find((role) => userMasterRoles.includes(role)) ?? null;
   }
 
-  async function handleMasterRoleChange(role) {
+  async function handleMasterRoleChange(role: string) {
     if (!selectedUser) return;
     if (!confirm(`${selectedUser.email} のマスタロールを ${role} に変更しますか？`)) return;
     try {

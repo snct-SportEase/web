@@ -1,4 +1,5 @@
-<script>
+<script lang="ts">
+  import type { Snippet } from 'svelte';
   let {
     title,
     description,
@@ -9,7 +10,7 @@
     headingTag = 'h3',
     children,
     class: className = ''
-  } = $props();
+  }: { title: string; description: string; actionLabel?: string; href?: string | null; onclick?: (event: MouseEvent) => void; size?: 'compact' | 'spacious'; headingTag?: 'h2' | 'h3' | 'h4'; children?: Snippet; class?: string } = $props();
 
   const paddingClass = $derived(size === 'spacious' ? 'p-6' : 'p-5');
   const titleClass = $derived(size === 'spacious' ? 'text-xl' : 'text-base');

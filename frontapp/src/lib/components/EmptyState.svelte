@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
+  import type { Snippet } from 'svelte';
   let {
     title,
     description = null,
     children,
     class: className = ''
-  } = $props();
+  }: { title: string; description?: string | null; children?: Snippet; class?: string } = $props();
 </script>
 
 <div class={`rounded-lg border border-gray-200 bg-gray-50 p-8 text-center text-gray-500 ${className}`}>

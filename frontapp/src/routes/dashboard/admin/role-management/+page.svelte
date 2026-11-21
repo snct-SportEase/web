@@ -1,24 +1,26 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import EditRoleModal from '../../../../lib/components/EditRoleModal.svelte';
 
-	let usersWithRoles = $state([]);
-	let allUsers = $state([]);
-	let filteredUsers = $state([]);
-	let selectedUsers = $state([]);
+	type User = { id: string; email: string; display_name?: string | null; roles?: { id: number; name: string }[] };
+	type SortColumn = 'email' | 'display_name' | 'roles';
+	let usersWithRoles = $state<User[]>([]);
+	let allUsers = $state<User[]>([]);
+	let filteredUsers = $state<User[]>([]);
+	let selectedUsers = $state<User[]>([]);
 	let emailSearch = $state('');
 	let role = $state('');
 	let showUserList = $state(false);
 
 	let showEditModal = $state(false);
-	let selectedUserForEdit = $state(null);
+	let selectedUserForEdit = $state<User | null>(null);
 
 	let sortColumn = $state('');
 	let sortAsc = $state(true);
 
 	const defaultRoles = ['root', 'admin', 'student'];
 
-	function sortUsers(column) {
+	function sortUsers(column: SortColumn) {
 		if (sortColumn === column) {
 			sortAsc = !sortAsc;
 		} else {
@@ -48,7 +50,7 @@
 		usersWithRoles = [...usersWithRoles];
 	}
 
-	function openEditModal(user) {
+	function openEditModal(user: User) {
 		selectedUserForEdit = user;
 		showEditModal = true;
 	}
@@ -56,7 +58,7 @@
 	async function fetchUsersWithRoles() {
 		const res = await fetch('/api/admin/users');
 		if (res.ok) {
-			const data = await res.json();
+			const data: User[] = await res.json();
 			if (Array.isArray(data)) {
 				usersWithRoles = data.filter(u => u.roles && u.roles.some(r => !defaultRoles.includes(r.name)));
 			}
@@ -80,7 +82,7 @@
 		}
 	}
 
-	function selectUser(user) {
+	function selectUser(user: User) {
 		if (!selectedUsers.find(u => u.id === user.id)) {
 			selectedUsers = [...selectedUsers, user];
 		}
@@ -88,15 +90,15 @@
 		showUserList = false;
 	}
 
-	function removeUser(user) {
-		selectedUsers = selectedUsers.filter(u => u.ID !== user.ID);
+	function removeUser(user: User) {
+		selectedUsers = selectedUsers.filter(u => u.id !== user.id);
 	}
 
 	function handleRoleUpdate() {
 		location.reload();
 	}
 
-	function isClassSportRole(roleName) {
+	function isClassSportRole(roleName: string): boolean {
 		// アンダースコアを含むクラス管理用ロールは割り当て不可
 		const trimmed = roleName.trim();
 		if (trimmed.includes('_')) {
@@ -269,7 +271,7 @@
 						<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 							{#if user.roles}
 								<div class="flex space-x-2">
-									{#each user.roles as role (role.id)}
+									{#each user.roles ?? [] as role (role.id)}
 										{#if !defaultRoles.includes(role.name)}
 											<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800"										>
 												{role.name}

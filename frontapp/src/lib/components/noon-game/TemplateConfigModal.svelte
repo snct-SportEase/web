@@ -1,9 +1,18 @@
-<script>
+<script lang="ts">
+ type TemplateType = 'year-relay' | 'course-relay' | 'tug-of-war' | 'typing' | 'borrowing-race';
+ type TemplateForm = {
+  name: string; description: string; scheduled_at: string; location: string; status: string; mode: string;
+  win_points: number; loss_points: number; draw_points: number; participation_points: number;
+  allow_manual_points: boolean; exclude_registration_limit: boolean; duration_minutes: number;
+  participant_class_ids: number[]; points_by_rank: Record<number, number>;
+  year_relay_points: { block_a: Record<number, number>; block_b: Record<number, number>; overall: Record<number, number> };
+  groups: { group_name: string; class_names: string[] }[];
+ };
  let {
   selectedTemplateType, templateConfigForm = $bindable(), classes,
   closeTemplateConfig, saveDefaultGroups, createTemplate,
   isInteractive, creatingTemplate, hasSessionForTemplate, templateKeyFor
- } = $props();
+ }: { selectedTemplateType: TemplateType; templateConfigForm: TemplateForm; classes: { id: number; name: string }[]; closeTemplateConfig: () => void; saveDefaultGroups: (key: string) => void; createTemplate: () => void; isInteractive: boolean; creatingTemplate: Record<string, boolean>; hasSessionForTemplate: (key: string) => boolean; templateKeyFor: (type: TemplateType) => string } = $props();
 </script>
 
       <div class="app-layer-modal fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center min-h-screen overflow-y-auto">
@@ -106,7 +115,7 @@
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
                             <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_a[rank]} oninput={(e) => {
-                              templateConfigForm.year_relay_points.block_a = {...templateConfigForm.year_relay_points.block_a, [rank]: Number(e.target.value) || 0};
+                              templateConfigForm.year_relay_points.block_a = {...templateConfigForm.year_relay_points.block_a, [rank]: Number(e.currentTarget.value) || 0};
                             }} />
                           </label>
                         {/each}
@@ -120,7 +129,7 @@
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
                             <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.block_b[rank]} oninput={(e) => {
-                              templateConfigForm.year_relay_points.block_b = {...templateConfigForm.year_relay_points.block_b, [rank]: Number(e.target.value) || 0};
+                              templateConfigForm.year_relay_points.block_b = {...templateConfigForm.year_relay_points.block_b, [rank]: Number(e.currentTarget.value) || 0};
                             }} />
                           </label>
                         {/each}
@@ -134,7 +143,7 @@
                           <label class="flex flex-col text-xs font-medium text-gray-700">
                             {rank}位
                             <input type="number" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.year_relay_points.overall[rank]} oninput={(e) => {
-                              templateConfigForm.year_relay_points.overall = {...templateConfigForm.year_relay_points.overall, [rank]: Number(e.target.value) || 0};
+                              templateConfigForm.year_relay_points.overall = {...templateConfigForm.year_relay_points.overall, [rank]: Number(e.currentTarget.value) || 0};
                             }} />
                           </label>
                         {/each}
@@ -151,7 +160,7 @@
 								<label class="flex flex-col text-xs font-medium text-gray-700">
 									{rank}位
 									<input type="number" min="0" class="mt-1 border rounded px-2 py-1 text-sm" value={templateConfigForm.points_by_rank[rank] ?? 0} oninput={(event) => {
-										templateConfigForm.points_by_rank = { ...templateConfigForm.points_by_rank, [rank]: Number(event.target.value) || 0 };
+										templateConfigForm.points_by_rank = { ...templateConfigForm.points_by_rank, [rank]: Number(event.currentTarget.value) || 0 };
 									}} />
 								</label>
 							{/each}
@@ -166,7 +175,7 @@
 							{#each classes as classItem (classItem.id)}
 								<label class="flex items-center gap-2 rounded border bg-white px-3 py-2 text-sm">
 									<input type="checkbox" value={classItem.id} checked={templateConfigForm.participant_class_ids.includes(classItem.id)} onchange={(event) => {
-										templateConfigForm.participant_class_ids = event.target.checked
+										templateConfigForm.participant_class_ids = event.currentTarget.checked
 											? [...templateConfigForm.participant_class_ids, classItem.id]
 											: templateConfigForm.participant_class_ids.filter((id) => id !== classItem.id);
 									}} />
@@ -183,26 +192,26 @@
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       1位の点数
                       <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[1]} oninput={(e) => {
-                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 1: Number(e.target.value) || 0};
+                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 1: Number(e.currentTarget.value) || 0};
                       }} />
                     </label>
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       2位の点数
                       <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[2]} oninput={(e) => {
-                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 2: Number(e.target.value) || 0};
+                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 2: Number(e.currentTarget.value) || 0};
                       }} />
                     </label>
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       3位の点数
                       <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[3]} oninput={(e) => {
-                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 3: Number(e.target.value) || 0};
+                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 3: Number(e.currentTarget.value) || 0};
                       }} />
                     </label>
                     {#if selectedTemplateType !== 'typing'}
                     <label class="flex flex-col text-sm font-medium text-gray-700">
                       4位の点数
                       <input type="number" class="mt-1 border rounded px-3 py-2" value={templateConfigForm.points_by_rank[4]} oninput={(e) => {
-                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 4: Number(e.target.value) || 0};
+                        templateConfigForm.points_by_rank = {...templateConfigForm.points_by_rank, 4: Number(e.currentTarget.value) || 0};
                       }} />
                     </label>
                     {/if}
@@ -242,7 +251,7 @@
                             class="mt-1 border rounded px-2 py-1 text-sm"
                             value={group.group_name}
                             oninput={(e) => {
-                              templateConfigForm.groups[index].group_name = e.target.value;
+                              templateConfigForm.groups[index].group_name = e.currentTarget.value;
                               templateConfigForm.groups = [...templateConfigForm.groups];
                             }}
                             placeholder="例: 1年生" />
@@ -263,7 +272,7 @@
                           class="border rounded px-2 py-1 text-sm"
                           value={group.class_names ? group.class_names.join(', ') : ''}
                           oninput={(e) => {
-                            const classNames = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                            const classNames = e.currentTarget.value.split(',').map(s => s.trim()).filter(s => s);
                             templateConfigForm.groups[index].class_names = classNames;
                             templateConfigForm.groups = [...templateConfigForm.groups];
                           }}

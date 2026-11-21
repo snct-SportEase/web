@@ -1,11 +1,11 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
 
-  let eventId = $state(null);
+  let eventId = $state<number | null>(null);
   let isMicVotingEnabled = $state(false);
-  let micResult = $state(null);
-  let error = $state(null);
+  let micResult = $state<{ class_name: string; vote_count: number; total_points: number; season: string } | null>(null);
+  let error = $state<string | null>(null);
   let isLoading = $state(true);
   let isUpdating = $state(false);
 

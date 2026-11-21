@@ -1,18 +1,35 @@
-<script>
-    import { onMount, tick } from 'svelte';
+<script lang="ts">
+    import { onMount, onDestroy, tick } from 'svelte';
+    import { SvelteMap } from 'svelte/reactivity';
     import { browser } from '$app/env';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
     import { dndzone } from 'svelte-dnd-action';
+    import type { BracketData, BracketInstance, Match, Side, Player } from '@snct-sportease/matchline';
+
+    type AppMatch = Omit<Match, 'id' | 'sides'> & { id?: number | string; sides?: (Side & { teamId?: number })[] };
+    type TournamentData = Omit<BracketData, 'matches'> & { matches?: AppMatch[] };
+    type Tournament = { id: number | string; name: string; sport_id?: number; data: TournamentData | null };
+    type Preview = { sport_name: string; tournament_data: TournamentData; shuffled_teams?: { name: string; id: number }[] };
+    type EventSport = { sport_id: number; sport_name: string; location: string; template_key?: string | null };
+    type SeedItem = { id: string; name: string; teamID?: number };
+    type BoardSlot = 'A' | 'B' | 'MAIN';
+    type BoardSeed = { id: string; classID: number };
+    type BoardRun = { game_type: string; name: string; description?: string | null; location: string; scheduled_date?: string | null; win_points: number; rank_points?: Record<string, number>; regular_minutes: number; final_minutes: number; rules_pdf_url?: string | null; tournaments?: { slot_key: BoardSlot; entries?: { seed_number: number; class_id: number }[] }[] };
     
-    let createBracket = $state(null);
+    let createBracket = $state<typeof import('@snct-sportease/matchline').createBracket | null>(null);
+    const bracketInstances = new SvelteMap<number | string, BracketInstance>();
+    onDestroy(() => {
+        bracketInstances.forEach((instance) => instance?.uninstall?.());
+        bracketInstances.clear();
+    });
 
     let isGenerating = $state(false);
     let isSaving = $state(false);
     let isExporting = $state(false);
-    let allTournaments = $state([]);
-    let generatedTournamentsPreview = $state(null);
-    let eventSports = $state([]);
+    let allTournaments = $state<Tournament[]>([]);
+    let generatedTournamentsPreview = $state<Preview[] | null>(null);
+    let eventSports = $state<EventSport[]>([]);
     let selectedMissingSportId = $state('');
     let isCreatingMissingSport = $state(false);
     let missingSports = $derived(generatedTournamentsPreview ? [] : eventSports.filter((sport) =>
@@ -22,25 +39,26 @@
         !allTournaments.some((tournament) => Number(tournament.sport_id) === Number(sport.sport_id))
     ));
 
-    let editingTournamentId = $state(null);
-    let teamsForEditing = $state([]);
-    let originalSeedTeamIDs = $state([]);
+    let editingTournamentId = $state<number | string | null>(null);
+    let teamsForEditing = $state<SeedItem[]>([]);
+    let originalSeedTeamIDs = $state<number[]>([]);
     let isLoadingSeeds = $state(false);
     let isSavingSeeds = $state(false);
     const flipDurationMs = 300;
 
-    let boardGameClasses = $state([]);
-    let boardGameRuns = $state([]);
+    let boardGameClasses = $state<{ id: number; name: string }[]>([]);
+    let boardGameRuns = $state<BoardRun[]>([]);
     let boardGameType = $state('shogi');
-    let selectedBoardClassIDs = $state([]);
-    let boardSeedOrders = $state({ A: [], B: [], MAIN: [] });
+    let boardSlots: BoardSlot[] = $derived(boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN']);
+    let selectedBoardClassIDs = $state<number[]>([]);
+    let boardSeedOrders = $state<Record<BoardSlot, BoardSeed[]>>({ A: [], B: [], MAIN: [] });
     let boardGameForm = $state({ name: '将棋', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 5, rank1: 40, rank2: 30, rank3: 20, rank4: 10, regularMinutes: 15, finalMinutes: 30, rulesPdfUrl: '' });
-    let boardGamePdfFile = $state(null);
+    let boardGamePdfFile = $state<File | null>(null);
     let isSavingBoardGame = $state(false);
 
     onMount(async () => {
         if (browser) {
-            const bracketryModule = await import('bracketry');
+            const bracketryModule = await import('@snct-sportease/matchline');
             createBracket = bracketryModule.createBracket;
         }
         await activeEvent.init();
@@ -50,13 +68,13 @@
         }
     });
 
-    function defaultBoardGameForm(type) {
+    function defaultBoardGameForm(type: string) {
         return type === 'shogi'
             ? { name: '将棋', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 5, rank1: 40, rank2: 30, rank3: 20, rank4: 10, regularMinutes: 15, finalMinutes: 30, rulesPdfUrl: '' }
             : { name: 'オセロ', description: '', location: 'ICTメディア室', scheduledDate: '', winPoints: 10, rank1: 50, rank2: 40, rank3: 30, rank4: 20, regularMinutes: 10, finalMinutes: 20, rulesPdfUrl: '' };
     }
 
-    function makeBoardSeedItems(slot, classIDs) {
+    function makeBoardSeedItems(slot: BoardSlot, classIDs: number[]): BoardSeed[] {
         return classIDs.map((classID) => ({ id: `${slot}-${classID}`, classID }));
     }
 
@@ -79,7 +97,7 @@
         }
     }
 
-    function loadBoardGameForm(type) {
+    function loadBoardGameForm(type: string) {
         boardGameType = type;
         boardGamePdfFile = null;
         const run = boardGameRuns.find((item) => item.game_type === type);
@@ -122,12 +140,12 @@
         boardSeedOrders = nextSeedOrders;
     }
 
-    function handleBoardSeedDnd(slot, event) {
+    function handleBoardSeedDnd(slot: BoardSlot, event: CustomEvent<{ items: BoardSeed[] }>) {
         if (!Array.isArray(event.detail?.items)) return;
         boardSeedOrders = { ...boardSeedOrders, [slot]: event.detail.items };
     }
 
-    function boardClassName(classID) {
+    function boardClassName(classID: number): string {
         return boardGameClasses.find((item) => item.id === classID)?.name || String(classID);
     }
 
@@ -151,7 +169,7 @@
         isSavingBoardGame = true;
         try {
             const rulesPdfUrl = await uploadBoardGamePdf();
-            const slots = boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN'];
+            const slots: BoardSlot[] = boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN'];
             const seedOrders = Object.fromEntries(slots.map((slot) => [slot, boardSeedOrders[slot].map((item) => item.classID)]));
             const response = await fetch(`/api/root/events/${currentEvent.id}/tournament-templates/board-game/run`, {
                 method: 'POST',
@@ -176,7 +194,7 @@
             alert(`${result.name}のトーナメントを保存しました。`);
             await Promise.all([fetchTournamentsForActiveEvent(), fetchBoardGameSetup()]);
         } catch (error) {
-            alert(error.message || '盤上競技トーナメントの保存に失敗しました');
+            alert(error instanceof Error ? error.message : '盤上競技トーナメントの保存に失敗しました');
         } finally {
             isSavingBoardGame = false;
         }
@@ -213,7 +231,7 @@
             await fetchTournamentsForActiveEvent();
             alert(`${sport.sport_name}のトーナメントを追加しました。`);
         } catch (error) {
-            alert(error.message || 'トーナメントの追加に失敗しました');
+            alert(error instanceof Error ? error.message : 'トーナメントの追加に失敗しました');
         } finally {
             isCreatingMissingSport = false;
         }
@@ -239,7 +257,7 @@
             });
 
             if (response.ok) {
-                const previewData = await response.json();
+                const previewData: Preview[] = await response.json();
                 generatedTournamentsPreview = previewData;
                 allTournaments = previewData.map((t, index) => ({
                     id: `preview-${index}`,
@@ -307,18 +325,18 @@
         try {
             const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments`);
             if (response.ok) {
-                const fetchedTournaments = await response.json();
+                const fetchedTournaments: (Omit<Tournament, 'data'> & { data: TournamentData | string | null })[] = await response.json();
 
-                allTournaments = fetchedTournaments.map(t => {
+                allTournaments = fetchedTournaments.map((t): Tournament => {
                     if (typeof t.data === 'string') {
                         try {
-                            t.data = JSON.parse(t.data);
+                            return { ...t, data: JSON.parse(t.data) as TournamentData };
                         } catch (e) {
                             console.error('Failed to parse tournament data:', e);
-                            t.data = null;
+                            return { ...t, data: null };
                         }
                     }
-                    return t;
+                    return { ...t, data: t.data };
                 });
 
                 generatedTournamentsPreview = null; // Ensure preview is cleared
@@ -370,7 +388,7 @@
             document.body.removeChild(anchor);
             window.URL.revokeObjectURL(url);
         } catch (error) {
-            alert(error.message || 'Excelのダウンロードに失敗しました');
+            alert(error instanceof Error ? error.message : 'Excelのダウンロードに失敗しました');
         } finally {
             isExporting = false;
         }
@@ -379,25 +397,29 @@
     async function renderAllBrackets() {
         if (!browser) return;
         await tick();
+        bracketInstances.forEach((instance) => instance?.uninstall?.());
+        bracketInstances.clear();
         allTournaments.forEach(tournament => {
             renderBracket(tournament);
         });
     }
 
-    function renderBracket(tournament) {
+    function renderBracket(tournament: Tournament) {
         if (!browser || !createBracket) return;
         const wrapper = document.getElementById(`bracket-${tournament.id}`);
         if (wrapper && tournament.data) {
+            bracketInstances.get(tournament.id)?.uninstall?.();
             wrapper.innerHTML = '';
-            createBracket(tournament.data, wrapper);
+            const bracketData: BracketData = { ...tournament.data, matches: tournament.data.matches?.map((match) => ({ ...match, id: match.id == null ? undefined : String(match.id) })) };
+            bracketInstances.set(tournament.id, createBracket(bracketData, wrapper));
         }
     }
 
-    function getOrderedContestantIds(bracketData) {
+    function getOrderedContestantIds(bracketData: TournamentData | null): (string | null)[] {
         if (!bracketData || !bracketData.matches) {
             return [];
         }
-        const contestantIds = [];
+        const contestantIds: (string | null)[] = [];
         const firstRoundMatches = bracketData.matches.filter(m => m.roundIndex === 0).sort((a, b) => a.order - b.order);
 
         for (const match of firstRoundMatches) {
@@ -414,7 +436,7 @@
         return contestantIds;
     }
 
-    function getTeams(tournament) {
+    function getTeams(tournament: Tournament): SeedItem[] {
         const bracketData = tournament.data;
         if (!bracketData || !bracketData.contestants) {
             return [];
@@ -422,7 +444,7 @@
         const orderedContestantIds = getOrderedContestantIds(bracketData);
         const teams = orderedContestantIds.map(contestantId => {
             if (!contestantId) return { name: 'BYE' };
-            const contestant = bracketData.contestants[contestantId];
+            const contestant = bracketData.contestants?.[contestantId];
             if (contestant && contestant.players && contestant.players.length > 0 && contestant.players[0].title) {
                 return { name: contestant.players[0].title };
             }
@@ -432,12 +454,12 @@
         return teams.map((team, index) => ({ ...team, id: `${tournament.id}-team-${index}` }));
     }
 
-    function updateBracketDataWithNewTeams(bracketData, newTeamOrder) {
-        const newBracketData = JSON.parse(JSON.stringify(bracketData));
+    function updateBracketDataWithNewTeams(bracketData: TournamentData, newTeamOrder: string[]): TournamentData {
+        const newBracketData: TournamentData = JSON.parse(JSON.stringify(bracketData));
         const orderedContestantIds = getOrderedContestantIds(newBracketData);
 
-        const teamDataMap = {};
-        Object.values(newBracketData.contestants).forEach(c => {
+        const teamDataMap: Record<string, Player[]> = {};
+        Object.values(newBracketData.contestants ?? {}).forEach(c => {
             if (c.players && c.players.length > 0 && c.players[0].title) {
                 teamDataMap[c.players[0].title] = c.players;
             }
@@ -446,7 +468,7 @@
         orderedContestantIds.forEach((contestantId, index) => {
             if (!contestantId) return;
 
-            const contestant = newBracketData.contestants[contestantId];
+            const contestant = newBracketData.contestants?.[contestantId];
             if (contestant) {
                 const newTeamName = newTeamOrder[index];
                 if (newTeamName && newTeamName !== 'BYE') {
@@ -461,7 +483,7 @@
         return newBracketData;
     }
 
-    function isEditableSavedTournament(tournament) {
+    function isEditableSavedTournament(tournament: Tournament) {
         const sport = eventSports.find((item) => Number(item.sport_id) === Number(tournament.sport_id));
         return Boolean(sport && sport.location !== 'noon_game' && sport.template_key !== 'board_game_tournament' &&
             sport.sport_name !== '将棋' && sport.sport_name !== 'オセロ' &&
@@ -469,7 +491,7 @@
                 match.sides?.some((side) => Number(side.teamId) > 0)));
     }
 
-    async function toggleEdit(tournament) {
+    async function toggleEdit(tournament: Tournament) {
         if (editingTournamentId === tournament.id) {
             editingTournamentId = null;
             teamsForEditing = [];
@@ -489,21 +511,22 @@
             const response = await fetch(`/api/root/events/${currentEvent.id}/tournaments/${tournament.id}/seeds`);
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'シード順を取得できませんでした');
-            originalSeedTeamIDs = result.seeds.map((seed) => seed.team_id);
-            teamsForEditing = result.seeds.map((seed) => ({ id: String(seed.team_id), teamID: seed.team_id, name: seed.team_name }));
+            const seeds: { team_id: number; team_name: string }[] = result.seeds;
+            originalSeedTeamIDs = seeds.map((seed) => seed.team_id);
+            teamsForEditing = seeds.map((seed) => ({ id: String(seed.team_id), teamID: seed.team_id, name: seed.team_name }));
             editingTournamentId = tournament.id;
         } catch (error) {
-            alert(error.message || 'シード順を取得できませんでした');
+            alert(error instanceof Error ? error.message : 'シード順を取得できませんでした');
         } finally {
             isLoadingSeeds = false;
         }
     }
 
-    function handleDnd(e) {
+    function handleDnd(e: CustomEvent<{ items: SeedItem[] }>) {
         teamsForEditing = e.detail.items;
     }
 
-    async function saveTeamOrder(tournament) {
+    async function saveTeamOrder(tournament: Tournament) {
         if (!browser) return;
         if (!generatedTournamentsPreview) {
             const currentEvent = get(activeEvent);
@@ -526,13 +549,14 @@
                 await fetchTournamentsForActiveEvent();
                 alert('シード順を更新しました。');
             } catch (error) {
-                alert(error.message || 'シード順を保存できませんでした');
+                alert(error instanceof Error ? error.message : 'シード順を保存できませんでした');
             } finally {
                 isSavingSeeds = false;
             }
             return;
         }
         const newTeamNames = teamsForEditing.map(t => t.name);
+        if (!tournament.data) return;
         const newBracketData = updateBracketDataWithNewTeams(tournament.data, newTeamNames);
 
         const tournamentIndex = allTournaments.findIndex(t => t.id === tournament.id);
@@ -541,13 +565,13 @@
             allTournaments = [...allTournaments];
 
             if (generatedTournamentsPreview) {
-                const previewIndex = parseInt(tournament.id.split('-')[1]);
+                const previewIndex = parseInt(String(tournament.id).split('-')[1]);
                 const currentPreview = generatedTournamentsPreview[previewIndex];
 
                 if (currentPreview) {
                     const originalShuffledTeams = currentPreview.shuffled_teams || [];
                     const teamObjectMap = new Map(originalShuffledTeams.map(team => [team.name, team]));
-                    const newShuffledTeams = newTeamNames.map(name => teamObjectMap.get(name)).filter(Boolean);
+                    const newShuffledTeams = newTeamNames.map(name => teamObjectMap.get(name)).filter((team): team is NonNullable<typeof team> => Boolean(team));
 
                     const newPreviewArray = [...generatedTournamentsPreview];
                     newPreviewArray[previewIndex] = {
@@ -634,7 +658,7 @@
     {#if selectedBoardClassIDs.length > 0}
         <p class="mt-6 text-sm text-gray-600">クラスをドラッグ＆ドロップしてシード順を変更できます。</p>
         <div class="mt-6 grid gap-4 md:grid-cols-2">
-            {#each (boardGameType === 'shogi' ? ['A', 'B'] : ['MAIN']) as slot (slot)}
+            {#each boardSlots as slot (slot)}
                 <div class="rounded border bg-white p-3">
                     <h3 class="mb-2 font-semibold">{slot === 'MAIN' ? '本戦' : `${slot}ブロック`} シード順</h3>
                     <ol

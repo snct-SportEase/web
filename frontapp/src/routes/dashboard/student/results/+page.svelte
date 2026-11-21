@@ -1,16 +1,25 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import { fetchPublishedNoonGameSessions, flattenNoonGameMatches } from '$lib/utils/noonGameSessions.js';
+  import type { NoonGameMatch } from '$lib/utils/noonGameSessions.js';
+  import type { BracketData, Match, Side } from '@snct-sportease/matchline';
+
+  type TournamentMatch = Omit<Match, 'id'> & { id?: number | string };
+  type TournamentData = Omit<BracketData, 'matches'> & { matches?: TournamentMatch[] };
+  type Tournament = { id: number; name: string; data: TournamentData | null };
+  type TournamentResponse = Omit<Tournament, 'data'> & { data: TournamentData | string | null };
+  type NoonEntry = NonNullable<NoonGameMatch['entries']>[number];
+  type NoonDetail = NonNullable<NonNullable<NoonGameMatch['result']>['details']>[number];
 
   let loading = $state(true);
   let error = $state('');
-  let tournamentResults = $state([]);
-  let noonGameMatches = $state([]);
+  let tournamentResults = $state<{ tournament: Tournament; match: TournamentMatch }[]>([]);
+  let noonGameMatches = $state<(NoonGameMatch & { session_name: string })[]>([]);
 
-  function normalizeTournament(tournament) {
-    if (typeof tournament?.data !== 'string') return tournament;
+  function normalizeTournament(tournament: TournamentResponse): Tournament {
+    if (typeof tournament.data !== 'string') return { ...tournament, data: tournament.data };
     try {
       return { ...tournament, data: JSON.parse(tournament.data) };
     } catch {
@@ -18,20 +27,20 @@
     }
   }
 
-  function sideName(tournament, side) {
+  function sideName(tournament: Tournament, side: Side | undefined): string {
     if (side?.title) return side.title;
-    return tournament?.data?.contestants?.[side?.contestantId]?.players?.[0]?.title || '未定';
+    return (side?.contestantId && tournament.data?.contestants?.[side.contestantId]?.players?.[0]?.title) || '未定';
   }
 
-  function score(side) {
+  function score(side: Side | undefined): number | string | undefined {
     return side?.scores?.[0]?.mainScore;
   }
 
-  function completedMatch(match) {
-    return match?.sides?.some((side) => score(side) !== undefined);
+  function completedMatch(match: TournamentMatch): boolean {
+    return match?.sides?.some((side) => score(side) !== undefined) ?? false;
   }
 
-  function tournamentMatchResults(tournaments) {
+  function tournamentMatchResults(tournaments: Tournament[]) {
     return tournaments.flatMap((tournament) =>
       (tournament.data?.matches || [])
         .filter(completedMatch)
@@ -39,19 +48,20 @@
     );
   }
 
-  function formatStatus(status) {
-    return ({ scheduled: '予定', in_progress: '進行中', completed: '終了', finished: '終了', cancelled: '中止' })[status] || status || '未定';
+  function formatStatus(status: string | undefined): string {
+    const labels: Record<string, string> = { scheduled: '予定', in_progress: '進行中', completed: '終了', finished: '終了', cancelled: '中止' };
+    return (status && labels[status]) || status || '未定';
   }
 
-  function entryName(entry) {
+  function entryName(entry: NoonEntry | undefined): string {
     return entry?.resolved_name || entry?.display_name || '参加者未定';
   }
 
-  function resultEntries(match) {
+  function resultEntries(match: NoonGameMatch): NoonDetail[] {
     return [...(match?.result?.details || [])].sort((a, b) => (a.rank || 999) - (b.rank || 999));
   }
 
-  function resultEntryName(detail, match) {
+  function resultEntryName(detail: NoonDetail, match: NoonGameMatch): string {
     return detail?.entry_resolved_name || entryName(match?.entries?.find((entry) => String(entry.id) === String(detail?.entry_id)));
   }
 
@@ -67,11 +77,12 @@
       ]);
       if (!tournamentResponse.ok) throw new Error('通常競技の結果を取得できませんでした。');
 
-      const tournaments = (await tournamentResponse.json()).map(normalizeTournament);
+      const payload: TournamentResponse[] = await tournamentResponse.json();
+      const tournaments = payload.map(normalizeTournament);
       tournamentResults = tournamentMatchResults(tournaments);
       noonGameMatches = flattenNoonGameMatches(sessions);
     } catch (cause) {
-      error = cause?.message || '結果一覧を取得できませんでした。';
+      error = cause instanceof Error ? cause.message : '結果一覧を取得できませんでした。';
     } finally {
       loading = false;
     }

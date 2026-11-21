@@ -1,13 +1,14 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import Alert from '$lib/components/Alert.svelte';
     import EmptyState from '$lib/components/EmptyState.svelte';
     import PageHeader from '$lib/components/PageHeader.svelte';
     import LoadingState from '$lib/components/LoadingState.svelte';
     
-    let events = $state([]);
+    type ArchivedEvent = { id: number; name: string; year: number; season: string; status: string; is_rainy_mode: boolean; start_date: string; end_date?: string | null };
+    let events = $state<ArchivedEvent[]>([]);
     let loading = $state(true);
-    let error = $state(null);
+    let error = $state<string | null>(null);
 
     onMount(async () => {
         try {
@@ -15,7 +16,7 @@
             if (!res.ok) {
                 throw new Error('Failed to fetch events');
             }
-            const allEvents = await res.json();
+            const allEvents: ArchivedEvent[] = await res.json();
             events = allEvents.filter(e => e.status === 'archived');
             // Sort events by year (descending), season (autumn first)
             events.sort((a, b) => {
@@ -25,13 +26,13 @@
                 return 0;
             });
         } catch (err) {
-            error = err.message;
+            error = err instanceof Error ? err.message : String(err);
         } finally {
             loading = false;
         }
     });
 
-    function formatDate(dateStr) {
+    function formatDate(dateStr: string | null | undefined): string {
         if (!dateStr) return '';
         const d = new Date(dateStr);
         return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;

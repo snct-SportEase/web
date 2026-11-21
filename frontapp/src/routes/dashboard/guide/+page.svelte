@@ -1,13 +1,13 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
   import { onMount } from 'svelte';
   import PWAInstallGuideModal from '$lib/components/PWAInstallGuideModal.svelte';
   import ActionCard from '$lib/components/ActionCard.svelte';
 
   let showPWAInstallGuide = $state(false);
-  let activeEvent = $state(null);
-  let competitionGuidelinesUrl = $state(null);
-  let guideDocuments = $state([]);
+  let activeEvent = $state<{ id: number; name: string } | null>(null);
+  let competitionGuidelinesUrl = $state<string | null>(null);
+  let guideDocuments = $state<{ id: number; title: string; description?: string | null; pdf_url: string }[]>([]);
 
   onMount(async () => {
     try {

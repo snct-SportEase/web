@@ -1,15 +1,23 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import { get } from 'svelte/store';
 
-  let session = $state(null);
-  let sessions = $state([]);
-  let selectedSessionId = $state(null);
-  let groups = $state([]);
-  let matches = $state([]);
-  let pointsSummary = $state([]);
-  let typingResults = $state([]);
+  type Session = { id: number; name: string; template_key: string };
+  type Entry = { id: number | string; resolved_name?: string; display_name?: string | null };
+  type Detail = { id: number; class_id?: number; entry_id: number | string; entry_resolved_name?: string; resolved_name?: string; display_name?: string; rank?: number | null; points: number; competition_score?: number | null };
+  type Match = { id: number; title?: string | null; status: string; entries?: Entry[]; result?: { details?: Detail[]; note?: string | null } | null };
+  type Summary = { id?: number; class_id: number; class_name: string; points: number };
+  type Group = { id: number; name: string; members?: { class?: { name: string } | null }[] };
+  type TypingResult = { team_name: string; match_1_score: number; match_2_score: number; match_3_score: number; total_score: number; rank: number; points: number };
+  type SessionData = { session: Session; groups?: Group[]; matches?: Match[]; points_summary?: Summary[]; typing_results?: TypingResult[]; typing_import_status?: string };
+  let session = $state<Session | null>(null);
+  let sessions = $state<Session[]>([]);
+  let selectedSessionId = $state<number | null>(null);
+  let groups = $state<Group[]>([]);
+  let matches = $state<Match[]>([]);
+  let pointsSummary = $state<Summary[]>([]);
+  let typingResults = $state<TypingResult[]>([]);
   let typingImportStatus = $state('pending');
   let loading = $state(false);
   let errorMessage = $state('');
@@ -24,7 +32,7 @@
     }
   });
 
-  async function fetchSessions(eventId, preferredSessionId = selectedSessionId) {
+  async function fetchSessions(eventId: number, preferredSessionId: number | null = selectedSessionId) {
     loading = true;
     errorMessage = '';
     try {
@@ -33,7 +41,7 @@
         const detail = await safeJson(listResponse);
         throw new Error(detail?.error || '昼競技一覧の取得に失敗しました');
       }
-      const listData = await listResponse.json();
+      const listData: { sessions?: Session[] } = await listResponse.json();
       sessions = listData.sessions || [];
       const selected = sessions.find((item) => item.id === preferredSessionId) || sessions[0];
       if (!selected) {
@@ -52,7 +60,7 @@
         const detail = await safeJson(res);
         throw new Error(detail?.error || '昼競技データの取得に失敗しました');
       }
-      const data = await res.json();
+      const data: SessionData = await res.json();
       session = data.session;
       groups = data.groups || [];
       matches = data.matches || [];
@@ -83,13 +91,13 @@
       }
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
+      errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;
     }
   }
 
-  async function safeJson(res) {
+  async function safeJson(res: Response): Promise<{ error?: string } | null> {
     try {
       return await res.json();
     } catch {
@@ -97,7 +105,7 @@
     }
   }
 
-  function detectTemplateFromMatch(match) {
+  function detectTemplateFromMatch(match: Match) {
     const title = match.title || '';
 		if (session?.template_key === 'borrowing_race') {
 			return { type: 'borrowing-race' };
@@ -118,7 +126,7 @@
     return null;
   }
 
-  function getEntryName(detail, entries) {
+  function getEntryName(detail: Detail, entries: Entry[] | undefined): string {
     // バックエンドから設定された entry_resolved_name を最優先
     if (detail.entry_resolved_name) {
       return detail.entry_resolved_name;
@@ -154,7 +162,7 @@
     return detail.resolved_name || detail.display_name || '-';
   }
 
-  function insertOrdered(items, item, compare) {
+  function insertOrdered<T>(items: T[], item: T, compare: (left: T, right: T) => number): T[] {
     let insertAt = items.length;
     for (let index = 0; index < items.length; index += 1) {
       if (compare(item, items[index]) < 0) {
@@ -169,8 +177,8 @@
     ];
   }
 
-  function orderByRank(details) {
-    let ordered = [];
+  function orderByRank(details: Detail[] | undefined): Detail[] {
+    let ordered: Detail[] = [];
     for (const detail of details || []) {
       ordered = insertOrdered(
         ordered,
@@ -181,8 +189,8 @@
     return ordered;
   }
 
-  function orderByPointsDesc(summary) {
-    let ordered = [];
+  function orderByPointsDesc(summary: Summary[] | undefined): Summary[] {
+    let ordered: Summary[] = [];
     for (const item of summary || []) {
       ordered = insertOrdered(
         ordered,

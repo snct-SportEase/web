@@ -1,8 +1,8 @@
-<script>
+<script lang="ts">
   import { browser } from '$app/env';
   import { getDeviceType, getBrowserType } from '$lib/utils/pwa.js';
 
-  let { isOpen = false, onClose = () => {} } = $props();
+  let { isOpen = false, onClose = () => {} }: { isOpen?: boolean; onClose?: () => void } = $props();
 
   // Note: deviceType and browserType are computed but not currently used in the template
   $effect(() => {
@@ -12,13 +12,13 @@
     }
   });
 
-  function handleKeydown(event) {
+  function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       onClose();
     }
   }
 
-  function handleOverlayKeydown(event) {
+  function handleOverlayKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       event.preventDefault();
       onClose();

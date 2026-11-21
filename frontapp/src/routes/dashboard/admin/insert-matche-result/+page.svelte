@@ -1,31 +1,40 @@
-<script>
+<script lang="ts">
   import { activeEvent as activeEventStore } from '$lib/stores/eventStore.js';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/env';
 	import { page } from '$app/state';
 	import InsertMatchResultModal from '$lib/components/InsertMatchResultModal.svelte';
 	import ConfirmMatchResultModal from '$lib/components/ConfirmMatchResultModal.svelte';
 	import { canEnterEventResults } from '$lib/utils/eventStatus.js';
+	import type { LayoutData } from '../$types';
+	import type { BracketData, BracketInstance, Match, Side } from '@snct-sportease/matchline';
 
-	let { data } = page;
+	type AppSide = Side & { teamId?: number };
+	type AppMatch = Omit<Match, 'id' | 'sides'> & { id: number; sides?: AppSide[]; isLoserBracketMatch?: boolean; loserBracketBlock?: string };
+	type Tournament = { id: number; name: string; data: Omit<BracketData, 'matches'> & { matches?: AppMatch[] } };
+	type BoardTournament = { id: number; entries: { id: number; team_name: string }[]; rankings?: { rank: number; entry_id: number }[] };
+	type BoardRun = { id: number; location: string; win_points: number; rules_pdf_url?: string | null; rank_points?: Record<string, number>; tournaments?: BoardTournament[] };
+	type Scores = { team1_score: number; team2_score: number };
+
+	let data = page.data as LayoutData;
 	let user = $derived(data.user);
 	let isRoot = $derived(user?.roles?.some(role => role.name === 'root'));
 
-	let tournaments = $state([]);
-	let selectedTournamentId = $state('');
-	let selectedMatch = $state(null);
-	let activeEventId = $state(null);
+	let tournaments = $state<Tournament[]>([]);
+	let selectedTournamentId = $state<number | ''>('');
+	let selectedMatch = $state<AppMatch | null>(null);
+	let activeEventId = $state<number | null>(null);
 	let activeEventStatus = $state('');
 	let showModal = $state(false);
 	let showConfirmModal = $state(false);
-	let scoresToSubmit = $state(null);
+	let scoresToSubmit = $state<Scores | null>(null);
 	let isRainyMode = $state(false);
-	let boardGameRuns = $state([]);
-	let rankingSelections = $state([]);
-	let rankingTournamentId = $state(null);
+	let boardGameRuns = $state<BoardRun[]>([]);
+	let rankingSelections = $state<(number | '')[]>([]);
+	let rankingTournamentId = $state<number | null>(null);
 	let isSavingRankings = $state(false);
 
-	let ws;
+	let ws: WebSocket | undefined;
 
 	$effect(() => {
 		if (selectedTournamentId && typeof window !== 'undefined') {
@@ -62,7 +71,7 @@
 	onMount(async () => {
 		try {
 			const eventData = await activeEventStore.init();
-			activeEventId = eventData?.id;
+			activeEventId = eventData?.id ?? null;
 			activeEventStatus = eventData?.status || '';
 			isRainyMode = eventData?.is_rainy_mode || false;
 
@@ -76,14 +85,10 @@
 			console.error(error);
 		}
 
-		return () => {
-			if (ws) {
-				ws.close();
-			}
-		};
 	});
+	onDestroy(() => ws?.close());
 
-	function openModal(match) {
+	function openModal(match: AppMatch) {
 		if (!canEnterEventResults(activeEventStatus)) {
 			alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
 			return;
@@ -97,7 +102,7 @@
 		selectedMatch = null;
 	}
 
-	function handleConfirm(scores) {
+	function handleConfirm(scores: Scores) {
 		scoresToSubmit = scores;
 		showConfirmModal = true;
 	}
@@ -107,7 +112,7 @@
 		scoresToSubmit = null;
 	}
 
-	async function handleSubmit(result = {}) {
+	async function handleSubmit(result: { winnerId?: number | null } = {}) {
 		if (!canEnterEventResults(activeEventStatus)) {
 			alert('試合結果は開催中またはテスト中の大会でのみ入力できます。');
 			return;
@@ -117,7 +122,7 @@
 		const { team1_score, team2_score } = scoresToSubmit;
 		const winnerId = result?.winnerId;
 
-		const body = {
+		const body: Scores & { winner_id?: number } = {
 			team1_score: team1_score,
 			team2_score: team2_score
 		};
@@ -158,6 +163,9 @@
 	}
 
 	let selectedTournament = $derived(tournaments.find((t) => t.id === selectedTournamentId));
+	function teamName(side: AppSide | undefined): string {
+		return (side?.contestantId && selectedTournament?.data.contestants?.[side.contestantId]?.players?.[0]?.title) || 'TBD';
+	}
 	let selectedBoardGame = $derived.by(() => {
 		for (const run of boardGameRuns) {
 			const tournament = run.tournaments?.find((item) => item.id === selectedTournamentId);
@@ -175,7 +183,7 @@
 		}
 	}
 
-	function updateRankingSelection(index, value) {
+	function updateRankingSelection(index: number, value: string) {
 		const next = [...rankingSelections];
 		next[index] = value ? Number(value) : '';
 		rankingSelections = next;
@@ -203,7 +211,7 @@
 			boardGameRuns = boardGameRuns.map((run) => run.id === result.id ? result : run);
 			alert('順位点を登録しました。');
 		} catch (error) {
-			alert(error.message || '順位の登録に失敗しました');
+			alert(error instanceof Error ? error.message : '順位の登録に失敗しました');
 		} finally {
 			isSavingRankings = false;
 		}
@@ -215,16 +223,26 @@
 		}
 	});
 
+	let bracketInstance: BracketInstance | null = null;
+	let bracketVersion = 0;
+	onDestroy(() => { bracketVersion++; bracketInstance?.uninstall?.(); });
+
 	async function renderBracket() {
 		if (!browser) return;
+		const version = ++bracketVersion;
 		setTimeout(async () => {
+			if (version !== bracketVersion) return;
 			const wrapper = document.getElementById('bracket-container');
 			if (wrapper) {
+				bracketInstance?.uninstall?.();
+				bracketInstance = null;
 				wrapper.innerHTML = '';
 				if (selectedTournament && selectedTournament.data) {
 					try {
-						const { createBracket } = await import('bracketry');
-						createBracket(selectedTournament.data, wrapper);
+						const { createBracket } = await import('@snct-sportease/matchline');
+						if (version !== bracketVersion) return;
+						const bracketData: BracketData = { ...selectedTournament.data, matches: selectedTournament.data.matches?.map((match) => ({ ...match, id: String(match.id) })) };
+						bracketInstance = createBracket(bracketData, wrapper);
 					} catch (error) {
 						console.error('Failed to load createBracket:', error);
 						wrapper.innerHTML = '<p>ブラケットの読み込みに失敗しました。</p>';
@@ -312,7 +330,7 @@
 		</section>
 	{/if}
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-		{#each selectedTournament.data.matches as match (match.id)}
+		{#each selectedTournament.data.matches ?? [] as match (match.id)}
 			{@const isLoserBracketMatch = match.isLoserBracketMatch}
 			{#if !isLoserBracketMatch || isRainyMode}
 				<div class="border rounded-lg p-4 {isLoserBracketMatch ? 'bg-yellow-50' : ''}">
@@ -324,11 +342,9 @@
 						{/if}
 					</p>
 					<p>
-						{selectedTournament.data.contestants[match.sides?.[0]?.contestantId]?.players?.[0]
-							?.title ?? 'TBD'}
+						{teamName(match.sides?.[0])}
 						vs
-						{selectedTournament.data.contestants[match.sides?.[1]?.contestantId]?.players?.[0]
-							?.title ?? 'TBD'}
+						{teamName(match.sides?.[1])}
 					</p>
 					{#if match.sides?.some((side) => side.isWinner)}
 						{@const score1 = match.sides?.[0]?.scores?.[0]?.mainScore}
@@ -336,9 +352,7 @@
 						<p>Score: {score1 ?? 'N/A'} - {score2 ?? 'N/A'}</p>
 						{@const winnerSide = match.sides?.find((side) => side.isWinner)}
 						{#if winnerSide}
-							{@const winnerName =
-								selectedTournament.data.contestants[winnerSide.contestantId]?.players?.[0]?.title ??
-								'TBD'}
+							{@const winnerName = teamName(winnerSide)}
 							<p class="font-bold text-green-600">Winner: {winnerName}</p>
 						{:else if score1 !== undefined && score1 === score2}
 							<p class="font-bold text-yellow-600">Draw</p>
@@ -376,8 +390,8 @@
     bind:showModal={showConfirmModal}
     team1Score={scoresToSubmit?.team1_score ?? 0}
     team2Score={scoresToSubmit?.team2_score ?? 0}
-    team1Name={selectedTournament?.data.contestants[selectedMatch?.sides?.[0]?.contestantId]?.players?.[0]?.title}
-    team2Name={selectedTournament?.data.contestants[selectedMatch?.sides?.[1]?.contestantId]?.players?.[0]?.title}
+    team1Name={teamName(selectedMatch?.sides?.[0])}
+    team2Name={teamName(selectedMatch?.sides?.[1])}
     team1Id={selectedMatch?.sides?.[0]?.teamId}
     team2Id={selectedMatch?.sides?.[1]?.teamId}
     onconfirm={handleSubmit}

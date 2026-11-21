@@ -1,10 +1,10 @@
 
-<script>
+<script lang="ts">
     import Modal from '$lib/components/Modal.svelte';
     import ModalFooter from '$lib/components/ModalFooter.svelte';
-    let { showModal = $bindable(false), team1Score = 0, team2Score = 0, team1Name = 'Team 1', team2Name = 'Team 2', team1Id = null, team2Id = null, onconfirm, oncancel } = $props();
+    let { showModal = $bindable(false), team1Score = 0, team2Score = 0, team1Name = 'Team 1', team2Name = 'Team 2', team1Id = null, team2Id = null, onconfirm, oncancel }: { showModal?: boolean; team1Score?: number; team2Score?: number; team1Name?: string; team2Name?: string; team1Id?: number | null; team2Id?: number | null; onconfirm?: (result?: { winnerId: number | null }) => void; oncancel?: () => void } = $props();
 
-    let selectedWinnerId = $state(null);
+    let selectedWinnerId = $state<number | null>(null);
 
     function confirm() {
         if (isTie) {

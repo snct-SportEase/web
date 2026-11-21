@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { activeEvent } from '$lib/stores/eventStore.js';
   import Modal from '$lib/components/Modal.svelte';
@@ -6,16 +6,19 @@
   import Badge from '$lib/components/Badge.svelte';
   import ModalFooter from '$lib/components/ModalFooter.svelte';
 
-  let events = $state([]);
+  type EventInfo = { id: number; name: string; year: number; season: string; start_date: string; end_date: string; survey_url: string | null; status: string; hide_scores: boolean; duplicate_registration_threshold: number };
+  type EventForm = Omit<EventInfo, 'id'> & { id: number | null };
+  type TestRun = { state: string; overdue_notification_count?: number; last_error?: string | null };
+  let events = $state<EventInfo[]>([]);
   let showModal = $state(false);
-  let selectedEvent = $state(null);
+  let selectedEvent = $state<EventInfo | null>(null);
   let isNameManuallyChanged = $state(false);
   let isSaving = $state(false);
-  let testRun = $state(null);
-  let notificationResumePolicy = $state('shift');
+  let testRun = $state<TestRun | null>(null);
+  let notificationResumePolicy = $state<'shift' | 'resume' | 'cancel_overdue'>('shift');
   let isRecovering = $state(false);
 
-  let currentEvent = $state({
+  let currentEvent = $state<EventForm>({
     id: null,
     name: '',
     year: new Date().getFullYear(),
@@ -68,7 +71,7 @@
       await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init({ force: true })]);
       alert('テスト開始時点へ復元しました。予約通知は再開方法を選ぶまで停止しています。');
     } catch (error) {
-      alert(error.message);
+      alert(error instanceof Error ? error.message : String(error));
     } finally {
       isRecovering = false;
     }
@@ -84,7 +87,7 @@
       await Promise.all([fetchEvents(), fetchTestRunStatus(), activeEvent.init({ force: true })]);
       alert('復元用スナップショットを破棄しました。現在のデータがそのまま残ります。');
     } catch (error) {
-      alert(error.message);
+      alert(error instanceof Error ? error.message : String(error));
     } finally {
       isRecovering = false;
     }
@@ -109,7 +112,7 @@
       await fetchTestRunStatus();
       alert('予約通知の配信制御を解除しました。');
     } catch (error) {
-      alert(error.message);
+      alert(error instanceof Error ? error.message : String(error));
     } finally {
       isRecovering = false;
     }
@@ -129,7 +132,7 @@
       events = await response.json();
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      alert(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -153,7 +156,7 @@
     showModal = true;
   }
 
-  function openEditModal(event) {
+  function openEditModal(event: EventInfo) {
     selectedEvent = event;
     isNameManuallyChanged = true; // 編集時は手動変更とみなし、自動更新しない
     currentEvent = {
@@ -193,7 +196,7 @@
 
       const body = {
         ...currentEvent,
-        year: parseInt(currentEvent.year, 10),
+        year: parseInt(String(currentEvent.year), 10),
         duplicate_registration_threshold: duplicateRegistrationThreshold,
       };
 
@@ -218,13 +221,14 @@
       }
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      alert(error instanceof Error ? error.message : String(error));
     } finally {
       isSaving = false;
     }
   }
 
-  async function notifySurvey(id) {
+  async function notifySurvey(id: number | undefined) {
+    if (id === undefined) return;
     if (!confirm('アンケート通知を全ユーザーに送信します。よろしいですか？')) return;
     try {
       const resp = await fetch(`/api/root/events/${id}/notify-survey`, { method: 'POST' });
@@ -234,12 +238,13 @@
       }
       alert('アンケート通知を作成しました。Push通知は通知を有効化済みのユーザーに送信されます。');
     } catch (err) {
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function handleCsvUpload(id, e) {
-    const file = e.target.files[0];
+  async function handleCsvUpload(id: number, e: Event & { currentTarget: HTMLInputElement }) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     const formData = new FormData();
@@ -258,18 +263,18 @@
       const data = await resp.json();
       alert(`インポート成功: ${data.imported_classes_count} クラス分の点数が反映されました。`);
     } catch (err) {
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     }
     // Upload inputリセット
-    e.target.value = '';
+    input.value = '';
   }
 
-  async function downloadExport(event, type) {
+  async function downloadExport(event: EventInfo, type: 'pdf' | 'csv') {
     try {
       if (type === 'pdf') {
         const res = await fetch(`/api/scores/class?event_id=${event.id}`);
         if (!res.ok) throw new Error('クラススコアの取得に失敗しました');
-        const scores = await res.json();
+        const scores: { rank_overall: number; class_name: string; total_points_overall: number; total_points_current_event: number }[] = await res.json();
         
         let htmlContent = `
           <div style="font-family: Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', Meiryo, sans-serif; padding: 20px;">
@@ -303,12 +308,11 @@
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+        } as const;
         const pdfModule = await import('html2pdf.js');
         // The UMD package can be wrapped in an extra default export by the bundler.
-        const html2pdf = typeof pdfModule.default === 'function'
-          ? pdfModule.default
-          : pdfModule.default?.default;
+        const wrapped = pdfModule.default as typeof pdfModule.default | { default: typeof pdfModule.default };
+        const html2pdf = typeof wrapped === 'function' ? wrapped : wrapped.default;
         html2pdf().set(opt).from(htmlContent).save();
       } else {
         const resp = await fetch(`/api/root/events/${event.id}/export/${type}`);
@@ -328,7 +332,7 @@
         window.URL.revokeObjectURL(url);
       }
     } catch (err) {
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -356,7 +360,7 @@
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -383,7 +387,7 @@
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     }
   }
 </script>
@@ -536,7 +540,7 @@
               <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-1">
                 <input type="url" id="survey_url" bind:value={currentEvent.survey_url} placeholder="https://forms.gle/..." class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 {#if selectedEvent && currentEvent.survey_url}
-                  <button type="button" onclick={() => notifySurvey(selectedEvent.id)} class="whitespace-nowrap text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded hover:bg-blue-200 border border-blue-200 font-medium">
+                  <button type="button" onclick={() => notifySurvey(selectedEvent?.id)} class="whitespace-nowrap text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded hover:bg-blue-200 border border-blue-200 font-medium">
                     通知を送信
                   </button>
                 {/if}

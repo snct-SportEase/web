@@ -1,9 +1,9 @@
-<script>
-    let { showModal = $bindable(false), user = null, onroleDeleted } = $props();
+<script lang="ts">
+    let { showModal = $bindable(false), user = null, onroleDeleted }: { showModal?: boolean; user?: { id: string; email: string; roles?: { id: number; name: string }[] } | null; onroleDeleted?: () => void } = $props();
 
     const defaultRoles = ['root', 'admin', 'student'];
 
-    function isClassSportRole(roleName) {
+    function isClassSportRole(roleName: string): boolean {
         // アンダースコアを含むクラス管理用ロールは削除不可
         if (roleName.includes('_')) {
             if (!defaultRoles.includes(roleName.toLowerCase())) {
@@ -17,7 +17,8 @@
         showModal = false;
     }
 
-    async function deleteRole(roleName) {
+    async function deleteRole(roleName: string): Promise<void> {
+        if (!user) return;
         if (defaultRoles.includes(roleName)) {
             alert('デフォルトのロールは削除できません。');
             return;
@@ -60,7 +61,7 @@
         <div class="mb-4">
             <h3 class="font-semibold">現在のロール:</h3>
             <div class="mt-2 space-y-2">
-                {#each user.roles.filter(r => r.name !== 'student') as role (role.id)}
+                {#each (user.roles ?? []).filter(r => r.name !== 'student') as role (role.id)}
                     <div class="flex items-center justify-between bg-gray-100 p-2 rounded-md">
                         <span class="text-sm font-medium text-gray-800">{role.name}</span>
                         {#if !defaultRoles.includes(role.name) && !isClassSportRole(role.name)}

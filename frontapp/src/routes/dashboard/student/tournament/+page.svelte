@@ -1,20 +1,26 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import { browser } from '$app/env';
     import { activeEvent } from '$lib/stores/eventStore.js';
     import { get } from 'svelte/store';
+    import type { BracketData, BracketInstance } from '@snct-sportease/matchline';
 
-    let allTournaments = $state([]);
+    type Tournament = { id: number; name: string; sport_id: number; data: BracketData | null };
+    type TournamentResponse = Omit<Tournament, 'data'> & { data: BracketData | string | null };
+
+    let allTournaments = $state<Tournament[]>([]);
     let isLoading = $state(false);
     let isRainyMode = $state(false);
 
-    onMount(async () => {
-        await activeEvent.init();
-        const currentEvent = get(activeEvent);
-        if (currentEvent) {
-            isRainyMode = currentEvent.is_rainy_mode || false;
-            await fetchTournamentsForActiveEvent();
-        }
+    onMount(() => {
+        void (async () => {
+            await activeEvent.init();
+            const currentEvent = get(activeEvent);
+            if (currentEvent) {
+                isRainyMode = currentEvent.is_rainy_mode || false;
+                await fetchTournamentsForActiveEvent();
+            }
+        })();
         
         // ページがフォーカスされた時にトーナメントデータを再取得
         const handleFocus = async () => {
@@ -56,18 +62,18 @@
         try {
             const response = await fetch(`/api/student/events/${currentEvent.id}/tournaments`);
             if (response.ok) {
-                const fetchedTournaments = await response.json();
+                const fetchedTournaments: TournamentResponse[] = await response.json();
 
-                allTournaments = fetchedTournaments.map(t => {
+                allTournaments = fetchedTournaments.map((t): Tournament => {
                     if (typeof t.data === 'string') {
                         try {
-                            t.data = JSON.parse(t.data);
+                            return { ...t, data: JSON.parse(t.data) as BracketData };
                         } catch (e) {
                             console.error('Failed to parse tournament data:', e);
-                            t.data = null;
+                            return { ...t, data: null };
                         }
                     }
-                    return t;
+                    return { ...t, data: t.data };
                 });
 
             } else {
@@ -83,11 +89,11 @@
 
     }
 
-    function bracket(node, initialData) {
-        let bracketInstance = null;
+    function bracket(node: HTMLElement, initialData: BracketData | null) {
+        let bracketInstance: BracketInstance | null = null;
         let renderVersion = 0;
 
-        async function render(data) {
+        async function render(data: BracketData | null) {
             const currentVersion = ++renderVersion;
             bracketInstance?.uninstall?.();
             bracketInstance = null;
@@ -99,7 +105,7 @@
             }
 
             try {
-                const { createBracket } = await import('bracketry');
+                const { createBracket } = await import('@snct-sportease/matchline');
                 if (currentVersion !== renderVersion) return;
                 bracketInstance = createBracket(data, node);
             } catch (error) {
@@ -113,7 +119,7 @@
         void render(initialData);
 
         return {
-            update(data) {
+            update(data: BracketData | null) {
                 void render(data);
             },
             destroy() {

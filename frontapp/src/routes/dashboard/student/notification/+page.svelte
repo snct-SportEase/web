@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
   import { page } from '$app/state';
   import { enhance } from '$app/forms';
   import { markNotificationsSeen } from '$lib/stores/notificationBadgeStore.js';
+  import type { PageData, ActionData } from './$types';
 
-  const roleLabels = {
+  const roleLabels: Record<string, string> = {
     student: '学生',
     admin: '管理者',
     root: 'ルート'
@@ -16,11 +17,11 @@
     all_matches: '全ての試合'
   };
 
-  let data = $derived(page.data);
-  let form = $derived(page.form);
+  let data = $derived(page.data as PageData);
+  let form = $derived(page.form as ActionData);
   let notifications = $derived(data.notifications ? [...data.notifications] : []);
   let initialSelectedFilters = $derived(data.user?.notification_filters || ['general']);
-  let selectedFilters = $state([]);
+  let selectedFilters = $state<string[]>([]);
   let selectedFiltersInitialized = $state(false);
 
   $effect(() => {
@@ -33,7 +34,7 @@
     markNotificationsSeen(data.user, notifications);
   });
 
-  function formatDate(value) {
+  function formatDate(value: string | null | undefined): string {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -48,7 +49,7 @@
     });
   }
 
-  function toggleFilter(filter) {
+  function toggleFilter(filter: string) {
     if (filter === 'general') return; // general is always required
     if (selectedFilters.includes(filter)) {
       selectedFilters = selectedFilters.filter(f => f !== filter);

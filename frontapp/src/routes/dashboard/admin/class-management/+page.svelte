@@ -1,7 +1,9 @@
-<script>
-	let { data } = $props();
+<script lang="ts">
+	import type { PageData } from './$types';
+	type Member = { id: string; email: string; display_name: string | null; class_id?: number | null };
+	let { data }: { data: PageData } = $props();
 
-	function normalizeClassId(value) {
+	function normalizeClassId(value: number | string | null | undefined): number | null {
 		if (value === null || value === undefined || value === '') return null;
 		if (typeof value === 'number') return value;
 		const parsed = Number(value);
@@ -11,19 +13,19 @@
 	let classes = $derived(data?.classes ?? []);
 	let allSports = $derived(data?.allSports ?? []);
 	let availableSports = $derived(data?.availableSports ?? []);
-	let selectedClassId = $state(null);
-	let classMembers = $state([]);
-	let selectedSportId = $state(null);
-	let selectedMembers = $state([]);
-	let assignedMembers = $state([]);
+	let selectedClassId = $state<number | null>(null);
+	let classMembers = $state<Member[]>([]);
+	let selectedSportId = $state<number | null>(null);
+	let selectedMembers = $state<Member[]>([]);
+	let assignedMembers = $state<Member[]>([]);
 
 	let membersLoading = $state(false);
 	let teamMembersLoading = $state(false);
 	let sportsLoading = $state(false);
 	let assignLoading = $state(false);
 
-	let error = $state(null);
-	let success = $state(null);
+	let error = $state<string | null>(null);
+	let success = $state<string | null>(null);
 	let isAdmin = $derived(data?.isAdmin ?? false);
 	let noonSessionName = $derived(data?.noonSessionName ?? null);
 	let noonSessionSportMatched = $derived(data?.noonSessionSportMatched ?? false);
@@ -43,7 +45,7 @@
 		selectedSportId !== null ? availableSports.find((sport) => sport.id === selectedSportId) : null
 	);
 	let isBoardGameSelected = $derived(selectedSport?.templateKey === 'board_game_tournament');
-	function toNumber(value) {
+	function toNumber(value: number | string | null | undefined): number | null {
 		if (value === '' || value === null || value === undefined) {
 			return null;
 		}
@@ -56,7 +58,7 @@
 		member.email.toLowerCase().includes(searchQuery.toLowerCase())
 	));
 
-	function authorizedFetch(url, options = {}) {
+	function authorizedFetch(url: string, options: { method?: string; headers?: Record<string, string>; body?: string } = {}) {
 		const { headers, ...rest } = options;
 		return fetch(url, {
 			credentials: 'include',
@@ -67,12 +69,12 @@
 		});
 	}
 
-	function getSportName(sportId) {
+	function getSportName(sportId: number): string {
 		const sport = allSports.find((s) => s.id === sportId);
 		return sport ? sport.name : '不明な競技';
 	}
 
-	async function loadClassMembers(classId) {
+	async function loadClassMembers(classId: number) {
 		if (!classId) return;
 
 		membersLoading = true;
@@ -89,13 +91,13 @@
 			selectedMembers = [];
 		} catch (err) {
 			console.error('Error loading class members:', err);
-			error = err.message || 'クラスメンバーの取得に失敗しました';
+			error = err instanceof Error ? err.message : 'クラスメンバーの取得に失敗しました';
 		} finally {
 			membersLoading = false;
 		}
 	}
 
-	async function loadTeamMembers(sportId) {
+	async function loadTeamMembers(sportId: number) {
 		if (!selectedClass || !sportId) {
 			assignedMembers = [];
 			return;
@@ -119,14 +121,14 @@
 			assignedMembers = Array.isArray(members) ? members : [];
 		} catch (err) {
 			console.error('Error loading team members:', err);
-			error = err.message || 'チームメンバーの取得に失敗しました';
+			error = err instanceof Error ? err.message : 'チームメンバーの取得に失敗しました';
 		} finally {
 			teamMembersLoading = false;
 		}
 	}
 
-	async function handleClassChange(event) {
-		const value = toNumber(event?.target?.value ?? selectedClassId);
+	async function handleClassChange(event: Event & { currentTarget: HTMLSelectElement }) {
+		const value = toNumber(event.currentTarget.value ?? selectedClassId);
 		selectedClassId = value;
 		if (selectedClassId !== null) {
 			await loadClassMembers(selectedClassId);
@@ -136,8 +138,8 @@
 		}
 	}
 
-	async function handleSportChange(event) {
-		selectedSportId = toNumber(event?.target?.value ?? selectedSportId);
+	async function handleSportChange(event: Event & { currentTarget: HTMLSelectElement }) {
+		selectedSportId = toNumber(event.currentTarget.value ?? selectedSportId);
 		if (selectedSportId !== null) {
 			await loadTeamMembers(selectedSportId);
 		} else {
@@ -145,7 +147,7 @@
 		}
 	}
 
-	function toggleMemberSelection(user) {
+	function toggleMemberSelection(user: Member) {
 		if (selectedMembers.find((m) => m.id === user.id)) {
 			selectedMembers = selectedMembers.filter((m) => m.id !== user.id);
 		} else {
@@ -157,14 +159,14 @@
 		}
 	}
 
-	function boardGameRole(index) {
+	function boardGameRole(index: number): string {
 		if (selectedSport?.gameType === 'shogi') {
 			return ['代表A', '代表B', '補欠'][index] || '';
 		}
 		return `代表${index + 1}`;
 	}
 
-	function selectedBoardGameRole(userId) {
+	function selectedBoardGameRole(userId: string): string {
 		if (!isBoardGameSelected) return '';
 		const index = selectedMembers.findIndex((member) => member.id === userId);
 		return index >= 0 ? boardGameRole(index) : '';
@@ -181,7 +183,7 @@
 		success = null;
 
 		try {
-			const requestBody = {
+			const requestBody: { sport_id: number; user_ids: string[]; class_id?: number | string } = {
 				sport_id: selectedSportId,
 				user_ids: selectedMembers.map((m) => m.id)
 			};
@@ -210,13 +212,13 @@
 			selectedMembers = [];
 		} catch (err) {
 			console.error('Error assigning members:', err);
-			error = err.message || 'メンバーの割り当てに失敗しました';
+			error = err instanceof Error ? err.message : 'メンバーの割り当てに失敗しました';
 		} finally {
 			assignLoading = false;
 		}
 	}
 
-	async function removeMember(user) {
+	async function removeMember(user: Member) {
 		if (!selectedClass || selectedSportId === null) return;
 		if (!confirm(`${user.display_name || user.email} をチームから削除しますか？`)) return;
 
@@ -225,7 +227,7 @@
 		success = null;
 
 		try {
-			const requestBody = {
+			const requestBody: { sport_id: number; user_id: string; class_id?: number | string } = {
 				sport_id: selectedSportId,
 				user_id: user.id
 			};
@@ -251,7 +253,7 @@
 			await loadTeamMembers(selectedSportId);
 		} catch (err) {
 			console.error('Error removing member:', err);
-			error = err.message || 'メンバーの削除に失敗しました';
+			error = err instanceof Error ? err.message : 'メンバーの削除に失敗しました';
 		} finally {
 			assignLoading = false;
 		}

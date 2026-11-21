@@ -1,5 +1,6 @@
-<script>
-  let { header, children, class: className = '' } = $props();
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+  let { header, children, class: className = '' }: { header?: Snippet; children?: Snippet; class?: string } = $props();
 </script>
 
 <div class={`overflow-x-auto ${className}`}>

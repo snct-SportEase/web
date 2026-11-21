@@ -1,28 +1,33 @@
-<script>
+<script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import { afterNavigate } from '$app/navigation';
     import { activeEvent } from '$lib/stores/eventStore.js';
+    import type { ActiveEvent } from '$lib/utils/activeEvent.js';
 
-    let allSports = $state([]);
-    let eventSports = $state([]);
+    type Sport = { id: number; name: string };
+    type EventSport = { event_id: number; sport_id: number; sport_name?: string; location: string; description?: string | null; template_key?: string | null; min_capacity?: number | null; max_capacity?: number | null };
+    const errorText = (error: unknown): string => error instanceof Error ? error.message : String(error);
+
+    let allSports = $state<Sport[]>([]);
+    let eventSports = $state<EventSport[]>([]);
     let newSportName = $state('');
 
-    let newAssignment = $state({
+    let newAssignment = $state<{ sport_id: number | null; description: string; location: string; other_location: string }>({
         sport_id: null,
         description: '',
         location: 'other',
         other_location: '',
     });
 
-    let currentActiveEvent = $state(null);
-    let editingCapacity = $state(null); // { event_id, sport_id } or null
-    let editingSportId = $state(null);
+    let currentActiveEvent = $state<ActiveEvent | null>(null);
+    let editingCapacity = $state<{ event_id: number; sport_id: number } | null>(null);
+    let editingSportId = $state<number | null>(null);
     let editingLocation = $state('');
     let editingOtherLocation = $state('');
     let editingDescription = $state('');
     let isSavingSettings = $state(false);
-    let editingMinCapacity = $state(null);
-    let editingMaxCapacity = $state(null);
+    let editingMinCapacity = $state<number | null>(null);
+    let editingMaxCapacity = $state<number | null>(null);
     let isAssigning = $state(false); // 割り当て処理中のフラグ
 
     // 昼競技(noon_game)は /dashboard/root/noon-game で管理するため、通常競技の割り当て対象から除外する
@@ -38,7 +43,7 @@
     // この画面で扱うのは「通常競技」のみ（noon_game は別画面で管理）
     let visibleEventSports = $derived(eventSports ? eventSports.filter(es => es.location !== 'noon_game') : []);
 
-    let unsubscribe = null;
+    let unsubscribe: (() => void) | null = null;
 
     // データを初期化・再取得する関数
     async function initializeData() {
@@ -98,11 +103,11 @@
             allSports = await response.json();
         } catch (error) {
             console.error(error);
-            alert(`競技マスタの取得に失敗しました: ${error.message}`);
+            alert(`競技マスタの取得に失敗しました: ${errorText(error)}`);
         }
     }
 
-    async function fetchEventSports(eventId) {
+    async function fetchEventSports(eventId: number) {
         try {
             // /api/events/:id/sports は全ユーザー許可(GET)されている前提
             const response = await fetch(`/api/events/${eventId}/sports`); 
@@ -110,7 +115,7 @@
             eventSports = await response.json();
         } catch (error) {
             console.error(error);
-            alert(`割り当て済み競技の取得に失敗しました: ${error.message}`);
+            alert(`割り当て済み競技の取得に失敗しました: ${errorText(error)}`);
         }
     }
 
@@ -136,7 +141,7 @@
             alert('新しい競技を登録しました。');
         } catch (error) {
             console.error(error);
-            alert(`登録エラー: ${error.message}`);
+            alert(`登録エラー: ${errorText(error)}`);
         }
     }
 
@@ -167,7 +172,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sport_id: parseInt(newAssignment.sport_id, 10),
+                    sport_id: Number(newAssignment.sport_id),
                     description: newAssignment.description,
                     location
                 }),
@@ -190,13 +195,13 @@
             alert('競技を大会に割り当てました。');
         } catch (error) {
             console.error(error);
-            alert(`割り当てエラー: ${error.message}`);
+            alert(`割り当てエラー: ${errorText(error)}`);
         } finally {
             isAssigning = false; // 処理完了
         }
     }
 
-    async function deleteAssignedSport(sportId) {
+    async function deleteAssignedSport(sportId: number) {
         if (!currentActiveEvent) {
             alert('アクティブな大会が設定されていません。');
             return;
@@ -221,17 +226,17 @@
             alert(`「${sportName}」の割り当てを解除しました。`);
         } catch (error) {
             console.error(error);
-            alert(`削除エラー: ${error.message}`);
+            alert(`削除エラー: ${errorText(error)}`);
         }
     }
 
     // Helper to get sport name from ID
-    function getSportName(sportId) {
+    function getSportName(sportId: number): string {
         const sport = allSports.find(s => s.id === sportId);
         return sport ? sport.name : '不明な競技';
     }
 
-    function isOtherLocation(location) {
+    function isOtherLocation(location: string): boolean {
         return typeof location === 'string' && location.startsWith('other:');
     }
 
@@ -243,7 +248,7 @@
         return `other:${newAssignment.other_location.trim()}`;
     }
 
-    function displayLocation(location) {
+    function displayLocation(location: string): string {
         if (isOtherLocation(location)) {
             return location.slice('other:'.length);
         }
@@ -255,8 +260,8 @@
         return location;
     }
 
-    function locationOptionLabel(location) {
-        const labels = {
+    function locationOptionLabel(location: string): string {
+        const labels: Record<string, string> = {
             gym1: 'gym1',
             gym2: 'gym2',
             ground: 'ground',
@@ -265,13 +270,13 @@
         return labels[location] || location;
     }
 
-    function canEditSportSettings(eventSport) {
+    function canEditSportSettings(eventSport: EventSport): boolean {
         const name = eventSport.sport_name || getSportName(eventSport.sport_id);
         return eventSport.template_key !== 'board_game_tournament' &&
             name !== '将棋' && name !== 'オセロ';
     }
 
-    function startEditSportSettings(eventSport) {
+    function startEditSportSettings(eventSport: EventSport) {
         editingSportId = eventSport.sport_id;
         editingLocation = isOtherLocation(eventSport.location) ? 'other' : eventSport.location;
         editingOtherLocation = isOtherLocation(eventSport.location)
@@ -286,7 +291,7 @@
         editingDescription = '';
     }
 
-    async function saveSportSettings(eventSport) {
+    async function saveSportSettings(eventSport: EventSport) {
         if (!currentActiveEvent || isSavingSettings) return;
         let location = editingLocation;
         if (location === 'other') {
@@ -310,13 +315,13 @@
             cancelEditSportSettings();
             alert('場所と概要を更新しました。');
         } catch (error) {
-            alert(`更新エラー: ${error.message}`);
+            alert(`更新エラー: ${errorText(error)}`);
         } finally {
             isSavingSettings = false;
         }
     }
 
-    function startEditCapacity(eventId, sportId) {
+    function startEditCapacity(eventId: number, sportId: number) {
         const eventSport = eventSports.find(es => es.event_id === eventId && es.sport_id === sportId);
         editingCapacity = { event_id: eventId, sport_id: sportId };
         editingMinCapacity = eventSport?.min_capacity ?? null;
@@ -329,7 +334,8 @@
         editingMaxCapacity = null;
     }
 
-    async function saveCapacity(eventId, sportId) {
+    async function saveCapacity(eventId: number, sportId: number) {
+        if (!currentActiveEvent) return;
         // Validate
         if (editingMinCapacity !== null && editingMaxCapacity !== null && editingMinCapacity > editingMaxCapacity) {
             alert('最低定員は最高定員以下である必要があります。');
@@ -357,7 +363,7 @@
             alert('定員設定を更新しました。');
         } catch (error) {
             console.error(error);
-            alert(`更新エラー: ${error.message}`);
+            alert(`更新エラー: ${errorText(error)}`);
         }
     }
 </script>

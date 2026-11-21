@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Modal from '$lib/components/Modal.svelte';
   import FormField from '$lib/components/FormField.svelte';
   import ModalFooter from '$lib/components/ModalFooter.svelte';
@@ -15,7 +15,7 @@
     try {
       const body = {
         ...currentEvent,
-        year: parseInt(currentEvent.year, 10),
+        year: parseInt(String(currentEvent.year), 10),
       };
 
       const response = await fetch('/api/root/events', {
@@ -37,7 +37,7 @@
 
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      alert(error instanceof Error ? error.message : String(error));
     }
   }
 </script>

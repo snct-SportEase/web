@@ -1,26 +1,40 @@
-<script>
+<script lang="ts">
   import { onMount, onDestroy, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import { browser } from '$app/env';
   import { activeEvent } from '$lib/stores/eventStore.js';
+  type TemplateType = 'year-relay' | 'course-relay' | 'tug-of-war' | 'typing' | 'borrowing-race';
+  type RankPoints = Record<number, number>;
+  type DefaultGroup = { group_name: string; class_names: string[] };
+  type TemplateConfig = { name: string; description: string; scheduled_at: string; location: string; status: string; mode: string; win_points: number; loss_points: number; draw_points: number; participation_points: number; allow_manual_points: boolean; exclude_registration_limit: boolean; duration_minutes: number; participant_class_ids: number[]; points_by_rank: RankPoints; year_relay_points: { block_a: RankPoints; block_b: RankPoints; overall: RankPoints }; groups: DefaultGroup[] };
+  type Session = { id: number; name: string; description?: string | null; mode: string; win_points?: number; loss_points?: number; draw_points?: number; participation_points?: number; allow_manual_points?: boolean; exclude_registration_limit?: boolean; template_key?: string; status: string; scheduled_at?: string | null; location?: string | null };
+  type Group = { id: number; name: string; description?: string | null; members?: { class_id: number; class?: { name: string } }[] };
+  type Entry = { id: number; side_type?: string; class_id?: number | null; group_id?: number | null; display_name?: string | null; resolved_name?: string };
+  type Match = { id: number; title?: string | null; scheduled_at?: string | null; location?: string | null; format?: string | null; memo?: string | null; status?: string; allow_draw?: boolean; entries?: Entry[]; home_side_type?: string; home_class_id?: number | null; home_group_id?: number | null; away_side_type?: string; away_class_id?: number | null; away_group_id?: number | null; home_display_name?: string; away_display_name?: string; winner_display?: string | null; result?: { winner?: string } | null };
+  type Participant = { id: number | null; type: string; class_id: string; group_id: string; display_name: string };
+  type MatchForm = { id: number | null; title: string; scheduled_at: string; location: string; format: string; memo: string; status: string; allow_draw: boolean; participants: Participant[] };
+  type PointsSettings = { block_a?: RankPoints; block_b?: RankPoints; overall?: RankPoints; rank_points?: RankPoints; duration_minutes?: number } & Record<string, number | RankPoints | undefined>;
+  type TemplateRun = { id: number; template_key: string; points_by_rank?: PointsSettings };
+  type Summary = { id?: number; class_id: number; class_name: string; points: number };
+  type TemplatePayload = { session: { name: string; description: string | null; scheduled_at: string | null; location: string | null; status: string; mode: string; win_points: number; loss_points: number; draw_points: number; participation_points: number; allow_manual_points: boolean; exclude_registration_limit: boolean; points_by_rank?: RankPoints | { block_a: RankPoints; block_b: RankPoints; overall: RankPoints }; duration_minutes?: number; participant_class_ids?: number[]; groups?: DefaultGroup[] } };
 
-  let session = $state(null);
-  let sessions = $state([]);
-  let selectedSessionId = $state(null);
-  let classes = $state([]);
-  let groups = $state([]);
-  let matches = $state([]);
-  let pointsSummary = $state([]);
-  let templateRuns = $state([]);
+  let session = $state<Session | null>(null);
+  let sessions = $state<Session[]>([]);
+  let selectedSessionId = $state<number | null>(null);
+  let classes = $state<{ id: number; name: string }[]>([]);
+  let groups = $state<Group[]>([]);
+  let matches = $state<Match[]>([]);
+  let pointsSummary = $state<Summary[]>([]);
+  let templateRuns = $state<TemplateRun[]>([]);
   let loading = $state(false);
   let savingSession = $state(false);
   let savingGroup = $state(false);
   let savingMatch = $state(false);
   let savingManualPoint = $state(false);
-  let creatingTemplate = $state({});
+  let creatingTemplate = $state<Record<string, boolean>>({});
   let typingImportStatus = $state('pending');
-  let selectedTemplateType = $state(null);
-  let templateConfigForm = $state({
+  let selectedTemplateType = $state<TemplateType | null>(null);
+  let templateConfigForm = $state<TemplateConfig>({
     name: '',
     description: '',
     scheduled_at: '',
@@ -59,14 +73,14 @@
   let sessionFormAllowManualPoints = $state(true);
   let sessionFormExcludeRegistrationLimit = $state(false);
 
-  let groupForm = $state({
+  let groupForm = $state<{ id: number | null; name: string; description: string; class_ids: number[] }>({
     id: null,
     name: '',
     description: '',
     class_ids: []
   });
 
-  let matchForm = $state({
+  let matchForm = $state<MatchForm>({
     id: null,
     title: '',
     scheduled_at: '',
@@ -78,7 +92,7 @@
     participants: []
   });
 
-  let manualPointForm = $state({
+  let manualPointForm = $state<{ class_id: number | string | null; points: number; reason: string }>({
     class_id: null,
     points: 0,
     reason: ''
@@ -87,18 +101,18 @@
   let errorMessage = $state('');
   let isInteractive = $state(false);
 
-  const modeLabels = { mixed: 'クラス＆グループ混在', class: 'クラス対抗のみ', group: 'グループ対抗のみ' };
-  const templateKeyLabels = { year_relay: '学年対抗リレー', course_relay: 'コース対抗リレー', tug_of_war: '綱引き', typing: '競技タイピング', borrowing_race: '借り物競争' };
+  const modeLabels: Record<string, string> = { mixed: 'クラス＆グループ混在', class: 'クラス対抗のみ', group: 'グループ対抗のみ' };
+  const templateKeyLabels: Record<string, string> = { year_relay: '学年対抗リレー', course_relay: 'コース対抗リレー', tug_of_war: '綱引き', typing: '競技タイピング', borrowing_race: '借り物競争' };
 
-  function hasSessionForTemplate(templateKey) {
+  function hasSessionForTemplate(templateKey: string) {
     return sessions.some((item) => item.template_key === templateKey);
   }
 
-  function templateKeyFor(templateType) {
+  function templateKeyFor(templateType: TemplateType) {
     return { 'year-relay': 'year_relay', 'course-relay': 'course_relay', 'tug-of-war': 'tug_of_war', typing: 'typing', 'borrowing-race': 'borrowing_race' }[templateType];
   }
 
-  let escapeHandler = null;
+  let escapeHandler: ((e: KeyboardEvent) => void) | null = null;
 
   onMount(async () => {
     console.log('[NoonGame] onMount');
@@ -131,7 +145,7 @@
     }
   });
 
-  async function fetchSession(eventId) {
+  async function fetchSession(eventId: number) {
     console.log('[NoonGame] fetchSession start', eventId);
     loading = true;
     errorMessage = '';
@@ -157,13 +171,13 @@
       }
     } catch (err) {
       console.error('[NoonGame] fetchSession error', err);
-      errorMessage = err.message;
+      errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;
     }
   }
 
-  async function fetchSessions(eventId, preferredSessionId = selectedSessionId) {
+  async function fetchSessions(eventId: number, preferredSessionId: number | null = selectedSessionId) {
     loading = true;
     errorMessage = '';
     try {
@@ -190,13 +204,14 @@
       typingImportStatus = detail.typing_import_status || 'pending';
       populateSessionForm(session);
     } catch (err) {
-      errorMessage = err.message;
+      errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;
     }
   }
 
-  function populateSessionForm(s) {
+  function populateSessionForm(s: Session | null) {
+    if (!s) { resetSessionForm(); return; }
     sessionFormName = s.name ?? '';
     sessionFormDescription = s.description ?? '';
     sessionFormMode = s.mode ?? 'mixed';
@@ -229,7 +244,7 @@
     };
   }
 
-  function normalizeGroupClassIds(classIds) {
+  function normalizeGroupClassIds(classIds: (number | string | null | undefined)[]) {
     if (!Array.isArray(classIds)) return [];
     const normalized = classIds
       .filter((id) => id !== null && id !== undefined && id !== '')
@@ -238,13 +253,13 @@
     return Array.from(new Set(normalized));
   }
 
-  function getClassNamesForGroupClassIds(classIds) {
+  function getClassNamesForGroupClassIds(classIds: (number | string | null | undefined)[]) {
     return normalizeGroupClassIds(classIds)
       .map((id) => classes.find((cls) => cls.id === id)?.name ?? null)
       .filter(Boolean);
   }
 
-  function deriveAutoGroupNameFromClassNames(classNames) {
+  function deriveAutoGroupNameFromClassNames(classNames: (string | null)[]) {
     if (!Array.isArray(classNames) || classNames.length === 0) return '';
 
     const trimmedNames = classNames
@@ -269,15 +284,15 @@
     return '';
   }
 
-  function deriveAutoGroupNameFromClassIds(classIds) {
+  function deriveAutoGroupNameFromClassIds(classIds: (number | string | null | undefined)[]) {
     return deriveAutoGroupNameFromClassNames(getClassNamesForGroupClassIds(classIds));
   }
 
-  function isGroupClassSelected(classId) {
+  function isGroupClassSelected(classId: number) {
     return normalizeGroupClassIds(groupForm.class_ids).includes(classId);
   }
 
-  function toggleGroupClassSelection(classId) {
+  function toggleGroupClassSelection(classId: number) {
     const normalized = normalizeGroupClassIds(groupForm.class_ids);
     const nextClassIds = normalized.includes(classId)
       ? normalized.filter((id) => id !== classId)
@@ -366,8 +381,8 @@
         alert('昼競技セッションを更新しました。');
       } catch (err) {
         console.error('[NoonGame] update session error', err);
-        errorMessage = err.message;
-        alert(err.message);
+        errorMessage = err instanceof Error ? err.message : String(err);
+        alert(err instanceof Error ? err.message : String(err));
       } finally {
         savingSession = false;
       }
@@ -397,15 +412,15 @@
         alert('昼競技セッションを作成しました。');
       } catch (err) {
         console.error('[NoonGame] create session error', err);
-        errorMessage = err.message;
-        alert(err.message);
+        errorMessage = err instanceof Error ? err.message : String(err);
+        alert(err instanceof Error ? err.message : String(err));
       } finally {
         savingSession = false;
       }
     }
   }
 
-  function startEditGroup(group) {
+  function startEditGroup(group: Group) {
     groupForm = {
       id: group.id,
       name: group.name,
@@ -449,14 +464,14 @@
       alert('グループを保存しました。');
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
-      alert(err.message);
+      errorMessage = err instanceof Error ? err.message : String(err);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       savingGroup = false;
     }
   }
 
-  async function deleteGroup(groupId) {
+  async function deleteGroup(groupId: number) {
     if (!session) return;
     if (!confirm('このグループを削除しますか？関連する試合がある場合は削除できません。')) return;
     try {
@@ -471,11 +486,11 @@
       alert('グループを削除しました。');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     }
   }
 
-  function updateGroupsList(group) {
+  function updateGroupsList(group: Group) {
     const exists = groups.findIndex(g => g.id === group.id);
     if (exists >= 0) {
       groups = [
@@ -488,7 +503,7 @@
     }
   }
 
-  function startEditMatch(match) {
+  function startEditMatch(match: Match) {
     matchForm = {
       id: match.id,
       title: match.title ?? '',
@@ -537,12 +552,12 @@
     matchForm = { ...matchForm, participants: updated };
   }
 
-  function removeParticipant(index) {
+  function removeParticipant(index: number) {
     const updated = matchForm.participants.filter((_, i) => i !== index);
     matchForm = { ...matchForm, participants: updated };
   }
 
-  function moveParticipant(index, direction) {
+  function moveParticipant(index: number, direction: number) {
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= matchForm.participants.length) {
       return;
@@ -553,7 +568,7 @@
     matchForm = { ...matchForm, participants: reordered };
   }
 
-  function setParticipantType(index, type) {
+  function setParticipantType(index: number, type: string) {
     const updated = [...matchForm.participants];
     updated[index] = {
       ...updated[index],
@@ -564,7 +579,7 @@
     matchForm = { ...matchForm, participants: updated };
   }
 
-  function updateParticipantField(index, field, value) {
+  function updateParticipantField(index: number, field: 'class_id' | 'group_id' | 'display_name', value: string) {
     const updated = [...matchForm.participants];
     updated[index] = {
       ...updated[index],
@@ -591,7 +606,7 @@
 
       const participantsPayload = matchForm.participants.map((participant, idx) => {
         const type = (participant.type || 'class').toLowerCase();
-        const payloadParticipant = {
+        const payloadParticipant: { id: number | null; type: string; class_id: number | null; group_id: number | null; display_name: string | null } = {
           id: participant.id ?? null,
           type,
           class_id: null,
@@ -667,14 +682,14 @@
       alert('試合を保存しました。');
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
-      alert(err.message);
+      errorMessage = err instanceof Error ? err.message : String(err);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       savingMatch = false;
     }
   }
 
-  async function deleteMatch(matchId) {
+  async function deleteMatch(matchId: number) {
     if (!session) return;
     if (!confirm('この試合を削除しますか？')) return;
     try {
@@ -689,11 +704,11 @@
       alert('試合を削除しました。');
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      alert(err instanceof Error ? err.message : String(err));
     }
   }
 
-  function updateMatchList(match) {
+  function updateMatchList(match: Match) {
     const exists = matches.findIndex(m => m.id === match.id);
     if (exists >= 0) {
       matches = [
@@ -741,8 +756,8 @@
       alert('手動加点を登録しました。');
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
-      alert(err.message);
+      errorMessage = err instanceof Error ? err.message : String(err);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       savingManualPoint = false;
     }
@@ -755,7 +770,7 @@
     }
   }
 
-  function toLocalDateTime(value) {
+  function toLocalDateTime(value: string | null | undefined) {
     if (!value) return '';
     const date = new Date(value);
     const formatter = new Intl.DateTimeFormat('sv-SE', {
@@ -766,7 +781,7 @@
     return formatter.format(date).replace(' ', 'T');
   }
 
-  async function safeJson(response) {
+  async function safeJson(response: Response): Promise<{ error?: string } | null> {
     try {
       return await response.json();
     } catch {
@@ -774,7 +789,7 @@
     }
   }
 
-  function openTemplateConfig(templateType) {
+  function openTemplateConfig(templateType: TemplateType) {
     const current = get(activeEvent);
     if (!current) {
       alert('イベントが選択されていません。');
@@ -806,7 +821,7 @@
 		const existingTemplateSession = sessions.find((item) => item.template_key === templateKeyMap[templateType]);
 
     // デフォルトの点数設定
-    let pointsByRank = {
+    let pointsByRank: RankPoints = {
       1: 40,
       2: 30,
       3: 20,
@@ -817,7 +832,7 @@
 		} else if (templateType === 'borrowing-race') {
 			pointsByRank = { 1: 100, 2: 90, 3: 80, 4: 70, 5: 60, 6: 50, 7: 40, 8: 30, 9: 20, 10: 10 };
     }
-    let yearRelayPoints = {
+    let yearRelayPoints: TemplateConfig['year_relay_points'] = {
       block_a: {1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5},
       block_b: {1: 30, 2: 25, 3: 20, 4: 15, 5: 10, 6: 5},
       overall: {1: 30, 2: 20, 3: 10, 4: 0, 5: 0, 6: 0}
@@ -856,7 +871,10 @@
 				pointsByRank = { ...pointsByRank, ...(existingRun.points_by_rank.rank_points || {}) };
 			} else {
         // コース対抗リレー・綱引き・タイピングの場合
-        pointsByRank = { ...existingRun.points_by_rank };
+        pointsByRank = {};
+        for (const [key, value] of Object.entries(existingRun.points_by_rank)) {
+          if (/^\d+$/.test(key) && typeof value === 'number') pointsByRank[Number(key)] = value;
+        }
         const maxRank = templateType === 'typing' ? 6 : 4;
         const defaults = templateType === 'typing' ? [40, 30, 25, 0, 0, 0] : [40, 30, 20, 10];
         for (let rank = 1; rank <= maxRank; rank++) {
@@ -880,7 +898,7 @@
         ];
       }
       // 既存のセッションがあれば、その設定を使用
-      if (isEditingSelectedTemplate) {
+      if (isEditingSelectedTemplate && session) {
         templateConfigForm = {
           name: session.name || templateNames[templateType],
           description: session.description || '',
@@ -896,7 +914,7 @@
           exclude_registration_limit: session.exclude_registration_limit ?? false,
 				duration_minutes: existingRun?.points_by_rank?.duration_minutes || 15,
 				participant_class_ids: templateType === 'borrowing-race'
-					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter(Boolean)
+					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter((id): id is number => Boolean(id))
 					: [],
           points_by_rank: pointsByRank,
           year_relay_points: yearRelayPoints,
@@ -927,7 +945,7 @@
     }).catch(err => {
       console.error('Failed to load default groups:', err);
       // エラー時は空のグループ設定を使用
-      if (isEditingSelectedTemplate) {
+      if (isEditingSelectedTemplate && session) {
         templateConfigForm = {
           name: session.name || templateNames[templateType],
           description: session.description || '',
@@ -943,7 +961,7 @@
           exclude_registration_limit: session.exclude_registration_limit ?? false,
 				duration_minutes: existingRun?.points_by_rank?.duration_minutes || 15,
 				participant_class_ids: templateType === 'borrowing-race'
-					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter(Boolean)
+					? matches.flatMap((match) => match.entries || []).map((entry) => entry.class_id).filter((id): id is number => Boolean(id))
 					: [],
           points_by_rank: pointsByRank,
           year_relay_points: yearRelayPoints,
@@ -973,13 +991,13 @@
     });
   }
 
-  async function loadDefaultGroups(templateKey) {
+  async function loadDefaultGroups(templateKey: string): Promise<DefaultGroup[]> {
     try {
       const res = await fetch(`/api/root/noon-game/templates/${templateKey}/default-groups`);
       if (!res.ok) {
         throw new Error('Failed to load default groups');
       }
-      const data = await res.json();
+      const data: { groups?: DefaultGroup[] } = await res.json();
       return (data.groups || []).map(g => ({
         group_name: g.group_name,
         class_names: g.class_names || []
@@ -990,7 +1008,7 @@
     }
   }
 
-  async function saveDefaultGroups(templateKey) {
+  async function saveDefaultGroups(templateKey: string) {
     try {
       const groups = templateConfigForm.groups.map((g, index) => ({
         group_index: index + 1,
@@ -1038,7 +1056,7 @@
 				'borrowing-race': '借り物競争'
       };
 
-      const payload = {
+      const payload: TemplatePayload = {
         session: {
           name: templateConfigForm.name,
           description: templateConfigForm.description || null,
@@ -1086,7 +1104,7 @@
 			payload.session.participant_class_ids = templateConfigForm.participant_class_ids.map(Number);
 			payload.session.points_by_rank = {};
 			for (const [rank, points] of Object.entries(templateConfigForm.points_by_rank)) {
-				payload.session.points_by_rank[rank] = Number(points) || 0;
+				payload.session.points_by_rank[Number(rank)] = Number(points) || 0;
 			}
       } else if (templateType === 'course-relay' || templateType === 'tug-of-war' || templateType === 'typing') {
         // コース対抗リレーと綱引きの場合
@@ -1142,8 +1160,8 @@
       await refetchCurrentSession();
     } catch (err) {
       console.error(err);
-      errorMessage = err.message;
-      alert(err.message);
+      errorMessage = err instanceof Error ? err.message : String(err);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       creatingTemplate = { ...creatingTemplate, [templateType]: false };
     }
@@ -1550,7 +1568,7 @@
                                 id={`match-form-participant-${index}-type`}
                                 class="border rounded px-2 py-1 w-full"
                                 value={participant.type}
-                                onchange={(e) => setParticipantType(index, e.target.value)}
+                                onchange={(e) => setParticipantType(index, e.currentTarget.value)}
                               >
                                 <option value="class">クラス</option>
                                 <option value="group">グループ</option>
@@ -1565,7 +1583,7 @@
                                   id={`match-form-participant-${index}-group`}
                                   class="border rounded px-2 py-1 w-full"
                                   value={participant.group_id}
-                                  onchange={(e) => updateParticipantField(index, 'group_id', e.target.value)}
+                                  onchange={(e) => updateParticipantField(index, 'group_id', e.currentTarget.value)}
                                 >
                                   <option value="">選択</option>
                                   {#each groups as group (group.id)}
@@ -1577,7 +1595,7 @@
                                   id={`match-form-participant-${index}-class`}
                                   class="border rounded px-2 py-1 w-full"
                                   value={participant.class_id}
-                                  onchange={(e) => updateParticipantField(index, 'class_id', e.target.value)}
+                                  onchange={(e) => updateParticipantField(index, 'class_id', e.currentTarget.value)}
                                 >
                                   <option value="">選択</option>
                                   {#each classes as cls (cls.id)}
@@ -1592,7 +1610,7 @@
                                 id={`match-form-participant-${index}-display-name`}
                                 class="border rounded px-2 py-1 w-full"
                                 value={participant.display_name}
-                                oninput={(e) => updateParticipantField(index, 'display_name', e.target.value)}
+                                oninput={(e) => updateParticipantField(index, 'display_name', e.currentTarget.value)}
                                 placeholder="例: 1年Aチーム"
                               />
                             </div>

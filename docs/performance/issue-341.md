@@ -72,7 +72,7 @@ API回数は次で再現できる（利用中サービスと競合しないport�
 ```sh
 cd frontapp
 PLAYWRIGHT_HTML_OPEN=never PLAYWRIGHT_APP_PORT=5341 MOCK_BACKEND_PORT=8341 \
-MOCK_BACKEND_URL=http://127.0.0.1:8341 npm run test:e2e -- dashboard-api-counts.spec.js
+MOCK_BACKEND_URL=http://127.0.0.1:8341 npm run test:e2e -- dashboard-api-counts.spec.ts
 ```
 
 Dashboard応答には `Server-Timing: ssr;dur=...` を付ける。
@@ -157,8 +157,8 @@ E2EにはAPI回数、得点非表示、通知、競技作成・割り当て、�
 | `read_cache_adversarial_test.go` | 4 | 3世代の読み取りを逆順に完了、DB/ユーザー/大会の分離、64並列の呼び出し側変更、JSON符号化失敗後の再試行 |
 | `sport_defaults_cache_test.go` | 1 | 一部の初期競技登録だけ成功した後の再試行で重複登録しない |
 | `class_progress_adversarial_test.go` | 9 | 未認証・クラス未所属・別大会・DB障害等で要約データの取得へ進まない |
-| `hooks.server.adversarial.spec.js` | 6 | 認証/大会の通信・JSON障害、同時SSRを逆順に完了してもユーザーと大会が混ざらない |
-| `notificationBadgeStore.adversarial.spec.js` | 8 | Pushの連続到着、503、ログアウト、ユーザー切替、JSON解析失敗、古い既読処理、破損した既読データ |
+| `hooks.server.adversarial.spec.ts` | 6 | 認証/大会の通信・JSON障害、同時SSRを逆順に完了してもユーザーと大会が混ざらない |
+| `notificationBadgeStore.adversarial.spec.ts` | 8 | Pushの連続到着、503、ログアウト、ユーザー切替、JSON解析失敗、古い既読処理、破損した既読データ |
 
 通知の2件は修正前にテストが失敗することを確認し、回帰テストとともに修正した。
 

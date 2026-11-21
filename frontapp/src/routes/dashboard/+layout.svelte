@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { page } from '$app/state';
   import { browser } from '$app/env';
   import { goto } from '$app/navigation';
@@ -10,8 +10,10 @@
   import { pushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
   import { openPWAInstallDialog } from '$lib/stores/pwaInstallStore.js';
   import { activeEvent } from '$lib/stores/eventStore.js';
+  import type { Snippet } from 'svelte';
+  import type { LayoutData } from './$types';
 
-  let { children, data } = $props();
+  let { children, data }: { children?: Snippet; data: LayoutData } = $props();
 
   $effect.pre(() => {
     if (data.activeEventAvailable) activeEvent.seed(data.activeEvent);
@@ -22,7 +24,7 @@
   let showPWANotification = $state(false);
   let isMobile = $state(false);
   let isPWA = $state(true);
-  let mobileHeaderMenu = $state();
+  let mobileHeaderMenu = $state<HTMLDetailsElement>();
   let canSeeNotifications = $derived(user?.roles?.some(role => ['student', 'admin', 'root'].includes(role.name)));
   let isStudentOnly = $derived(
     user?.roles?.some((role) => role.name === 'student') &&
@@ -39,7 +41,7 @@
   
   async function checkTestRunIsolation(force = false) {
     const event = await activeEvent.init({ force });
-    const isIsolating = ['starting', 'testing', 'restoring', 'failed'].includes(event?.test_run_state) || event?.status === 'testing';
+    const isIsolating = ['starting', 'testing', 'restoring', 'failed'].includes(event?.test_run_state ?? '') || event?.status === 'testing';
     if (isStudentOnly && isIsolating && page.url.pathname !== '/dashboard/maintenance') {
       await goto('/dashboard/maintenance', { invalidateAll: true });
     }
@@ -63,8 +65,8 @@
       checkMobile();
       window.addEventListener('resize', checkMobile);
 
-      const closeMobileHeaderMenu = (event) => {
-        if (mobileHeaderMenu?.open && !mobileHeaderMenu.contains(event.target)) {
+      const closeMobileHeaderMenu = (event: PointerEvent) => {
+        if (mobileHeaderMenu?.open && event.target instanceof Node && !mobileHeaderMenu.contains(event.target)) {
           mobileHeaderMenu.open = false;
         }
       };
@@ -88,7 +90,7 @@
     }
   }
 
-  function handleDisplayNameClick(e) {
+  function handleDisplayNameClick(e: MouseEvent) {
     e?.preventDefault?.();
     e?.stopPropagation?.();
     console.log('handleDisplayNameClick called');
@@ -99,7 +101,7 @@
     showEditDisplayNameModal = false;
   }
 
-  async function handleSaveDisplayName(newDisplayName) {
+  async function handleSaveDisplayName(newDisplayName: string) {
     const response = await fetch('/api/user/profile', {
       method: 'PUT',
       credentials: 'include',
@@ -151,7 +153,7 @@
     }
   }
 
-  function openSidebar(e) {
+  function openSidebar(e: MouseEvent | TouchEvent) {
     e?.preventDefault?.();
     e?.stopPropagation?.();
     console.log('openSidebar called');

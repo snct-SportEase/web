@@ -1,8 +1,9 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/env';
 
-  let users = $state([]);
+  type User = { id: string; email: string; display_name: string | null; roles?: { id: number; name: string }[] };
+  let users = $state<User[]>([]);
   let searchQuery = $state('');
   let searchType = $state('email');
   let isLoading = $state(false);
@@ -36,18 +37,18 @@
     await fetchUsers(searchQuery, searchType);
   }
 
-  function getMasterRoles(user) {
+  function getMasterRoles(user: User): string[] {
     return (user.roles ?? [])
       .filter((role) => masterRoles.includes(role.name))
       .map((role) => role.name);
   }
 
-  function getCurrentMasterRole(user) {
+  function getCurrentMasterRole(user: User): string | null {
     const userMasterRoles = getMasterRoles(user);
     return masterRoles.find((role) => userMasterRoles.includes(role)) ?? null;
   }
 
-  async function replaceMasterRole(user, role) {
+  async function replaceMasterRole(user: User, role: string) {
     if (!confirm(`${user.email} のマスタロールを ${role} に変更しますか？`)) return;
     try {
       const res = await fetch('/api/root/users/promote', {
