@@ -890,7 +890,10 @@
                     <div class="space-y-3">
 					{#if run.type === 'borrowing-race'}
 						<p class="text-sm text-gray-600">「競技内獲得点」を入力すると順位を自動計算します。「大会総合点」は確定時に順位点から反映されます。</p>
-						<div class="overflow-x-auto">
+						<!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="借り物競走の得点" tabindex="0">
 							<table class="min-w-full divide-y divide-gray-200 text-sm">
 								<thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">クラス</th><th class="px-3 py-2 text-right">現在順位</th><th class="px-3 py-2 text-right">競技内獲得点</th><th class="px-3 py-2 text-right">大会総合点</th></tr></thead>
 								<tbody class="divide-y divide-gray-200">
@@ -1094,7 +1097,10 @@
       {#if pointsSummary.length === 0}
         <p class="text-gray-500">まだ集計結果がありません。</p>
       {:else}
-        <div class="overflow-x-auto">
+        <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="昼競技ポイント集計" tabindex="0">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">
               <tr>

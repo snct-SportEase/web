@@ -146,7 +146,10 @@
 
   <!-- ユーザーテーブル -->
   <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
+    <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="ユーザー検索結果" tabindex="0">
       <table class="w-full">
         <thead>
           <tr class="border-b border-gray-200 bg-gray-50">

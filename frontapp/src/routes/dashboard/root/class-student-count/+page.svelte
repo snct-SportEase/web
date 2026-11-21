@@ -152,7 +152,10 @@
     <h2 class="text-xl font-semibold mb-4">手動で更新</h2>
     <p class="mb-4 text-sm text-gray-600">専教は在籍人数による判定の対象外のため、設定一覧には表示されません。</p>
     <form onsubmit={(e) => { e.preventDefault(); handleSave(); }}>
-      <div class="overflow-x-auto rounded-lg border border-gray-200">
+      <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto rounded-lg border border-gray-200" role="region" aria-label="クラス人数の一覧" tabindex="0">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>

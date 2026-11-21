@@ -161,15 +161,15 @@
   }
 </script>
 
-<div class="min-h-screen bg-gray-50 flex flex-col">
+<div class="dashboard-shell min-h-screen bg-gray-50 flex flex-col">
   {#if (!$isSidebarOpen || (browser && !isMobile)) && user?.is_profile_complete}
-    <header class="app-layer-header sticky top-0 z-30 bg-white p-2 shadow-sm pointer-events-auto md:p-4">
+    <header class="dashboard-header app-layer-header sticky top-0 z-30 bg-white p-2 shadow-sm pointer-events-auto md:p-4">
       <div class="flex justify-between items-center pointer-events-auto">
         <div class="flex items-center pointer-events-auto">
           <button type="button" onclick={openSidebar} class="mr-1 rounded-md p-2 hover:bg-gray-100 pointer-events-auto md:mr-4" aria-label="サイドバーを開く">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>
-          <a href="/dashboard" data-sveltekit-preload-data="hover" class="flex items-center"><h1 class="text-xl font-bold text-gray-800 md:text-2xl">Dashboard</h1></a>
+          <a href="/dashboard" data-sveltekit-preload-data="hover" class="dashboard-brand"><span class="dashboard-brand-mark" aria-hidden="true">S</span><span><strong>SportEase</strong><small>大会を、もっとスムーズに。</small></span></a>
         </div>
         <div class="flex items-center pointer-events-auto">
           <button
@@ -325,9 +325,9 @@
     </div>
   {/if}
 
-  <main class="p-8 flex-1">
+  <div class="dashboard-content flex-1">
     {@render children?.()}
-  </main>
+  </div>
 
   <footer class="border-t border-gray-200 bg-white px-6 py-4 text-center text-sm text-gray-600">
     <div class="flex flex-col items-center gap-2">

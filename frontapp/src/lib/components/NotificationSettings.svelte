@@ -215,7 +215,7 @@
 </script>
 
 <div class="{prominent && canEnableNotifications && isSupported && !isSubscribed ? 'rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm' : 'rounded-lg border border-gray-200 bg-white p-5 shadow-sm'}">
-  <div class="flex items-center justify-between mb-4">
+  <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
     <div>
       <h3 class="text-lg font-semibold {prominent && !isSubscribed ? 'text-amber-900' : 'text-gray-800'}">プッシュ通知設定</h3>
       <p class="mt-1 text-sm {prominent && !isSubscribed ? 'text-amber-800' : 'text-gray-600'}">
@@ -268,7 +268,7 @@
         <p class="mt-1">管理者にお問い合わせください。</p>
       </div>
     {/if}
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
       <div class="flex-1">
         {#if isSubscribed}
           <p class="text-sm text-gray-700">
@@ -284,13 +284,13 @@
           </p>
         {/if}
       </div>
-      <div class="ml-4">
+      <div class="w-full sm:w-auto">
         {#if isSubscribed}
           <button
             type="button"
             onclick={disableNotifications}
             disabled={isLoading}
-            class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
           >
             {#if isLoading}
               処理中...
@@ -303,7 +303,7 @@
             type="button"
             onclick={enableNotifications}
             disabled={isLoading || permissionStatus === 'denied' || !vapidKeySet}
-            class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
           >
             {#if isLoading}
               処理中...

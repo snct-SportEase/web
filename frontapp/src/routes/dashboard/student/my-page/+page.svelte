@@ -396,7 +396,10 @@
 					</div>
 				{/if}
 				{#if upcomingMatches.length > 0}
-					<div class="overflow-x-auto rounded-lg border border-gray-200">
+					<!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto rounded-lg border border-gray-200" role="region" aria-label="参加試合の一覧" tabindex="0">
 						<table class="w-full">
 							<thead>
 								<tr class="bg-gray-50 border-b border-gray-200">

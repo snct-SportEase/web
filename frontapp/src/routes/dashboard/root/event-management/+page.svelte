@@ -393,7 +393,7 @@
 </script>
 
 <div class="container mx-auto p-4">
-  <div class="flex justify-between items-center mb-6">
+  <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
     <h1 class="text-2xl font-bold">大会情報登録・管理</h1>
     <div class="flex flex-wrap gap-2">
       <button onclick={downloadDBDump} class="btn btn-secondary bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
@@ -450,8 +450,11 @@
     </section>
   {/if}
 
-  <div class="bg-white shadow-md rounded-lg overflow-x-auto">
-    <table class="min-w-full leading-normal">
+  <!-- キーボードでも横スクロールできるよう領域をフォーカス可能にする。 -->
+  <!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="table-scroll bg-white shadow-md rounded-lg overflow-x-auto" role="region" aria-label="大会一覧" tabindex="0">
+    <table class="event-table min-w-full leading-normal">
       <thead>
         <tr>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">大会名</th>
@@ -466,7 +469,7 @@
       <tbody>
         {#each events as event (event.id)}
           <tr onclick={() => openEditModal(event)} class="cursor-pointer hover:bg-gray-50 transition-colors">
-            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.name}</td>
+            <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm"><button type="button" class="event-edit-link" onclick={(e) => { e.stopPropagation(); openEditModal(event); }}>{event.name}</button></td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.year}</td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm">{event.season === 'spring' ? '春' : '秋'}</td>
             <td class="px-5 py-5 border-b border-gray-200 bg-transparent text-sm whitespace-nowrap">

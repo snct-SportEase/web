@@ -1,10 +1,11 @@
 import { page } from 'vitest/browser';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Sidebar from '$src/lib/components/Sidebar.svelte';
 import { isPWAInstalled } from '$lib/utils/pwa.js';
 import { closePWAInstallDialog, pwaInstallDialogOpen } from '$lib/stores/pwaInstallStore.js';
 import { get } from 'svelte/store';
+import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
 
 vi.mock('$app/env/public', () => ({
 	PUBLIC_WEBPUSH_PUBLIC_KEY: ''
@@ -21,8 +22,10 @@ const studentUser = {
 };
 
 describe('Sidebar PWA status', () => {
+	afterEach(() => { isSidebarOpen.set(false); vi.unstubAllGlobals(); });
 	beforeEach(() => {
 		closePWAInstallDialog();
+		isSidebarOpen.set(true);
 		vi.mocked(isPWAInstalled).mockReturnValue(false);
 		vi.stubGlobal(
 			'fetch',

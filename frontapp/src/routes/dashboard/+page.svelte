@@ -273,10 +273,14 @@
 </script>
 
 <div class="space-y-12">
-  <section class="space-y-2">
-    <h1 class="text-3xl font-bold text-gray-900">
-      ようこそ、{user?.display_name || user?.email || 'User'} さん
-    </h1>
+  <section class="dashboard-hero">
+    <div class="dashboard-hero-content">
+      <p class="dashboard-eyebrow"><span aria-hidden="true"></span> SENDAI NCT · SPORT EASE</p>
+      <h1>ようこそ、{user?.display_name || user?.email || 'User'} さん</h1>
+      <p class="dashboard-hero-description">大会の情報も、みんなの予定も。ここからスムーズに確認できます。</p>
+      <div class="dashboard-event-pill"><span aria-hidden="true">●</span> {activeEvent?.name || '大会情報を確認しましょう'}</div>
+    </div>
+    <div class="dashboard-hero-art" aria-hidden="true"><span></span><span></span><span></span><b>PLAY<br />TOGETHER.</b></div>
   </section>
 
   {#if activeEvent?.survey_url && activeEvent?.is_survey_published}
@@ -603,7 +607,7 @@
                 : 'クラスメンバーがまだ登録されていません。'}
             </p>
           {:else}
-            <DataTable>
+            <DataTable label="クラスメンバー一覧">
               {#snippet header()}
                   <tr>
                     <th class="px-4 py-3 text-left font-semibold text-gray-600">氏名</th>

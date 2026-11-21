@@ -235,7 +235,10 @@
 
 <div class="bg-white shadow-md rounded-lg p-6">
 	<h2 class="text-xl font-semibold mb-4">現在のロールを持つユーザー</h2>
-	<div class="overflow-x-auto">
+	<!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="現在のロールを持つユーザー" tabindex="0">
 		<table class="min-w-full divide-y divide-gray-200">
 			<thead class="bg-gray-50">
 				<tr>

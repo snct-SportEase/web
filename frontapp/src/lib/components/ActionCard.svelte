@@ -22,7 +22,7 @@
   type={href ? undefined : 'button'}
   role={href ? 'link' : 'button'}
   {onclick}
-  class={`group block rounded-lg border border-indigo-100 bg-white text-left shadow-sm transition hover:border-indigo-300 hover:shadow ${paddingClass} ${className}`}
+  class={`action-card group block rounded-xl border border-indigo-100 bg-white text-left shadow-sm transition hover:border-indigo-300 hover:shadow ${paddingClass} ${className}`}
 >
   {#if children}
     <div class={size === 'spacious' ? 'mb-3 flex items-center' : 'mb-2 flex items-center'}>

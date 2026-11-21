@@ -96,6 +96,8 @@
   }
 </script>
 
+<a class="skip-link" href="#main-content">本文へ移動</a>
+
 <div class="app-container">
   {#if data.user}
     <!-- モバイル用オーバーレイ背景 -->
@@ -111,7 +113,7 @@
     {/if}
     <Sidebar user={data.user} />
   {/if}
-  <main class="main-content">
+  <main id="main-content" class="main-content" tabindex="-1">
     {@render children?.()}
   </main>
   <PWAInstallPromptModal />

@@ -896,7 +896,10 @@
           <!-- Per-Class Capacity Setting -->
           {#if classes.length > 0}
             <div class="space-y-2 mb-4">
-              <div class="overflow-x-auto">
+              <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="クラスごとの定員" tabindex="0">
                 <table class="min-w-full border border-gray-300 rounded-md">
                   <thead class="bg-gray-100">
                     <tr>
@@ -1008,7 +1011,10 @@
           <!-- Per-Class Rainy Mode Capacity Setting -->
           {#if classes.length > 0}
             <div class="space-y-2 mb-4">
-              <div class="overflow-x-auto">
+              <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="クラスごとの雨天時定員" tabindex="0">
                 <table class="min-w-full border border-gray-300 rounded-md">
                   <thead class="bg-gray-100">
                     <tr>

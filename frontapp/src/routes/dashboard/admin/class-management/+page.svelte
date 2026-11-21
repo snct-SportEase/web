@@ -317,7 +317,10 @@
 				{:else if filteredClassMembers.length === 0}
 					<p class="text-gray-500">検索条件に一致するメンバーが見つかりません</p>
 				{:else}
-					<div class="overflow-x-auto">
+					<!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="クラスメンバー" tabindex="0">
 						<table class="min-w-full divide-y divide-gray-200">
 							<thead class="bg-gray-50">
 								<tr>
@@ -406,7 +409,10 @@
 					{:else if assignedMembers.length === 0}
 						<p class="text-gray-500">メンバーが割り当てられていません</p>
 					{:else}
-						<div class="overflow-x-auto">
+						<!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="競技への割り当て済みメンバー" tabindex="0">
 							<table class="min-w-full divide-y divide-gray-200">
 								<thead class="bg-gray-50">
 									<tr>

@@ -2,6 +2,7 @@
   import { isSidebarOpen } from '$lib/stores/sidebarStore.js';
   import { onMount } from 'svelte';
   import { browser } from '$app/env';
+  import { page } from '$app/state';
   import * as publicEnv from '$app/env/public';
   import { notificationBadgeCount, refreshNotificationBadge } from '$lib/stores/notificationBadgeStore.js';
   import { pushSubscriptionStatus, updatePushSubscriptionStatus } from '$lib/stores/pushSubscriptionStore.js';
@@ -146,9 +147,9 @@
   }
 </script>
 
-<aside class="app-layer-sidebar w-full md:w-64 bg-gray-800 text-white flex flex-col transition-all duration-300 fixed md:relative inset-y-0 left-0 md:z-auto" class:closed={!$isSidebarOpen}>
+<aside inert={!$isSidebarOpen} class="sport-sidebar app-layer-sidebar w-full md:w-64 bg-gray-800 text-white flex flex-col transition-all duration-300 fixed md:relative inset-y-0 left-0 md:z-auto" class:closed={!$isSidebarOpen}>
   <div class="h-16 flex items-center justify-between px-4 relative">
-    <a href="/dashboard" class="flex items-center z-10" onclick={handleLinkClick}><span class="text-2xl font-bold">SportEase</span></a>
+    <a href="/dashboard" aria-current={page.url.pathname === '/dashboard' ? 'page' : undefined} class="flex items-center z-10" onclick={handleLinkClick}><span class="sidebar-brand-mark" aria-hidden="true">S</span><span class="sidebar-brand-name">SportEase<small>EVENT MANAGEMENT</small></span></a>
     <button
       type="button"
       onclick={handleClick}
@@ -178,48 +179,48 @@
       {$pushSubscriptionStatus.permission === 'denied' ? '通知拒否中' : '通知未設定'}
     </a>
   {/if}
-  <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+  <nav aria-label="メインメニュー" class="sidebar-nav flex-1 px-2 py-4 space-y-1 overflow-y-auto">
     <!-- Root Menu -->
     {#if isRoot}
       <div class="pt-4">
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Root</h3>
-        <a href="/dashboard/root/event-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/event-management" aria-current={page.url.pathname === '/dashboard/root/event-management' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           大会情報登録・管理
         </a>
-        <a href="/dashboard/root/rainy-mode" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/rainy-mode" aria-current={page.url.pathname === '/dashboard/root/rainy-mode' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           雨天時モード管理
         </a>
-        <a href="/dashboard/root/notification" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/notification" aria-current={page.url.pathname === '/dashboard/root/notification' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           通知管理
         </a>
-        <a href="/dashboard/root/notification-requests" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/notification-requests" aria-current={page.url.pathname === '/dashboard/root/notification-requests' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           通知申請管理
         </a>
-        <a href="/dashboard/root/tournament-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/tournament-management" aria-current={page.url.pathname === '/dashboard/root/tournament-management' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           トーナメント生成・管理
         </a>
         <div class="pt-3">
           <h4 class="px-4 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">競技設定</h4>
-          <a href="/dashboard/root/sport-management" class="flex items-center px-6 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+          <a href="/dashboard/root/sport-management" aria-current={page.url.pathname === '/dashboard/root/sport-management' ? 'page' : undefined} class="flex items-center px-6 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
             通常競技管理
           </a>
-          <a href="/dashboard/root/noon-game" class="flex items-center px-6 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+          <a href="/dashboard/root/noon-game" aria-current={page.url.pathname === '/dashboard/root/noon-game' ? 'page' : undefined} class="flex items-center px-6 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
             昼競技管理
           </a>
         </div>
-        <a href="/dashboard/root/class-student-count" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/class-student-count" aria-current={page.url.pathname === '/dashboard/root/class-student-count' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           各クラス人数設定
         </a>
-        <a href="/dashboard/root/change-username" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/change-username" aria-current={page.url.pathname === '/dashboard/root/change-username' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           ユーザー管理
         </a>
-        <a href="/dashboard/root/user-promotion" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/user-promotion" aria-current={page.url.pathname === '/dashboard/root/user-promotion' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           権限管理
         </a>
-        <a href="/dashboard/root/identify-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/identify-mic" aria-current={page.url.pathname === '/dashboard/root/identify-mic' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           行事委員会賞確認
         </a>
-        <a href="/dashboard/root/competition-guidelines-upload" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/root/competition-guidelines-upload" aria-current={page.url.pathname === '/dashboard/root/competition-guidelines-upload' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           資料管理
         </a>
       </div>
@@ -229,32 +230,32 @@
     {#if isAdmin || isRoot}
       <div class="pt-4">
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</h3>
-        <a href="/dashboard/admin/manage-dashboard" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/manage-dashboard" aria-current={page.url.pathname === '/dashboard/admin/manage-dashboard' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           統計ダッシュボード
         </a>
-        <a href="/dashboard/admin/class-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/class-management" aria-current={page.url.pathname === '/dashboard/admin/class-management' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           クラス競技割り当て・管理
         </a>
-        <a href="/dashboard/admin/role-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/role-management" aria-current={page.url.pathname === '/dashboard/admin/role-management' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           ロール割り当て・管理
         </a>
-        <a href="/dashboard/admin/barcode-reader" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/barcode-reader" aria-current={page.url.pathname === '/dashboard/admin/barcode-reader' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           バーコード読み取り
         </a>
-        <a href="/dashboard/admin/insert-matche-result" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/insert-matche-result" aria-current={page.url.pathname === '/dashboard/admin/insert-matche-result' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           試合結果入力
         </a>
-        <a href="/dashboard/admin/attendance-management" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/attendance-management" aria-current={page.url.pathname === '/dashboard/admin/attendance-management' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           出席登録
         </a>
         <!-- 行事委員会賞投票の被対象者は1~2年生のみ。投票はadminとrootしか行えない -->
-        <a href="/dashboard/admin/vorting-mic" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/vorting-mic" aria-current={page.url.pathname === '/dashboard/admin/vorting-mic' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           行事委員会賞投票
         </a>
-        <a href="/dashboard/admin/sport-details-registration" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/sport-details-registration" aria-current={page.url.pathname === '/dashboard/admin/sport-details-registration' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           競技詳細情報登録
         </a>
-        <a href="/dashboard/admin/noon-game-results" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/admin/noon-game-results" aria-current={page.url.pathname === '/dashboard/admin/noon-game-results' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           昼競技結果入力
         </a>
       </div>
@@ -264,31 +265,31 @@
     {#if isStudent || isAdmin || isRoot}
       <div>
         <h3 class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Student</h3>
-        <a href="/dashboard/student/my-page" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/my-page" aria-current={page.url.pathname === '/dashboard/student/my-page' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           マイページ
         </a>
-        <a href="/dashboard/student/class-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/class-info" aria-current={page.url.pathname === '/dashboard/student/class-info' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           クラス情報
         </a>
-        <a href="/dashboard/student/sport-info" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/sport-info" aria-current={page.url.pathname === '/dashboard/student/sport-info' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           競技一覧・詳細閲覧
         </a>
-        <a href="/dashboard/student/timetable" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/timetable" aria-current={page.url.pathname === '/dashboard/student/timetable' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           タイムテーブル
         </a>
-        <a href="/dashboard/student/tournament" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/tournament" aria-current={page.url.pathname === '/dashboard/student/tournament' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           トーナメント
         </a>
-        <a href="/dashboard/student/results" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/results" aria-current={page.url.pathname === '/dashboard/student/results' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           結果一覧
         </a>
-        <a href="/dashboard/student/score-list" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/score-list" aria-current={page.url.pathname === '/dashboard/student/score-list' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           点数一覧
         </a>
-        <a href="/dashboard/student/noon-game" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/noon-game" aria-current={page.url.pathname === '/dashboard/student/noon-game' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           昼競技結果
         </a>
-        <a href="/dashboard/student/notification" class="flex items-center justify-between px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/notification" aria-current={page.url.pathname === '/dashboard/student/notification' ? 'page' : undefined} class="flex items-center justify-between px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           <span>通知</span>
           <span class="ml-3 flex items-center gap-2">
             {#if shouldShowPushSetupBadge}
@@ -306,7 +307,7 @@
             {/if}
           </span>
         </a>
-        <a href="/dashboard/student/notification-request" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+        <a href="/dashboard/student/notification-request" aria-current={page.url.pathname === '/dashboard/student/notification-request' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
           通知申請
         </a>
       </div>
@@ -314,7 +315,7 @@
     
     <!-- アーカイブ -->
     <div class="pt-4 border-t border-gray-700">
-      <a href="/dashboard/archive" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+      <a href="/dashboard/archive" aria-current={page.url.pathname === '/dashboard/archive' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
         </svg>
@@ -324,7 +325,7 @@
     
     <!-- 資料 -->
     <div class="pt-4 border-t border-gray-700">
-      <a href="/dashboard/guide" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+      <a href="/dashboard/guide" aria-current={page.url.pathname === '/dashboard/guide' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
         </svg>
@@ -334,7 +335,7 @@
     
     <!-- プライバシーポリシー -->
     <div class="pt-4 pb-4 border-t border-gray-700">
-      <a href="/dashboard/privacy-policy" class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
+      <a href="/dashboard/privacy-policy" aria-current={page.url.pathname === '/dashboard/privacy-policy' ? 'page' : undefined} class="flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-gray-700" onclick={handleLinkClick}>
         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
         </svg>

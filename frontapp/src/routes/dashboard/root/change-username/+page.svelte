@@ -503,7 +503,10 @@ import { onMount } from 'svelte';
     <p class="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
       通知はプッシュ購読の登録状況です。PWAはアプリとして起動した履歴を示し、端末からの削除は検出できません。
     </p>
-    <div class="overflow-x-auto">
+    <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="ユーザー一覧" tabindex="0">
       <table class="w-full">
         <thead>
           <tr class="border-b border-gray-200 bg-gray-50">

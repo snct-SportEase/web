@@ -243,7 +243,10 @@
           <p class="mt-2 text-sm text-gray-600">{typingImportStatus === 'finalized' ? '確定済みのチーム結果です。個人スコアは表示しません。' : '結果はまだインポート・確定されていません。'}</p>
         </div>
         {#if typingResults.length > 0}
-          <div class="overflow-x-auto">
+          <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="競技タイピングの結果" tabindex="0">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
               <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">チーム</th><th class="px-3 py-2 text-right">第1試合</th><th class="px-3 py-2 text-right">第2試合</th><th class="px-3 py-2 text-right">第3試合</th><th class="px-3 py-2 text-right">合計</th><th class="px-3 py-2 text-right">順位</th><th class="px-3 py-2 text-right">大会得点</th></tr></thead>
               <tbody class="divide-y divide-gray-200">
@@ -336,7 +339,10 @@
       {#if pointsSummary.length === 0}
         <p class="text-gray-500">まだ集計結果がありません。</p>
       {:else}
-        <div class="overflow-x-auto">
+        <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="昼競技ポイント集計" tabindex="0">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">
               <tr>

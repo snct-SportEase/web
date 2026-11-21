@@ -408,7 +408,10 @@
                                     アーカイブでの簡易トーナメント表示<br>
                                     ※詳細な対戦ツリーはダッシュボードの本機能から閲覧してください（本アーカイブは過去の履歴です）。
                                 </p>
-                                <div class="overflow-x-auto">
+                                <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="大会の試合結果" tabindex="0">
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
                                             <tr>
@@ -473,7 +476,10 @@
                     <section class="mb-4 rounded-lg border border-indigo-100 bg-white p-5 shadow-sm">
                         <h3 class="text-lg font-semibold text-gray-900">{typingSession.session?.name}の結果</h3>
                         {#if typingSession.typing_results?.length}
-                            <div class="mt-4 overflow-x-auto">
+                            <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll mt-4 overflow-x-auto" role="region" aria-label="競技タイピングの結果" tabindex="0">
                                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                                     <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">チーム</th><th class="px-3 py-2 text-right">第1試合</th><th class="px-3 py-2 text-right">第2試合</th><th class="px-3 py-2 text-right">第3試合</th><th class="px-3 py-2 text-right">合計</th><th class="px-3 py-2 text-right">順位</th><th class="px-3 py-2 text-right">大会得点</th></tr></thead>
                                     <tbody class="divide-y divide-gray-200">

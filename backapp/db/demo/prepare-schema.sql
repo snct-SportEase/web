@@ -25,9 +25,32 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     dirty BOOLEAN NOT NULL
 );
 
--- 完全な旧スキーマが確認できる場合だけ、失敗した初回適用のdirty状態を修復する。
-DELETE FROM schema_migrations
-WHERE dirty = TRUE AND @base_schema_complete = 3;
+-- dirty を無条件に消して古いバージョンへ戻すと、適用済みの変更を再実行してしまう。
+-- 25 は MySQL が ALTER TABLE をコミットした後に失敗しうるため、
+-- 必要な列とインデックスが揃っている場合に限り残りのデータ更新を完了する。
+SET @recover_25 = (
+    SELECT COUNT(*) = 1 FROM schema_migrations WHERE version = 25 AND dirty = TRUE
+) AND (
+    SELECT COUNT(*) = 2 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'notifications'
+      AND column_name IN ('scheduled_at', 'sent_at') AND column_type = 'datetime(6)'
+) AND (
+    SELECT COUNT(*) = 2 AND
+        SUM(seq_in_index = 1 AND column_name = 'sent_at') = 1 AND
+        SUM(seq_in_index = 2 AND column_name = 'scheduled_at') = 1
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'notifications'
+      AND index_name = 'idx_notifications_due'
+);
+
+SET @recovery_sql = IF(@recover_25,
+    'UPDATE notifications SET sent_at = created_at WHERE sent_at IS NULL AND scheduled_at IS NULL',
+    'SELECT 1');
+PREPARE recovery_stmt FROM @recovery_sql;
+EXECUTE recovery_stmt;
+DEALLOCATE PREPARE recovery_stmt;
+
+UPDATE schema_migrations SET dirty = FALSE WHERE version = 25 AND dirty = TRUE AND @recover_25;
 
 INSERT INTO schema_migrations (version, dirty)
 SELECT

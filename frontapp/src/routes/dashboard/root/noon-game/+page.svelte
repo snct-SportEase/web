@@ -1694,7 +1694,10 @@
             {#if pointsSummary.length === 0}
               <p class="text-gray-500">ポイントデータがまだありません。</p>
             {:else}
-              <div class="overflow-x-auto">
+              <!-- 横スクロールをキーボードでも利用可能にする。 -->
+<!-- eslint-disable-next-line svelte/no-unused-svelte-ignore -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="table-scroll overflow-x-auto" role="region" aria-label="昼競技のポイントサマリー" tabindex="0">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                   <thead class="bg-gray-50">
                     <tr>
